@@ -1,131 +1,309 @@
-# Asgard - Universal Development Tools Suite
+# Asguardian
 
-Named after the realm of the Norse gods, Asgard is a comprehensive suite of development and quality assurance tools. Like the mythical realm that houses the great halls of the Aesir, Asgard houses the tools that watch over and forge your codebase.
-
-## Subpackages
-
-### Heimdall - Code Quality Control
-*Named after the Norse watchman god who guards Bifrost*
-
-Static code analysis and quality control:
-- Code complexity analysis
-- Duplication detection
-- Code smell detection
-- Technical debt analysis
-- Security vulnerability scanning
-- Performance profiling
-- Dependency analysis
-- Architecture validation
-
-### Freya - Visual and UI Testing
-*Named after the Norse goddess of love and beauty*
-
-Visual testing and UI validation:
-- Accessibility validation (WCAG compliance)
-- Visual regression testing
-- Responsive design testing
-- Layout validation
-- Style checking
-- Mobile compatibility testing
-
-### Forseti - API and Schema Specification
-*Named after the Norse god of justice who presides over contracts*
-
-API contract validation:
-- OpenAPI/Swagger specification
-- GraphQL schema validation
-- Database schema analysis
-- JSON Schema generation
-- Contract compatibility checking
-- Breaking change detection
-
-### Verdandi - Runtime Performance Metrics
-*Named after the Norse Norn who measures the present*
-
-Runtime performance calculation:
-- Web vitals (LCP, FID, CLS)
-- Apdex score calculation
-- Percentile analysis
-- Cache metrics
-- Database query metrics
-- Network latency analysis
-
-### Volundr - Infrastructure Generation
-*Named after the legendary Norse master smith*
-
-Infrastructure code generation:
-- Kubernetes manifests
-- Terraform modules
-- Dockerfiles and docker-compose
-- CI/CD pipelines (GitHub Actions, GitLab CI, etc.)
+Named after the realm of the Norse gods, **Asguardian** is a comprehensive suite of development quality assurance tools for Python projects. It covers static analysis, security scanning, API validation, performance metrics, infrastructure generation, and more — all from a single package.
 
 ## Installation
 
 ```bash
-# Install base package
-pip install -e ./Asgard
-
-# Install with specific module dependencies
-pip install -e "./Asgard[heimdall]"
-pip install -e "./Asgard[freya]"
-pip install -e "./Asgard[forseti]"
-pip install -e "./Asgard[volundr]"
-
-# Install all dependencies
-pip install -e "./Asgard[all]"
+pip install asguardian
 ```
 
-## CLI Usage
+Python 3.11 or higher is required.
 
-### Unified CLI
+## Quick Start
+
+### Static Analysis and Code Quality
+
 ```bash
+# Analyse a project directory
 asgard heimdall analyze ./src
-asgard freya crawl http://localhost:3000
-asgard forseti validate openapi.yaml
-asgard verdandi report ./metrics
-asgard volundr generate kubernetes --name myapp
+
+# Get letter ratings (A–E) for Maintainability, Reliability, and Security
+asgard heimdall ratings ./src
+
+# Check quality gate (pass/fail against thresholds)
+asgard heimdall gate ./src
+
+# Check for security vulnerabilities
+asgard heimdall security scan ./src
+
+# View tracked issues with lifecycle states
+asgard heimdall issues ./src
 ```
 
-### Individual Module CLIs (backwards compatible)
+### Security Scanning
+
 ```bash
-heimdall analyze ./src
-freya crawl http://localhost:3000
-forseti validate openapi.yaml
-verdandi report ./metrics
-volundr generate kubernetes --name myapp
+# Detect security hotspots requiring manual review
+asgard heimdall security hotspots ./src
+
+# OWASP Top 10 and CWE Top 25 compliance report
+asgard heimdall security compliance ./src
+
+# Taint analysis: source-to-sink injection tracking
+asgard heimdall security taint ./src
 ```
+
+### API and Schema Validation
+
+```bash
+# Validate an OpenAPI specification
+asgard forseti validate openapi.yaml
+
+# Check for breaking changes between two specs
+asgard forseti breaking-changes old.yaml new.yaml
+
+# Validate a GraphQL schema
+asgard forseti validate schema.graphql
+```
+
+### Web and UI Testing
+
+```bash
+# Crawl a site and check for broken links
+asgard freya crawl http://localhost:3000
+
+# Run image optimisation scan
+asgard freya images http://localhost:3000
+```
+
+### Performance Metrics
+
+```bash
+# Calculate web vitals from a metrics file
+asgard verdandi report ./metrics.json
+
+# Check SLO compliance
+asgard verdandi slo ./metrics.json
+```
+
+### Infrastructure Generation
+
+```bash
+# Generate Kubernetes manifests
+asgard volundr generate kubernetes --name myapp --image myapp:latest
+
+# Generate a Dockerfile
+asgard volundr generate dockerfile --lang python
+
+# Generate a GitHub Actions CI/CD pipeline
+asgard volundr generate ci github
+```
+
+## Web Dashboard
+
+Asguardian includes a standalone web dashboard that displays your project's quality metrics, issues, and history in a browser.
+
+### Launch the dashboard
+
+```bash
+# Start on the default port (8080)
+asgard-dashboard --path ./src
+
+# Specify a custom port
+asgard-dashboard --path ./src --port 9090
+```
+
+Then open `http://localhost:8080` in your browser.
+
+The dashboard provides three pages:
+
+- **Overview** — quality gate status, A–E ratings (Maintainability, Reliability, Security), and issue summary
+- **Issues** — filterable table of all tracked issues with severity and lifecycle status
+- **History** — trend view of analysis snapshots over time
+
+The `heimdall dashboard` command is an alias for `asgard-dashboard`.
+
+## MCP Server (AI Agent Integration)
+
+Asguardian includes a JSON-RPC MCP server that exposes analysis results to AI coding assistants such as Claude Code, Cursor, and Windsurf.
+
+### Start the MCP server
+
+```bash
+asgard-mcp --path ./src
+```
+
+### Configure Claude Code
+
+Add the following to your `.claude/mcp.json` (or Claude Code settings):
+
+```json
+{
+  "mcpServers": {
+    "asguardian": {
+      "command": "asgard-mcp",
+      "args": ["--path", "/path/to/your/project"]
+    }
+  }
+}
+```
+
+Once configured, your AI assistant can query quality ratings, issues, hotspots, and history directly.
+
+## Quality Profiles
+
+Asguardian ships with built-in quality profiles that group rules into named sets.
+
+```bash
+# List available profiles
+asgard heimdall profiles list
+
+# Run analysis using a specific profile
+asgard heimdall analyze ./src --profile "Asgard Way - Strict"
+```
+
+Built-in profiles:
+
+| Profile | Description |
+|---|---|
+| Asgard Way - Python | Balanced rule set for Python projects |
+| Asgard Way - Strict | Stricter thresholds for production codebases |
+
+## Quality Gates
+
+```bash
+# Evaluate the built-in "Asgard Way" gate
+asgard heimdall gate ./src
+
+# Specify a custom gate configuration
+asgard heimdall gate ./src --gate my-gate.yaml
+```
+
+A gate returns `PASSED` or `FAILED` with a per-condition breakdown. Exit code is `0` for pass and `1` for failure, making it suitable for CI/CD pipelines.
+
+## New Code Period
+
+Track metrics specifically for code changed since a baseline commit or date.
+
+```bash
+# Metrics for code changed since a git tag
+asgard heimdall new-code ./src --since v1.0.0
+
+# Metrics for code changed in the last 30 days
+asgard heimdall new-code ./src --days 30
+```
+
+## SBOM Generation
+
+Generate a Software Bill of Materials in industry-standard formats.
+
+```bash
+# SPDX 2.3 format
+asgard heimdall sbom ./src --format spdx
+
+# CycloneDX 1.4 format
+asgard heimdall sbom ./src --format cyclonedx
+```
+
+## Auto CodeFix
+
+Get template-based fix suggestions for common rule violations.
+
+```bash
+asgard heimdall codefix ./src
+```
+
+## Language Support
+
+| Language | Rules |
+|---|---|
+| Python | Complexity, duplication, smells, security, naming (PEP 8), documentation, taint analysis |
+| JavaScript | no-eval, no-debugger, no-var, eqeqeq, no-console, complexity (12 rules) |
+| TypeScript | All JS rules + no-explicit-any, no-any-cast, no-non-null-assertion, prefer-interface |
+| Shell/Bash | eval injection, curl --insecure, hardcoded secrets, missing set -e/u (12 rules) |
 
 ## Python API
 
+All modules can be used directly in Python code.
+
 ```python
-from Asgard.Heimdall.Quality.services import ComplexityAnalyzer
-from Asgard.Freya.Accessibility.services import WcagValidator
+from Asgard.Heimdall.Ratings.services.ratings_calculator import RatingsCalculator
+from Asgard.Heimdall.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
+from Asgard.Heimdall.Security.services.hotspot_detector import HotspotDetector
+from Asgard.Heimdall.Security.services.taint_analyzer import TaintAnalyzer
+from Asgard.Heimdall.Issues.services.issue_tracker import IssueTracker
+from Asgard.Reporting.services.history_store import HistoryStore
+from Asgard.Dashboard.services.data_collector import DataCollector
 from Asgard.Forseti.OpenAPI.services import SpecValidatorService
 from Asgard.Verdandi.Web.services import VitalsCalculator
 from Asgard.Volundr.Kubernetes.services import ManifestGenerator
+```
+
+## CLI Reference
+
+### Unified CLI (`asgard`)
+
+```
+asgard heimdall analyze <path>
+asgard heimdall ratings <path>
+asgard heimdall gate <path>
+asgard heimdall profiles list
+asgard heimdall history <path>
+asgard heimdall new-code <path>
+asgard heimdall issues <path>
+asgard heimdall sbom <path>
+asgard heimdall codefix <path>
+asgard heimdall mcp-server
+asgard heimdall dashboard
+
+asgard heimdall quality documentation <path>
+asgard heimdall quality naming <path>
+asgard heimdall quality bugs <path>
+asgard heimdall quality javascript <path>
+asgard heimdall quality typescript <path>
+asgard heimdall quality shell <path>
+
+asgard heimdall security hotspots <path>
+asgard heimdall security compliance <path>
+asgard heimdall security taint <path>
+
+asgard freya crawl <url>
+asgard freya images <url>
+
+asgard forseti validate <spec>
+asgard forseti breaking-changes <old> <new>
+
+asgard verdandi report <metrics>
+asgard verdandi slo <metrics>
+
+asgard volundr generate kubernetes
+asgard volundr generate dockerfile
+asgard volundr generate ci
+```
+
+### Standalone entry points
+
+```
+heimdall       Individual Heimdall CLI
+freya          Individual Freya CLI
+forseti        Individual Forseti CLI
+verdandi       Individual Verdandi CLI
+volundr        Individual Volundr CLI
+asgard-mcp     Start the MCP JSON-RPC server
+asgard-dashboard   Start the web dashboard
 ```
 
 ## Project Structure
 
 ```
 Asgard/
-├── Asgard/                 # Main package
-│   ├── __init__.py
-│   ├── cli.py              # Unified CLI
-│   ├── Heimdall/           # Code quality
-│   ├── Freya/              # Visual testing
-│   ├── Forseti/            # API specs
-│   ├── Verdandi/           # Performance metrics
-│   └── Volundr/            # Infrastructure
-├── Asgard_Test/            # Test suite
-│   ├── tests_Heimdall/
-│   ├── tests_Freya/
-│   ├── tests_Verdandi/
-│   └── tests_Volundr/
+├── Asgard/
+│   ├── cli.py
+│   ├── Heimdall/           # Static analysis, security, quality
+│   ├── Freya/              # Visual and UI testing
+│   ├── Forseti/            # API and schema validation
+│   ├── Verdandi/           # Runtime performance metrics
+│   ├── Volundr/            # Infrastructure generation
+│   ├── Reporting/          # History store, PR decoration
+│   ├── MCP/                # MCP JSON-RPC server
+│   └── Dashboard/          # Web dashboard
+├── Asgard_Test/            # Test suite (716 tests)
 ├── pyproject.toml
+├── CHANGELOG.md
 └── README.md
 ```
 
 ## License
 
-MIT License - Asgard Contributors
+MIT License — see [LICENSE](LICENSE) for details.
