@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    runs-on: [self-hosted, UAT, arm64]
+    runs-on: [self-hosted, UAT, x64]
     permissions:
       id-token: write
     steps:
