@@ -73,7 +73,7 @@ def scan_directory(
     root: str,
     include_extensions: Optional[List[str]] = None,
     exclude_patterns: Optional[List[str]] = None,
-) -> Iterator[str]:
+) -> Iterator[Path]:
     """Yield absolute paths of code files under root, respecting exclusions."""
     for dirpath, dirnames, filenames in os.walk(root):
         # Prune excluded directories in-place so os.walk skips them
@@ -86,4 +86,13 @@ def scan_directory(
             if is_excluded_path(full_path, exclude_patterns):
                 continue
             if is_code_file(full_path, include_extensions):
-                yield full_path
+                yield Path(full_path)
+
+
+def discover_files(
+    root: str,
+    exclude_patterns: Optional[List[str]] = None,
+    include_extensions: Optional[List[str]] = None,
+) -> Iterator[Path]:
+    """Alias for scan_directory for backward compatibility with CLI dry-run."""
+    yield from scan_directory(root, include_extensions, exclude_patterns)
