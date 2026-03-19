@@ -8,9 +8,9 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Forseti.CodeGen.models.codegen_models import (
     CodeGenConfig,
@@ -132,9 +132,9 @@ class TypeScriptGeneratorService:
         content = spec_path.read_text(encoding="utf-8")
 
         try:
-            return yaml.safe_load(content)
+            return cast(dict[str, Any], yaml.safe_load(content))
         except yaml.YAMLError:
-            return json.loads(content)
+            return cast(dict[str, Any], json.loads(content))
 
     def _parse_types(
         self,
@@ -217,7 +217,7 @@ class TypeScriptGeneratorService:
         """Convert JSON Schema type to TypeScript type."""
         if "$ref" in schema:
             # Extract type name from reference
-            ref = schema["$ref"]
+            ref = cast(str, schema["$ref"])
             return ref.split("/")[-1]
 
         schema_type = schema.get("type", "any")

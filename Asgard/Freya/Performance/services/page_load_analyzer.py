@@ -6,7 +6,7 @@ Performance Observer for Core Web Vitals.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from playwright.async_api import Page, async_playwright
 
@@ -195,7 +195,7 @@ class PageLoadAnalyzer:
                     return vitals;
                 }
             """)
-            return vitals
+            return cast(Dict[Any, Any], vitals)
         except Exception:
             return {}
 
@@ -376,36 +376,39 @@ class PageLoadAnalyzer:
 
     def _calculate_lcp_score(self, metrics: PageLoadMetrics) -> Optional[float]:
         """Calculate LCP score (0-100)."""
-        if metrics.largest_contentful_paint is None:
+        lcp = cast(Optional[float], metrics.largest_contentful_paint)
+        if lcp is None:
             return None
-        if metrics.largest_contentful_paint <= 2500:
+        if lcp <= 2500:
             return 100
-        elif metrics.largest_contentful_paint <= 4000:
-            return 50 + 50 * (4000 - metrics.largest_contentful_paint) / 1500
+        elif lcp <= 4000:
+            return 50 + 50 * (4000 - lcp) / 1500
         else:
-            return max(0, 50 * (8000 - metrics.largest_contentful_paint) / 4000)
+            return max(0, 50 * (8000 - lcp) / 4000)
 
     def _calculate_fid_score(self, metrics: PageLoadMetrics) -> Optional[float]:
         """Calculate FID score (0-100)."""
-        if metrics.first_input_delay is None:
+        fid = cast(Optional[float], metrics.first_input_delay)
+        if fid is None:
             return None
-        if metrics.first_input_delay <= 100:
+        if fid <= 100:
             return 100
-        elif metrics.first_input_delay <= 300:
-            return 50 + 50 * (300 - metrics.first_input_delay) / 200
+        elif fid <= 300:
+            return 50 + 50 * (300 - fid) / 200
         else:
-            return max(0, 50 * (600 - metrics.first_input_delay) / 300)
+            return max(0, 50 * (600 - fid) / 300)
 
     def _calculate_cls_score(self, metrics: PageLoadMetrics) -> Optional[float]:
         """Calculate CLS score (0-100)."""
-        if metrics.cumulative_layout_shift is None:
+        cls = cast(Optional[float], metrics.cumulative_layout_shift)
+        if cls is None:
             return None
-        if metrics.cumulative_layout_shift <= 0.1:
+        if cls <= 0.1:
             return 100
-        elif metrics.cumulative_layout_shift <= 0.25:
-            return 50 + 50 * (0.25 - metrics.cumulative_layout_shift) / 0.15
+        elif cls <= 0.25:
+            return 50 + 50 * (0.25 - cls) / 0.15
         else:
-            return max(0, 50 * (0.5 - metrics.cumulative_layout_shift) / 0.25)
+            return max(0, 50 * (0.5 - cls) / 0.25)
 
     def _score_to_grade(self, score: float) -> PerformanceGrade:
         """Convert score to grade."""

@@ -84,7 +84,7 @@ class MemoryMetricsCalculator:
             return 0.0
         return round((used_bytes / total_bytes) * 100, 2)
 
-    def bytes_to_human_readable(self, bytes_value: int) -> str:
+    def bytes_to_human_readable(self, bytes_value: float) -> str:
         """
         Convert bytes to human-readable format.
 

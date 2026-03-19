@@ -36,7 +36,7 @@ def _make_handler_class(config: DashboardConfig) -> type:
 
         def log_message(self, format: str, *args) -> None:  # type: ignore[override]
             """Override to write access log to stdout in a clean format."""
-            print(f"[asgard-dashboard] {self.address_string()} {format % args}")
+            print(f"[asguardian-dashboard] {self.address_string()} {format % args}")
 
         def _send_html(self, html: str, status: int = 200) -> None:
             """Send an HTML response."""

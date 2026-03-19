@@ -218,7 +218,7 @@ class JSONSchemaSpec(BaseModel):
 
     def to_dict(self) -> dict[str, Any]:
         """Convert to standard JSON Schema dictionary."""
-        result = {}
+        result: dict[str, Any] = {}
 
         if self.schema_uri:
             result["$schema"] = self.schema_uri

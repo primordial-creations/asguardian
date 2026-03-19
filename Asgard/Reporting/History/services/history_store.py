@@ -14,7 +14,7 @@ import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Tuple, cast
 
 from Asgard.Reporting.History.models.history_models import (
     AnalysisSnapshot,
@@ -122,7 +122,7 @@ class HistoryStore:
                 ),
             )
 
-        return snapshot.snapshot_id
+        return cast(str, snapshot.snapshot_id)
 
     def get_snapshots(
         self, project_path: str, limit: int = 50

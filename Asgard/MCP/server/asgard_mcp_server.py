@@ -20,8 +20,21 @@ import traceback
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
+from Asgard.Heimdall.Dependencies.models.sbom_models import SBOMConfig, SBOMFormat
+from Asgard.Heimdall.Dependencies.services.sbom_generator import SBOMGenerator
+from Asgard.Heimdall.Issues.models.issue_models import IssueFilter, IssueStatus
+from Asgard.Heimdall.Issues.services.issue_tracker import IssueTracker
+from Asgard.Heimdall.Quality.models.analysis_models import AnalysisConfig
+from Asgard.Heimdall.Quality.models.debt_models import DebtConfig
+from Asgard.Heimdall.Quality.services.file_length_analyzer import FileAnalyzer
+from Asgard.Heimdall.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
+from Asgard.Heimdall.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
+from Asgard.Heimdall.Ratings.models.ratings_models import RatingsConfig
+from Asgard.Heimdall.Ratings.services.ratings_calculator import RatingsCalculator
+from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
+from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
 from Asgard.MCP.models.mcp_models import (
     MCPRequest,
     MCPResponse,
@@ -32,12 +45,12 @@ from Asgard.MCP.models.mcp_models import (
 
 
 _SERVER_INFO = {
-    "name": "asgard-mcp",
+    "name": "asguardian-mcp",
     "version": "1.0.0",
     "description": "Asgard code analysis MCP server",
 }
 
-_CAPABILITIES = {
+_CAPABILITIES: Dict[str, Any] = {
     "tools": {},
 }
 
@@ -279,9 +292,6 @@ class AsgardMCPServer:
 
     def _tool_quality_analyze(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Run quality analysis and return a summary."""
-        from Asgard.Heimdall.Quality.models.analysis_models import AnalysisConfig
-        from Asgard.Heimdall.Quality.services.file_length_analyzer import FileAnalyzer
-
         path = params.get("path", self._config.project_path)
         scan_path = Path(path).resolve()
 
@@ -310,9 +320,6 @@ class AsgardMCPServer:
 
     def _tool_security_scan(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Run security scan and return a summary."""
-        from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
-        from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
-
         path = params.get("path", self._config.project_path)
         scan_path = Path(path).resolve()
 
@@ -342,14 +349,6 @@ class AsgardMCPServer:
 
     def _tool_quality_gate(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Evaluate the quality gate and return gate status."""
-        from Asgard.Heimdall.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
-        from Asgard.Heimdall.Ratings.models.ratings_models import RatingsConfig
-        from Asgard.Heimdall.Ratings.services.ratings_calculator import RatingsCalculator
-        from Asgard.Heimdall.Quality.models.debt_models import DebtConfig
-        from Asgard.Heimdall.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
-        from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
-        from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
-
         path = params.get("path", self._config.project_path)
         scan_path = Path(path).resolve()
 
@@ -398,13 +397,6 @@ class AsgardMCPServer:
 
     def _tool_ratings(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Calculate A-E ratings and return the result."""
-        from Asgard.Heimdall.Ratings.models.ratings_models import RatingsConfig
-        from Asgard.Heimdall.Ratings.services.ratings_calculator import RatingsCalculator
-        from Asgard.Heimdall.Quality.models.debt_models import DebtConfig
-        from Asgard.Heimdall.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
-        from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
-        from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
-
         path = params.get("path", self._config.project_path)
         scan_path = Path(path).resolve()
 
@@ -447,9 +439,6 @@ class AsgardMCPServer:
 
     def _tool_sbom(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Generate an SBOM and return the document."""
-        from Asgard.Heimdall.Dependencies.models.sbom_models import SBOMConfig, SBOMFormat
-        from Asgard.Heimdall.Dependencies.services.sbom_generator import SBOMGenerator
-
         path = params.get("path", self._config.project_path)
         fmt_str = params.get("format", "cyclonedx")
         scan_path = Path(path).resolve()
@@ -460,14 +449,11 @@ class AsgardMCPServer:
         document = generator.generate(str(scan_path))
 
         if fmt == SBOMFormat.CYCLONEDX:
-            return generator.to_cyclonedx_json(document)
-        return generator.to_spdx_json(document)
+            return cast(Dict[str, Any], generator.to_cyclonedx_json(document))
+        return cast(Dict[str, Any], generator.to_spdx_json(document))
 
     def _tool_list_issues(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """List tracked issues for a project."""
-        from Asgard.Heimdall.Issues.models.issue_models import IssueFilter, IssueStatus
-        from Asgard.Heimdall.Issues.services.issue_tracker import IssueTracker
-
         path = params.get("path", self._config.project_path)
         status_str = params.get("status", "open")
         limit = int(params.get("limit", 20))
@@ -504,9 +490,6 @@ class AsgardMCPServer:
 
     def _tool_compliance_report(self, params: Dict[str, Any]) -> Dict[str, Any]:
         """Generate an OWASP or CWE compliance report."""
-        from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
-        from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
-
         path = params.get("path", self._config.project_path)
         standard = params.get("standard", "owasp")
         scan_path = Path(path).resolve()

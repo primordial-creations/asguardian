@@ -8,7 +8,7 @@ Supports backward, forward, and full compatibility modes.
 import json
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from Asgard.Forseti.Avro.models.avro_models import (
     AvroCompatibilityResult,
@@ -310,7 +310,7 @@ class AvroCompatibilityService:
         if isinstance(schema, list):
             return "union"
         if isinstance(schema, dict):
-            return schema.get("type", "unknown")
+            return cast(str, schema.get("type", "unknown"))
         return "unknown"
 
     def _types_compatible(self, writer_type: str, reader_type: str) -> bool:

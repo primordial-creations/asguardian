@@ -7,7 +7,7 @@ Generates GraphQL schemas from source code analysis.
 import ast
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from Asgard.Forseti.GraphQL.models.graphql_models import (
     GraphQLConfig,
@@ -419,7 +419,7 @@ class SchemaGeneratorService:
     def _openapi_type_to_graphql(self, schema: dict[str, Any]) -> str:
         """Convert an OpenAPI type to a GraphQL type."""
         if "$ref" in schema:
-            ref = schema["$ref"]
+            ref = cast(str, schema["$ref"])
             return ref.split("/")[-1]
 
         schema_type = schema.get("type", "string")

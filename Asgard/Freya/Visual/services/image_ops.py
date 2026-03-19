@@ -182,7 +182,7 @@ def load_image(path: str) -> Image:
         offset = y * (1 + row_bytes)
         filter_type = raw[offset]
         current_raw = raw[offset + 1:offset + 1 + row_bytes]
-        unfiltered = _unfilter_row(filter_type, current_raw, previous_row, bpp)
+        unfiltered = _unfilter_row(filter_type, current_raw, previous_row or bytes(row_bytes), bpp)
         previous_row = unfiltered
 
         for x in range(width):

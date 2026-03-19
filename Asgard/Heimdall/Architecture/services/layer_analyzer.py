@@ -5,6 +5,7 @@ Analyzes adherence to layered architecture patterns.
 """
 
 import ast
+import json
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -424,8 +425,6 @@ class LayerAnalyzer:
 
     def _generate_json_report(self, result: LayerReport) -> str:
         """Generate JSON format report."""
-        import json
-
         output = {
             "scan_path": result.scan_path,
             "scanned_at": result.scanned_at.isoformat(),

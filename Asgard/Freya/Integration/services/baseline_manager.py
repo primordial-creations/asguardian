@@ -15,6 +15,7 @@ from Asgard.Freya.Integration.models.integration_models import (
     BaselineConfig,
     BaselineEntry,
 )
+from Asgard.Freya.Visual.models.visual_models import ComparisonConfig
 from Asgard.Freya.Visual.services import ScreenshotCapture, VisualRegressionTester
 
 
@@ -183,31 +184,33 @@ class BaselineManager:
         capture = ScreenshotCapture(output_directory=str(self.storage_dir / "current"))
 
         if device:
-            current = await capture.capture_device(url, device, full_page=True)
+            screenshots = await capture.capture_with_devices(url, devices=[device])
+            if not screenshots:
+                raise ValueError(f"Device '{device}' not found")
+            current = screenshots[0]
         else:
-            current = await capture.capture(
-                url,
-                viewport_width=baseline.viewport_width,
-                viewport_height=baseline.viewport_height,
-                full_page=True
-            )
+            current = await capture.capture_full_page(url)
 
-        threshold = threshold or self.config.diff_threshold
-        regression = VisualRegressionTester(threshold=threshold)
+        effective_threshold = threshold if threshold is not None else self.config.diff_threshold
+        regression = VisualRegressionTester(output_directory=str(self.storage_dir / "diffs"))
+        comparison_config = ComparisonConfig(threshold=1.0 - effective_threshold)
 
-        result = regression.compare(baseline.screenshot_path, current.file_path)
+        result = regression.compare(baseline.screenshot_path, current.file_path, comparison_config)
 
-        if result.has_difference and self.config.auto_update:
+        has_difference = not result.is_similar
+        difference_percentage = round((1.0 - result.similarity_score) * 100, 2)
+
+        if has_difference and self.config.auto_update:
             await self.update_baseline(url, name, device)
 
         return {
             "success": True,
             "baseline": baseline.model_dump(),
             "current_screenshot": current.file_path,
-            "has_difference": result.has_difference,
-            "difference_percentage": result.difference_percentage,
+            "has_difference": has_difference,
+            "difference_percentage": difference_percentage,
             "diff_image_path": result.diff_image_path,
-            "passed": not result.has_difference,
+            "passed": not has_difference,
         }
 
     def list_baselines(self, url: Optional[str] = None) -> List[BaselineEntry]:

@@ -5,7 +5,7 @@ Parses and normalizes OpenAPI specifications.
 """
 
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from Asgard.Forseti.OpenAPI.models.openapi_models import (
     OpenAPIConfig,
@@ -168,7 +168,7 @@ class SpecParserService:
 
     def _convert_operation(self, operation: dict[str, Any]) -> dict[str, Any]:
         """Convert a Swagger 2.0 operation to OpenAPI 3.0."""
-        converted = {
+        converted: dict[str, Any] = {
             "responses": {},
         }
 
@@ -335,5 +335,5 @@ class SpecParserService:
             Dictionary of schema name to schema definition.
         """
         if spec.components and "schemas" in spec.components:
-            return spec.components["schemas"]
+            return cast(dict[str, Any], spec.components["schemas"])
         return {}

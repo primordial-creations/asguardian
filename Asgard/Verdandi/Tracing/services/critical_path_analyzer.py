@@ -5,7 +5,7 @@ Analyzes distributed traces to identify the critical path.
 """
 
 from collections import defaultdict
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from Asgard.Verdandi.Tracing.models.tracing_models import (
     CriticalPathResult,
@@ -242,7 +242,7 @@ class CriticalPathAnalyzer:
         self,
         trace_a: DistributedTrace,
         trace_b: DistributedTrace,
-    ) -> Dict[str, any]:
+    ) -> Dict[str, Any]:
         """
         Compare critical paths of two traces.
 

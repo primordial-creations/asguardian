@@ -4,6 +4,7 @@ Heimdall Datetime Usage Analysis Models
 Pydantic models for detecting deprecated and unsafe datetime usage patterns.
 """
 
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -46,7 +47,6 @@ class DatetimeViolation(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         return f"{os.path.basename(self.file_path)}:{self.line_number}"
 
     @property

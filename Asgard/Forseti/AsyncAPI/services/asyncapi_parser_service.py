@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Forseti.AsyncAPI.models.asyncapi_models import (
     AsyncAPIConfig,

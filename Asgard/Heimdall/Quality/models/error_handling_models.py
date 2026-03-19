@@ -11,6 +11,7 @@ Detected Patterns:
 - Async functions that await external calls without error handling
 """
 
+import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -58,7 +59,6 @@ class ErrorHandlingViolation(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         return f"{os.path.basename(self.file_path)}:{self.line_number}"
 
     @property

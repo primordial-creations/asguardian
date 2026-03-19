@@ -8,8 +8,58 @@ contracts and agreements.
 import argparse
 import json
 import sys
+import traceback
+import yaml  # type: ignore[import-untyped]
 from pathlib import Path
 from typing import Optional
+
+from Asgard.Forseti.AsyncAPI import AsyncAPIValidatorService, AsyncAPIParserService, AsyncAPIConfig
+from Asgard.Forseti.Avro import AvroValidatorService, AvroConfig, AvroCompatibilityService, CompatibilityMode
+from Asgard.Forseti.CodeGen import (
+    TypeScriptGeneratorService,
+    PythonGeneratorService,
+    GolangGeneratorService,
+    CodeGenConfig,
+    HttpClientType,
+)
+from Asgard.Forseti.Contracts import (
+    ContractValidatorService,
+    CompatibilityCheckerService,
+    BreakingChangeDetectorService,
+)
+from Asgard.Forseti.Database import SchemaAnalyzerService, SchemaDiffService, MigrationGeneratorService
+from Asgard.Forseti.Documentation import DocsGeneratorService, APIDocConfig, DocumentationFormat
+from Asgard.Forseti.GraphQL import (
+    SchemaValidatorService as GraphQLSchemaValidatorService,
+    GraphQLConfig,
+    SchemaGeneratorService as GraphQLSchemaGeneratorService,
+    IntrospectionService,
+)
+from Asgard.Forseti.JSONSchema import (
+    SchemaValidatorService as JSONSchemaValidatorService,
+    JSONSchemaConfig,
+    SchemaGeneratorService as JSONSchemaGeneratorService,
+    SchemaInferenceService,
+)
+from Asgard.Forseti.JSONSchema.utilities import load_schema_file, validate_schema_syntax
+from Asgard.Forseti.MockServer import (
+    MockServerGeneratorService,
+    MockServerConfig,
+    MockDataGeneratorService,
+    MockDataConfig,
+)
+from Asgard.Forseti.OpenAPI import (
+    SpecValidatorService,
+    OpenAPIConfig,
+    SpecGeneratorService,
+    SpecConverterService,
+)
+from Asgard.Forseti.OpenAPI.utilities import compare_specs
+from Asgard.Forseti.Protobuf import (
+    ProtobufValidatorService,
+    ProtobufConfig,
+    ProtobufCompatibilityService,
+)
 
 
 def add_performance_flags(parser: argparse.ArgumentParser) -> None:
@@ -498,15 +548,12 @@ def main(args: Optional[list[str]] = None) -> int:
     except Exception as e:
         print(f"Error: {e}", file=sys.stderr)
         if parsed.verbose:
-            import traceback
             traceback.print_exc()
         return 1
 
 
 def _handle_openapi(args: argparse.Namespace) -> int:
     """Handle OpenAPI commands."""
-    from Asgard.Forseti.OpenAPI import SpecValidatorService, OpenAPIConfig
-
     if not args.command:
         print("Error: No command specified. Use 'forseti openapi --help' for options.")
         return 1
@@ -519,7 +566,6 @@ def _handle_openapi(args: argparse.Namespace) -> int:
         return 0 if result.is_valid else 1
 
     elif args.command == "generate":
-        from Asgard.Forseti.OpenAPI import SpecGeneratorService
         service = SpecGeneratorService()
         spec = service.from_fastapi_app(args.source_path)
         if args.output:
@@ -530,7 +576,6 @@ def _handle_openapi(args: argparse.Namespace) -> int:
         return 0
 
     elif args.command == "convert":
-        from Asgard.Forseti.OpenAPI import SpecConverterService
         service = SpecConverterService()
         version_map = {"2.0": "2.0", "3.0": "3.0.0", "3.1": "3.1.0"}
         result = service.convert(args.spec_file, version_map[args.target_version])
@@ -543,7 +588,6 @@ def _handle_openapi(args: argparse.Namespace) -> int:
         return 0 if result.success else 1
 
     elif args.command == "diff":
-        from Asgard.Forseti.OpenAPI.utilities import compare_specs
         diff = compare_specs(args.spec1, args.spec2)
         print(json.dumps(diff, indent=2))
         return 0
@@ -553,28 +597,24 @@ def _handle_openapi(args: argparse.Namespace) -> int:
 
 def _handle_graphql(args: argparse.Namespace) -> int:
     """Handle GraphQL commands."""
-    from Asgard.Forseti.GraphQL import SchemaValidatorService, GraphQLConfig
-
     if not args.command:
         print("Error: No command specified. Use 'forseti graphql --help' for options.")
         return 1
 
     if args.command == "validate":
         config = GraphQLConfig(strict_mode=args.strict if hasattr(args, 'strict') else False)
-        service = SchemaValidatorService(config)
+        service = GraphQLSchemaValidatorService(config)
         result = service.validate_file(args.schema_file)
         print(service.generate_report(result, args.format))
         return 0 if result.is_valid else 1
 
     elif args.command == "generate":
-        from Asgard.Forseti.GraphQL import SchemaGeneratorService
-        service = SchemaGeneratorService()
+        service = GraphQLSchemaGeneratorService()
         # This would require loading Python modules
         print("Note: Generation from source requires importable Python modules")
         return 0
 
     elif args.command == "introspect":
-        from Asgard.Forseti.GraphQL import IntrospectionService
         service = IntrospectionService()
         headers = {}
         if args.header:
@@ -599,7 +639,6 @@ def _handle_database(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "analyze":
-        from Asgard.Forseti.Database import SchemaAnalyzerService
         service = SchemaAnalyzerService()
         schema = service.analyze_sql_file(args.source)
         if args.output:
@@ -611,14 +650,12 @@ def _handle_database(args: argparse.Namespace) -> int:
         return 0
 
     elif args.command == "diff":
-        from Asgard.Forseti.Database import SchemaDiffService
         service = SchemaDiffService()
         result = service.diff_sql_files(args.schema1, args.schema2)
         print(service.generate_report(result, args.format))
         return 0 if not result.has_changes else 1
 
     elif args.command == "migrate":
-        from Asgard.Forseti.Database import MigrationGeneratorService
         service = MigrationGeneratorService()
         # Load diff from file
         with open(args.diff_file) as f:
@@ -637,21 +674,18 @@ def _handle_contract(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "validate":
-        from Asgard.Forseti.Contracts import ContractValidatorService
         service = ContractValidatorService()
         result = service.validate(args.contract_file, args.implementation)
         print(service.generate_report(result, args.format))
         return 0 if result.is_valid else 1
 
     elif args.command == "check-compat":
-        from Asgard.Forseti.Contracts import CompatibilityCheckerService
         service = CompatibilityCheckerService()
         result = service.check(args.old_spec, args.new_spec)
         print(service.generate_report(result, args.format))
         return 0 if result.is_compatible else 1
 
     elif args.command == "breaking-changes":
-        from Asgard.Forseti.Contracts import BreakingChangeDetectorService
         service = BreakingChangeDetectorService()
         changes = service.detect(args.old_spec, args.new_spec)
         version = getattr(args, 'version', 'unknown')
@@ -669,23 +703,20 @@ def _handle_jsonschema(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "validate":
-        from Asgard.Forseti.JSONSchema import SchemaValidatorService, JSONSchemaConfig
         config = JSONSchemaConfig(strict_mode=args.strict if hasattr(args, 'strict') else True)
-        service = SchemaValidatorService(config)
+        service = JSONSchemaValidatorService(config)
         result = service.validate_file(args.data_file, args.schema_file)
         print(service.generate_report(result, args.format))
         return 0 if result.is_valid else 1
 
     elif args.command == "generate":
-        from Asgard.Forseti.JSONSchema import SchemaGeneratorService
-        service = SchemaGeneratorService()
+        service = JSONSchemaGeneratorService()
         # This would require loading Python modules
         print("Note: Generation requires importable Python modules")
         print("Use Python API: SchemaGeneratorService().from_pydantic(YourModel)")
         return 0
 
     elif args.command == "infer":
-        from Asgard.Forseti.JSONSchema import SchemaInferenceService
         service = SchemaInferenceService()
         result = service.infer_from_file(args.samples_file, title=args.title)
         if args.output:
@@ -713,7 +744,6 @@ def _handle_audit(args: argparse.Namespace) -> int:
     # Find and validate OpenAPI specs
     for spec_file in path.rglob("*.yaml"):
         if _looks_like_openapi(spec_file):
-            from Asgard.Forseti.OpenAPI import SpecValidatorService
             service = SpecValidatorService()
             result = service.validate_file(str(spec_file))
             results.append({
@@ -725,7 +755,6 @@ def _handle_audit(args: argparse.Namespace) -> int:
 
     # Find and validate JSON Schemas
     for schema_file in path.rglob("*.schema.json"):
-        from Asgard.Forseti.JSONSchema.utilities import load_schema_file, validate_schema_syntax
         try:
             schema = load_schema_file(schema_file)
             errors = validate_schema_syntax(schema)
@@ -746,7 +775,6 @@ def _handle_audit(args: argparse.Namespace) -> int:
 
     # Find and validate Protobuf schemas
     for proto_file in path.rglob("*.proto"):
-        from Asgard.Forseti.Protobuf import ProtobufValidatorService
         try:
             service = ProtobufValidatorService()
             result = service.validate(str(proto_file))
@@ -767,7 +795,6 @@ def _handle_audit(args: argparse.Namespace) -> int:
 
     # Find and validate Avro schemas
     for avro_file in path.rglob("*.avsc"):
-        from Asgard.Forseti.Avro import AvroValidatorService
         try:
             service = AvroValidatorService()
             result = service.validate(str(avro_file))
@@ -811,8 +838,6 @@ def _handle_audit(args: argparse.Namespace) -> int:
 
 def _handle_asyncapi(args: argparse.Namespace) -> int:
     """Handle AsyncAPI commands."""
-    from Asgard.Forseti.AsyncAPI import AsyncAPIValidatorService, AsyncAPIParserService, AsyncAPIConfig
-
     if not args.command:
         print("Error: No command specified. Use 'forseti asyncapi --help' for options.")
         return 1
@@ -851,8 +876,6 @@ def _handle_mock(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "generate":
-        from Asgard.Forseti.MockServer import MockServerGeneratorService, MockServerConfig
-
         config = MockServerConfig(
             server_framework=args.framework if hasattr(args, 'framework') else "flask",
             port=args.port if hasattr(args, 'port') else 8080,
@@ -893,8 +916,6 @@ def _handle_mock(args: argparse.Namespace) -> int:
         return 0
 
     elif args.command == "data":
-        from Asgard.Forseti.MockServer import MockDataGeneratorService, MockDataConfig
-
         config = MockDataConfig()
         service = MockDataGeneratorService(config)
 
@@ -939,8 +960,6 @@ def _handle_codegen(args: argparse.Namespace) -> int:
     output_dir = args.output if hasattr(args, 'output') and args.output else None
 
     if args.command == "typescript":
-        from Asgard.Forseti.CodeGen import TypeScriptGeneratorService, CodeGenConfig, HttpClientType
-
         http_client = HttpClientType.AXIOS if getattr(args, 'http_client', 'fetch') == 'axios' else HttpClientType.FETCH
         config = CodeGenConfig(
             http_client=http_client,
@@ -969,8 +988,6 @@ def _handle_codegen(args: argparse.Namespace) -> int:
         return 0 if result.success else 1
 
     elif args.command == "python":
-        from Asgard.Forseti.CodeGen import PythonGeneratorService, CodeGenConfig, HttpClientType
-
         http_client_map = {
             "requests": HttpClientType.REQUESTS,
             "httpx": HttpClientType.HTTPX,
@@ -1005,8 +1022,6 @@ def _handle_codegen(args: argparse.Namespace) -> int:
         return 0 if result.success else 1
 
     elif args.command == "golang":
-        from Asgard.Forseti.CodeGen import GolangGeneratorService, CodeGenConfig
-
         config = CodeGenConfig(
             package_name=getattr(args, 'package_name', 'apiclient'),
         )
@@ -1042,8 +1057,6 @@ def _handle_docs(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "generate":
-        from Asgard.Forseti.Documentation import DocsGeneratorService, APIDocConfig, DocumentationFormat
-
         format_map = {
             "html": DocumentationFormat.HTML,
             "markdown": DocumentationFormat.MARKDOWN,
@@ -1095,8 +1108,6 @@ def _handle_protobuf(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "validate":
-        from Asgard.Forseti.Protobuf import ProtobufValidatorService, ProtobufConfig
-
         config = ProtobufConfig(
             strict_mode=args.strict if hasattr(args, 'strict') else False,
             check_naming_conventions=not (args.no_naming_check if hasattr(args, 'no_naming_check') else False),
@@ -1107,8 +1118,6 @@ def _handle_protobuf(args: argparse.Namespace) -> int:
         return 0 if result.is_valid else 1
 
     elif args.command == "check-compat":
-        from Asgard.Forseti.Protobuf import ProtobufCompatibilityService
-
         service = ProtobufCompatibilityService()
         result = service.check(args.old_proto, args.new_proto)
         print(service.generate_report(result, args.format))
@@ -1124,8 +1133,6 @@ def _handle_avro(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "validate":
-        from Asgard.Forseti.Avro import AvroValidatorService, AvroConfig
-
         config = AvroConfig(
             strict_mode=args.strict if hasattr(args, 'strict') else False,
             require_doc=args.require_doc if hasattr(args, 'require_doc') else False,
@@ -1136,8 +1143,6 @@ def _handle_avro(args: argparse.Namespace) -> int:
         return 0 if result.is_valid else 1
 
     elif args.command == "check-compat":
-        from Asgard.Forseti.Avro import AvroCompatibilityService, CompatibilityMode
-
         mode_map = {
             "backward": CompatibilityMode.BACKWARD,
             "forward": CompatibilityMode.FORWARD,
@@ -1156,7 +1161,6 @@ def _handle_avro(args: argparse.Namespace) -> int:
 def _looks_like_openapi(file_path: Path) -> bool:
     """Check if a file looks like an OpenAPI specification."""
     try:
-        import yaml
         content = file_path.read_text(encoding="utf-8")
         data = yaml.safe_load(content)
         if isinstance(data, dict):
@@ -1169,7 +1173,6 @@ def _looks_like_openapi(file_path: Path) -> bool:
 def _looks_like_asyncapi(file_path: Path) -> bool:
     """Check if a file looks like an AsyncAPI specification."""
     try:
-        import yaml
         content = file_path.read_text(encoding="utf-8")
         data = yaml.safe_load(content)
         if isinstance(data, dict):

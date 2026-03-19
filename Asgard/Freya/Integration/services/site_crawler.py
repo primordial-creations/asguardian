@@ -6,12 +6,13 @@ tests on each page, generating a consolidated report.
 """
 
 import asyncio
+import json
 import re
 import time
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 from urllib.parse import urljoin, urlparse
 
 from playwright.async_api import async_playwright, Page, Browser, BrowserContext
@@ -285,7 +286,7 @@ class SiteCrawler:
         Returns:
             List of discovered detail page URLs
         """
-        discovered_urls = []
+        discovered_urls: List[Any] = []
 
         # Track which item types we've already discovered
         discovered_types: Set[str] = set()
@@ -922,7 +923,7 @@ class SiteCrawler:
         worst_pages = sorted(page_results, key=lambda r: r.overall_score)[:5]
         worst_page_urls = [p.url for p in worst_pages]
 
-        issue_counter = Counter()
+        issue_counter: Counter[str] = Counter()
         for result in page_results:
             for issue in result.issues:
                 issue_key = f"{issue.get('type', 'unknown')}:{issue.get('message', '')}"
@@ -958,8 +959,6 @@ class SiteCrawler:
 
     async def _save_report(self, report: SiteCrawlReport):
         """Save the crawl report to files."""
-        import json
-
         json_path = self.output_dir / "crawl_report.json"
         with open(json_path, "w") as f:
             f.write(report.model_dump_json(indent=2))

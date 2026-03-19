@@ -8,7 +8,7 @@ security issues, and configuration problems.
 import os
 from typing import Any, Dict, List, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.common.output_formatter import (
     FormattedIssue,

@@ -13,9 +13,11 @@ Loads configuration from multiple sources with precedence:
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
+
+import tomllib  # type: ignore[import]
 
 from Asgard.config.models import AsgardConfig
 from Asgard.config.defaults import DEFAULT_CONFIG
@@ -88,7 +90,7 @@ class AsgardConfigLoader:
     def _find_config_file(self, filenames: list) -> Optional[Path]:
         """Find the first existing config file from the list."""
         for filename in filenames:
-            config_path = self.project_root / filename
+            config_path = self.project_root / str(filename)
             if config_path.exists():
                 return config_path
         return None
@@ -115,10 +117,10 @@ class AsgardConfigLoader:
             if not content:
                 return None
             try:
-                return json.loads(content)
+                return cast(Dict[str, Any], json.loads(content))
             except json.JSONDecodeError:
                 # Try YAML format
-                return yaml.safe_load(content)
+                return cast(Dict[str, Any], yaml.safe_load(content))
 
     def _load_pyproject_toml(self) -> Optional[Dict[str, Any]]:
         """Load configuration from pyproject.toml [tool.asgard] section."""
@@ -126,19 +128,10 @@ class AsgardConfigLoader:
         if not pyproject_path.exists():
             return None
 
-        try:
-            import tomllib
-        except ImportError:
-            try:
-                import tomli as tomllib
-            except ImportError:
-                # tomllib/tomli not available, skip TOML loading
-                return None
-
         with open(pyproject_path, "rb") as f:
             data = tomllib.load(f)
 
-        return data.get("tool", {}).get("asgard", None)
+        return cast(Optional[Dict[str, Any]], data.get("tool", {}).get("asgard", None))
 
     def _load_env_overrides(self) -> Dict[str, Any]:
         """
@@ -247,14 +240,14 @@ class AsgardConfigLoader:
     @classmethod
     def generate_default_yaml(cls) -> str:
         """Generate default configuration as YAML string."""
-        return DEFAULT_CONFIG.to_yaml()
+        return cast(str, DEFAULT_CONFIG.to_yaml())
 
     @classmethod
     def generate_default_toml(cls) -> str:
         """Generate default configuration as TOML string for pyproject.toml."""
-        return DEFAULT_CONFIG.to_toml()
+        return cast(str, DEFAULT_CONFIG.to_toml())
 
     @classmethod
     def generate_default_json(cls) -> str:
         """Generate default configuration as JSON string."""
-        return DEFAULT_CONFIG.model_dump_json(indent=2, by_alias=True)
+        return cast(str, DEFAULT_CONFIG.model_dump_json(indent=2, by_alias=True))

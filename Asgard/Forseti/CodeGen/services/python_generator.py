@@ -8,9 +8,9 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Forseti.CodeGen.models.codegen_models import (
     CodeGenConfig,
@@ -134,9 +134,9 @@ class PythonGeneratorService:
         content = spec_path.read_text(encoding="utf-8")
 
         try:
-            return yaml.safe_load(content)
+            return cast(dict[str, Any], yaml.safe_load(content))
         except yaml.YAMLError:
-            return json.loads(content)
+            return cast(dict[str, Any], json.loads(content))
 
     def _parse_types(
         self,
@@ -218,7 +218,7 @@ class PythonGeneratorService:
     def _json_type_to_python(self, schema: dict[str, Any]) -> str:
         """Convert JSON Schema type to Python type."""
         if "$ref" in schema:
-            ref = schema["$ref"]
+            ref = cast(str, schema["$ref"])
             return ref.split("/")[-1]
 
         schema_type = schema.get("type", "Any")

@@ -10,6 +10,7 @@ Unified analyzer that combines all OOP metrics:
 This provides a complete picture of object-oriented design quality.
 """
 
+import json
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -195,17 +196,17 @@ class OOPAnalyzer:
                 # Check for violations
                 violations = []
                 if combined.cbo > self.config.cbo_threshold:
-                    violations.append(f"CBO {combined.cbo} exceeds threshold {self.config.cbo_threshold}")
+                    violations.append(f"Coupling Between Objects (CBO) {combined.cbo} exceeds threshold {self.config.cbo_threshold}")
                 if combined.dit > self.config.dit_threshold:
-                    violations.append(f"DIT {combined.dit} exceeds threshold {self.config.dit_threshold}")
+                    violations.append(f"Depth of Inheritance Tree (DIT) {combined.dit} exceeds threshold {self.config.dit_threshold}")
                 if combined.noc > self.config.noc_threshold:
-                    violations.append(f"NOC {combined.noc} exceeds threshold {self.config.noc_threshold}")
+                    violations.append(f"Number of Children (NOC) {combined.noc} exceeds threshold {self.config.noc_threshold}")
                 if combined.lcom > self.config.lcom_threshold:
-                    violations.append(f"LCOM {combined.lcom:.2f} exceeds threshold {self.config.lcom_threshold}")
+                    violations.append(f"Lack of Cohesion of Methods (LCOM) {combined.lcom:.2f} exceeds threshold {self.config.lcom_threshold}")
                 if combined.rfc > self.config.rfc_threshold:
-                    violations.append(f"RFC {combined.rfc} exceeds threshold {self.config.rfc_threshold}")
+                    violations.append(f"Response for a Class (RFC) {combined.rfc} exceeds threshold {self.config.rfc_threshold}")
                 if combined.wmc > self.config.wmc_threshold:
-                    violations.append(f"WMC {combined.wmc} exceeds threshold {self.config.wmc_threshold}")
+                    violations.append(f"Weighted Methods per Class (WMC) {combined.wmc} exceeds threshold {self.config.wmc_threshold}")
 
                 combined.violations = violations
 
@@ -425,9 +426,24 @@ class OOPAnalyzer:
         lines.append(f"  Scanned At:   {result.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}")
         lines.append(f"  Duration:     {result.scan_duration_seconds:.2f}s")
         lines.append("")
+        lines.append("  METRIC DEFINITIONS")
+        lines.append("  " + "-" * 47)
+        lines.append("  Coupling Between Objects (CBO): Number of classes a class is coupled to.")
+        lines.append("    High CBO means the class is hard to reuse and changes ripple widely.")
+        lines.append("  Depth of Inheritance Tree (DIT): How deep this class is in the inheritance")
+        lines.append("    hierarchy. Deep hierarchies are harder to understand and maintain.")
+        lines.append("  Number of Children (NOC): Number of direct subclasses. High NOC means the")
+        lines.append("    base class is heavily relied upon — changes break many subclasses.")
+        lines.append("  Lack of Cohesion of Methods (LCOM): Measures how well the methods of a class")
+        lines.append("    relate to each other. High LCOM means the class is doing too many things.")
+        lines.append("  Response for a Class (RFC): Number of methods that can be executed in")
+        lines.append("    response to a message. High RFC means high complexity and testing burden.")
+        lines.append("  Weighted Methods per Class (WMC): Sum of complexities of all methods.")
+        lines.append("    High WMC means the class is too complex and should be split.")
+        lines.append("")
         lines.append("  Thresholds:")
-        lines.append(f"    CBO:  {result.cbo_threshold}    DIT: {result.dit_threshold}    NOC: {result.noc_threshold}")
-        lines.append(f"    LCOM: {result.lcom_threshold}  RFC: {result.rfc_threshold}   WMC: {result.wmc_threshold}")
+        lines.append(f"    Coupling Between Objects (CBO):  {result.cbo_threshold}    Depth of Inheritance Tree (DIT): {result.dit_threshold}    Number of Children (NOC): {result.noc_threshold}")
+        lines.append(f"    Lack of Cohesion of Methods (LCOM): {result.lcom_threshold}  Response for a Class (RFC): {result.rfc_threshold}   Weighted Methods per Class (WMC): {result.wmc_threshold}")
         lines.append("")
 
         if result.has_violations:
@@ -436,16 +452,12 @@ class OOPAnalyzer:
             lines.append("-" * 70)
             lines.append("")
 
-            for v in result.violations[:20]:  # Show first 20
+            for v in result.violations:
                 lines.append(f"  [{v.overall_severity.value.upper()}] {v.class_name}")
                 lines.append(f"    File: {v.relative_path}:{v.line_number}")
-                lines.append(f"    CBO={v.cbo} DIT={v.dit} LCOM={v.lcom:.2f} RFC={v.rfc} WMC={v.wmc}")
+                lines.append(f"    Coupling Between Objects (CBO)={v.cbo} Depth of Inheritance Tree (DIT)={v.dit} Lack of Cohesion of Methods (LCOM)={v.lcom:.2f} Response for a Class (RFC)={v.rfc} Weighted Methods per Class (WMC)={v.wmc}")
                 for violation in v.violations:
                     lines.append(f"    - {violation}")
-                lines.append("")
-
-            if len(result.violations) > 20:
-                lines.append(f"  ... and {len(result.violations) - 20} more violations")
                 lines.append("")
         else:
             lines.append("  No OOP metric violations found!")
@@ -461,12 +473,12 @@ class OOPAnalyzer:
         lines.append(f"  Compliance Rate:    {result.compliance_rate:.1f}%")
         lines.append("")
         lines.append("  Averages:")
-        lines.append(f"    CBO:  {result.average_cbo:.2f}    DIT: {result.average_dit:.2f}")
-        lines.append(f"    LCOM: {result.average_lcom:.2f}  RFC: {result.average_rfc:.2f}  WMC: {result.average_wmc:.2f}")
+        lines.append(f"    Coupling Between Objects (CBO):  {result.average_cbo:.2f}    Depth of Inheritance Tree (DIT): {result.average_dit:.2f}")
+        lines.append(f"    Lack of Cohesion of Methods (LCOM): {result.average_lcom:.2f}  Response for a Class (RFC): {result.average_rfc:.2f}  Weighted Methods per Class (WMC): {result.average_wmc:.2f}")
         lines.append("")
         lines.append("  Maximums:")
-        lines.append(f"    CBO:  {result.max_cbo}    DIT: {result.max_dit}")
-        lines.append(f"    LCOM: {result.max_lcom:.2f}  RFC: {result.max_rfc}  WMC: {result.max_wmc}")
+        lines.append(f"    Coupling Between Objects (CBO):  {result.max_cbo}    Depth of Inheritance Tree (DIT): {result.max_dit}")
+        lines.append(f"    Lack of Cohesion of Methods (LCOM): {result.max_lcom:.2f}  Response for a Class (RFC): {result.max_rfc}  Weighted Methods per Class (WMC): {result.max_wmc}")
         lines.append("")
         lines.append("=" * 70)
 
@@ -474,8 +486,6 @@ class OOPAnalyzer:
 
     def _generate_json_report(self, result: OOPReport) -> str:
         """Generate JSON format report."""
-        import json
-
         output = {
             "scan_path": result.scan_path,
             "scanned_at": result.scanned_at.isoformat(),

@@ -33,7 +33,7 @@ class BaselineEntry:
     message: str = ""
     reason: str = ""
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
-    created_by: str = "asgard"
+    created_by: str = "asguardian"
     expires_at: Optional[str] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
 
@@ -261,7 +261,7 @@ class BaselineManager:
         location_func: Callable[[T], str],
         message_func: Optional[Callable[[T], str]] = None,
         reason: str = "Initial baseline",
-        created_by: str = "asgard",
+        created_by: str = "asguardian",
         expiry_days: Optional[int] = None,
     ) -> int:
         """
@@ -353,7 +353,7 @@ class BaselineManager:
         item_type: str,
         message: str = "",
         reason: str = "",
-        created_by: str = "asgard",
+        created_by: str = "asguardian",
         expiry_days: Optional[int] = None,
     ) -> bool:
         """

@@ -6,6 +6,7 @@ methods, or conditional blocks) which violate the coding standard
 that ALL imports MUST be at the top of the file.
 """
 
+import os
 from enum import Enum
 from pathlib import Path
 from typing import List, Optional, Dict, Tuple
@@ -53,7 +54,6 @@ class LazyImport(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         return f"{os.path.basename(self.file_path)}:{self.line_number}"
 
     @property

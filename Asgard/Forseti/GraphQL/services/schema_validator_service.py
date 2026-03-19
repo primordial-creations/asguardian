@@ -4,6 +4,7 @@ GraphQL Schema Validator Service.
 Validates GraphQL schemas against the GraphQL specification.
 """
 
+import json
 import re
 import time
 from pathlib import Path
@@ -321,7 +322,6 @@ class SchemaValidatorService:
             Formatted report string.
         """
         if format == "json":
-            import json
             return json.dumps(result.model_dump(), indent=2, default=str)
         elif format == "markdown":
             return self._generate_markdown_report(result)

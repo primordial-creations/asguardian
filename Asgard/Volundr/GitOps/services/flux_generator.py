@@ -8,9 +8,9 @@ with best practices for GitOps deployments.
 import hashlib
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.GitOps.models.gitops_models import (
     FluxGitRepository,
@@ -300,7 +300,7 @@ class FluxGenerator:
         if git_repo.verify_commits:
             manifest["spec"]["verify"] = {"mode": "head"}
 
-        return yaml.dump(manifest, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(manifest, default_flow_style=False, sort_keys=False))
 
     def _generate_kustomization_manifest(self, ks: FluxKustomization) -> str:
         """Generate Flux Kustomization manifest YAML."""
@@ -361,7 +361,7 @@ class FluxGenerator:
         if ks.post_build:
             manifest["spec"]["postBuild"] = ks.post_build
 
-        return yaml.dump(manifest, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(manifest, default_flow_style=False, sort_keys=False))
 
     def _validate_git_repository(self, git_repo: FluxGitRepository) -> List[str]:
         """Validate the GitRepository configuration."""

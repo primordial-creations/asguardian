@@ -232,7 +232,7 @@ class UnifiedFormatter:
     # JSON format methods
     def _format_result_json(self, result: FormattedResult) -> str:
         """Format result as JSON."""
-        data = {
+        data: Dict[str, Any] = {
             "message": result.message,
             "severity": result.severity.value,
             "file_path": result.file_path,

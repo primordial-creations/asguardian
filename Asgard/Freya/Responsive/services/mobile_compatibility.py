@@ -7,7 +7,7 @@ feature detection, and common mobile issues.
 
 import time
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from playwright.async_api import async_playwright, Page
 
@@ -35,7 +35,7 @@ class MobileCompatibilityTester:
     async def test(
         self,
         url: str,
-        devices: List[str] = None
+        devices: Optional[List[str]] = None
     ) -> MobileCompatibilityReport:
         """
         Test mobile compatibility.
@@ -354,7 +354,7 @@ class MobileCompatibilityTester:
         issues: List[MobileCompatibilityIssue]
     ) -> List[MobileCompatibilityIssue]:
         """Remove duplicate issues, merging affected devices."""
-        seen = {}
+        seen: dict[str, MobileCompatibilityIssue] = {}
 
         for issue in issues:
             key = f"{issue.issue_type}:{issue.element_selector}:{issue.description}"
@@ -371,7 +371,7 @@ class MobileCompatibilityTester:
     def _calculate_score(
         self,
         issues: List[MobileCompatibilityIssue],
-        load_time_ms: int,
+        load_time_ms: Optional[int],
         page_size_bytes: int
     ) -> float:
         """Calculate mobile-friendly score."""

@@ -7,9 +7,9 @@ for Kustomize overlays.
 
 import hashlib
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Kustomize.models.kustomize_models import (
     GeneratedKustomization,
@@ -67,7 +67,7 @@ class PatchGenerator:
         if spec_overrides:
             patch["spec"] = spec_overrides
 
-        return yaml.dump(patch, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(patch, default_flow_style=False, sort_keys=False))
 
     def generate_json6902_patch(
         self,

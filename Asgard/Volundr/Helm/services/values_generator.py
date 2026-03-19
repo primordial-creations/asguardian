@@ -7,9 +7,9 @@ and best practice configurations.
 
 import hashlib
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Helm.models.helm_models import (
     HelmValues,
@@ -144,7 +144,7 @@ class ValuesGenerator:
             YAML string
         """
         values_dict = self.generate(image_repository, environment, **kwargs)
-        return yaml.dump(values_dict, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(values_dict, default_flow_style=False, sort_keys=False))
 
     def generate_environment_overlay(
         self,

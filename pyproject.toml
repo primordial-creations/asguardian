@@ -51,19 +51,19 @@ test = [
 ]
 
 [project.scripts]
-asgard = "Asgard.cli:main"
+asguardian = "Asgard.cli:main"
 heimdall = "Asgard.Heimdall.cli:main"
 freya = "Asgard.Freya.cli:main"
 forseti = "Asgard.Forseti.cli:main"
 verdandi = "Asgard.Verdandi.cli:main"
 volundr = "Asgard.Volundr.cli:main"
-asgard-mcp = "Asgard.MCP.server:main"
-asgard-dashboard = "Asgard.Dashboard.server:main"
+asguardian-mcp = "Asgard.MCP.server:main"
+asguardian-dashboard = "Asgard.Dashboard.server:main"
 
 [project.urls]
-Homepage = "https://github.com/JakeDruett/asgard"
-Documentation = "https://github.com/JakeDruett/asgard#readme"
-Repository = "https://github.com/JakeDruett/asgard"
+Homepage = "https://github.com/JakeDruett/asguardian"
+Documentation = "https://github.com/JakeDruett/asguardian#readme"
+Repository = "https://github.com/JakeDruett/asguardian"
 
 [tool.setuptools.packages.find]
 exclude = ["Asgard_Test", "Asgard_Test.*"]

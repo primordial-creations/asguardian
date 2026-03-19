@@ -6,7 +6,7 @@ Forecasts future performance based on historical trends.
 
 import math
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Sequence, Tuple
+from typing import Dict, List, Optional, Sequence, Tuple, cast
 
 from Asgard.Verdandi.Trend.models.trend_models import (
     ForecastPoint,
@@ -430,8 +430,8 @@ class ForecastCalculator:
         sorted_intervals = sorted(intervals)
         mid = len(sorted_intervals) // 2
         if len(sorted_intervals) % 2 == 0:
-            return (sorted_intervals[mid - 1] + sorted_intervals[mid]) / 2
-        return sorted_intervals[mid]
+            return cast(float, (sorted_intervals[mid - 1] + sorted_intervals[mid]) / 2)
+        return cast(float, sorted_intervals[mid])
 
     def _generate_warnings(
         self,

@@ -5,8 +5,9 @@ Pydantic models for unified configuration across all Asgard modules.
 """
 
 from enum import Enum
-from typing import Dict, List, Literal, Optional
+from typing import Dict, List, Literal, Optional, cast
 
+import yaml  # type: ignore[import-untyped]
 from pydantic import BaseModel, Field, model_validator
 
 
@@ -810,9 +811,8 @@ class AsgardConfig(BaseModel):
 
     def to_yaml(self) -> str:
         """Export configuration as YAML string."""
-        import yaml
         data = self.model_dump(by_alias=True)
-        return yaml.dump(data, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(data, default_flow_style=False, sort_keys=False))
 
     def to_toml(self) -> str:
         """Export configuration as TOML string for pyproject.toml."""

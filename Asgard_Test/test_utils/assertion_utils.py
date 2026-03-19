@@ -7,7 +7,7 @@ schema validation, approximate comparisons, and file system assertions.
 
 import json
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import jsonschema
 import yaml
@@ -103,7 +103,7 @@ def assert_approximate(
     actual: float,
     expected: float,
     tolerance: float = 0.001,
-    message: str = None
+    message: Optional[str] = None
 ) -> None:
     """
     Assert that two floating point numbers are approximately equal.
@@ -137,7 +137,7 @@ def assert_approximate(
         raise AssertionError(message)
 
 
-def assert_file_exists(path: Path, message: str = None) -> None:
+def assert_file_exists(path: Path, message: Optional[str] = None) -> None:
     """
     Assert that a file or directory exists.
 

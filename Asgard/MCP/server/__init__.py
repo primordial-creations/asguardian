@@ -9,7 +9,7 @@ from Asgard.MCP.server.asgard_mcp_server import AsgardMCPServer
 def main() -> None:
     """CLI entry point for the Asgard MCP server."""
     parser = argparse.ArgumentParser(
-        prog="asgard-mcp",
+        prog="asguardian-mcp",
         description="Asgard MCP server - exposes Asgard analysis tools to AI agents via JSON-RPC.",
     )
     parser.add_argument(

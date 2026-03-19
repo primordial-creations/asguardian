@@ -14,7 +14,7 @@ Exposed tools:
     asgard_compliance_report - Get OWASP/CWE compliance
 
 Usage:
-    asgard-mcp --port 8765 --path ./src
+    asguardian-mcp --port 8765 --path ./src
 
 Programmatic Usage:
     from Asgard.MCP import AsgardMCPServer, MCPServerConfig

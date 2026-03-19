@@ -5,7 +5,7 @@ Analyzes meta tags for SEO compliance including title, description,
 Open Graph, and Twitter Card tags.
 """
 
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from playwright.async_api import Page, async_playwright
 
@@ -154,7 +154,7 @@ class MetaTagAnalyzer:
 
     async def _extract_meta_data(self, page: Page) -> Dict:
         """Extract all meta tag data from the page."""
-        return await page.evaluate("""
+        return cast(Dict[Any, Any], await page.evaluate("""
             () => {
                 const data = {
                     og: {},
@@ -193,7 +193,7 @@ class MetaTagAnalyzer:
 
                 return data;
             }
-        """)
+        """))
 
     def _analyze_title(self, value: Optional[str]) -> MetaTag:
         """Analyze the title tag."""

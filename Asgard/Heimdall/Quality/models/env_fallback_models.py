@@ -13,6 +13,7 @@ Detected Patterns:
 - config.get("VAR", default="value")
 """
 
+import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -73,7 +74,6 @@ class EnvFallbackViolation(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         return f"{os.path.basename(self.file_path)}:{self.line_number}"
 
     @property

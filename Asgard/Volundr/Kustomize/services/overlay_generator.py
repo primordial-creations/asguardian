@@ -8,9 +8,9 @@ image overrides, replica scaling, and resource patches.
 import hashlib
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Kustomize.models.kustomize_models import (
     GeneratedKustomization,
@@ -243,7 +243,7 @@ class OverlayGenerator:
         if overlay.resources:
             kustomization["resources"].extend(overlay.resources)
 
-        return yaml.dump(kustomization, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(kustomization, default_flow_style=False, sort_keys=False))
 
     def _generate_replica_patch(
         self,
@@ -267,7 +267,7 @@ class OverlayGenerator:
             "spec": {"replicas": replicas},
         }
 
-        return yaml.dump(patch, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(patch, default_flow_style=False, sort_keys=False))
 
     def _generate_resource_patch(
         self,
@@ -300,7 +300,7 @@ class OverlayGenerator:
             },
         }
 
-        return yaml.dump(patch, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(patch, default_flow_style=False, sort_keys=False))
 
     def _validate_overlay(
         self, files: Dict[str, str], overlay: KustomizeOverlay

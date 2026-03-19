@@ -5,7 +5,7 @@ Introspects GraphQL endpoints to extract schema information.
 """
 
 import json
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from urllib.request import Request, urlopen
 from urllib.error import URLError
 
@@ -199,7 +199,7 @@ class IntrospectionService:
         if "data" not in result or "__schema" not in result["data"]:
             raise ValueError("Invalid introspection response")
 
-        return result["data"]["__schema"]
+        return cast(dict[str, Any], result["data"]["__schema"])
 
     def _parse_introspection_result(self, schema_data: dict[str, Any]) -> GraphQLSchema:
         """Parse introspection result into a GraphQL schema."""
@@ -369,7 +369,7 @@ class IntrospectionService:
             inner = self._format_type_ref(of_type) if of_type else "Unknown"
             return f"[{inner}]"
         elif name:
-            return name
+            return cast(str, name)
         else:
             return "Unknown"
 

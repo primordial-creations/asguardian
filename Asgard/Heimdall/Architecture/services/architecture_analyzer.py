@@ -4,6 +4,7 @@ Heimdall Architecture Analyzer Service
 Unified analyzer that combines all architecture analysis features.
 """
 
+import json
 import time
 from pathlib import Path
 from typing import Optional
@@ -200,6 +201,14 @@ class ArchitectureAnalyzer:
             lines.append("  SOLID PRINCIPLES")
             lines.append("-" * 70)
             lines.append("")
+            lines.append(
+                "  Checks five object-oriented design principles: Single Responsibility"
+                " (one reason to change), Open/Closed (open for extension, closed for"
+                " modification), Liskov Substitution (subtypes behave like their base),"
+                " Interface Segregation (no fat interfaces), Dependency Inversion (depend"
+                " on abstractions)."
+            )
+            lines.append("")
             lines.append(f"  Classes Analyzed:  {result.solid_report.total_classes}")
             lines.append(f"  Violations Found:  {result.solid_report.total_violations}")
             lines.append("")
@@ -216,6 +225,12 @@ class ArchitectureAnalyzer:
             lines.append("  LAYER ARCHITECTURE")
             lines.append("-" * 70)
             lines.append("")
+            lines.append(
+                "  Verifies that code only imports across layers in the permitted direction"
+                " (e.g. presentation -> service -> repository -> domain). A violation means"
+                " a lower layer is importing from a higher one."
+            )
+            lines.append("")
             lines.append(f"  Layers Defined:    {len(result.layer_report.layers)}")
             lines.append(f"  Violations Found:  {result.layer_report.total_violations}")
             lines.append(f"  Status:            {'VALID' if result.layer_report.is_valid else 'INVALID'}")
@@ -226,6 +241,11 @@ class ArchitectureAnalyzer:
             lines.append("-" * 70)
             lines.append("  DESIGN PATTERNS")
             lines.append("-" * 70)
+            lines.append("")
+            lines.append(
+                "  Identifies common GoF structural and behavioural patterns (Factory,"
+                " Singleton, Observer, Strategy, etc.) present in the codebase."
+            )
             lines.append("")
             lines.append(f"  Patterns Found:    {result.pattern_report.total_patterns}")
             lines.append("")
@@ -241,6 +261,12 @@ class ArchitectureAnalyzer:
             lines.append("-" * 70)
             lines.append("  HEXAGONAL ARCHITECTURE")
             lines.append("-" * 70)
+            lines.append("")
+            lines.append(
+                "  Checks that domain logic is isolated from infrastructure by ports"
+                " (interfaces) and adapters (implementations). A violation means domain"
+                " code directly depends on an adapter."
+            )
             lines.append("")
             lines.append(f"  Ports Found:       {len(result.hexagonal_report.ports)}")
             lines.append(f"  Adapters Found:    {len(result.hexagonal_report.adapters)}")
@@ -264,8 +290,6 @@ class ArchitectureAnalyzer:
 
     def _generate_json_report(self, result: ArchitectureReport) -> str:
         """Generate JSON format report."""
-        import json
-
         output = {
             "scan_path": result.scan_path,
             "scanned_at": result.scanned_at.isoformat(),
@@ -398,14 +422,11 @@ class ArchitectureAnalyzer:
                 lines.append("| Principle | Class | Message | Severity |")
                 lines.append("|-----------|-------|---------|----------|")
 
-                for v in result.solid_report.violations[:10]:  # Limit to 10
+                for v in result.solid_report.violations:
                     lines.append(
                         f"| {v.principle_name[:20]} | {v.class_name} | "
                         f"{v.message[:40]} | {v.severity.value.upper()} |"
                     )
-
-                if len(result.solid_report.violations) > 10:
-                    lines.append(f"| ... | ... | +{len(result.solid_report.violations) - 10} more | ... |")
 
                 lines.append("")
 
@@ -423,7 +444,7 @@ class ArchitectureAnalyzer:
                 lines.append("| Source | Target | Message |")
                 lines.append("|--------|--------|---------|")
 
-                for v in result.layer_report.violations[:10]:
+                for v in result.layer_report.violations:
                     lines.append(
                         f"| {v.source_module} ({v.source_layer}) | "
                         f"{v.target_module} ({v.target_layer}) | {v.message} |"
@@ -438,7 +459,7 @@ class ArchitectureAnalyzer:
             lines.append("| Pattern | Class | Confidence |")
             lines.append("|---------|-------|------------|")
 
-            for p in result.pattern_report.patterns[:15]:
+            for p in result.pattern_report.patterns:
                 lines.append(
                     f"| {p.pattern_type.value.replace('_', ' ').title()} | "
                     f"{p.class_name} | {p.confidence:.0%} |"
@@ -462,7 +483,7 @@ class ArchitectureAnalyzer:
                 lines.append("| Severity | Source Zone | Target Zone | Message |")
                 lines.append("|----------|------------|-------------|---------|")
 
-                for v in result.hexagonal_report.violations[:10]:
+                for v in result.hexagonal_report.violations:
                     lines.append(
                         f"| {v.severity.value.upper()} | "
                         f"{v.source_zone.value} | {v.target_zone.value} | "

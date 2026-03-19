@@ -5,7 +5,7 @@ Analyzes resource loading performance using the Resource Timing API.
 Identifies slow resources, render-blocking content, and optimization opportunities.
 """
 
-from typing import List, Optional
+from typing import Any, List, Optional, cast
 
 from playwright.async_api import Page, async_playwright
 
@@ -91,7 +91,7 @@ class ResourceTimingAnalyzer:
 
     async def _extract_resource_timing(self, page: Page) -> List[dict]:
         """Extract resource timing entries from the page."""
-        return await page.evaluate("""
+        return cast(List[dict], await page.evaluate("""
             () => {
                 const entries = performance.getEntriesByType('resource');
                 return entries.map(entry => ({
@@ -112,7 +112,7 @@ class ResourceTimingAnalyzer:
                     decodedBodySize: entry.decodedBodySize || 0,
                 }));
             }
-        """)
+        """))
 
     def _parse_resource(self, raw: dict) -> ResourceTiming:
         """Parse raw resource data into ResourceTiming model."""

@@ -8,9 +8,9 @@ transformers, and generators.
 import hashlib
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Kustomize.models.kustomize_models import (
     GeneratedKustomization,
@@ -137,7 +137,7 @@ class BaseGenerator:
             },
         }
 
-        return yaml.dump(deployment, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(deployment, default_flow_style=False, sort_keys=False))
 
     def _generate_service(self, config: KustomizeConfig) -> str:
         """Generate service.yaml for base."""
@@ -162,7 +162,7 @@ class BaseGenerator:
             },
         }
 
-        return yaml.dump(service, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(service, default_flow_style=False, sort_keys=False))
 
     def _generate_hpa(self, config: KustomizeConfig) -> str:
         """Generate hpa.yaml for base."""
@@ -193,7 +193,7 @@ class BaseGenerator:
             },
         }
 
-        return yaml.dump(hpa, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(hpa, default_flow_style=False, sort_keys=False))
 
     def _generate_networkpolicy(self, config: KustomizeConfig) -> str:
         """Generate networkpolicy.yaml for base."""
@@ -225,7 +225,7 @@ class BaseGenerator:
             },
         }
 
-        return yaml.dump(networkpolicy, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(networkpolicy, default_flow_style=False, sort_keys=False))
 
     def _generate_base_kustomization(
         self, config: KustomizeConfig, files: Dict[str, str]
@@ -294,7 +294,7 @@ class BaseGenerator:
                     secret_entry["envs"] = secret.envs
                 kustomization["secretGenerator"].append(secret_entry)
 
-        return yaml.dump(kustomization, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(kustomization, default_flow_style=False, sort_keys=False))
 
     def _validate_base(
         self, files: Dict[str, str], config: KustomizeConfig

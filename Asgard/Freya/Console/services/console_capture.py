@@ -8,7 +8,7 @@ during page load.
 import asyncio
 import re
 from datetime import datetime
-from typing import Callable, Dict, List, Optional
+from typing import Callable, Dict, List, Optional, cast
 
 from playwright.async_api import ConsoleMessage as PWConsoleMessage
 from playwright.async_api import Error, Page, async_playwright
@@ -285,17 +285,17 @@ class ConsoleCapture:
     def _should_capture(self, message: ConsoleMessage) -> bool:
         """Check if a message should be captured based on config."""
         if message.message_type == ConsoleMessageType.ERROR:
-            return self.config.capture_errors
+            return cast(bool, self.config.capture_errors)
         elif message.message_type == ConsoleMessageType.WARNING:
-            return self.config.capture_warnings
+            return cast(bool, self.config.capture_warnings)
         elif message.message_type == ConsoleMessageType.INFO:
-            return self.config.capture_info
+            return cast(bool, self.config.capture_info)
         elif message.message_type == ConsoleMessageType.LOG:
-            return self.config.capture_logs
+            return cast(bool, self.config.capture_logs)
         elif message.message_type == ConsoleMessageType.DEBUG:
-            return self.config.capture_debug
+            return cast(bool, self.config.capture_debug)
         elif message.message_type == ConsoleMessageType.TRACE:
-            return self.config.capture_debug
+            return cast(bool, self.config.capture_debug)
         return True
 
     def _build_report(

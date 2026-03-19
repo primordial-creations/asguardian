@@ -4,10 +4,12 @@ Schema Validator Service.
 Validates data against JSON Schemas.
 """
 
+import json
 import re
 import time
+import yaml  # type: ignore[import-untyped]
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from Asgard.Forseti.JSONSchema.models.jsonschema_models import (
     JSONSchemaConfig,
@@ -115,7 +117,7 @@ class SchemaValidatorService:
             schema = resolve_refs(schema)
 
         # Validate
-        self._validate_value(data, schema, "$", errors)
+        self._validate_value(data, cast(dict[str, Any], schema), "$", errors)
 
         validation_time_ms = (time.time() - start_time) * 1000
 
@@ -141,9 +143,6 @@ class SchemaValidatorService:
         Returns:
             JSONSchemaValidationResult with validation details.
         """
-        import json
-        import yaml
-
         start_time = time.time()
 
         # Load data
@@ -243,7 +242,7 @@ class SchemaValidatorService:
         if "oneOf" in schema:
             matches = 0
             for subschema in schema["oneOf"]:
-                sub_errors: list[JSONSchemaValidationError] = []
+                sub_errors = []
                 self._validate_value(value, subschema, path, sub_errors)
                 if not sub_errors:
                     matches += 1
@@ -257,7 +256,7 @@ class SchemaValidatorService:
 
         # Handle not
         if "not" in schema:
-            sub_errors: list[JSONSchemaValidationError] = []
+            sub_errors = []
             self._validate_value(value, schema["not"], path, sub_errors)
             if not sub_errors:
                 errors.append(JSONSchemaValidationError(
@@ -641,7 +640,6 @@ class SchemaValidatorService:
     ) -> str:
         """Generate a validation report."""
         if format == "json":
-            import json
             return json.dumps(result.model_dump(), indent=2, default=str)
         elif format == "markdown":
             return self._generate_markdown_report(result)

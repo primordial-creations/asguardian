@@ -4,6 +4,7 @@ Heimdall Dependency Analyzer Service
 Unified analyzer that combines all dependency analysis features.
 """
 
+import json
 import time
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -266,8 +267,6 @@ class DependencyAnalyzer:
 
     def _generate_json_report(self, result: DependencyReport) -> str:
         """Generate JSON format report."""
-        import json
-
         output = {
             "scan_path": result.scan_path,
             "scanned_at": result.scanned_at.isoformat(),

@@ -7,7 +7,7 @@ Runs all accessibility, visual, and responsive tests on a URL.
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from Asgard.Freya.Integration.models.integration_models import (
     TestCategory,
@@ -78,10 +78,10 @@ class UnifiedTester:
         self.config.categories = categories
         self.config.min_severity = min_severity
 
-        accessibility_results = []
-        visual_results = []
-        responsive_results = []
-        screenshots = {}
+        accessibility_results: List[Any] = []
+        visual_results: List[Any] = []
+        responsive_results: List[Any] = []
+        screenshots: Dict[Any, Any] = {}
 
         run_all = TestCategory.ALL in categories
 
@@ -289,7 +289,7 @@ class UnifiedTester:
     async def _run_visual_tests(self, url: str) -> tuple[List[UnifiedTestResult], dict]:
         """Run all visual tests."""
         results = []
-        screenshots = {}
+        screenshots: Dict[Any, Any] = {}
 
         try:
             layout = LayoutValidator()

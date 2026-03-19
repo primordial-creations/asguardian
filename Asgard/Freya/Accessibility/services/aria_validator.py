@@ -6,7 +6,7 @@ properties, and their correct usage.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, Set, cast
 
 from playwright.async_api import async_playwright, Page
 
@@ -406,9 +406,9 @@ class ARIAValidator:
     async def _count_aria_elements(self, page: Page) -> int:
         """Count total elements with ARIA attributes or roles."""
         try:
-            return await page.evaluate("""
+            return cast(int, await page.evaluate("""
                 () => document.querySelectorAll('[role], [aria-label], [aria-labelledby], [aria-describedby]').length
-            """)
+            """))
         except Exception:
             return 0
 
@@ -428,14 +428,14 @@ class ARIAValidator:
                     return tag;
                 }
             """, element)
-            return selector
+            return cast(str, selector)
         except Exception:
             return "unknown"
 
     async def _get_element_html(self, element) -> Optional[str]:
         """Get truncated outer HTML."""
         try:
-            html = await element.evaluate("el => el.outerHTML")
+            html = cast(str, await element.evaluate("el => el.outerHTML"))
             return html[:200] + "..." if len(html) > 200 else html
         except Exception:
             return None
@@ -444,7 +444,7 @@ class ARIAValidator:
         """Build selector from element data."""
         if elem_data.get("id"):
             return f'#{elem_data["id"]}'
-        tag = elem_data.get("tag", "div")
+        tag = cast(str, elem_data.get("tag", "div"))
         class_name = elem_data.get("className", "")
         if class_name:
             classes = class_name.split()[:2]

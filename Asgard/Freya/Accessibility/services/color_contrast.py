@@ -9,7 +9,7 @@ import colorsys
 import math
 import re
 from datetime import datetime
-from typing import List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, cast
 
 from playwright.async_api import async_playwright, Page
 
@@ -126,6 +126,11 @@ class ColorContrastChecker:
         fg_rgb = self._parse_color(foreground)
         bg_rgb = self._parse_color(background)
 
+        if fg_rgb is None:
+            fg_rgb = (0, 0, 0)
+        if bg_rgb is None:
+            bg_rgb = (255, 255, 255)
+
         contrast_ratio = self._calculate_contrast_ratio(fg_rgb, bg_rgb)
         text_size = self._categorize_text_size(font_size_px, font_weight)
 
@@ -198,7 +203,7 @@ class ColorContrastChecker:
                     };
                 }
             """, element)
-            return styles
+            return cast(Dict[Any, Any], styles)
         except Exception:
             return {
                 "color": "rgb(0, 0, 0)",
@@ -226,7 +231,7 @@ class ColorContrastChecker:
                     return 'rgb(255, 255, 255)';  // Default to white
                 }
             """, element)
-            return bg_color
+            return cast(str, bg_color)
         except Exception:
             return "rgb(255, 255, 255)"
 
@@ -312,7 +317,7 @@ class ColorContrastChecker:
                     return path.slice(-3).join(' > ');
                 }
             """, element)
-            return selector
+            return cast(Optional[str], selector)
         except Exception:
             return None
 

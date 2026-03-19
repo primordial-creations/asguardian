@@ -7,6 +7,7 @@ properly defined as abstractions, and adapters implement ports correctly.
 """
 
 import ast
+import json
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
@@ -638,8 +639,6 @@ class HexagonalAnalyzer:
 
     def _generate_json_report(self, result: HexagonalReport) -> str:
         """Generate JSON format report."""
-        import json
-
         output = {
             "scan_path": result.scan_path,
             "scanned_at": result.scanned_at.isoformat(),

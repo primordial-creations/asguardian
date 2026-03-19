@@ -5,6 +5,7 @@ Detects performance regressions between two datasets.
 """
 
 import math
+import random
 from datetime import datetime
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -268,8 +269,6 @@ class RegressionDetector:
         Returns:
             Dictionary with bootstrap confidence intervals
         """
-        import random
-
         if not before or not after:
             return {}
 
@@ -359,6 +358,7 @@ class RegressionDetector:
         t_stat = (mean2 - mean1) / math.sqrt(se_total)
 
         # Welch-Satterthwaite degrees of freedom
+        df: float
         if se1 == 0 or se2 == 0:
             df = n1 + n2 - 2
         else:
@@ -531,7 +531,7 @@ class RegressionDetector:
         p99_change: float,
     ) -> List[str]:
         """Generate recommendations based on regression analysis."""
-        recommendations = []
+        recommendations: List[str] = []
 
         if not is_regression:
             return recommendations

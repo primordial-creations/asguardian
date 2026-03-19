@@ -8,7 +8,7 @@ infrastructure and multiple services.
 import hashlib
 import os
 from datetime import datetime
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from Asgard.Volundr.Scaffold.models.scaffold_models import (
     ProjectConfig,
@@ -257,10 +257,10 @@ class MonorepoScaffold:
         if not config.services:
             return Language.PYTHON
         # Count language occurrences
-        lang_counts = {}
+        lang_counts: Dict[Language, int] = {}
         for service in config.services:
             lang_counts[service.language] = lang_counts.get(service.language, 0) + 1
-        return max(lang_counts, key=lang_counts.get)
+        return max(lang_counts, key=lambda k: lang_counts[k])
 
     # Template methods
     def _root_readme(self, config: ProjectConfig) -> str:
@@ -824,13 +824,15 @@ deploy-prod:
 
     def _get_next_steps(self, config: ProjectConfig) -> List[str]:
         """Get next steps for the generated monorepo."""
-        return [
+        steps: List[str] = [
             f"cd {config.name}",
             "git init",
-            "pre-commit install" if config.include_pre_commit else None,
             "make dev",
             "Open http://localhost:<port> for each service",
         ]
+        if config.include_pre_commit:
+            steps.insert(2, "pre-commit install")
+        return steps
 
     def save_to_directory(
         self, report: ScaffoldReport, output_dir: Optional[str] = None

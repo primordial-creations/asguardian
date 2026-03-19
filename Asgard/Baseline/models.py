@@ -165,7 +165,7 @@ class BaselineFile(BaseModel):
 
     def get_stats(self) -> BaselineStats:
         """Calculate statistics for this baseline."""
-        stats = BaselineStats(total_entries=len(self.entries))
+        stats = BaselineStats(total_entries=len(self.entries), expired_entries=0, active_entries=0)
 
         for entry in self.entries:
             # By type

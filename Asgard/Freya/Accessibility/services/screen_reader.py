@@ -6,7 +6,7 @@ landmark structure, heading structure, and form labels.
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from playwright.async_api import async_playwright, Page
 
@@ -46,9 +46,9 @@ class ScreenReaderValidator:
         Returns:
             ScreenReaderReport with all findings
         """
-        issues = []
-        landmark_structure = {}
-        heading_structure = []
+        issues: List[Any] = []
+        landmark_structure: Dict[str, int] = {}
+        heading_structure: List[Any] = []
         language = None
 
         async with async_playwright() as p:
@@ -109,7 +109,7 @@ class ScreenReaderValidator:
             ))
             return None
 
-        return lang
+        return cast(Optional[str], lang)
 
     async def _analyze_landmarks(
         self,
@@ -425,7 +425,7 @@ class ScreenReaderValidator:
                     return null;
                 }
             """, element)
-            return name
+            return cast(Optional[str], name)
         except Exception:
             return None
 
@@ -443,6 +443,6 @@ class ScreenReaderValidator:
                     return tag;
                 }
             """, element)
-            return selector
+            return cast(str, selector)
         except Exception:
             return "unknown"

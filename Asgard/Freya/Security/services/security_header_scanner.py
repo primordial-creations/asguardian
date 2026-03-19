@@ -548,7 +548,7 @@ class SecurityHeaderScanner:
 
     def _calculate_score(self, report: SecurityHeaderReport) -> float:
         """Calculate security score (0-100)."""
-        score = 0
+        score: float = 0
         max_score = 100
 
         # CSP: 25 points
@@ -593,7 +593,7 @@ class SecurityHeaderScanner:
                 score += 5
 
         # Cross-origin policies: 10 points total
-        cross_origin_score = 0
+        cross_origin_score: float = 0
         for header in [
             report.cross_origin_opener_policy,
             report.cross_origin_embedder_policy,

@@ -8,7 +8,7 @@ semantic versioning suggestions, impact analysis, and migration paths.
 import re
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, List, Optional, cast
 
 from Asgard.Forseti.Contracts.models.contract_models import (
     ContractConfig,
@@ -35,7 +35,7 @@ class MigrationStep:
     action: str
     description: str
     code_example: Optional[str] = None
-    affected_endpoints: list[str] = None
+    affected_endpoints: Optional[list[str]] = None
 
     def __post_init__(self):
         if self.affected_endpoints is None:
@@ -104,7 +104,7 @@ class BreakingChangeDetectorService:
             List of breaking changes.
         """
         result = self.compatibility_checker.check(old_version_path, new_version_path)
-        return result.breaking_changes
+        return cast(List[Any], result.breaking_changes)
 
     def categorize_changes(
         self,

@@ -4,12 +4,18 @@ Schema Generator Service.
 Generates JSON Schemas from Python types and Pydantic models.
 """
 
+import dataclasses
 import inspect
+import json
+import re
+import yaml  # type: ignore[import-untyped]
 from datetime import date, datetime, time
 from enum import Enum
 from pathlib import Path
-from typing import Any, Optional, Union, get_args, get_origin
+from typing import Any, Literal, Optional, Union, get_args, get_origin
 from uuid import UUID
+
+from pydantic import BaseModel
 
 from Asgard.Forseti.JSONSchema.models.jsonschema_models import (
     JSONSchemaConfig,
@@ -74,26 +80,22 @@ class SchemaGeneratorService:
         self._definitions = {}
 
         # Try to use Pydantic's built-in schema generation
-        try:
-            from pydantic import BaseModel
-            if issubclass(model, BaseModel):
-                schema = model.model_json_schema()
+        if issubclass(model, BaseModel):
+            schema = model.model_json_schema()
 
-                # Apply config options
-                if not self.config.include_descriptions:
-                    self._remove_descriptions(schema)
-                if not self.config.include_examples:
-                    self._remove_examples(schema)
+            # Apply config options
+            if not self.config.include_descriptions:
+                self._remove_descriptions(schema)
+            if not self.config.include_examples:
+                self._remove_examples(schema)
 
-                # Override title/description if provided
-                if title:
-                    schema["title"] = title
-                if description:
-                    schema["description"] = description
+            # Override title/description if provided
+            if title:
+                schema["title"] = title
+            if description:
+                schema["description"] = description
 
-                return schema
-        except ImportError:
-            pass
+            return schema
 
         # Fallback to manual generation
         return self._generate_object_schema(model, title, description)
@@ -150,8 +152,6 @@ class SchemaGeneratorService:
         Returns:
             JSON Schema dictionary.
         """
-        import dataclasses
-
         if not dataclasses.is_dataclass(dataclass_type):
             raise ValueError(f"{dataclass_type} is not a dataclass")
 
@@ -262,7 +262,7 @@ class SchemaGeneratorService:
 
         # Handle list/List
         if origin is list:
-            schema: dict[str, Any] = {"type": "array"}
+            schema = {"type": "array"}
             if args:
                 schema["items"] = self._type_to_schema(args[0])
             return schema
@@ -315,13 +315,9 @@ class SchemaGeneratorService:
             return {"enum": values}
 
         # Handle Literal
-        try:
-            from typing import Literal
-            if get_origin(type_hint) is Literal:
-                values = list(get_args(type_hint))
-                return {"enum": values}
-        except ImportError:
-            pass
+        if get_origin(type_hint) is Literal:
+            values = list(get_args(type_hint))
+            return {"enum": values}
 
         # Handle classes with annotations (dataclass-like)
         if hasattr(type_hint, "__annotations__"):
@@ -420,8 +416,6 @@ class SchemaGeneratorService:
 
     def _infer_string_format(self, value: str) -> Optional[str]:
         """Infer string format from value."""
-        import re
-
         patterns = [
             (r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}", "date-time"),
             (r"^\d{4}-\d{2}-\d{2}$", "date"),
@@ -471,9 +465,6 @@ class SchemaGeneratorService:
             schema: Schema dictionary.
             output_path: Output file path.
         """
-        import json
-        import yaml
-
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
 

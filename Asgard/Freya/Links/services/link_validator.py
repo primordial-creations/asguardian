@@ -9,7 +9,7 @@ import asyncio
 import re
 import time
 from datetime import datetime
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, cast
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -156,7 +156,7 @@ class LinkValidator:
             }
         """)
 
-        return links
+        return cast(List[Dict[Any, Any]], links)
 
     def _filter_links(self, links: List[Dict], base_url: str) -> List[Dict]:
         """Filter links based on configuration."""
@@ -489,7 +489,7 @@ class LinkValidator:
         error_penalty = min(10, report.error_count * 5)
         score -= error_penalty
 
-        return max(0, score)
+        return cast(float, max(0, score))
 
     async def close(self) -> None:
         """Close the HTTP client."""

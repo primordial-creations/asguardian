@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Docker.models.docker_models import (
     ComposeConfig,

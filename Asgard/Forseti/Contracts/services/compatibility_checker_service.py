@@ -4,6 +4,7 @@ Compatibility Checker Service.
 Checks backward compatibility between API versions.
 """
 
+import json
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -414,7 +415,6 @@ class CompatibilityCheckerService:
     ) -> str:
         """Generate a compatibility report."""
         if format == "json":
-            import json
             return json.dumps(result.model_dump(), indent=2, default=str)
         elif format == "markdown":
             return self._generate_markdown_report(result)

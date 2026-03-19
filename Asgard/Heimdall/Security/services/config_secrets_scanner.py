@@ -11,6 +11,7 @@ Detects:
 - High-entropy strings (Shannon entropy > 3.5) for strings longer than 20 chars
 """
 
+import configparser
 import fnmatch
 import json
 import math
@@ -19,6 +20,10 @@ from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, Iterator, List, Optional, Tuple
+
+import tomllib
+
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Heimdall.Security.models.config_secrets_models import (
     ConfigSecretFinding,
@@ -292,11 +297,6 @@ class ConfigSecretsScanner:
     def _analyze_yaml(self, file_path: Path) -> List[ConfigSecretFinding]:
         """Parse and scan a YAML file."""
         try:
-            import yaml
-        except ImportError:
-            return []
-
-        try:
             content = file_path.read_text(encoding="utf-8")
             data = yaml.safe_load(content)
             if data is None:
@@ -317,14 +317,6 @@ class ConfigSecretsScanner:
     def _analyze_toml(self, file_path: Path) -> List[ConfigSecretFinding]:
         """Parse and scan a TOML file."""
         try:
-            import tomllib
-        except ImportError:
-            try:
-                import tomli as tomllib
-            except ImportError:
-                return []
-
-        try:
             content = file_path.read_bytes()
             data = tomllib.loads(content.decode("utf-8"))
             return self._scan_data(file_path, data)
@@ -333,8 +325,6 @@ class ConfigSecretsScanner:
 
     def _analyze_ini(self, file_path: Path) -> List[ConfigSecretFinding]:
         """Parse and scan an INI/CFG file."""
-        import configparser
-
         findings = []
         try:
             parser = configparser.ConfigParser()

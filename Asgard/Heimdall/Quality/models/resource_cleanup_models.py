@@ -11,6 +11,7 @@ Detected Patterns:
 - Sockets, subprocess.Popen, or other connections not in a 'with' block
 """
 
+import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -57,7 +58,6 @@ class ResourceCleanupViolation(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         return f"{os.path.basename(self.file_path)}:{self.line_number}"
 
     @property

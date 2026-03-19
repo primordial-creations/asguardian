@@ -26,10 +26,10 @@ COMMON_BREAKPOINTS = [
     Breakpoint(name="mobile-lg", width=414, height=896, is_mobile=True, device_scale_factor=3),
     Breakpoint(name="tablet", width=768, height=1024, is_mobile=True, device_scale_factor=2),
     Breakpoint(name="tablet-lg", width=1024, height=1366, is_mobile=True, device_scale_factor=2),
-    Breakpoint(name="desktop-sm", width=1280, height=800),
-    Breakpoint(name="desktop-md", width=1440, height=900),
-    Breakpoint(name="desktop-lg", width=1920, height=1080),
-    Breakpoint(name="desktop-xl", width=2560, height=1440),
+    Breakpoint(name="desktop-sm", width=1280, height=800, is_mobile=False, device_scale_factor=1.0),
+    Breakpoint(name="desktop-md", width=1440, height=900, is_mobile=False, device_scale_factor=1.0),
+    Breakpoint(name="desktop-lg", width=1920, height=1080, is_mobile=False, device_scale_factor=1.0),
+    Breakpoint(name="desktop-xl", width=2560, height=1440, is_mobile=False, device_scale_factor=1.0),
 ]
 
 MOBILE_DEVICES = {

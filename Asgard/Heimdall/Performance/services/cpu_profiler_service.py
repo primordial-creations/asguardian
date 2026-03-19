@@ -278,7 +278,6 @@ class CpuProfilerService:
 
     def _find_function_line(self, content: str, func_name: str) -> dict:
         """Find the line number where a function is defined."""
-        import re
         pattern = rf"def\s+{re.escape(func_name)}\s*\("
         match = re.search(pattern, content)
         if match:

@@ -8,9 +8,9 @@ best practices, and comprehensive configurations.
 import hashlib
 import os
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Helm.models.helm_models import (
     GeneratedHelmChart,
@@ -152,7 +152,7 @@ class ChartGenerator:
                     dep_data["alias"] = dep.alias
                 chart_data["dependencies"].append(dep_data)
 
-        return yaml.dump(chart_data, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(chart_data, default_flow_style=False, sort_keys=False))
 
     def _generate_values_yaml(self, config: HelmConfig) -> str:
         """Generate values.yaml content."""
@@ -253,7 +253,7 @@ class ChartGenerator:
         if values.extra_config:
             values_data.update(values.extra_config)
 
-        return yaml.dump(values_data, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(values_data, default_flow_style=False, sort_keys=False))
 
     def _generate_helpers_template(self, config: HelmConfig) -> str:
         """Generate _helpers.tpl content."""

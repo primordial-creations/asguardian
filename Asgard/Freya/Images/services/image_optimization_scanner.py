@@ -8,7 +8,7 @@ accessibility, performance, and best practices.
 import re
 import time
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, cast
 from urllib.parse import urljoin, urlparse
 
 import httpx
@@ -774,7 +774,7 @@ class ImageOptimizationScanner:
             modern_ratio = report.optimized_format_count / total_images
             score += modern_ratio * 5
 
-        return max(0, min(100, score))
+        return cast(float, max(0, min(100, score)))
 
     def _generate_suggestions(self, report: ImageReport) -> List[str]:
         """Generate actionable suggestions."""

@@ -458,12 +458,15 @@ class StaticSecurityService:
 
             if report.secrets_report.findings:
                 lines.append("")
-                for finding in report.secrets_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.pattern_name}: {finding.masked_value}")
-
-                if len(report.secrets_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.secrets_report.findings) - 5} more")
+                groups: dict = {}
+                for finding in report.secrets_report.findings:
+                    key = (finding.pattern_name, finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper())
+                    groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (pattern_name, severity), locations in groups.items():
+                    count = len(locations)
+                    lines.append(f"  {pattern_name} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         if report.dependency_report:
@@ -477,14 +480,17 @@ class StaticSecurityService:
 
             if report.dependency_report.vulnerabilities:
                 lines.append("")
-                for vuln in report.dependency_report.vulnerabilities[:5]:
-                    lines.append(f"  [{vuln.risk_level.upper()}] {vuln.package_name} {vuln.installed_version}")
-                    lines.append(f"    {vuln.title}")
-                    if vuln.fixed_version:
-                        lines.append(f"    Fix: Upgrade to {vuln.fixed_version}")
-
-                if len(report.dependency_report.vulnerabilities) > 5:
-                    lines.append(f"  ... and {len(report.dependency_report.vulnerabilities) - 5} more")
+                dep_groups: dict = {}
+                for vuln in report.dependency_report.vulnerabilities:
+                    risk = vuln.risk_level.upper() if isinstance(vuln.risk_level, str) else vuln.risk_level.value.upper()
+                    key = (vuln.title, risk)
+                    dep_groups.setdefault(key, []).append((vuln.package_name, vuln.installed_version, vuln.fixed_version))
+                for (title, risk), packages in dep_groups.items():
+                    count = len(packages)
+                    lines.append(f"  {title} ({risk.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for pkg_name, installed, fixed in packages:
+                        fix_str = f"  ->  fix: upgrade to {fixed}" if fixed else ""
+                        lines.append(f"    {pkg_name} {installed}{fix_str}")
             lines.append("")
 
         if report.vulnerability_report:
@@ -498,12 +504,16 @@ class StaticSecurityService:
 
             if report.vulnerability_report.findings:
                 lines.append("")
-                for finding in report.vulnerability_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.title}")
-
-                if len(report.vulnerability_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.vulnerability_report.findings) - 5} more")
+                vuln_groups: dict = {}
+                for finding in report.vulnerability_report.findings:
+                    severity = finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper()
+                    key = (finding.title, severity)
+                    vuln_groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (title, severity), locations in vuln_groups.items():
+                    count = len(locations)
+                    lines.append(f"  {title} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         if report.crypto_report:
@@ -517,12 +527,16 @@ class StaticSecurityService:
 
             if report.crypto_report.findings:
                 lines.append("")
-                for finding in report.crypto_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.description}")
-
-                if len(report.crypto_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.crypto_report.findings) - 5} more")
+                crypto_groups: dict = {}
+                for finding in report.crypto_report.findings:
+                    severity = finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper()
+                    key = (finding.description, severity)
+                    crypto_groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (description, severity), locations in crypto_groups.items():
+                    count = len(locations)
+                    lines.append(f"  {description} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         if report.access_report and hasattr(report.access_report, 'findings'):
@@ -536,12 +550,16 @@ class StaticSecurityService:
 
             if report.access_report.findings:
                 lines.append("")
-                for finding in report.access_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.title}")
-
-                if len(report.access_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.access_report.findings) - 5} more")
+                access_groups: dict = {}
+                for finding in report.access_report.findings:
+                    severity = finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper()
+                    key = (finding.title, severity)
+                    access_groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (title, severity), locations in access_groups.items():
+                    count = len(locations)
+                    lines.append(f"  {title} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         if report.auth_report and hasattr(report.auth_report, 'findings'):
@@ -555,12 +573,16 @@ class StaticSecurityService:
 
             if report.auth_report.findings:
                 lines.append("")
-                for finding in report.auth_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.title}")
-
-                if len(report.auth_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.auth_report.findings) - 5} more")
+                auth_groups: dict = {}
+                for finding in report.auth_report.findings:
+                    severity = finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper()
+                    key = (finding.title, severity)
+                    auth_groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (title, severity), locations in auth_groups.items():
+                    count = len(locations)
+                    lines.append(f"  {title} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         if report.headers_report and hasattr(report.headers_report, 'findings'):
@@ -574,12 +596,16 @@ class StaticSecurityService:
 
             if report.headers_report.findings:
                 lines.append("")
-                for finding in report.headers_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.title}")
-
-                if len(report.headers_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.headers_report.findings) - 5} more")
+                headers_groups: dict = {}
+                for finding in report.headers_report.findings:
+                    severity = finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper()
+                    key = (finding.title, severity)
+                    headers_groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (title, severity), locations in headers_groups.items():
+                    count = len(locations)
+                    lines.append(f"  {title} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         if report.tls_report and hasattr(report.tls_report, 'findings'):
@@ -593,12 +619,16 @@ class StaticSecurityService:
 
             if report.tls_report.findings:
                 lines.append("")
-                for finding in report.tls_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.title}")
-
-                if len(report.tls_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.tls_report.findings) - 5} more")
+                tls_groups: dict = {}
+                for finding in report.tls_report.findings:
+                    severity = finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper()
+                    key = (finding.title, severity)
+                    tls_groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (title, severity), locations in tls_groups.items():
+                    count = len(locations)
+                    lines.append(f"  {title} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         if report.container_report and hasattr(report.container_report, 'findings'):
@@ -612,12 +642,16 @@ class StaticSecurityService:
 
             if report.container_report.findings:
                 lines.append("")
-                for finding in report.container_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.title}")
-
-                if len(report.container_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.container_report.findings) - 5} more")
+                container_groups: dict = {}
+                for finding in report.container_report.findings:
+                    severity = finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper()
+                    key = (finding.title, severity)
+                    container_groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (title, severity), locations in container_groups.items():
+                    count = len(locations)
+                    lines.append(f"  {title} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         if report.infrastructure_report and hasattr(report.infrastructure_report, 'findings'):
@@ -631,12 +665,16 @@ class StaticSecurityService:
 
             if report.infrastructure_report.findings:
                 lines.append("")
-                for finding in report.infrastructure_report.findings[:5]:
-                    lines.append(f"  [{finding.severity.upper()}] {finding.file_path}:{finding.line_number}")
-                    lines.append(f"    {finding.title}")
-
-                if len(report.infrastructure_report.findings) > 5:
-                    lines.append(f"  ... and {len(report.infrastructure_report.findings) - 5} more")
+                infra_groups: dict = {}
+                for finding in report.infrastructure_report.findings:
+                    severity = finding.severity.upper() if isinstance(finding.severity, str) else finding.severity.value.upper()
+                    key = (finding.title, severity)
+                    infra_groups.setdefault(key, []).append(f"{finding.file_path}:{finding.line_number}")
+                for (title, severity), locations in infra_groups.items():
+                    count = len(locations)
+                    lines.append(f"  {title} ({severity.lower()}) -- {count} occurrence{'s' if count != 1 else ''}")
+                    for loc in locations:
+                        lines.append(f"    {loc}")
             lines.append("")
 
         lines.extend([

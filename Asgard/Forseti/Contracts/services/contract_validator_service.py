@@ -4,6 +4,7 @@ Contract Validator Service.
 Validates API implementations against contracts.
 """
 
+import json
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -294,7 +295,6 @@ class ContractValidatorService:
     ) -> str:
         """Generate a validation report."""
         if format == "json":
-            import json
             return json.dumps(result.model_dump(), indent=2, default=str)
         elif format == "markdown":
             return self._generate_markdown_report(result)

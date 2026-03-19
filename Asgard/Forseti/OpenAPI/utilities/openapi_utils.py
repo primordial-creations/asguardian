@@ -5,10 +5,10 @@ OpenAPI Utilities - Helper functions for OpenAPI specification handling.
 import json
 import re
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 from urllib.parse import urlparse
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Forseti.OpenAPI.models.openapi_models import OpenAPIVersion
 
@@ -37,15 +37,15 @@ def load_spec_file(file_path: Path) -> dict[str, Any]:
 
     try:
         if suffix in [".json"]:
-            return json.loads(content)
+            return cast(dict[str, Any], json.loads(content))
         elif suffix in [".yaml", ".yml"]:
-            return yaml.safe_load(content)
+            return cast(dict[str, Any], yaml.safe_load(content))
         else:
             # Try JSON first, then YAML
             try:
-                return json.loads(content)
+                return cast(dict[str, Any], json.loads(content))
             except json.JSONDecodeError:
-                return yaml.safe_load(content)
+                return cast(dict[str, Any], yaml.safe_load(content))
     except Exception as e:
         raise ValueError(f"Failed to parse specification file: {e}")
 
@@ -238,7 +238,7 @@ def resolve_references(
             return [resolve_refs(item, root, depth) for item in obj]
         return obj
 
-    return resolve_refs(spec_data, spec_data)
+    return cast(dict[str, Any], resolve_refs(spec_data, spec_data))
 
 
 def validate_url(url: str) -> bool:

@@ -5,6 +5,7 @@ Pydantic models for detecting forbidden library imports that should use
 wrapper libraries instead of direct imports.
 """
 
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -38,7 +39,6 @@ class ForbiddenImportViolation(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         return f"{os.path.basename(self.file_path)}:{self.line_number}"
 
     @property

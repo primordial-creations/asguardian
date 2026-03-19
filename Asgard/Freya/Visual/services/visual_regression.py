@@ -12,7 +12,7 @@ import hashlib
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, cast
 
 from Asgard.Freya.Visual.models.visual_models import (
     ComparisonConfig,
@@ -365,7 +365,7 @@ class VisualRegressionTester:
             if sum_sq1 == 0 or sum_sq2 == 0:
                 return 0.0
 
-            return numerator / (sum_sq1 * sum_sq2) ** 0.5
+            return cast(float, numerator / (sum_sq1 * sum_sq2) ** 0.5)
 
         corr_r = correlation(hist1[0:256], hist2[0:256])
         corr_g = correlation(hist1[256:512], hist2[256:512])

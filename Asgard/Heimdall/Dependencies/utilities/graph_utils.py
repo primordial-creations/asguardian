@@ -6,12 +6,7 @@ Utility functions for working with dependency graphs.
 
 from typing import Dict, List, Optional, Set, Tuple
 
-# NetworkX is optional - provide fallbacks if not available
-try:
-    import networkx as nx
-    HAS_NETWORKX = True
-except ImportError:
-    HAS_NETWORKX = False
+import networkx as nx
 
 
 def create_dependency_graph(
@@ -29,12 +24,6 @@ def create_dependency_graph(
     Raises:
         ImportError: If NetworkX is not installed
     """
-    if not HAS_NETWORKX:
-        raise ImportError(
-            "NetworkX is required for graph operations. "
-            "Install with: pip install networkx"
-        )
-
     graph = nx.DiGraph()
 
     for source, target in dependencies:
@@ -55,9 +44,6 @@ def find_strongly_connected_components(
     Returns:
         List of sets, each set is a strongly connected component
     """
-    if not HAS_NETWORKX:
-        raise ImportError("NetworkX is required for SCC detection.")
-
     # Find SCCs with more than one node (actual cycles)
     sccs = list(nx.strongly_connected_components(graph))
     return [scc for scc in sccs if len(scc) > 1]
@@ -73,9 +59,6 @@ def find_simple_cycles(graph: "nx.DiGraph") -> List[List[str]]:
     Returns:
         List of cycles, each cycle is a list of nodes
     """
-    if not HAS_NETWORKX:
-        raise ImportError("NetworkX is required for cycle detection.")
-
     return list(nx.simple_cycles(graph))
 
 
@@ -93,9 +76,6 @@ def calculate_modularity(
     Returns:
         Modularity score (0-1, higher is better)
     """
-    if not HAS_NETWORKX:
-        raise ImportError("NetworkX is required for modularity calculation.")
-
     # Convert to undirected for modularity calculation
     undirected = graph.to_undirected()
 
@@ -115,9 +95,6 @@ def detect_communities(graph: "nx.DiGraph") -> List[Set[str]]:
     Returns:
         List of node sets representing communities
     """
-    if not HAS_NETWORKX:
-        raise ImportError("NetworkX is required for community detection.")
-
     # Convert to undirected for community detection
     undirected = graph.to_undirected()
 
@@ -140,9 +117,6 @@ def get_node_degrees(graph: "nx.DiGraph") -> Dict[str, Dict[str, int]]:
     Returns:
         Dict mapping node to {in_degree, out_degree}
     """
-    if not HAS_NETWORKX:
-        raise ImportError("NetworkX is required for degree calculation.")
-
     result = {}
     for node in graph.nodes():
         result[node] = {
@@ -162,9 +136,6 @@ def topological_sort(graph: "nx.DiGraph") -> Optional[List[str]]:
     Returns:
         List of nodes in topological order, or None if cycles exist
     """
-    if not HAS_NETWORKX:
-        raise ImportError("NetworkX is required for topological sort.")
-
     try:
         return list(nx.topological_sort(graph))
     except nx.NetworkXUnfeasible:
@@ -184,9 +155,6 @@ def get_transitive_closure(graph: "nx.DiGraph") -> "nx.DiGraph":
     Returns:
         Transitive closure graph
     """
-    if not HAS_NETWORKX:
-        raise ImportError("NetworkX is required for transitive closure.")
-
     return nx.transitive_closure(graph)
 
 
@@ -206,9 +174,6 @@ def find_shortest_path(
     Returns:
         List of nodes in the path, or None if no path exists
     """
-    if not HAS_NETWORKX:
-        raise ImportError("NetworkX is required for path finding.")
-
     try:
         return nx.shortest_path(graph, source, target)
     except nx.NetworkXNoPath:

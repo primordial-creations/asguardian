@@ -6,6 +6,7 @@ Command handlers are delegated to submodules for better organization.
 """
 
 import argparse
+import io
 import sys
 
 from Asgard.Heimdall.cli.common import (
@@ -120,6 +121,8 @@ from Asgard.Heimdall.cli.handlers import (
     run_mcp_server,
     run_dashboard,
     run_full_scan,
+    _TeeStream,
+    open_output_in_browser,
 )
 
 
@@ -1384,6 +1387,45 @@ def main(args=None):
     if args.command is None:
         parser.print_help()
         sys.exit(0)
+
+    # Commands that should NOT open a browser (long-running servers / no report output)
+    _NO_BROWSER = {"mcp-server", "dashboard", "install-browsers", "scan"}
+    _should_open_browser = args.command not in _NO_BROWSER
+
+    _buf: io.StringIO = io.StringIO()
+    _tee = _TeeStream(sys.stdout, _buf)
+    if _should_open_browser:
+        sys.stdout = _tee
+
+    try:
+        _dispatch(args, verbose)
+    finally:
+        if _should_open_browser:
+            sys.stdout = sys.__stdout__
+            _captured = _buf.getvalue()
+            if _captured.strip():
+                # Build a descriptive title including subcommand if available
+                sub = (
+                    getattr(args, "quality_command", None)
+                    or getattr(args, "security_command", None)
+                    or getattr(args, "performance_command", None)
+                    or getattr(args, "deps_command", None)
+                    or getattr(args, "arch_command", None)
+                    or getattr(args, "oop_command", None)
+                    or getattr(args, "logic_command", None)
+                    or getattr(args, "syntax_command", None)
+                    or getattr(args, "req_command", None)
+                    or getattr(args, "lic_command", None)
+                )
+                _cmd_label = args.command
+                if sub:
+                    _cmd_label = f"{args.command} {sub}"
+                _title = f"Heimdall - {_cmd_label}"
+                open_output_in_browser(_captured, _title)
+
+
+def _dispatch(args, verbose: bool) -> None:
+    """Inner dispatch — separated so the browser-open finally block always runs."""
 
     # Handle quality subcommands
     if args.command == "quality":

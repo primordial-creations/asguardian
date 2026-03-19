@@ -2,23 +2,28 @@
 Asgard CLI - Unified command-line interface for development tools.
 
 Usage:
-    asgard <module> [command] [options]
-    asgard init [--format yaml|toml|json]
-    asgard init-backend <folder_name>
-    asgard heimdall analyze <path>
-    asgard freya crawl <url>
-    asgard forseti validate <spec>
-    asgard verdandi metrics <path>
-    asgard volundr generate <type>
+    asguardian <module> [command] [options]
+    asguardian init [--format yaml|toml|json]
+    asguardian init-backend <folder_name>
+    asguardian heimdall analyze <path>
+    asguardian freya crawl <url>
+    asguardian forseti validate <spec>
+    asguardian verdandi metrics <path>
+    asguardian volundr generate <type>
 """
 
 import argparse
 import subprocess
 import sys
 from pathlib import Path
-from typing import Optional
+from typing import Optional, cast
 
 from Asgard.BackendInit.service import init_backend
+from Asgard.Forseti.cli import main as forseti_main
+from Asgard.Freya.cli import main as freya_main
+from Asgard.Heimdall.cli import main as heimdall_main
+from Asgard.Verdandi.cli import main as verdandi_main
+from Asgard.Volundr.cli import main as volundr_main
 from Asgard.config.loader import AsgardConfigLoader
 
 
@@ -38,9 +43,9 @@ def handle_install_browsers(args: argparse.Namespace) -> int:
             print()
             print("Browser installation complete!")
             print("You can now use Freya's browser-based features:")
-            print("  asgard freya performance audit <url>")
-            print("  asgard freya visual capture <url>")
-            print("  asgard freya accessibility audit <url>")
+            print("  asguardian freya performance audit <url>")
+            print("  asguardian freya visual capture <url>")
+            print("  asguardian freya accessibility audit <url>")
             return 0
         else:
             print(f"Browser installation failed with exit code {result.returncode}")
@@ -57,7 +62,7 @@ def handle_install_browsers(args: argparse.Namespace) -> int:
 
 COMPREHENSIVE_HELP = """
 ================================================================================
-                         ASGARD - Universal Development Tools Suite
+                         ASGUARDIAN - Universal Development Tools Suite
                                     Version 1.0.0
 ================================================================================
 
@@ -68,15 +73,15 @@ API validation, performance metrics, and infrastructure generation.
                                   QUICK START
 --------------------------------------------------------------------------------
 
-  asgard init                    # Generate configuration file (asgard.yaml)
-  asgard init-backend <folder>   # Scaffold a standard backend project structure
-  asgard install-browsers        # Install Chromium for Freya (run once after install)
-  asgard heimdall quality <path> # Run code quality analysis
-  asgard heimdall security <path> # Run security scanning
-  asgard freya crawl <url>        # Visual regression testing
-  asgard forseti validate <spec>  # API schema validation
-  asgard verdandi web vitals      # Web performance metrics
-  asgard volundr generate k8s     # Generate Kubernetes manifests
+  asguardian init                    # Generate configuration file (asgard.yaml)
+  asguardian init-backend <folder>   # Scaffold a standard backend project structure
+  asguardian install-browsers        # Install Chromium for Freya (run once after install)
+  asguardian heimdall quality <path> # Run code quality analysis
+  asguardian heimdall security <path> # Run security scanning
+  asguardian freya crawl <url>        # Visual regression testing
+  asguardian forseti validate <spec>  # API schema validation
+  asguardian verdandi web vitals      # Web performance metrics
+  asguardian volundr generate k8s     # Generate Kubernetes manifests
 
 ================================================================================
                                    MODULES
@@ -86,12 +91,12 @@ API validation, performance metrics, and infrastructure generation.
   INIT - Configuration Management
 --------------------------------------------------------------------------------
 
-  asgard init [--format yaml|toml|json] [--force]
+  asguardian init [--format yaml|toml|json] [--force]
 
   Generate a default Asgard configuration file in your project root.
   Configuration controls thresholds, excluded paths, and scanner behavior.
 
-  asgard init-backend <folder_name>
+  asguardian init-backend <folder_name>
 
   Scaffold a standard backend project structure inside the named folder.
   Creates: apis/, models/, services/, prompts/, tests/, utilities/,
@@ -261,11 +266,11 @@ Asgard looks for configuration in the following locations (in order):
   1. Environment variables (ASGARD_*)
   2. CLI flags
   3. asgard.yaml in current directory
-  4. pyproject.toml [tool.asgard] section
+  4. pyproject.toml [tool.asguardian] section
   5. .asgardrc (JSON format)
   6. Default values
 
-Run 'asgard init' to generate a default configuration file.
+Run 'asguardian init' to generate a default configuration file.
 
 ================================================================================
                               OUTPUT FORMATS
@@ -280,39 +285,39 @@ Run 'asgard init' to generate a default configuration file.
 ================================================================================
 
   # Initialize configuration
-  asgard init --format yaml
+  asguardian init --format yaml
 
   # Run full quality analysis on a directory
-  asgard heimdall quality lazy-imports ./src --format json
+  asguardian heimdall quality lazy-imports ./src --format json
 
   # Check type annotation coverage
-  asgard heimdall quality typing ./src --threshold 80
+  asguardian heimdall quality typing ./src --threshold 80
 
   # Scan for security issues
-  asgard heimdall security scan ./src --format github
+  asguardian heimdall security scan ./src --format github
 
   # Create a baseline of current violations
-  asgard heimdall baseline create ./src
+  asguardian heimdall baseline create ./src
 
   # Run analysis excluding baselined issues
-  asgard heimdall quality lazy-imports ./src --baseline .asgard-baseline.json
+  asguardian heimdall quality lazy-imports ./src --baseline .asgard-baseline.json
 
   # Calculate web performance score
-  asgard verdandi web vitals --lcp 2100 --fid 50 --cls 0.05
+  asguardian verdandi web vitals --lcp 2100 --fid 50 --cls 0.05
 
   # Check SLA compliance
-  asgard verdandi analyze sla --data "100,150,200,600,800" --threshold 500
+  asguardian verdandi analyze sla --data "100,150,200,600,800" --threshold 500
 
   # Generate Kubernetes manifests
-  asgard volundr generate kubernetes myapp --output ./k8s
+  asguardian volundr generate kubernetes myapp --output ./k8s
 
 ================================================================================
                               MORE HELP
 ================================================================================
 
-  asgard <module> --help           Show help for a specific module
-  asgard heimdall quality --help   Show help for quality commands
-  asgard heimdall security --help  Show help for security commands
+  asguardian <module> --help           Show help for a specific module
+  asguardian heimdall quality --help   Show help for quality commands
+  asguardian heimdall security --help  Show help for security commands
 
 ================================================================================
 """
@@ -320,7 +325,7 @@ Run 'asgard init' to generate a default configuration file.
 
 def handle_init_backend(args: argparse.Namespace) -> int:
     """Handle the 'init-backend' command to scaffold a backend project."""
-    return init_backend(args.folder_name)
+    return cast(int, init_backend(args.folder_name))
 
 
 def handle_init(args: argparse.Namespace) -> int:
@@ -333,8 +338,8 @@ def handle_init(args: argparse.Namespace) -> int:
         filename = "asgard.yaml"
     elif output_format == "toml":
         content = AsgardConfigLoader.generate_default_toml()
-        filename = "pyproject.toml.asgard"
-        print(f"Note: Add the following to your pyproject.toml [tool.asgard] section:")
+        filename = "pyproject.toml.asguardian"
+        print(f"Note: Add the following to your pyproject.toml [tool.asguardian] section:")
     elif output_format == "json":
         content = AsgardConfigLoader.generate_default_json()
         filename = ".asgardrc"
@@ -358,7 +363,7 @@ def handle_init(args: argparse.Namespace) -> int:
 def main(args: Optional[list] = None) -> int:
     """Main entry point for the Asgard CLI."""
     parser = argparse.ArgumentParser(
-        prog="asgard",
+        prog="asguardian",
         description="Asgard - Universal Development Tools Suite",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
@@ -373,14 +378,14 @@ Subcommands:
   volundr           Infrastructure generation
 
 Examples:
-  asgard init --format yaml
-  asgard init-backend my_service
-  asgard install-browsers              # Required once for Freya
-  asgard heimdall analyze ./src
-  asgard freya crawl http://localhost:3000
-  asgard forseti validate openapi.yaml
-  asgard verdandi report ./metrics
-  asgard volundr generate kubernetes --name myapp
+  asguardian init --format yaml
+  asguardian init-backend my_service
+  asguardian install-browsers              # Required once for Freya
+  asguardian heimdall analyze ./src
+  asguardian freya crawl http://localhost:3000
+  asguardian forseti validate openapi.yaml
+  asguardian verdandi report ./metrics
+  asguardian volundr generate kubernetes --name myapp
         """,
     )
 
@@ -532,29 +537,19 @@ Examples:
 
     # Dispatch to the appropriate module CLI
     if parsed_args.module == "heimdall":
-        from Asgard.Heimdall.cli import main as heimdall_main
-
-        return heimdall_main(parsed_args.heimdall_args)
+        return cast(int, heimdall_main(parsed_args.heimdall_args))
 
     elif parsed_args.module == "freya":
-        from Asgard.Freya.cli import main as freya_main
-
-        return freya_main(parsed_args.freya_args)
+        return cast(int, freya_main(parsed_args.freya_args))
 
     elif parsed_args.module == "forseti":
-        from Asgard.Forseti.cli import main as forseti_main
-
-        return forseti_main(parsed_args.forseti_args)
+        return cast(int, forseti_main(parsed_args.forseti_args))
 
     elif parsed_args.module == "verdandi":
-        from Asgard.Verdandi.cli import main as verdandi_main
-
-        return verdandi_main(parsed_args.verdandi_args)
+        return cast(int, verdandi_main(parsed_args.verdandi_args))
 
     elif parsed_args.module == "volundr":
-        from Asgard.Volundr.cli import main as volundr_main
-
-        return volundr_main(parsed_args.volundr_args)
+        return cast(int, volundr_main(parsed_args.volundr_args))
 
     return 0
 

@@ -6,7 +6,7 @@ Compares current metrics against established baselines.
 
 import math
 from datetime import datetime
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, cast
 
 from Asgard.Verdandi.Anomaly.models.anomaly_models import (
     AnomalyDetection,
@@ -188,7 +188,7 @@ class BaselineComparator:
             iqr_score = 0
 
         # Combine scores (weighted average)
-        return 0.6 * z_score + 0.4 * iqr_score
+        return cast(float, 0.6 * z_score + 0.4 * iqr_score)
 
     def is_within_baseline(
         self,
@@ -275,7 +275,7 @@ class BaselineComparator:
         timestamps: Sequence[datetime],
     ) -> List[AnomalyDetection]:
         """Detect anomalies in values against baseline."""
-        anomalies = []
+        anomalies: List[AnomalyDetection] = []
 
         if not baseline.is_valid:
             return anomalies

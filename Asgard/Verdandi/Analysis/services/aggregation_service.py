@@ -125,7 +125,7 @@ class AggregationService:
 
         results = []
         window_start = timestamps_sorted[0]
-        window_values = []
+        window_values: list[Union[int, float]] = []
 
         for ts, value in zip(timestamps_sorted, values_sorted):
             window_end = window_start + timedelta(seconds=window_size)

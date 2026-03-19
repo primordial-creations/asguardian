@@ -8,9 +8,9 @@ with deployment strategies and best practices.
 import hashlib
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.CICD.models.cicd_models import (
     CICDPlatform,
@@ -178,7 +178,7 @@ class PipelineGenerator:
 
         workflow["jobs"] = jobs
 
-        return yaml.dump(workflow, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        return cast(str, yaml.dump(workflow, default_flow_style=False, sort_keys=False, allow_unicode=True))
 
     def _generate_gitlab_ci(self, config: PipelineConfig) -> str:
         """Generate GitLab CI/CD pipeline."""
@@ -219,7 +219,7 @@ class PipelineGenerator:
 
             pipeline[job_name] = job
 
-        return yaml.dump(pipeline, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        return cast(str, yaml.dump(pipeline, default_flow_style=False, sort_keys=False, allow_unicode=True))
 
     def _generate_azure_devops(self, config: PipelineConfig) -> str:
         """Generate Azure DevOps pipeline."""
@@ -270,7 +270,7 @@ class PipelineGenerator:
 
         pipeline["stages"] = stages
 
-        return yaml.dump(pipeline, default_flow_style=False, sort_keys=False, allow_unicode=True)
+        return cast(str, yaml.dump(pipeline, default_flow_style=False, sort_keys=False, allow_unicode=True))
 
     def _generate_jenkins(self, config: PipelineConfig) -> str:
         """Generate Jenkinsfile (declarative pipeline)."""

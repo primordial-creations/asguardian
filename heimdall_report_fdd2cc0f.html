@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - quality type-check</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - quality type-check</h1>
+  <pre>======================================================================
+STATIC TYPE CHECKING REPORT (mypy 1.19.1)
+======================================================================
+
+Scan Path: /mnt/storage/home-data/Documents/GAIA/Asgard/Asgard
+Scan Time: 2026-03-19 17:30:47
+Duration: 96.68 seconds
+Engine: mypy 1.19.1
+Mode: basic
+Files Analyzed: 617
+
+SUMMARY
+--------------------------------------------------
+Total Errors: 31
+Total Warnings: 0
+Total Info: 0
+Files With Errors: 13
+Status: FAILING
+
+ERRORS BY CATEGORY
+--------------------------------------------------
+  General                           21
+  Assignment Error                   4
+  Missing Import                     3
+  Argument Error                     2
+  Return Type                        1
+
+  CATEGORY DESCRIPTIONS
+  -----------------------------------------------
+  missing_import     — Module or name cannot be found at import time
+  undefined_variable — Name used that was never assigned or imported
+  argument_error     — Wrong number or type of arguments passed to a function
+  return_type        — Function returns a value incompatible with its declared type
+  attribute_error    — Accessing a member that doesn't exist on the type
+  assignment_error   — Assigning a value of an incompatible type to a variable
+  operator_error     — Using an operator (+ - * / etc.) with incompatible types
+  override_error     — Subclass method signature doesn't match the base class
+  type_mismatch      — Value used where a different type is expected
+  general            — Other type errors not fitting a specific category
+  unreachable_code   — Code path that can never execute
+  deprecated         — Use of a deprecated API
+
+TOP RULES / ERROR CODES
+--------------------------------------------------
+  no-any-return                                    14
+  var-annotated                                     7
+  assignment                                        4  (assigning a value of an incompatible type)
+  no-redef                                          3  (name re-defined in an incompatible way)
+  arg-type                                          2  (wrong type passed as an argument)
+  return                                            1  (function return type mismatch)
+
+MOST PROBLEMATIC FILES
+--------------------------------------------------
+  cli.py                                                  E:  6 W:  0
+  spec_converter_service.py                               E:  5 W:  0
+  loader.py                                               E:  4 W:  0
+  spec_parser_service.py                                  E:  3 W:  0
+  schema_validator_service.py                             E:  3 W:  0
+  unified_tester.py                                       E:  3 W:  0
+  schema_generator_service.py                             E:  1 W:  0
+  python_generator.py                                     E:  1 W:  0
+  typescript_generator.py                                 E:  1 W:  0
+  schema_generator_service.py                             E:  1 W:  0
+  kubernetes_validator.py                                 E:  1 W:  0
+  cli.py                                                  E:  1 W:  0
+  image_ops.py                                            E:  1 W:  0
+
+DIAGNOSTICS
+--------------------------------------------------
+
+  cli.py
+    L323:0 [ERROR] Returning Any from function declared to return "int" (no-any-return)
+    L537:0 [ERROR] Returning Any from function declared to return "int" (no-any-return)
+    L542:0 [ERROR] Returning Any from function declared to return "int" (no-any-return)
+    L547:0 [ERROR] Returning Any from function declared to return "int" (no-any-return)
+    L552:0 [ERROR] Returning Any from function declared to return "int" (no-any-return)
+    L557:0 [ERROR] Returning Any from function declared to return "int" (no-any-return)
+    L1120:0 [ERROR] Missing return statement (return)
+
+  image_ops.py
+    L185:0 [ERROR] Argument 3 to "_unfilter_row" has incompatible type "bytes | None"; expected "bytes" (arg-type)
+
+  kubernetes_validator.py
+    L538:0 [ERROR] Need type annotation for "results_by_file" (hint: "results_by_file: dict[&lt;type&gt;, &lt;type&gt;] = ...") (var-annotated)
+
+  loader.py
+    L101:0 [ERROR] Returning Any from function declared to return "Path | None" (no-any-return)
+    L253:0 [ERROR] Returning Any from function declared to return "str" (no-any-return)
+    L258:0 [ERROR] Returning Any from function declared to return "str" (no-any-return)
+    L263:0 [ERROR] Returning Any from function declared to return "str" (no-any-return)
+
+  python_generator.py
+    L222:0 [ERROR] Returning Any from function declared to return "str" (no-any-return)
+
+  schema_generator_service.py
+    L265:0 [ERROR] Name "schema" already defined on line 247 (no-redef)
+    L423:0 [ERROR] Returning Any from function declared to return "str" (no-any-return)
+
+  schema_validator_service.py
+    L120:0 [ERROR] Argument 2 to "_validate_value" of "SchemaValidatorService" has incompatible type "dict[str, Any] | str | Path"; expected "dict[str, Any]" (arg-type)
+    L245:0 [ERROR] Name "sub_errors" already defined on line 228 (no-redef)
+    L259:0 [ERROR] Name "sub_errors" already defined on line 228 (no-redef)
+
+  spec_converter_service.py
+    L215:0 [ERROR] Incompatible types in assignment (expression has type "list[dict[str, Any]]", target has type "dict[str, Any]") (assignment)
+    L225:0 [ERROR] Need type annotation for "converted" (var-annotated)
+    L278:0 [ERROR] Incompatible types in assignment (expression has type "list[dict[str, Any]]", target has type "dict[Any, Any]") (assignment)
+    L475:0 [ERROR] Need type annotation for "converted" (var-annotated)
+    L503:0 [ERROR] Incompatible types in assignment (expression has type "list[Any]", target has type "dict[Any, Any]") (assignment)
+
+  spec_parser_service.py
+    L171:0 [ERROR] Need type annotation for "converted" (var-annotated)
+    L230:0 [ERROR] Incompatible types in assignment (expression has type "list[dict[str, Any]]", target has type "dict[Any, Any]") (assignment)
+    L338:0 [ERROR] Returning Any from function declared to return "dict[str, Any]" (no-any-return)
+
+  typescript_generator.py
+    L221:0 [ERROR] Returning Any from function declared to return "str" (no-any-return)
+
+  unified_tester.py
+    L82:0 [ERROR] Need type annotation for "visual_results" (hint: "visual_results: list[&lt;type&gt;] = ...") (var-annotated)
+    L83:0 [ERROR] Need type annotation for "responsive_results" (hint: "responsive_results: list[&lt;type&gt;] = ...") (var-annotated)
+    L292:0 [ERROR] Need type annotation for "screenshots" (hint: "screenshots: dict[&lt;type&gt;, &lt;type&gt;] = ...") (var-annotated)
+
+======================================================================
+</pre>
+</body>
+</html>

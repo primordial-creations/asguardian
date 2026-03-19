@@ -1050,8 +1050,9 @@ def add_type_check_args(parser: argparse.ArgumentParser) -> None:
         "-m",
         choices=["off", "basic", "standard", "strict", "all"],
         default="basic",
-        help="Pyright type checking mode (default: basic). "
-             "'basic' matches Pylance defaults; 'strict' enables all checks.",
+        help="Type checking strictness (default: basic). "
+             "mypy: normal/strict map to basic/strict. "
+             "pyright: off/basic/standard/strict/all.",
     )
     parser.add_argument(
         "--python-version",
@@ -1119,7 +1120,19 @@ def add_type_check_args(parser: argparse.ArgumentParser) -> None:
         "--npx-path",
         type=str,
         default="npx",
-        help="Path to npx binary (default: npx)",
+        help="Path to npx binary (default: npx, only used with --engine=pyright)",
+    )
+    parser.add_argument(
+        "--engine",
+        choices=["mypy", "pyright"],
+        default="mypy",
+        help="Type checking engine: mypy (default, pure Python) or pyright (Pylance engine, requires Node.js/npx)",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=int,
+        default=300,
+        help="Subprocess timeout in seconds (default: 300)",
     )
 
 

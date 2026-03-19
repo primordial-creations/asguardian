@@ -23,7 +23,7 @@ import json
 import sys
 from pathlib import Path
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.common.output_formatter import OutputFormat, UnifiedFormatter
 from Asgard.common.progress import ProgressReporter
@@ -82,6 +82,8 @@ from Asgard.Volundr.GitOps import (
     ArgoDestination,
     ArgoCDGenerator,
     FluxGenerator,
+    FluxGitRepository,
+    FluxKustomization,
 )
 from Asgard.Volundr.Compose import (
     ComposeProject,
@@ -94,6 +96,7 @@ from Asgard.Volundr.Validation import (
     KubernetesValidator,
     TerraformValidator,
     DockerfileValidator,
+    ValidationContext,
 )
 from Asgard.Volundr.Scaffold import (
     ServiceConfig,
@@ -881,8 +884,6 @@ def run_argocd_app(args: argparse.Namespace) -> int:
 
 def run_flux_source(args: argparse.Namespace) -> int:
     """Generate Flux GitRepository."""
-    from Asgard.Volundr.GitOps import FluxGitRepository
-
     git_repo = FluxGitRepository(
         name=args.name,
         url=args.repo,
@@ -907,8 +908,6 @@ def run_flux_source(args: argparse.Namespace) -> int:
 
 def run_flux_kustomization(args: argparse.Namespace) -> int:
     """Generate Flux Kustomization."""
-    from Asgard.Volundr.GitOps import FluxKustomization
-
     ks = FluxKustomization(
         name=args.name,
         source_ref_name=args.source,
@@ -986,8 +985,6 @@ def run_compose_validate(args: argparse.Namespace) -> int:
 
 def run_validate_kubernetes(args: argparse.Namespace) -> int:
     """Validate Kubernetes manifests."""
-    from Asgard.Volundr.Validation import ValidationContext
-
     context = ValidationContext(strict_mode=args.strict) if hasattr(args, 'strict') else None
     validator = KubernetesValidator(context=context)
 
@@ -1241,6 +1238,8 @@ def main(args=None) -> int:
     else:
         print(f"Unknown command: {parsed_args.command}")
         sys.exit(1)
+
+    return 0
 
 
 if __name__ == "__main__":

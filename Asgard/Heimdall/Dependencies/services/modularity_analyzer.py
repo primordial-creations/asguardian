@@ -13,14 +13,9 @@ from Asgard.Heimdall.Dependencies.models.dependency_models import (
     ModularityMetrics,
     ModuleDependencies,
 )
-from Asgard.Heimdall.Dependencies.services.import_analyzer import ImportAnalyzer
+import networkx as nx
 
-# Optional NetworkX import
-try:
-    import networkx as nx
-    HAS_NETWORKX = True
-except ImportError:
-    HAS_NETWORKX = False
+from Asgard.Heimdall.Dependencies.services.import_analyzer import ImportAnalyzer
 
 
 class ModularityAnalyzer:
@@ -84,11 +79,7 @@ class ModularityAnalyzer:
                 metrics.unstable_modules.append(module.module_name)
 
         # Detect communities/clusters
-        if HAS_NETWORKX:
-            clusters, modularity_score = self._detect_communities_nx(graph)
-        else:
-            clusters = self._detect_communities_simple(graph)
-            modularity_score = 0.0
+        clusters, modularity_score = self._detect_communities_nx(graph)
 
         metrics.clusters = clusters
         metrics.modularity_score = modularity_score

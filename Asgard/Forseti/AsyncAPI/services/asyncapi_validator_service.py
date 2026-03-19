@@ -9,9 +9,9 @@ import re
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Forseti.AsyncAPI.models.asyncapi_models import (
     AsyncAPIConfig,
@@ -220,10 +220,10 @@ class AsyncAPIValidatorService:
 
         # Try YAML first (handles JSON too)
         try:
-            return yaml.safe_load(content)
+            return cast(dict[str, Any], yaml.safe_load(content))
         except yaml.YAMLError:
             # Try JSON
-            return json.loads(content)
+            return cast(dict[str, Any], json.loads(content))
 
     def _detect_asyncapi_version(self, spec_data: dict[str, Any]) -> Optional[AsyncAPIVersion]:
         """Detect the AsyncAPI version from the specification."""

@@ -13,14 +13,9 @@ from Asgard.Heimdall.Dependencies.models.dependency_models import (
     DependencyConfig,
     DependencySeverity,
 )
-from Asgard.Heimdall.Dependencies.services.import_analyzer import ImportAnalyzer
+import networkx as nx
 
-# Optional NetworkX import
-try:
-    import networkx as nx
-    HAS_NETWORKX = True
-except ImportError:
-    HAS_NETWORKX = False
+from Asgard.Heimdall.Dependencies.services.import_analyzer import ImportAnalyzer
 
 
 class CycleDetector:
@@ -57,10 +52,7 @@ class CycleDetector:
         # Build dependency graph
         graph = {m.module_name: m.all_dependencies for m in modules}
 
-        if HAS_NETWORKX:
-            return self._detect_with_networkx(graph)
-        else:
-            return self._detect_with_dfs(graph)
+        return self._detect_with_networkx(graph)
 
     def _detect_with_networkx(
         self, graph: Dict[str, Set[str]]

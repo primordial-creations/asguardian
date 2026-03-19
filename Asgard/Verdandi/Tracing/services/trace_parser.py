@@ -5,7 +5,7 @@ Parses trace data from various formats (OpenTelemetry, Jaeger, etc.).
 """
 
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence, cast
 
 from Asgard.Verdandi.Tracing.models.tracing_models import (
     DistributedTrace,
@@ -467,9 +467,9 @@ class TraceParser:
         attrs: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """Parse OTLP attribute array to dictionary."""
-        result = {}
+        result: Dict[str, Any] = {}
         for attr in attrs:
-            key = attr.get("key")
+            key = cast(str, attr.get("key", ""))
             value = attr.get("value", {})
             # Handle OTLP value types
             if "stringValue" in value:

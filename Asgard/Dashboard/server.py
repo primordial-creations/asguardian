@@ -1,7 +1,7 @@
 """
 Asgard Dashboard CLI Entry Point
 
-Entry point for the asgard-dashboard command-line script.
+Entry point for the asguardian-dashboard command-line script.
 """
 
 import argparse
@@ -14,14 +14,14 @@ from Asgard.Dashboard.services.dashboard_server import DashboardServer
 def main() -> None:
     """Parse CLI arguments and start the dashboard server."""
     parser = argparse.ArgumentParser(
-        prog="asgard-dashboard",
+        prog="asguardian-dashboard",
         description="Launch the Asgard web dashboard to browse code analysis results.",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  asgard-dashboard --path ./my-project\n"
-            "  asgard-dashboard --path ./my-project --port 9090\n"
-            "  asgard-dashboard --path ./my-project --no-open-browser\n"
+            "  asguardian-dashboard --path ./my-project\n"
+            "  asguardian-dashboard --path ./my-project --port 9090\n"
+            "  asguardian-dashboard --path ./my-project --no-open-browser\n"
         ),
     )
 

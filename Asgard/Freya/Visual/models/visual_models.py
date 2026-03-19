@@ -65,9 +65,9 @@ class DeviceConfig(BaseModel):
 
 
 COMMON_DEVICES = {
-    "desktop-1080p": DeviceConfig(name="Desktop 1080p", width=1920, height=1080),
-    "desktop-720p": DeviceConfig(name="Desktop 720p", width=1280, height=720),
-    "laptop": DeviceConfig(name="Laptop", width=1366, height=768),
+    "desktop-1080p": DeviceConfig(name="Desktop 1080p", width=1920, height=1080, device_scale_factor=1.0, is_mobile=False, has_touch=False, user_agent=None),
+    "desktop-720p": DeviceConfig(name="Desktop 720p", width=1280, height=720, device_scale_factor=1.0, is_mobile=False, has_touch=False, user_agent=None),
+    "laptop": DeviceConfig(name="Laptop", width=1366, height=768, device_scale_factor=1.0, is_mobile=False, has_touch=False, user_agent=None),
     "ipad": DeviceConfig(
         name="iPad",
         width=768,
@@ -75,6 +75,7 @@ COMMON_DEVICES = {
         is_mobile=True,
         has_touch=True,
         device_scale_factor=2,
+        user_agent=None,
     ),
     "ipad-pro": DeviceConfig(
         name="iPad Pro",
@@ -83,6 +84,7 @@ COMMON_DEVICES = {
         is_mobile=True,
         has_touch=True,
         device_scale_factor=2,
+        user_agent=None,
     ),
     "iphone-14": DeviceConfig(
         name="iPhone 14",
@@ -91,6 +93,7 @@ COMMON_DEVICES = {
         is_mobile=True,
         has_touch=True,
         device_scale_factor=3,
+        user_agent=None,
     ),
     "iphone-14-pro-max": DeviceConfig(
         name="iPhone 14 Pro Max",
@@ -99,6 +102,7 @@ COMMON_DEVICES = {
         is_mobile=True,
         has_touch=True,
         device_scale_factor=3,
+        user_agent=None,
     ),
     "pixel-7": DeviceConfig(
         name="Pixel 7",
@@ -107,6 +111,7 @@ COMMON_DEVICES = {
         is_mobile=True,
         has_touch=True,
         device_scale_factor=2.625,
+        user_agent=None,
     ),
     "galaxy-s21": DeviceConfig(
         name="Galaxy S21",
@@ -115,6 +120,7 @@ COMMON_DEVICES = {
         is_mobile=True,
         has_touch=True,
         device_scale_factor=3,
+        user_agent=None,
     ),
 }
 

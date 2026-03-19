@@ -10,11 +10,13 @@ from typing import Optional
 
 from Asgard.Heimdall.Security.Auth.models.auth_models import (
     AuthConfig,
+    AuthFindingType,
     AuthReport,
 )
 from Asgard.Heimdall.Security.Auth.services.jwt_validator import JWTValidator
-from Asgard.Heimdall.Security.Auth.services.session_analyzer import SessionAnalyzer
 from Asgard.Heimdall.Security.Auth.services.password_analyzer import PasswordAnalyzer
+from Asgard.Heimdall.Security.Auth.services.session_analyzer import SessionAnalyzer
+from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
 
 
 class AuthAnalyzer:
@@ -159,9 +161,6 @@ class AuthAnalyzer:
         Args:
             report: Report to recalculate
         """
-        from Heimdall.Security.models.security_models import SecuritySeverity
-        from Heimdall.Security.Auth.models.auth_models import AuthFindingType
-
         report.total_issues = len(report.findings)
         report.critical_issues = sum(
             1 for f in report.findings if f.severity == SecuritySeverity.CRITICAL.value
@@ -206,8 +205,6 @@ class AuthAnalyzer:
 
     def _severity_order(self, severity: str) -> int:
         """Get sort order for severity (critical first)."""
-        from Heimdall.Security.models.security_models import SecuritySeverity
-
         order = {
             SecuritySeverity.CRITICAL.value: 0,
             SecuritySeverity.HIGH.value: 1,

@@ -4,6 +4,7 @@ Heimdall Type Annotation Coverage Models
 Pydantic models for analyzing type annotation coverage in Python code.
 """
 
+import os
 from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -50,7 +51,6 @@ class FunctionAnnotation(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         return f"{os.path.basename(self.file_path)}:{self.line_number}"
 
     @property

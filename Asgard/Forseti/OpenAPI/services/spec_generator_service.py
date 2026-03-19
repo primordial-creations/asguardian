@@ -5,9 +5,11 @@ Generates OpenAPI specifications from source code analysis.
 """
 
 import ast
+import json
 import re
+import yaml  # type: ignore[import-untyped]
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from Asgard.Forseti.OpenAPI.models.openapi_models import (
     OpenAPIConfig,
@@ -145,7 +147,7 @@ class SpecGeneratorService:
                         if decorator.args:
                             path_arg = decorator.args[0]
                             if isinstance(path_arg, ast.Constant):
-                                path = path_arg.value
+                                path = cast(str, path_arg.value)
                                 operation = self._build_operation(node, decorator)
                                 return path, method.upper(), operation
         return None
@@ -332,7 +334,7 @@ class SpecGeneratorService:
         Returns:
             Dictionary representation.
         """
-        return spec.model_dump(exclude_none=True, by_alias=True)
+        return cast(dict[str, Any], spec.model_dump(exclude_none=True, by_alias=True))
 
     def to_yaml(self, spec: OpenAPISpec) -> str:
         """
@@ -344,8 +346,7 @@ class SpecGeneratorService:
         Returns:
             YAML string representation.
         """
-        import yaml
-        return yaml.dump(self.to_dict(spec), default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(self.to_dict(spec), default_flow_style=False, sort_keys=False))
 
     def to_json(self, spec: OpenAPISpec, indent: int = 2) -> str:
         """
@@ -358,5 +359,4 @@ class SpecGeneratorService:
         Returns:
             JSON string representation.
         """
-        import json
         return json.dumps(self.to_dict(spec), indent=indent)

@@ -4,7 +4,9 @@ Schema Inference Service.
 Infers JSON Schemas from sample data.
 """
 
+import json
 import re
+import yaml  # type: ignore[import-untyped]
 from collections import Counter
 from pathlib import Path
 from typing import Any, Optional
@@ -103,9 +105,6 @@ class SchemaInferenceService:
         Returns:
             JSONSchemaInferenceResult with inferred schema.
         """
-        import json
-        import yaml
-
         path = Path(file_path)
         content = path.read_text(encoding="utf-8")
 
@@ -495,7 +494,6 @@ class SchemaInferenceService:
     ) -> str:
         """Generate an inference report."""
         if format == "json":
-            import json
             return json.dumps(result.model_dump(), indent=2, default=str)
         elif format == "markdown":
             return self._generate_markdown_report(result)
@@ -504,8 +502,6 @@ class SchemaInferenceService:
 
     def _generate_text_report(self, result: JSONSchemaInferenceResult) -> str:
         """Generate a text format report."""
-        import json
-
         lines = []
         lines.append("=" * 60)
         lines.append("JSON Schema Inference Report")
@@ -527,8 +523,6 @@ class SchemaInferenceService:
 
     def _generate_markdown_report(self, result: JSONSchemaInferenceResult) -> str:
         """Generate a markdown format report."""
-        import json
-
         lines = []
         lines.append("# JSON Schema Inference Report\n")
         lines.append(f"- **Samples Analyzed**: {result.sample_count}")

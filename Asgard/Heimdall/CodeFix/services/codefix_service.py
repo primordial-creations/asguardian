@@ -5,6 +5,7 @@ Generates template-based code fix suggestions for known rule violations.
 For rules without a dedicated template, informational guidance is provided.
 """
 
+import re
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -143,7 +144,6 @@ class CodeFixService:
         )
 
     def _fix_env_fallback(self, code_snippet: str, context: Dict[str, Any]) -> CodeFix:
-        import re
         fixed = re.sub(
             r'os\.environ\.get\((["\'][^"\']+["\'])\s*,\s*[^)]+\)',
             r'os.environ[\1]',
@@ -210,7 +210,6 @@ class CodeFixService:
         )
 
     def _fix_var_declaration(self, code_snippet: str, context: Dict[str, Any]) -> CodeFix:
-        import re
         fixed = re.sub(r'\bvar\b', "const", code_snippet, count=1)
         return CodeFix(
             rule_id="quality.var_declaration",
@@ -324,7 +323,6 @@ class CodeFixService:
         )
 
     def _fix_shell_curl_insecure(self, code_snippet: str, context: Dict[str, Any]) -> CodeFix:
-        import re
         fixed = re.sub(r'\s+-k\b', "", code_snippet)
         fixed = re.sub(r'\s+--insecure\b', "", fixed)
         return CodeFix(
@@ -347,7 +345,6 @@ class CodeFixService:
         )
 
     def _fix_snake_case_violation(self, code_snippet: str, context: Dict[str, Any]) -> CodeFix:
-        import re
         name = context.get("identifier", code_snippet.strip())
         # Convert camelCase or PascalCase to snake_case
         snake = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", name)
@@ -371,7 +368,6 @@ class CodeFixService:
         )
 
     def _fix_pascal_case_violation(self, code_snippet: str, context: Dict[str, Any]) -> CodeFix:
-        import re
         name = context.get("identifier", code_snippet.strip())
         # Convert snake_case to PascalCase
         pascal = re.sub(r"(?:^|_)([a-zA-Z])", lambda m: m.group(1).upper(), name)

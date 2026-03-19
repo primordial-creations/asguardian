@@ -35,7 +35,7 @@ from Asgard.config.models import (
 
 
 # Default forbidden imports (configurable per project via asgard.yaml)
-DEFAULT_FORBIDDEN_IMPORTS = {}
+DEFAULT_FORBIDDEN_IMPORTS: dict[str, list[str]] = {}
 
 # Default exclude patterns
 DEFAULT_EXCLUDE_PATTERNS = [

@@ -4,6 +4,7 @@ OpenAPI Specification Converter Service.
 Converts between OpenAPI specification versions.
 """
 
+import re
 from pathlib import Path
 from typing import Any, Optional
 
@@ -197,7 +198,7 @@ class SpecConverterService:
 
     def _convert_path_item_2_to_3(self, path_item: dict[str, Any]) -> dict[str, Any]:
         """Convert a path item from Swagger 2.0 to OpenAPI 3.0."""
-        converted = {}
+        converted: dict[str, Any] = {}
         http_methods = ["get", "put", "post", "delete", "options", "head", "patch"]
 
         for method in http_methods:
@@ -221,7 +222,7 @@ class SpecConverterService:
 
     def _convert_operation_2_to_3(self, operation: dict[str, Any]) -> dict[str, Any]:
         """Convert an operation from Swagger 2.0 to OpenAPI 3.0."""
-        converted = {
+        converted: dict[str, Any] = {
             "responses": {},
         }
 
@@ -401,7 +402,6 @@ class SpecConverterService:
         servers = spec_data.get("servers", [])
         if servers:
             server_url = servers[0].get("url", "https://localhost/")
-            import re
             match = re.match(r"(https?)://([^/]+)(.*)", server_url)
             if match:
                 converted["schemes"] = [match.group(1)]
@@ -457,7 +457,7 @@ class SpecConverterService:
 
     def _convert_path_item_3_to_2(self, path_item: dict[str, Any]) -> dict[str, Any]:
         """Convert a path item from OpenAPI 3.0 to Swagger 2.0."""
-        converted = {}
+        converted: dict[str, Any] = {}
         http_methods = ["get", "put", "post", "delete", "options", "head", "patch"]
 
         for method in http_methods:
@@ -472,7 +472,7 @@ class SpecConverterService:
 
     def _convert_operation_3_to_2(self, operation: dict[str, Any]) -> dict[str, Any]:
         """Convert an operation from OpenAPI 3.0 to Swagger 2.0."""
-        converted = {
+        converted: dict[str, Any] = {
             "responses": {},
         }
 

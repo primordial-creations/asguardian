@@ -8,9 +8,9 @@ import html
 import json
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Forseti.Documentation.models.docs_models import (
     APIDocConfig,
@@ -173,9 +173,9 @@ class DocsGeneratorService:
         content = spec_path.read_text(encoding="utf-8")
 
         try:
-            return yaml.safe_load(content)
+            return cast(dict[str, Any], yaml.safe_load(content))
         except yaml.YAMLError:
-            return json.loads(content)
+            return cast(dict[str, Any], json.loads(content))
 
     def _parse_spec(
         self,
@@ -215,7 +215,7 @@ class DocsGeneratorService:
         """Extract base URL from spec."""
         servers = spec_data.get("servers", [])
         if servers:
-            return servers[0].get("url")
+            return cast(Optional[str], servers[0].get("url"))
         return None
 
     def _parse_endpoints_by_tag(

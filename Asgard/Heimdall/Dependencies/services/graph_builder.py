@@ -8,26 +8,22 @@ import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
+import matplotlib.pyplot as plt
+import networkx as nx
+
 from Asgard.Heimdall.Dependencies.models.dependency_models import (
     DependencyConfig,
     ModuleDependencies,
 )
 from Asgard.Heimdall.Dependencies.services.import_analyzer import ImportAnalyzer
 
-# Optional NetworkX import
-try:
-    import networkx as nx
-    HAS_NETWORKX = True
-except ImportError:
-    HAS_NETWORKX = False
-
 
 class GraphBuilder:
     """
     Builds dependency graphs from analyzed imports.
 
-    Uses NetworkX for graph operations when available,
-    falls back to dictionary-based representation otherwise.
+    Uses NetworkX for graph operations and matplotlib for visualization.
+    Both packages are required dependencies.
     """
 
     def __init__(self, config: Optional[DependencyConfig] = None):
@@ -47,15 +43,9 @@ class GraphBuilder:
         Returns:
             NetworkX DiGraph
 
-        Raises:
-            ImportError: If NetworkX is not installed
+        Returns:
+            NetworkX DiGraph
         """
-        if not HAS_NETWORKX:
-            raise ImportError(
-                "NetworkX is required for graph building. "
-                "Install with: pip install networkx"
-            )
-
         path = scan_path or self.config.scan_path
         modules = self.import_analyzer.analyze(path)
 
@@ -243,20 +233,7 @@ class GraphBuilder:
             output_path: Path to save the image
             figsize: Figure size (width, height)
 
-        Raises:
-            ImportError: If NetworkX or matplotlib is not installed
         """
-        if not HAS_NETWORKX:
-            raise ImportError("NetworkX is required for visualization.")
-
-        try:
-            import matplotlib.pyplot as plt
-        except ImportError:
-            raise ImportError(
-                "matplotlib is required for visualization. "
-                "Install with: pip install matplotlib"
-            )
-
         graph = self.build_graph(scan_path)
 
         fig, ax = plt.subplots(figsize=figsize)
@@ -300,19 +277,6 @@ class GraphBuilder:
         Returns:
             Dict mapping module names to their metrics
         """
-        if not HAS_NETWORKX:
-            # Fallback to basic metrics
-            graph = self.build_dict_graph(scan_path)
-            reverse = self.get_reverse_graph(scan_path)
-
-            return {
-                module: {
-                    "out_degree": len(deps),
-                    "in_degree": len(reverse.get(module, set())),
-                }
-                for module, deps in graph.items()
-            }
-
         graph = self.build_graph(scan_path)
 
         metrics = {}

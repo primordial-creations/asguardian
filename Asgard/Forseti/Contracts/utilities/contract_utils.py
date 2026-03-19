@@ -4,9 +4,9 @@ Contract Utilities - Helper functions for API contract handling.
 
 import json
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 def load_contract_file(file_path: Path) -> dict[str, Any]:
@@ -33,15 +33,15 @@ def load_contract_file(file_path: Path) -> dict[str, Any]:
 
     try:
         if suffix == ".json":
-            return json.loads(content)
+            return cast(dict[str, Any], json.loads(content))
         elif suffix in [".yaml", ".yml"]:
-            return yaml.safe_load(content)
+            return cast(dict[str, Any], yaml.safe_load(content))
         else:
             # Try JSON first, then YAML
             try:
-                return json.loads(content)
+                return cast(dict[str, Any], json.loads(content))
             except json.JSONDecodeError:
-                return yaml.safe_load(content)
+                return cast(dict[str, Any], yaml.safe_load(content))
     except Exception as e:
         raise ValueError(f"Failed to parse contract file: {e}")
 
@@ -99,7 +99,7 @@ def compare_schemas(
     Returns:
         Dictionary with differences.
     """
-    differences = {
+    differences: dict[str, list] = {
         "added_properties": [],
         "removed_properties": [],
         "modified_properties": [],

@@ -8,9 +8,9 @@ for GitOps deployments.
 import hashlib
 import os
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.GitOps.models.gitops_models import (
     ArgoApplication,
@@ -262,7 +262,7 @@ class ArgoCDGenerator:
         if app.info:
             manifest["spec"]["info"] = app.info
 
-        return yaml.dump(manifest, default_flow_style=False, sort_keys=False)
+        return cast(str, yaml.dump(manifest, default_flow_style=False, sort_keys=False))
 
     def _build_source_spec(self, source: ArgoSource) -> Dict[str, Any]:
         """Build source specification."""

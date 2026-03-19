@@ -155,7 +155,7 @@ class AggregationConfig(BaseModel):
         description="Whether to include histogram data",
     )
     histogram_buckets: List[float] = Field(
-        default_factory=lambda: [10, 25, 50, 100, 250, 500, 1000, 2500, 5000, 10000],
+        default_factory=lambda: [10.0, 25.0, 50.0, 100.0, 250.0, 500.0, 1000.0, 2500.0, 5000.0, 10000.0],
         description="Histogram bucket boundaries in ms",
     )
 

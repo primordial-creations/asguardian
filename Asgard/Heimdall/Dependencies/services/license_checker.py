@@ -9,6 +9,8 @@ import json
 import re
 import subprocess
 import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -221,9 +223,6 @@ class LicenseChecker:
     def _get_license_from_pypi(self, package_name: str) -> Optional[PackageLicense]:
         """Get license info from PyPI API."""
         try:
-            import urllib.request
-            import urllib.error
-
             url = f"https://pypi.org/pypi/{package_name}/json"
             with urllib.request.urlopen(url, timeout=10) as response:
                 data = json.loads(response.read().decode())

@@ -401,7 +401,6 @@ class CredentialAnalyzer:
 
     def _is_enum_value(self, matched_text: str) -> bool:
         """Check if matched text is an enum value definition, not a real credential."""
-        import re
         # Extract the value part (after = or : sign)
         if "=" in matched_text or ":" in matched_text:
             separator = "=" if "=" in matched_text else ":"

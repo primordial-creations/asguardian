@@ -5,6 +5,7 @@ Validates adherence to SOLID principles in Python code.
 """
 
 import ast
+import json
 import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set
@@ -565,8 +566,6 @@ class SOLIDValidator:
 
     def _generate_json_report(self, result: SOLIDReport) -> str:
         """Generate JSON format report."""
-        import json
-
         output = {
             "scan_path": result.scan_path,
             "scanned_at": result.scanned_at.isoformat(),

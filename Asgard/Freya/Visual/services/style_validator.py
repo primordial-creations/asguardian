@@ -8,7 +8,7 @@ import json
 import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, cast
 
 from playwright.async_api import async_playwright, Page
 
@@ -256,7 +256,7 @@ class StyleValidator:
         """Check for style consistency issues."""
         issues = []
 
-        font_sizes = {}
+        font_sizes: Dict[Any, int] = {}
         for elem in elements:
             size = elem.get("fontSize")
             if size:
@@ -304,7 +304,7 @@ class ThemeLoader:
 
         if path.suffix == ".json":
             with open(path, "r") as f:
-                return json.load(f)
+                return cast(Dict[Any, Any], json.load(f))
 
         elif path.suffix in [".ts", ".tsx", ".js"]:
             return ThemeLoader._parse_js_theme(path)

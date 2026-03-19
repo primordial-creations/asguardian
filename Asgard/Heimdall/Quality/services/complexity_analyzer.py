@@ -526,6 +526,24 @@ class ComplexityAnalyzer:
             f"  Averages:              CC={result.average_cyclomatic:.1f}, COG={result.average_cognitive:.1f}",
             f"  Maximums:              CC={result.max_cyclomatic}, COG={result.max_cognitive}",
             "",
+            "-" * 70,
+            "  METRIC DEFINITIONS",
+            "-" * 70,
+            "",
+            "  Cyclomatic Complexity (CC): Counts the number of independent paths through",
+            "    a function. Each branch (if/for/while/except/and/or) adds 1. A function",
+            "    with CC=1 is perfectly linear. Higher values mean harder to test and maintain.",
+            "",
+            "  Cognitive Complexity (COG): Measures how hard the code is for a human to",
+            "    read. Penalises nesting depth and non-linear control flow more than CC does.",
+            "",
+            "  SEVERITY THRESHOLDS",
+            f"    (thresholds configured: CC={result.cyclomatic_threshold}, COG={result.cognitive_threshold})",
+            f"    MODERATE  -- CC or COG exceeds threshold",
+            f"    HIGH      -- CC or COG exceeds threshold x 1.5",
+            f"    VERY_HIGH -- CC or COG exceeds threshold x 2",
+            f"    CRITICAL  -- CC or COG exceeds threshold x 3",
+            "",
         ]
 
         if result.has_violations:
@@ -614,7 +632,7 @@ class ComplexityAnalyzer:
                 "| Function | Line | Cyclomatic | Cognitive | Severity |",
                 "|----------|------|-----------|-----------|----------|",
             ])
-            for v in result.violations[:50]:
+            for v in result.violations:
                 name = v.qualified_name if hasattr(v, 'qualified_name') else v.name
                 sev = v.severity if isinstance(v.severity, str) else v.severity.value
                 lines.append(f"| `{name}` | {v.line_number} | {v.cyclomatic_complexity} | {v.cognitive_complexity} | {sev} |")

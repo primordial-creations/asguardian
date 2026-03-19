@@ -211,9 +211,13 @@ class TypeCheckReport(BaseModel):
 
 class TypeCheckConfig(BaseModel):
     """Configuration for type checking analysis."""
+    engine: str = Field(
+        "mypy",
+        description="Type checking engine: 'mypy' (default, pure Python) or 'pyright' (Pylance engine, requires Node.js/npx)",
+    )
     type_checking_mode: str = Field(
         "basic",
-        description="Pyright type checking mode: off, basic, standard, strict, all",
+        description="Strictness level. mypy: normal/strict. pyright: off/basic/standard/strict/all",
     )
     python_version: str = Field(
         "",
@@ -254,7 +258,11 @@ class TypeCheckConfig(BaseModel):
     )
     output_format: str = Field("text", description="Output format: text, json, markdown")
     verbose: bool = Field(False, description="Show verbose output")
-    npx_path: str = Field("npx", description="Path to npx binary for running pyright")
+    npx_path: str = Field("npx", description="Path to npx binary for running pyright (engine=pyright only)")
+    subprocess_timeout: int = Field(
+        300,
+        description="Timeout in seconds for the type checker subprocess",
+    )
 
     class Config:
         use_enum_values = True

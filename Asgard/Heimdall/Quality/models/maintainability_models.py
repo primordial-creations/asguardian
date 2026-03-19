@@ -13,6 +13,8 @@ Where:
 - CM = Comment percentage (0-100)
 """
 
+import math
+import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -61,7 +63,6 @@ class HalsteadMetrics(BaseModel):
     @property
     def volume(self) -> float:
         """Program volume: Length * log2(Vocabulary)."""
-        import math
         if self.vocabulary <= 0:
             return 0.0
         return self.length * math.log2(self.vocabulary)
@@ -114,7 +115,6 @@ class FunctionMaintainability(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         return f"{os.path.basename(self.file_path)}:{self.line_number}"
 
     @property
@@ -151,7 +151,6 @@ class FileMaintainability(BaseModel):
     @property
     def filename(self) -> str:
         """Return just the filename."""
-        import os
         return os.path.basename(self.file_path)
 
 

@@ -4,6 +4,7 @@ Database Schema Diff Service.
 Compares database schemas and identifies differences.
 """
 
+import json
 import time
 from pathlib import Path
 from typing import Optional
@@ -292,7 +293,6 @@ class SchemaDiffService:
             Formatted report string.
         """
         if format == "json":
-            import json
             return json.dumps(result.model_dump(), indent=2, default=str)
         elif format == "markdown":
             return self._generate_markdown_report(result)

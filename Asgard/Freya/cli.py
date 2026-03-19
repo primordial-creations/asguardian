@@ -27,6 +27,7 @@ Usage:
 import argparse
 import asyncio
 import json
+import shutil
 import sys
 from datetime import datetime
 from pathlib import Path
@@ -1024,7 +1025,6 @@ async def run_visual_capture(args: argparse.Namespace, verbose: bool = False) ->
             result = await capture.capture_viewport(args.url)
 
     if args.output:
-        import shutil
         shutil.move(result.file_path, args.output)
         print(f"Screenshot saved to: {args.output}")
     else:

@@ -3,11 +3,12 @@ JSONSchema Utilities - Helper functions for JSON Schema handling.
 """
 
 import json
+import re
 from copy import deepcopy
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 
 def load_schema_file(file_path: Path) -> dict[str, Any]:
@@ -34,15 +35,15 @@ def load_schema_file(file_path: Path) -> dict[str, Any]:
 
     try:
         if suffix == ".json":
-            return json.loads(content)
+            return cast(dict[str, Any], json.loads(content))
         elif suffix in [".yaml", ".yml"]:
-            return yaml.safe_load(content)
+            return cast(dict[str, Any], yaml.safe_load(content))
         else:
             # Try JSON first, then YAML
             try:
-                return json.loads(content)
+                return cast(dict[str, Any], json.loads(content))
             except json.JSONDecodeError:
-                return yaml.safe_load(content)
+                return cast(dict[str, Any], yaml.safe_load(content))
     except Exception as e:
         raise ValueError(f"Failed to parse schema file: {e}")
 
@@ -128,7 +129,7 @@ def resolve_refs(
     if "$defs" in schema:
         defs = {**defs, **schema["$defs"]}
 
-    return _resolve_refs_recursive(schema, defs, max_depth)
+    return cast(dict[str, Any], _resolve_refs_recursive(schema, defs, max_depth))
 
 
 def _resolve_refs_recursive(
@@ -265,7 +266,6 @@ def validate_schema_syntax(schema: dict[str, Any]) -> list[str]:
 
     # Check pattern is valid regex
     if "pattern" in schema:
-        import re
         try:
             re.compile(schema["pattern"])
         except re.error as e:
@@ -328,7 +328,7 @@ def _json_type_to_typescript(schema: dict[str, Any]) -> str:
 
     if "$ref" in schema:
         # Extract type name from reference
-        ref = schema["$ref"]
+        ref = cast(str, schema["$ref"])
         if ref.startswith("#/definitions/") or ref.startswith("#/$defs/"):
             return ref.split("/")[-1]
         return "any"

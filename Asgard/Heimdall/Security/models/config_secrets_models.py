@@ -11,6 +11,7 @@ Detected Patterns:
 - High-entropy strings (Shannon entropy > 3.5 for strings > 20 chars)
 """
 
+import os
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
@@ -57,7 +58,6 @@ class ConfigSecretFinding(BaseModel):
     @property
     def location(self) -> str:
         """Return a readable location string."""
-        import os
         basename = os.path.basename(self.file_path)
         if self.line_number:
             return f"{basename}:{self.line_number}"

@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Kubernetes.models.kubernetes_models import (
     EnvironmentType,

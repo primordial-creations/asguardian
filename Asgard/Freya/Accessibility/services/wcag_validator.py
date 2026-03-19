@@ -7,7 +7,7 @@ Tests against WCAG 2.1 Level A, AA, and AAA success criteria.
 
 import hashlib
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, List, Optional, cast
 
 from playwright.async_api import async_playwright, Page, Browser
 
@@ -178,9 +178,9 @@ class WCAGValidator:
         Returns:
             AccessibilityReport with all findings
         """
-        violations = []
-        warnings = []
-        notices = []
+        violations: List[Any] = []
+        warnings: List[Any] = []
+        notices: List[Any] = []
         passed_checks = 0
         total_checks = 0
 
@@ -562,7 +562,7 @@ class WCAGValidator:
     async def _get_element_html(self, element) -> str:
         """Get outer HTML of an element (truncated)."""
         try:
-            html = await element.evaluate("el => el.outerHTML")
+            html = cast(str, await element.evaluate("el => el.outerHTML"))
             if len(html) > 500:
                 html = html[:500] + "..."
             return html

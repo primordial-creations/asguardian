@@ -6,7 +6,7 @@ tab order, focus indicators, and keyboard traps.
 """
 
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from playwright.async_api import async_playwright, Page
 
@@ -46,10 +46,10 @@ class KeyboardNavigationTester:
         Returns:
             KeyboardNavigationReport with all findings
         """
-        issues = []
-        tab_order = []
-        focus_indicators = {}
-        focus_traps = []
+        issues: list[Any] = []
+        tab_order: list[Any] = []
+        focus_indicators: dict[Any, Any] = {}
+        focus_traps: list[Any] = []
         has_skip_link = False
 
         async with async_playwright() as p:
@@ -196,9 +196,9 @@ class KeyboardNavigationTester:
         elements: List[dict]
     ) -> tuple[List[str], Dict[str, bool], List[KeyboardIssue]]:
         """Test tab order through focusable elements."""
-        tab_order = []
-        focus_indicators = {}
-        issues = []
+        tab_order: list[Any] = []
+        focus_indicators: dict[Any, Any] = {}
+        issues: list[Any] = []
 
         try:
             await page.keyboard.press("Tab")
@@ -411,6 +411,6 @@ class KeyboardNavigationTester:
                     return tag;
                 }
             """, element)
-            return selector
+            return cast(str, selector)
         except Exception:
             return "unknown"

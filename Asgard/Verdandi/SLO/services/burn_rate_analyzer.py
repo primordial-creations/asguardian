@@ -5,7 +5,7 @@ Analyzes error budget burn rate for alerting and forecasting.
 """
 
 from datetime import datetime, timedelta
-from typing import List, Optional, Sequence, Tuple
+from typing import List, Optional, Sequence, Tuple, cast
 
 from Asgard.Verdandi.SLO.models.slo_models import (
     BurnRate,
@@ -283,7 +283,7 @@ class BurnRateAnalyzer:
                             (
                                 current_incident_start,
                                 burn_rate.calculated_at,
-                                current_severity,
+                                current_severity or "warning",
                             )
                         )
                     current_incident_start = None
@@ -313,8 +313,8 @@ class BurnRateAnalyzer:
         if burn_rate.time_to_exhaustion_hours is None:
             return None
 
-        return burn_rate.calculated_at + timedelta(
-            hours=burn_rate.time_to_exhaustion_hours
+        return cast(datetime, burn_rate.calculated_at) + timedelta(
+            hours=cast(float, burn_rate.time_to_exhaustion_hours)
         )
 
     def _calculate_time_to_exhaustion(

@@ -8,7 +8,7 @@ import hashlib
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TypeVar
+from typing import Any, Dict, List, Optional, TypeVar, cast
 
 from Asgard.Baseline.models import (
     BaselineEntry,
@@ -260,7 +260,7 @@ class BaselineManager:
         result = baseline.remove_entry(violation_id)
         if result:
             self.save()
-        return result
+        return cast(bool, result)
 
     def clean_expired(self) -> int:
         """
@@ -273,7 +273,7 @@ class BaselineManager:
         count = baseline.clean_expired()
         if count > 0:
             self.save()
-        return count
+        return cast(int, count)
 
     def get_stats(self) -> BaselineStats:
         """
@@ -310,7 +310,7 @@ class BaselineManager:
             rel_path = self._relative_path(file_path)
             entries = [e for e in entries if e.file_path == rel_path]
 
-        return entries
+        return cast(List[Any], entries)
 
     def generate_report(self, output_format: str = "text") -> str:
         """

@@ -5,7 +5,10 @@ Helper functions for security scanning and analysis.
 """
 
 import fnmatch
+import math
 import mimetypes
+import re
+from collections import Counter
 from pathlib import Path
 from typing import Generator, List, Optional, Set, Tuple
 
@@ -288,9 +291,6 @@ def calculate_entropy(data: str) -> float:
     Returns:
         Entropy value (bits per character)
     """
-    import math
-    from collections import Counter
-
     if not data:
         return 0.0
 
@@ -341,8 +341,6 @@ def is_inside_docstring(content: str, match_start: int, file_ext: str = ".py") -
     Returns:
         True if the position is inside a docstring or multi-line comment
     """
-    import re
-
     if file_ext in {".py"}:
         # Find all Python docstring regions (triple-quoted strings)
         docstring_pattern = re.compile(
@@ -439,8 +437,6 @@ def is_example_or_placeholder(text: str, context: str = "") -> bool:
     Returns:
         True if the text appears to be a placeholder/example
     """
-    import re
-
     lower_text = text.lower()
     lower_context = context.lower()
 
@@ -499,8 +495,6 @@ def is_parameterized_sql(matched_text: str, context: str) -> bool:
     Returns:
         True if the SQL appears to be properly parameterized
     """
-    import re
-
     # Patterns indicating parameterized queries (SAFE):
     # - cursor.execute("SELECT * FROM users WHERE id = %s", (user_id,))
     # - cursor.execute("SELECT * FROM users WHERE id = ?", [user_id])

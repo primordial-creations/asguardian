@@ -6,7 +6,7 @@ Aggregates distributed traces to produce service-level metrics.
 
 import math
 from datetime import datetime
-from typing import Dict, List, Optional, Sequence
+from typing import Dict, List, Optional, Sequence, cast
 
 from Asgard.Verdandi.APM.models.apm_models import (
     APMReport,
@@ -303,7 +303,7 @@ class TraceAggregator:
         min_start = min(start_times)
         max_end = max(end_times)
 
-        return max((max_end - min_start).total_seconds(), 1.0)
+        return cast(float, max((cast(datetime, max_end) - cast(datetime, min_start)).total_seconds(), 1.0))
 
     def _get_earliest_time(self, traces: Sequence[Trace]) -> Optional[datetime]:
         """Get earliest timestamp from traces."""

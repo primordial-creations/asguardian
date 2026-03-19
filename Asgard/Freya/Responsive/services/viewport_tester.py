@@ -6,7 +6,7 @@ Tests viewport configuration and behavior on mobile devices.
 
 import re
 from datetime import datetime
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from playwright.async_api import async_playwright, Page
 
@@ -127,7 +127,7 @@ class ViewportTester:
                     return meta ? meta.getAttribute('content') : null;
                 }
             """)
-            return content
+            return cast(Optional[str], content)
         except Exception:
             return None
 
@@ -209,6 +209,6 @@ class ViewportTester:
                     };
                 }
             """)
-            return result
+            return cast(Dict[Any, Any], result)
         except Exception:
             return {"sizes": {}, "minimum": None}

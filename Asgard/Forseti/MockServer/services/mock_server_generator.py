@@ -7,9 +7,9 @@ Generates mock server code from OpenAPI and AsyncAPI specifications.
 import json
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Forseti.MockServer.models.mock_models import (
     GeneratedFile,
@@ -219,15 +219,15 @@ class MockServerGeneratorService:
         content = spec_path.read_text(encoding="utf-8")
 
         try:
-            return yaml.safe_load(content)
+            return cast(dict[str, Any], yaml.safe_load(content))
         except yaml.YAMLError:
-            return json.loads(content)
+            return cast(dict[str, Any], json.loads(content))
 
     def _get_base_url(self, spec_data: dict[str, Any]) -> str:
         """Extract base URL from OpenAPI spec."""
         servers = spec_data.get("servers", [])
         if servers:
-            return servers[0].get("url", "")
+            return cast(str, servers[0].get("url", ""))
         return ""
 
     def _parse_openapi_endpoints(
@@ -838,7 +838,7 @@ MOCK_RESPONSES = {data_json}
         """Convert an endpoint to a valid function name."""
         if endpoint.operation_id:
             # Clean operation ID
-            name = endpoint.operation_id.replace("-", "_").replace(".", "_")
+            name = cast(str, endpoint.operation_id).replace("-", "_").replace(".", "_")
             return name
 
         # Generate from path and method

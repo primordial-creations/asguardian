@@ -4,6 +4,7 @@ Heimdall Coverage Analyzer Service
 Unified analyzer that combines all coverage analysis features.
 """
 
+import json
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -240,8 +241,6 @@ class CoverageAnalyzer:
 
     def _generate_json_report(self, result: CoverageReport) -> str:
         """Generate JSON format report."""
-        import json
-
         output = {
             "scan_path": result.scan_path,
             "scanned_at": result.scanned_at.isoformat(),

@@ -47,11 +47,155 @@ def _create_handler(func_name: str, analysis_func):
 # Import directly from the original module's namespace
 # These functions will be available after the original cli.py is modified
 import argparse
+import io
 import json
+import os
+import re
+import shutil
+import subprocess
 import uuid
+import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
+
+from Asgard.Heimdall.Architecture import ArchitectureAnalyzer, ArchitectureConfig
+from Asgard.Heimdall.CodeFix.services.codefix_service import CodeFixService
+from Asgard.Heimdall.Coverage import CoverageAnalyzer, CoverageConfig
+from Asgard.Heimdall.Dependencies import DependencyAnalyzer, DependencyConfig
+from Asgard.Heimdall.Dependencies.models.sbom_models import SBOMConfig, SBOMFormat
+from Asgard.Heimdall.Dependencies.services.sbom_generator import SBOMGenerator
+from Asgard.Heimdall.Init.linter_initializer import LinterInitializer
+from Asgard.Heimdall.OOP import OOPAnalyzer, OOPConfig
+from Asgard.Heimdall.Performance import StaticPerformanceService, PerformanceScanConfig
+from Asgard.Heimdall.Quality.utilities.file_utils import discover_files
+from Asgard.Heimdall.Security import StaticSecurityService, SecurityScanConfig
+from Asgard.MCP.models.mcp_models import MCPServerConfig
+from Asgard.MCP.server.asgard_mcp_server import AsgardMCPServer
+
+
+class _TeeStream:
+    """Writes to two streams simultaneously (terminal + buffer)."""
+
+    def __init__(self, primary, secondary: io.StringIO) -> None:
+        self._primary = primary
+        self._secondary = secondary
+
+    def write(self, s: str) -> int:
+        self._primary.write(s)
+        self._secondary.write(s)
+        return len(s)
+
+    def flush(self) -> None:
+        self._primary.flush()
+
+    def reconfigure(self, **kwargs) -> None:
+        if hasattr(self._primary, "reconfigure"):
+            self._primary.reconfigure(**kwargs)
+
+    def fileno(self) -> int:
+        return self._primary.fileno()
+
+    @property
+    def encoding(self) -> str:
+        return getattr(self._primary, "encoding", "utf-8")
+
+
+_ANSI_ESCAPE = re.compile(r"\x1b\[[0-9;]*[mGKHF]")
+
+
+def _strip_ansi(text: str) -> str:
+    """Remove ANSI terminal escape sequences from text."""
+    return _ANSI_ESCAPE.sub("", text)
+
+
+def _report_file_path(suffix: str = ".html") -> Path:
+    return Path.cwd() / f"heimdall_report_{uuid.uuid4().hex[:8]}{suffix}"
+
+
+def open_output_in_browser(content: str, title: str = "Heimdall Report") -> None:
+    """Wrap report content in an HTML page and open it in the default browser."""
+    is_html = content.lstrip().startswith(("<!DOCTYPE", "<html", "<!doctype"))
+    if is_html:
+        html = content
+    else:
+        clean = _strip_ansi(content)
+        escaped = (
+            clean
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+        html = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{title}</title>
+  <style>
+    body {{
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }}
+    h1 {{
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }}
+    pre {{
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }}
+  </style>
+</head>
+<body>
+  <h1>{title}</h1>
+  <pre>{escaped}</pre>
+</body>
+</html>"""
+
+    report_path = _report_file_path()
+    report_path.write_text(html, encoding="utf-8")
+
+    # Use the platform-native open command — more reliable than webbrowser.open()
+    # for snap/flatpak Firefox installations that ignore the webbrowser module.
+    if sys.platform == "darwin":
+        opener = "open"
+    elif sys.platform == "win32":
+        opener = None  # use os.startfile
+    else:
+        opener = shutil.which("xdg-open")
+
+    opened = False
+    if opener:
+        try:
+            subprocess.Popen(
+                [opener, str(report_path)],
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                start_new_session=True,
+            )
+            opened = True
+        except Exception:
+            pass
+    elif sys.platform == "win32":
+        try:
+            os.startfile(str(report_path))
+            opened = True
+        except Exception:
+            pass
+
+    if not opened:
+        webbrowser.open(str(report_path))
+
+    print(f"Report saved: {report_path}", file=sys.__stdout__)
 
 from Asgard.Heimdall.Quality.models.analysis_models import (
     AnalysisConfig,
@@ -370,7 +514,6 @@ def run_quality_analysis(args: argparse.Namespace, verbose: bool = False) -> int
 
     # Check for dry-run mode
     if getattr(args, 'dry_run', False):
-        from Asgard.Heimdall.Quality.utilities.file_utils import discover_files
         files = list(discover_files(scan_path, args.exclude if args.exclude else []))
         print(f"\nDry run: Would analyze {len(files)} files")
         for f in sorted(files)[:20]:
@@ -458,8 +601,16 @@ def run_quality_analysis(args: argparse.Namespace, verbose: bool = False) -> int
             lines.extend(["-" * 70, "  SUMMARY", "-" * 70, "",
                           f"  Files Scanned:          {result.total_files_scanned}",
                           f"  Files Over Threshold:   {result.files_exceeding_threshold}",
-                          f"  Compliance Rate:        {result.compliance_rate:.1f}%", "",
-                          "=" * 70, ""])
+                          f"  Compliance Rate:        {result.compliance_rate:.1f}%", ""])
+
+            if result.has_violations:
+                sorted_violations = sorted(result.violations, key=lambda x: x.line_count, reverse=True)
+                lines.extend(["-" * 70, "  VIOLATIONS (longest first)", "  " + "-" * 47, ""])
+                for v in sorted_violations:
+                    lines.append(f"  {v.relative_path}   {v.line_count} lines  (limit: {v.threshold}, over by {v.lines_over})")
+                lines.append("")
+
+            lines.extend(["=" * 70, ""])
             print("\n".join(lines))
 
         return 1 if result.has_violations else 0
@@ -1403,14 +1554,15 @@ def run_typing_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
 
 
 def run_type_check_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
-    """Execute static type checking using Pyright (Pylance engine)."""
+    """Execute static type checking (mypy by default, pyright optionally)."""
     scan_path = Path(args.path).resolve()
 
     if not scan_path.exists():
         print(f"Error: Path does not exist: {scan_path}")
         return 1
 
-    exclude_patterns = list(args.exclude) if args.exclude else []
+    # Extra user-supplied exclude patterns are appended to the defaults
+    user_excludes = list(args.exclude) if args.exclude else []
 
     # Handle errors-only flag
     include_warnings = True
@@ -1419,7 +1571,11 @@ def run_type_check_analysis(args: argparse.Namespace, verbose: bool = False) -> 
         severity_filter = "error"
         include_warnings = False
 
+    default_config = TypeCheckConfig()
+    exclude_patterns = default_config.exclude_patterns + user_excludes
+
     config = TypeCheckConfig(
+        engine=getattr(args, "engine", "mypy"),
         type_checking_mode=getattr(args, "mode", "basic"),
         python_version=getattr(args, "python_version", ""),
         python_platform=getattr(args, "python_platform", ""),
@@ -1432,6 +1588,7 @@ def run_type_check_analysis(args: argparse.Namespace, verbose: bool = False) -> 
         output_format=args.format,
         verbose=verbose,
         npx_path=getattr(args, "npx_path", "npx"),
+        subprocess_timeout=getattr(args, "timeout", 300),
     )
 
     try:
@@ -2036,7 +2193,6 @@ def run_hotspots_analysis(args: argparse.Namespace, verbose: bool = False) -> in
         report = detector.scan(scan_path)
 
         if args.format == "json":
-            import json as _json
             output = {
                 "scan_info": {
                     "scan_path": report.scan_path,
@@ -2066,7 +2222,7 @@ def run_hotspots_analysis(args: argparse.Namespace, verbose: bool = False) -> in
                     for h in report.hotspots
                 ],
             }
-            print(_json.dumps(output, indent=2))
+            print(json.dumps(output, indent=2))
         else:
             lines = [
                 "",
@@ -2140,7 +2296,6 @@ def run_compliance_analysis(args: argparse.Namespace, verbose: bool = False) -> 
         reporter = ComplianceReporter(config)
 
         if args.format == "json":
-            import json as _json
             output = {}
             if include_owasp:
                 owasp = reporter.generate_owasp_report(security_report, hotspot_report, str(scan_path))
@@ -2176,7 +2331,7 @@ def run_compliance_analysis(args: argparse.Namespace, verbose: bool = False) -> 
                         if entry.findings_count > 0
                     },
                 }
-            print(_json.dumps(output, indent=2))
+            print(json.dumps(output, indent=2))
         else:
             lines = [
                 "",
@@ -2267,7 +2422,6 @@ def run_ratings_analysis(args: argparse.Namespace, verbose: bool = False) -> int
                 print(f"Warning: could not save to history: {hist_err}")
 
         if args.format == "json":
-            import json as _json
             output = {
                 "scan_path": ratings.scan_path,
                 "scanned_at": ratings.scanned_at.isoformat(),
@@ -2291,7 +2445,7 @@ def run_ratings_analysis(args: argparse.Namespace, verbose: bool = False) -> int
                     "issues_count": ratings.security.issues_count,
                 },
             }
-            print(_json.dumps(output, indent=2))
+            print(json.dumps(output, indent=2))
         else:
             lines = [
                 "",
@@ -2418,7 +2572,6 @@ def run_gate_evaluation(args: argparse.Namespace, verbose: bool = False) -> int:
         )
 
         if args.format == "json":
-            import json as _json
             output = {
                 "gate_name": result.gate_name,
                 "status": result.status,
@@ -2438,7 +2591,7 @@ def run_gate_evaluation(args: argparse.Namespace, verbose: bool = False) -> int:
                     for r in result.condition_results
                 ],
             }
-            print(_json.dumps(output, indent=2))
+            print(json.dumps(output, indent=2))
         else:
             status_str = str(result.status).upper()
             lines = [
@@ -2530,8 +2683,6 @@ def run_init_linter(args, verbose: bool = False) -> int:
     GAIA coding standards. Also generates VSCode settings and checks
     for required tools/extensions.
     """
-    from Asgard.Heimdall.Init.linter_initializer import LinterInitializer
-
     project_path = Path(args.path).resolve()
 
     if not project_path.exists():
@@ -3156,8 +3307,7 @@ def run_taint_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
     except Exception as e:
         print(f"Error: {e}")
         if verbose:
-            import traceback
-            traceback.print_exc()
+            _traceback.print_exc()
         return 1
 
 
@@ -3265,8 +3415,7 @@ def run_bugs_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
     except Exception as e:
         print(f"Error: {e}")
         if verbose:
-            import traceback
-            traceback.print_exc()
+            _traceback.print_exc()
         return 1
 
 
@@ -3714,11 +3863,6 @@ def _run_issues_summary(args: argparse.Namespace, verbose: bool) -> int:
 
 def run_sbom_generation(args: argparse.Namespace, verbose: bool = False) -> int:
     """Execute SBOM generation and output the result."""
-    import json as _json
-
-    from Asgard.Heimdall.Dependencies.models.sbom_models import SBOMConfig, SBOMFormat
-    from Asgard.Heimdall.Dependencies.services.sbom_generator import SBOMGenerator
-
     scan_path = Path(args.path).resolve()
 
     if not scan_path.exists():
@@ -3743,7 +3887,7 @@ def run_sbom_generation(args: argparse.Namespace, verbose: bool = False) -> int:
         else:
             output_dict = generator.to_cyclonedx_json(document)
 
-        output_json = _json.dumps(output_dict, indent=2, default=str)
+        output_json = json.dumps(output_dict, indent=2, default=str)
 
         output_file = getattr(args, "output", None)
         if output_file:
@@ -3767,10 +3911,6 @@ def run_sbom_generation(args: argparse.Namespace, verbose: bool = False) -> int:
 
 def run_codefix_suggestions(args: argparse.Namespace, verbose: bool = False) -> int:
     """Execute codefix suggestion generation and display the result."""
-    import json as _json
-
-    from Asgard.Heimdall.CodeFix.services.codefix_service import CodeFixService
-
     scan_path = Path(args.path).resolve()
     rule_id = getattr(args, "rule_id", None)
     output_format = getattr(args, "format", "text")
@@ -3789,7 +3929,7 @@ def run_codefix_suggestions(args: argparse.Namespace, verbose: bool = False) -> 
                 return 0
 
             if output_format == "json":
-                print(_json.dumps(fix.dict(), indent=2, default=str))
+                print(json.dumps(fix.dict(), indent=2, default=str))
             else:
                 print("")
                 print("=" * 70)
@@ -3832,7 +3972,7 @@ def run_codefix_suggestions(args: argparse.Namespace, verbose: bool = False) -> 
                         "fix_type": fix.fix_type,
                         "confidence": fix.confidence,
                     })
-            print(_json.dumps(catalogue, indent=2, default=str))
+            print(json.dumps(catalogue, indent=2, default=str))
         else:
             print("")
             print("=" * 70)
@@ -3860,9 +4000,6 @@ def run_codefix_suggestions(args: argparse.Namespace, verbose: bool = False) -> 
 
 def run_mcp_server(args: argparse.Namespace, verbose: bool = False) -> int:
     """Start the Asgard MCP server."""
-    from Asgard.MCP.models.mcp_models import MCPServerConfig
-    from Asgard.MCP.server.asgard_mcp_server import AsgardMCPServer
-
     host = getattr(args, "host", "localhost")
     port = int(getattr(args, "port", 8765))
     project_path = getattr(args, "project_path", ".")
@@ -3906,6 +4043,206 @@ def run_dashboard(args: argparse.Namespace, verbose: bool = False) -> int:
 # Scan command handler (runs ALL analyses)
 # ---------------------------------------------------------------------------
 
+# Labels shown in tab buttons (short, uppercase acronyms preserved)
+_SCAN_TAB_LABELS: dict = {
+    "file_length": "File Length",
+    "complexity": "Complexity",
+    "lazy_imports": "Lazy Imports",
+    "env_fallbacks": "Env Fallbacks",
+    "type_check": "Type Check",
+    "security": "Security",
+    "performance": "Performance",
+    "oop": "OOP",
+    "architecture": "Architecture",
+    "dependencies": "Dependencies",
+    "test_coverage": "Test Coverage",
+}
+
+# Labels shown in the overview table category column (full names)
+_SCAN_DISPLAY_NAMES: dict = {
+    "file_length": "File Length",
+    "complexity": "Complexity",
+    "lazy_imports": "Lazy Imports",
+    "env_fallbacks": "Env Fallbacks",
+    "type_check": "Type Check",
+    "security": "Security",
+    "performance": "Performance",
+    "oop": "Object Oriented Programming",
+    "architecture": "Architecture",
+    "dependencies": "Dependencies",
+    "test_coverage": "Test Coverage",
+}
+
+# Short description of what each category checks (shown in overview table)
+_SCAN_DESCRIPTIONS: dict = {
+    "file_length": "Max lines per file threshold",
+    "complexity": "Cyclomatic & cognitive complexity of functions",
+    "lazy_imports": "Imports inside functions, methods, or blocks",
+    "env_fallbacks": "Environment variables with hardcoded fallback values",
+    "type_check": "Static type errors detected by mypy",
+    "security": "Security vulnerabilities, secrets & misconfigurations",
+    "performance": "Performance anti-patterns & inefficient code",
+    "oop": "OOP coupling, cohesion & inheritance metrics",
+    "architecture": "SOLID principles, layer & hexagonal design",
+    "dependencies": "Circular import cycles between modules",
+    "test_coverage": "Test coverage gaps across source methods",
+}
+
+
+def _detail_str(category: str, data: dict) -> str:
+    """Build a human-readable detail string for a scan category result."""
+    status = data.get("status", "?")
+    if status == "ERROR":
+        return data.get("error", "")[:80]
+    if category == "type_check":
+        return f"{data.get('errors', 0)} errors, {data.get('files_with_errors', 0)} files affected"
+    if category == "security":
+        return f"{data.get('total_findings', 0)} findings ({data.get('critical', 0)} critical)"
+    if category == "file_length":
+        rate = data.get("compliance_rate")
+        base = f"{data.get('violations', 0)} violations"
+        return f"{base} ({rate:.1f}% compliant)" if rate is not None else base
+    if category == "test_coverage":
+        pct = data.get("method_coverage_percent")
+        gaps = data.get("total_gaps", 0)
+        return f"{pct:.1f}% method coverage, {gaps} gaps" if pct is not None else f"{gaps} gaps"
+    if "violations" in data:
+        return f"{data['violations']} violations"
+    if "total_findings" in data:
+        return f"{data['total_findings']} findings"
+    if "circular_imports" in data:
+        return f"{data['circular_imports']} cycles"
+    return ""
+
+
+def _generate_scan_html_report(
+    scan_results: dict,
+    step_reports: dict,
+    scan_path: str,
+    duration: float,
+    scanned_at: "datetime",
+) -> str:
+    """Generate a single tabbed HTML page for the Heimdall full scan."""
+    pass_count = sum(1 for d in scan_results.values() if d.get("status") == "PASS")
+    fail_count = sum(1 for d in scan_results.values() if d.get("status") == "FAIL")
+    err_count = sum(1 for d in scan_results.values() if d.get("status") == "ERROR")
+    overall = "PASSING" if fail_count == 0 and err_count == 0 else "FAILING"
+    overall_color = "#4ec9b0" if overall == "PASSING" else "#f44747"
+
+    # Overview table rows
+    rows_html = ""
+    for cat, data in scan_results.items():
+        status = data.get("status", "?")
+        label = _SCAN_DISPLAY_NAMES.get(cat, cat.replace("_", " ").title())
+        detail = _detail_str(cat, data)
+        desc = _SCAN_DESCRIPTIONS.get(cat, "")
+        cls = "pass" if status == "PASS" else ("fail" if status == "FAIL" else "err")
+        rows_html += (
+            f"<tr>"
+            f"<td>{label}</td>"
+            f"<td class='{cls}'>{status}</td>"
+            f"<td>{detail}</td>"
+            f"<td class='desc'>{desc}</td>"
+            f"</tr>\n"
+        )
+
+    # Tab buttons and panels
+    btn_html = '<button class="tab-btn active" onclick="showTab(this,\'overview\')">Overview</button>\n'
+    panel_html = ""
+    for key, report_text in step_reports.items():
+        label = _SCAN_TAB_LABELS.get(key, key.replace("_", " ").title())
+        status = scan_results.get(key, {}).get("status", "?")
+        dot_cls = "pass" if status == "PASS" else ("fail" if status == "FAIL" else "err")
+        escaped = (
+            _strip_ansi(report_text)
+            .replace("&", "&amp;")
+            .replace("<", "&lt;")
+            .replace(">", "&gt;")
+        )
+        tid = f"tab_{key}"
+        btn_html += (
+            f'<button class="tab-btn" onclick="showTab(this,\'{tid}\')">'
+            f'<span class="{dot_cls}-dot"></span>{label}</button>\n'
+        )
+        panel_html += (
+            f'<div id="{tid}" class="tab-panel" style="display:none">'
+            f"<pre>{escaped}</pre>"
+            f"</div>\n"
+        )
+
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall Scan - {scan_path}</title>
+  <style>
+    *{{box-sizing:border-box;margin:0;padding:0}}
+    body{{background:#1e1e1e;color:#d4d4d4;font-family:'Cascadia Code','Fira Code',Consolas,monospace;font-size:13px;line-height:1.6;display:flex;flex-direction:column;height:100vh;overflow:hidden}}
+    .hdr{{background:#252526;padding:12px 20px;border-bottom:1px solid #333;flex-shrink:0}}
+    .hdr h1{{color:#569cd6;font-size:1em;margin-bottom:2px}}
+    .hdr .meta{{color:#777;font-size:.85em}}
+    .overall{{color:{overall_color};font-weight:bold;margin-left:8px}}
+    .tab-bar{{display:flex;background:#2d2d2d;border-bottom:1px solid #333;padding:8px 16px 0;gap:4px;flex-shrink:0;flex-wrap:wrap}}
+    .tab-btn{{background:#333;border:1px solid #444;border-bottom:none;color:#ccc;padding:5px 12px;cursor:pointer;font-family:inherit;font-size:12px;border-radius:4px 4px 0 0}}
+    .tab-btn:hover{{background:#3e3e3e}}
+    .tab-btn.active{{background:#1e1e1e;color:#fff;border-color:#569cd6;border-bottom-color:#1e1e1e}}
+    .pass-dot::before{{content:"● ";color:#4ec9b0}}
+    .fail-dot::before{{content:"● ";color:#f44747}}
+    .err-dot::before{{content:"● ";color:#ff8c00}}
+    .tab-content{{flex:1;overflow:auto;padding:20px 24px}}
+    .tab-panel{{display:none}}
+    .tab-panel pre{{white-space:pre-wrap;word-wrap:break-word}}
+    table{{border-collapse:collapse;width:100%;max-width:920px}}
+    th,td{{text-align:left;padding:6px 14px;border-bottom:1px solid #333}}
+    th{{color:#777;font-weight:normal;font-size:.9em}}
+    .desc{{color:#777;font-size:.9em}}
+    .pass{{color:#4ec9b0}}
+    .fail{{color:#f44747}}
+    .err{{color:#ff8c00}}
+    .summary{{margin-top:14px;color:#777;font-size:.9em}}
+  </style>
+</head>
+<body>
+  <div class="hdr">
+    <h1>Heimdall Full Scan <span class="overall">{overall}</span></h1>
+    <div class="meta">
+      {scan_path} &nbsp;|&nbsp; {scanned_at.strftime('%Y-%m-%d %H:%M:%S')} &nbsp;|&nbsp; {duration:.1f}s &nbsp;|&nbsp;
+      <span class="pass">{pass_count} passed</span> &nbsp;
+      <span class="fail">{fail_count} failed</span> &nbsp;
+      <span class="err">{err_count} errors</span>
+    </div>
+  </div>
+  <div class="tab-bar">
+    {btn_html}
+  </div>
+  <div class="tab-content">
+    <div id="overview" class="tab-panel" style="display:block">
+      <table>
+        <thead><tr><th>Category</th><th>Status</th><th>Details</th><th>What It Checks</th></tr></thead>
+        <tbody>
+          {rows_html}
+        </tbody>
+      </table>
+      <div class="summary">
+        <span class="pass">{pass_count} passed</span> &nbsp;
+        <span class="fail">{fail_count} failed</span> &nbsp;
+        <span class="err">{err_count} errors</span> &nbsp;|&nbsp;
+        <span class="overall">{overall}</span>
+      </div>
+    </div>
+    {panel_html}
+  </div>
+  <script>
+    function showTab(btn,id){{
+      document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p=>p.style.display='none');
+      btn.classList.add('active');
+      document.getElementById(id).style.display='block';
+    }}
+  </script>
+</body>
+</html>"""
+
 
 def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
     """Execute a full scan running all analysis categories."""
@@ -3934,18 +4271,23 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
             scan_excludes.append(pattern)
     exclude_patterns = scan_excludes
 
+    # Ensure stdout is line-buffered so progress prints appear in real time
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(line_buffering=True)
+
     # Track results from all scans
     scan_results = {}
     overall_exit = 0
+    step_reports: dict = {}
 
-    print("=" * 70)
-    print("  HEIMDALL FULL SCAN")
-    print("  Running all analysis categories...")
-    print("=" * 70)
-    print()
+    print("=" * 70, flush=True)
+    print("  HEIMDALL FULL SCAN", flush=True)
+    print("  Running all analysis categories...", flush=True)
+    print("=" * 70, flush=True)
+    print(flush=True)
 
     # ---- 1. Quality: File Length ----
-    print("[1/10] Quality: File Length Analysis...")
+    print("[1/11] Quality: File Length Analysis...")
     try:
         config = AnalysisConfig(
             scan_path=scan_path,
@@ -3965,12 +4307,36 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if result.has_violations:
             overall_exit = 1
         print(f"       {result.files_exceeding_threshold} violations in {result.total_files_scanned} files")
+        fl_lines = [
+            "",
+            "=" * 70,
+            "  FILE LENGTH ANALYSIS",
+            "=" * 70,
+            "",
+            f"  Scan Path:              {result.scan_path}",
+            f"  Files Scanned:          {result.total_files_scanned}",
+            f"  Files Over Threshold:   {result.files_exceeding_threshold}",
+            f"  Compliance Rate:        {result.compliance_rate:.1f}%",
+            "",
+        ]
+        if not result.has_violations:
+            fl_lines.extend(["  All files are within the threshold.", ""])
+        else:
+            sorted_viol = sorted(result.violations, key=lambda x: x.line_count, reverse=True)
+            fl_lines.extend(["-" * 70, "  VIOLATIONS (longest first)", "  " + "-" * 47, ""])
+            for v in sorted_viol:
+                fl_lines.append(
+                    f"  {v.relative_path}   {v.line_count} lines  (limit: {v.threshold}, over by {v.lines_over})"
+                )
+            fl_lines.append("")
+        fl_lines.extend(["=" * 70, ""])
+        step_reports["file_length"] = "\n".join(fl_lines)
     except Exception as e:
         scan_results["file_length"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- 2. Quality: Complexity ----
-    print("[2/10] Quality: Complexity Analysis...")
+    print("[2/11] Quality: Complexity Analysis...")
     try:
         complexity_config = ComplexityConfig(
             scan_path=scan_path,
@@ -3988,12 +4354,16 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if complexity_result.has_violations:
             overall_exit = 1
         print(f"       {violation_count} violations found")
+        try:
+            step_reports["complexity"] = complexity_analyzer.generate_report(complexity_result, "text")
+        except Exception:
+            step_reports["complexity"] = f"Complexity Analysis\n\n{json.dumps(scan_results['complexity'], indent=2)}"
     except Exception as e:
         scan_results["complexity"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- 3. Quality: Lazy Imports ----
-    print("[3/10] Quality: Lazy Import Detection...")
+    print("[3/11] Quality: Lazy Import Detection...")
     try:
         lazy_config = LazyImportConfig(
             scan_path=scan_path,
@@ -4012,12 +4382,16 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if lazy_result.has_violations:
             overall_exit = 1
         print(f"       {lazy_count} violations in {lazy_result.files_scanned} files")
+        try:
+            step_reports["lazy_imports"] = lazy_scanner.generate_report(lazy_result, "text")
+        except Exception:
+            step_reports["lazy_imports"] = f"Lazy Import Detection\n\n{json.dumps(scan_results['lazy_imports'], indent=2)}"
     except Exception as e:
         scan_results["lazy_imports"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- 4. Quality: Env Fallbacks ----
-    print("[4/10] Quality: Environment Variable Fallback Detection...")
+    print("[4/11] Quality: Environment Variable Fallback Detection...")
     try:
         env_config = EnvFallbackConfig(
             scan_path=scan_path,
@@ -4036,14 +4410,19 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if env_result.has_violations:
             overall_exit = 1
         print(f"       {env_count} violations in {env_result.files_scanned} files")
+        try:
+            step_reports["env_fallbacks"] = env_scanner.generate_report(env_result, "text")
+        except Exception:
+            step_reports["env_fallbacks"] = f"Env Fallback Detection\n\n{json.dumps(scan_results['env_fallbacks'], indent=2)}"
     except Exception as e:
         scan_results["env_fallbacks"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
-    # ---- 5. Quality: Type Checking (Pyright) ----
-    print("[5/10] Quality: Static Type Checking (Pyright)...")
+    # ---- 5. Quality: Type Checking (mypy) ----
+    print("[5/11] Quality: Static Type Checking (mypy)...")
     try:
         type_config = TypeCheckConfig(
+            engine="mypy",
             type_checking_mode=getattr(args, "type_check_mode", "basic"),
             include_tests=include_tests,
             exclude_patterns=exclude_patterns,
@@ -4063,14 +4442,17 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if type_result.has_violations:
             overall_exit = 1
         print(f"       {type_result.total_errors} errors, {type_result.total_warnings} warnings in {type_result.files_scanned} files")
+        try:
+            step_reports["type_check"] = type_checker.generate_report(type_result, "text")
+        except Exception:
+            step_reports["type_check"] = f"Static Type Checking\n\n{json.dumps({k: v for k, v in scan_results['type_check'].items() if k != 'errors_by_category'}, indent=2)}"
     except Exception as e:
         scan_results["type_check"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- 6. Security ----
-    print("[6/10] Security: Vulnerability Scan...")
+    print("[6/11] Security: Vulnerability Scan...")
     try:
-        from Asgard.Heimdall.Security import StaticSecurityService, SecurityScanConfig
         sec_config = SecurityScanConfig(
             scan_path=scan_path,
             min_severity="low",
@@ -4090,14 +4472,17 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if sec_total > 0:
             overall_exit = 1
         print(f"       {sec_total} findings ({sec_critical} critical)")
+        try:
+            step_reports["security"] = sec_service.generate_report(sec_result, "text")
+        except Exception:
+            step_reports["security"] = f"Security Analysis\n\n{json.dumps(scan_results['security'], indent=2)}"
     except Exception as e:
         scan_results["security"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- 7. Performance ----
-    print("[7/10] Performance: Pattern Analysis...")
+    print("[7/11] Performance: Pattern Analysis...")
     try:
-        from Asgard.Heimdall.Performance import StaticPerformanceService, PerformanceScanConfig
         perf_config = PerformanceScanConfig(
             scan_path=scan_path,
             include_tests=include_tests,
@@ -4114,14 +4499,17 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if perf_total > 0:
             overall_exit = 1
         print(f"       {perf_total} findings")
+        try:
+            step_reports["performance"] = perf_service.generate_report(perf_result, "text")
+        except Exception:
+            step_reports["performance"] = f"Performance Analysis\n\n{json.dumps(scan_results['performance'], indent=2)}"
     except Exception as e:
         scan_results["performance"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- 8. OOP Metrics ----
-    print("[8/10] OOP: Coupling/Cohesion Metrics...")
+    print("[8/11] OOP: Coupling/Cohesion Metrics...")
     try:
-        from Asgard.Heimdall.OOP import OOPAnalyzer, OOPConfig
         oop_config = OOPConfig(
             scan_path=scan_path,
             include_tests=include_tests,
@@ -4138,14 +4526,17 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if oop_violations > 0:
             overall_exit = 1
         print(f"       {oop_violations} violations")
+        try:
+            step_reports["oop"] = oop_analyzer.generate_report(oop_result, "text")
+        except Exception:
+            step_reports["oop"] = f"OOP Metrics\n\n{json.dumps(scan_results['oop'], indent=2)}"
     except Exception as e:
         scan_results["oop"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- 9. Architecture ----
-    print("[9/10] Architecture: SOLID/Layer Analysis...")
+    print("[9/11] Architecture: SOLID/Layer Analysis...")
     try:
-        from Asgard.Heimdall.Architecture import ArchitectureAnalyzer, ArchitectureConfig
         arch_config = ArchitectureConfig(
             scan_path=scan_path,
             exclude_patterns=exclude_patterns,
@@ -4160,14 +4551,17 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if arch_violations > 0:
             overall_exit = 1
         print(f"       {arch_violations} violations")
+        try:
+            step_reports["architecture"] = arch_analyzer.generate_report(arch_result, "text")
+        except Exception:
+            step_reports["architecture"] = f"Architecture Analysis\n\n{json.dumps(scan_results['architecture'], indent=2)}"
     except Exception as e:
         scan_results["architecture"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- 10. Dependencies ----
-    print("[10/10] Dependencies: Circular Import Detection...")
+    print("[10/11] Dependencies: Circular Import Detection...")
     try:
-        from Asgard.Heimdall.Dependencies import DependencyAnalyzer, DependencyConfig
         deps_config = DependencyConfig(
             scan_path=scan_path,
             include_tests=include_tests,
@@ -4184,8 +4578,39 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         if deps_cycles > 0:
             overall_exit = 1
         print(f"       {deps_cycles} circular dependencies")
+        try:
+            step_reports["dependencies"] = deps_analyzer.generate_report(deps_result, "text")
+        except Exception:
+            step_reports["dependencies"] = f"Dependency Analysis\n\n{json.dumps(scan_results['dependencies'], indent=2)}"
     except Exception as e:
         scan_results["dependencies"] = {"status": "ERROR", "error": str(e)}
+        print(f"       Error: {e}")
+
+    # ---- 11. Test Coverage ----
+    print("[11/11] Test Coverage: Gap Analysis...")
+    try:
+        coverage_config = CoverageConfig(
+            scan_path=scan_path,
+            exclude_patterns=exclude_patterns,
+        )
+        coverage_analyzer = CoverageAnalyzer(coverage_config)
+        coverage_result = coverage_analyzer.analyze(scan_path)
+        method_coverage = coverage_result.metrics.method_coverage_percent
+        total_gaps = coverage_result.total_gaps
+        scan_results["test_coverage"] = {
+            "method_coverage_percent": round(method_coverage, 1),
+            "total_gaps": total_gaps,
+            "status": "PASS" if method_coverage >= coverage_config.min_method_coverage else "FAIL",
+        }
+        if method_coverage < coverage_config.min_method_coverage:
+            overall_exit = 1
+        print(f"       {method_coverage:.1f}% method coverage, {total_gaps} gaps")
+        try:
+            step_reports["test_coverage"] = coverage_analyzer.generate_report(coverage_result, "text")
+        except Exception:
+            step_reports["test_coverage"] = f"Test Coverage\n\n{json.dumps(scan_results['test_coverage'], indent=2)}"
+    except Exception as e:
+        scan_results["test_coverage"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
     # ---- Summary ----
@@ -4207,23 +4632,9 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
     for category, data in scan_results.items():
         status = data.get("status", "?")
         status_str = f"{'PASS' if status == 'PASS' else 'FAIL' if status == 'FAIL' else 'ERR '}"
-        label = category.replace("_", " ").title()
+        label = _SCAN_DISPLAY_NAMES.get(category, category.replace("_", " ").title())
 
-        # Build details string
-        if status == "ERROR":
-            detail = data.get("error", "")[:40]
-        elif category == "type_check":
-            detail = f"{data.get('errors', 0)} errors, {data.get('files_with_errors', 0)} files affected"
-        elif category == "security":
-            detail = f"{data.get('total_findings', 0)} findings ({data.get('critical', 0)} critical)"
-        elif "violations" in data:
-            detail = f"{data['violations']} violations"
-        elif "total_findings" in data:
-            detail = f"{data['total_findings']} findings"
-        elif "circular_imports" in data:
-            detail = f"{data['circular_imports']} cycles"
-        else:
-            detail = ""
+        detail = _detail_str(category, data)
 
         print(f"  {label:<35} {status_str:<8} {detail}")
 
@@ -4294,5 +4705,15 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         ])
         print()
         print("\n".join(lines))
+
+    # Generate tabbed HTML report and open in browser
+    html_report = _generate_scan_html_report(
+        scan_results=scan_results,
+        step_reports=step_reports,
+        scan_path=str(scan_path),
+        duration=duration,
+        scanned_at=start_time,
+    )
+    open_output_in_browser(html_report, "Heimdall Full Scan")
 
     return overall_exit

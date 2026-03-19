@@ -10,7 +10,7 @@ import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Union
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Compose.models.compose_models import (
     ComposeProject,

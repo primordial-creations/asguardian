@@ -10,7 +10,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Heimdall.Security.Container.models.container_models import (
     ContainerConfig,

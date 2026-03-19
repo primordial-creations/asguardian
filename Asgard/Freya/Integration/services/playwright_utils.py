@@ -4,9 +4,9 @@ Freya Playwright Utilities
 Utility functions for Playwright browser automation.
 """
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional, cast
 
-from playwright.async_api import async_playwright, Browser, BrowserContext, Page
+from playwright.async_api import async_playwright, Browser, BrowserContext, Page, Playwright
 
 from Asgard.Freya.Integration.models.integration_models import (
     BrowserConfig,
@@ -115,8 +115,8 @@ class PlaywrightUtils:
             config: Browser configuration
         """
         self.config = config or BrowserConfig()
-        self._playwright = None
-        self._browser = None
+        self._playwright: Optional[Playwright] = None
+        self._browser: Optional[Browser] = None
 
     async def launch_browser(self) -> Browser:
         """
@@ -125,20 +125,21 @@ class PlaywrightUtils:
         Returns:
             Browser instance
         """
-        self._playwright = await async_playwright().start()
+        pw: Playwright = await async_playwright().start()
+        self._playwright = pw
 
-        browser_type = self._playwright.chromium
+        browser_type = pw.chromium
         if self.config.browser_type == "firefox":
-            browser_type = self._playwright.firefox
+            browser_type = pw.firefox
         elif self.config.browser_type == "webkit":
-            browser_type = self._playwright.webkit
+            browser_type = pw.webkit
 
         self._browser = await browser_type.launch(
             headless=self.config.headless,
             slow_mo=self.config.slow_mo,
         )
 
-        return self._browser
+        return self._browser  # type: ignore[return-value]
 
     async def close_browser(self) -> None:
         """Close the browser instance."""
@@ -199,12 +200,13 @@ class PlaywrightUtils:
         if record_video and video_dir:
             context_options["record_video_dir"] = video_dir
 
+        assert self._browser is not None
         context = await self._browser.new_context(**context_options)
 
         if network and network in NETWORK_PRESETS:
             await self._apply_network_conditions(context, NETWORK_PRESETS[network])
 
-        return context
+        return cast(BrowserContext, context)
 
     async def create_page(
         self,
@@ -233,7 +235,7 @@ class PlaywrightUtils:
         self,
         page: Page,
         url: str,
-        wait_until: str = "networkidle"
+        wait_until: Literal["commit", "domcontentloaded", "load", "networkidle"] = "networkidle"
     ) -> None:
         """
         Navigate to a URL.
@@ -321,7 +323,7 @@ class PlaywrightUtils:
                 };
             }
         """)
-        return metrics
+        return cast(Dict[Any, Any], metrics)
 
     async def get_accessibility_tree(self, page: Page) -> Dict:
         """
@@ -333,7 +335,7 @@ class PlaywrightUtils:
         Returns:
             Accessibility tree
         """
-        return await page.accessibility.snapshot()
+        return cast(Dict[Any, Any], await page.accessibility.snapshot())  # type: ignore[attr-defined]
 
     async def emulate_media(
         self,
@@ -358,7 +360,10 @@ class PlaywrightUtils:
             media_features.append({"name": "prefers-reduced-motion", "value": reduced_motion})
 
         if media_features:
-            await page.emulate_media(color_scheme=color_scheme, reduced_motion=reduced_motion)
+            await page.emulate_media(  # type: ignore[arg-type]
+                color_scheme=color_scheme,  # type: ignore[arg-type]
+                reduced_motion=reduced_motion,  # type: ignore[arg-type]
+            )
 
     async def set_viewport(
         self,

@@ -11,7 +11,7 @@ import time
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import yaml
+import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Validation.models.validation_models import (
     ValidationReport,
@@ -535,7 +535,7 @@ class KubernetesValidator:
 
         # Build file summaries
         file_summaries = []
-        results_by_file = {}
+        results_by_file: Dict[str, List[ValidationResult]] = {}
         for result in results:
             fp = result.file_path or "(no file)"
             if fp not in results_by_file:

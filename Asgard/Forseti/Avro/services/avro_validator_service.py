@@ -9,7 +9,7 @@ import json
 import re
 import time
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any, Optional, cast
 
 from Asgard.Forseti.Avro.models.avro_models import (
     AvroConfig,
@@ -330,8 +330,8 @@ class AvroValidatorService:
             if "type" in schema:
                 type_val = schema["type"]
                 if type_val in self.COMPLEX_TYPES and "name" in schema:
-                    return schema.get("name", type_val)
-                return type_val
+                    return cast(str, schema.get("name", type_val))
+                return cast(str, type_val)
         return str(schema)
 
     def _validate_complex_type(
