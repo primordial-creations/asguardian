@@ -31,6 +31,13 @@ from Asgard.Heimdall.Quality.BugDetection.models.bug_models import (
 )
 from Asgard.Heimdall.Quality.BugDetection.services.null_dereference_detector import NullDereferenceDetector
 from Asgard.Heimdall.Quality.BugDetection.services.unreachable_code_detector import UnreachableCodeDetector
+from Asgard.Heimdall.Quality.BugDetection.services.assertion_misuse_detector import AssertMisuseDetector
+from Asgard.Heimdall.Quality.BugDetection.services.division_by_zero_detector import DivisionByZeroDetector
+from Asgard.Heimdall.Quality.BugDetection.services.python_footgun_detector import PythonFootgunDetector
+from Asgard.Heimdall.Quality.BugDetection.services.exception_quality_detector import ExceptionQualityDetector
+from Asgard.Heimdall.Quality.BugDetection.services.type_erosion_scanner import TypeErosionScanner
+from Asgard.Heimdall.Quality.BugDetection.services.dead_code_detector import DeadCodeDetector
+from Asgard.Heimdall.Quality.BugDetection.services.magic_numbers_detector import MagicNumbersDetector
 from Asgard.Heimdall.Quality.BugDetection.services.bug_detector import BugDetector
 
 __all__ = [
@@ -42,4 +49,11 @@ __all__ = [
     "BugSeverity",
     "NullDereferenceDetector",
     "UnreachableCodeDetector",
+    "AssertMisuseDetector",
+    "DivisionByZeroDetector",
+    "PythonFootgunDetector",
+    "ExceptionQualityDetector",
+    "TypeErosionScanner",
+    "DeadCodeDetector",
+    "MagicNumbersDetector",
 ]

@@ -16,12 +16,14 @@ from Asgard.Heimdall.Architecture.models.architecture_models import (
     LayerDefinition,
     LayerReport,
     PatternReport,
+    PatternSuggestionReport,
     SOLIDReport,
 )
 from Asgard.Heimdall.Architecture.services.solid_validator import SOLIDValidator
 from Asgard.Heimdall.Architecture.services.layer_analyzer import LayerAnalyzer
 from Asgard.Heimdall.Architecture.services.pattern_detector import PatternDetector
 from Asgard.Heimdall.Architecture.services.hexagonal_analyzer import HexagonalAnalyzer
+from Asgard.Heimdall.Architecture.services.pattern_suggester import PatternSuggester
 
 
 class ArchitectureAnalyzer:
@@ -43,6 +45,7 @@ class ArchitectureAnalyzer:
         self.layer_analyzer = LayerAnalyzer(self.config)
         self.pattern_detector = PatternDetector(self.config)
         self.hexagonal_analyzer = HexagonalAnalyzer(self.config)
+        self.pattern_suggester = PatternSuggester(self.config)
 
     def analyze(
         self,
@@ -51,6 +54,7 @@ class ArchitectureAnalyzer:
         analyze_layers: bool = True,
         detect_patterns: bool = True,
         analyze_hexagonal: bool = False,
+        suggest_patterns: bool = True,
     ) -> ArchitectureReport:
         """
         Perform complete architecture analysis.
@@ -86,6 +90,9 @@ class ArchitectureAnalyzer:
 
         if analyze_hexagonal:
             report.hexagonal_report = self.hexagonal_analyzer.analyze(path)
+
+        if suggest_patterns:
+            report.suggestion_report = self.pattern_suggester.suggest(path)
 
         report.scan_duration_seconds = time.time() - start_time
 
@@ -274,6 +281,26 @@ class ArchitectureAnalyzer:
             lines.append(f"  Status:            {'VALID' if result.hexagonal_report.is_valid else 'INVALID'}")
             lines.append("")
 
+        # Pattern candidate suggestions summary
+        if result.suggestion_report:
+            lines.append("-" * 70)
+            lines.append("  PATTERN CANDIDATE SUGGESTIONS")
+            lines.append("-" * 70)
+            lines.append("")
+            lines.append(
+                "  Analyses code smells and structural signals to suggest GoF design"
+                " patterns that could improve the design (Builder, Strategy, Observer, etc.)."
+                " These are candidates — not violations."
+            )
+            lines.append("")
+            lines.append(f"  Suggestions Found: {result.suggestion_report.total_suggestions}")
+            lines.append("")
+            for pattern_type, suggestions in result.suggestion_report.suggestions_by_pattern.items():
+                if suggestions:
+                    label = pattern_type.value.replace("_", " ").title()
+                    lines.append(f"  {label}: {len(suggestions)} candidate(s)")
+            lines.append("")
+
         # Recommendations
         lines.append("-" * 70)
         lines.append("  RECOMMENDATIONS")
@@ -387,6 +414,24 @@ class ArchitectureAnalyzer:
                 ],
             }
 
+        if result.suggestion_report:
+            output["pattern_suggestions"] = {
+                "total_suggestions": result.suggestion_report.total_suggestions,
+                "suggestions": [
+                    {
+                        "pattern_type": s.pattern_type.value,
+                        "class_name": s.class_name,
+                        "file_path": s.file_path,
+                        "line_number": s.line_number,
+                        "confidence": s.confidence,
+                        "rationale": s.rationale,
+                        "signals": s.signals,
+                        "benefit": s.benefit,
+                    }
+                    for s in result.suggestion_report.suggestions
+                ],
+            }
+
         output["recommendations"] = self._generate_recommendations(result)
 
         return json.dumps(output, indent=2)
@@ -492,6 +537,24 @@ class ArchitectureAnalyzer:
 
                 lines.append("")
 
+        # Pattern candidate suggestions section
+        if result.suggestion_report and result.suggestion_report.suggestions:
+            lines.append("## Pattern Candidate Suggestions")
+            lines.append("")
+            lines.append(f"- **Total Suggestions:** {result.suggestion_report.total_suggestions}")
+            lines.append("")
+            lines.append("| Pattern | Class | Confidence | Signals |")
+            lines.append("|---------|-------|------------|---------|")
+
+            for s in result.suggestion_report.suggestions:
+                signal_str = "; ".join(s.signals[:2]) if s.signals else ""
+                lines.append(
+                    f"| {s.pattern_type.value.replace('_', ' ').title()} | "
+                    f"{s.class_name} | {s.confidence:.0%} | {signal_str[:60]} |"
+                )
+
+            lines.append("")
+
         # Recommendations
         lines.append("## Recommendations")
         lines.append("")
@@ -541,10 +604,30 @@ class ArchitectureAnalyzer:
                     "No ports detected -- define abstract base classes for domain boundaries"
                 )
 
+        if result.suggestion_report and result.suggestion_report.total_suggestions > 0:
+            recommendations.append(
+                f"Review {result.suggestion_report.total_suggestions} pattern candidate suggestion(s)"
+                " -- applying these patterns could improve maintainability and extensibility"
+            )
+
         if not recommendations:
             recommendations.append("Architecture is in good shape!")
 
         return recommendations
+
+    def suggest_patterns(
+        self, scan_path: Optional[Path] = None
+    ) -> PatternSuggestionReport:
+        """
+        Analyse the codebase for pattern candidates only.
+
+        Args:
+            scan_path: Root path to scan.
+
+        Returns:
+            PatternSuggestionReport with all suggestions.
+        """
+        return self.pattern_suggester.suggest(scan_path)
 
     def quick_check(self, scan_path: Optional[Path] = None) -> dict:
         """
@@ -563,5 +646,6 @@ class ArchitectureAnalyzer:
             "solid_violations": result.solid_report.total_violations if result.solid_report else 0,
             "layer_violations": result.layer_report.total_violations if result.layer_report else 0,
             "patterns_found": result.pattern_report.total_patterns if result.pattern_report else 0,
+            "pattern_suggestions": result.suggestion_report.total_suggestions if result.suggestion_report else 0,
             "recommendations": self._generate_recommendations(result),
         }

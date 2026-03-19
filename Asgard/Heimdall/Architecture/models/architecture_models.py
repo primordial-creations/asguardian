@@ -332,6 +332,49 @@ class HexagonalReport:
 
 
 @dataclass
+class PatternSuggestion:
+    """A suggested design pattern for a class or code region."""
+
+    pattern_type: PatternType
+    class_name: str
+    file_path: str
+    line_number: int
+    rationale: str
+    signals: List[str] = field(default_factory=list)
+    confidence: float = 0.6
+    benefit: str = ""
+
+
+@dataclass
+class PatternSuggestionReport:
+    """Report of pattern candidate suggestions from code smell analysis."""
+
+    scan_path: str = ""
+    scanned_at: datetime = field(default_factory=datetime.now)
+    suggestions: List["PatternSuggestion"] = field(default_factory=list)
+    scan_duration_seconds: float = 0.0
+
+    @property
+    def total_suggestions(self) -> int:
+        """Get total suggestion count."""
+        return len(self.suggestions)
+
+    @property
+    def suggestions_by_pattern(self) -> Dict[PatternType, List["PatternSuggestion"]]:
+        """Group suggestions by pattern type."""
+        result: Dict[PatternType, List[PatternSuggestion]] = {}
+        for s in self.suggestions:
+            if s.pattern_type not in result:
+                result[s.pattern_type] = []
+            result[s.pattern_type].append(s)
+        return result
+
+    def add_suggestion(self, suggestion: "PatternSuggestion") -> None:
+        """Add a pattern suggestion to the report."""
+        self.suggestions.append(suggestion)
+
+
+@dataclass
 class ArchitectureReport:
     """Combined architecture analysis report."""
 
@@ -341,6 +384,7 @@ class ArchitectureReport:
     layer_report: Optional[LayerReport] = None
     pattern_report: Optional[PatternReport] = None
     hexagonal_report: Optional[HexagonalReport] = None
+    suggestion_report: Optional[PatternSuggestionReport] = None
     scan_duration_seconds: float = 0.0
 
     @property

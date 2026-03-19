@@ -19,6 +19,8 @@ from Asgard.Heimdall.Architecture.models.architecture_models import (
     PatternMatch,
     PatternType,
     PatternReport,
+    PatternSuggestion,
+    PatternSuggestionReport,
     HexagonalZone,
     HexagonalViolation,
     HexagonalReport,
@@ -31,6 +33,7 @@ from Asgard.Heimdall.Architecture.services.solid_validator import SOLIDValidator
 from Asgard.Heimdall.Architecture.services.layer_analyzer import LayerAnalyzer
 from Asgard.Heimdall.Architecture.services.pattern_detector import PatternDetector
 from Asgard.Heimdall.Architecture.services.hexagonal_analyzer import HexagonalAnalyzer
+from Asgard.Heimdall.Architecture.services.pattern_suggester import PatternSuggester
 from Asgard.Heimdall.Architecture.services.architecture_analyzer import ArchitectureAnalyzer
 
 __all__ = [
@@ -45,6 +48,8 @@ __all__ = [
     "PatternMatch",
     "PatternType",
     "PatternReport",
+    "PatternSuggestion",
+    "PatternSuggestionReport",
     "HexagonalZone",
     "HexagonalViolation",
     "HexagonalReport",
@@ -56,6 +61,7 @@ __all__ = [
     "SOLIDValidator",
     "LayerAnalyzer",
     "PatternDetector",
+    "PatternSuggester",
     "HexagonalAnalyzer",
     "ArchitectureAnalyzer",
 ]

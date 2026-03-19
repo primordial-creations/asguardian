@@ -19,6 +19,13 @@ from Asgard.Heimdall.Quality.BugDetection.models.bug_models import (
 )
 from Asgard.Heimdall.Quality.BugDetection.services.null_dereference_detector import NullDereferenceDetector
 from Asgard.Heimdall.Quality.BugDetection.services.unreachable_code_detector import UnreachableCodeDetector
+from Asgard.Heimdall.Quality.BugDetection.services.assertion_misuse_detector import AssertMisuseDetector
+from Asgard.Heimdall.Quality.BugDetection.services.division_by_zero_detector import DivisionByZeroDetector
+from Asgard.Heimdall.Quality.BugDetection.services.python_footgun_detector import PythonFootgunDetector
+from Asgard.Heimdall.Quality.BugDetection.services.exception_quality_detector import ExceptionQualityDetector
+from Asgard.Heimdall.Quality.BugDetection.services.type_erosion_scanner import TypeErosionScanner
+from Asgard.Heimdall.Quality.BugDetection.services.dead_code_detector import DeadCodeDetector
+from Asgard.Heimdall.Quality.BugDetection.services.magic_numbers_detector import MagicNumbersDetector
 
 
 def _should_exclude(path: Path, exclude_patterns: List[str]) -> bool:
@@ -61,6 +68,13 @@ class BugDetector:
         self.config = config or BugDetectionConfig()
         self.null_detector = NullDereferenceDetector(self.config)
         self.unreachable_detector = UnreachableCodeDetector(self.config)
+        self.assert_detector = AssertMisuseDetector(self.config)
+        self.div_zero_detector = DivisionByZeroDetector(self.config)
+        self.footgun_detector = PythonFootgunDetector(self.config)
+        self.exception_detector = ExceptionQualityDetector(self.config)
+        self.type_erosion_scanner = TypeErosionScanner(self.config)
+        self.dead_code_detector = DeadCodeDetector(self.config)
+        self.magic_numbers_detector = MagicNumbersDetector(self.config)
 
     def scan(self, scan_path: Optional[Path] = None) -> BugReport:
         """
@@ -106,6 +120,27 @@ class BugDetector:
             if self.config.detect_unreachable_code:
                 unreachable_findings = self.unreachable_detector.analyze_file(file_path, lines)
                 file_findings.extend(unreachable_findings)
+
+            if self.config.detect_division_by_zero:
+                file_findings.extend(self.div_zero_detector.analyze_file(file_path, lines))
+
+            if self.config.detect_assertion_misuse:
+                file_findings.extend(self.assert_detector.analyze_file(file_path, lines))
+
+            if self.config.detect_python_footguns:
+                file_findings.extend(self.footgun_detector.analyze_file(file_path, lines))
+
+            if self.config.detect_exception_quality:
+                file_findings.extend(self.exception_detector.analyze_file(file_path, lines))
+
+            if self.config.detect_type_erosion:
+                file_findings.extend(self.type_erosion_scanner.analyze_file(file_path, lines))
+
+            if self.config.detect_dead_code:
+                file_findings.extend(self.dead_code_detector.analyze_file(file_path, lines))
+
+            if self.config.detect_magic_numbers:
+                file_findings.extend(self.magic_numbers_detector.analyze_file(file_path, lines))
 
             for finding in file_findings:
                 report.add_finding(finding)

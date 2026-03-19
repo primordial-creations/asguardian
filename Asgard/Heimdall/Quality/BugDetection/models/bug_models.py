@@ -20,11 +20,21 @@ from pydantic import BaseModel, Field
 
 class BugCategory(str, Enum):
     """Categories of bugs detected by the symbolic execution subset."""
-    NULL_DEREFERENCE = "null_dereference"   # Accessing attribute/method on potentially None value
-    UNREACHABLE_CODE = "unreachable_code"   # Code that can never execute
-    ALWAYS_FALSE = "always_false"           # Condition that is always False
-    ALWAYS_TRUE = "always_true"             # Condition that is always True
-    DIVISION_BY_ZERO = "division_by_zero"   # Division by a literal zero or zero-assigned variable
+    NULL_DEREFERENCE = "null_dereference"       # Accessing attribute/method on potentially None value
+    UNREACHABLE_CODE = "unreachable_code"       # Code that can never execute
+    ALWAYS_FALSE = "always_false"               # Condition that is always False
+    ALWAYS_TRUE = "always_true"                 # Condition that is always True
+    DIVISION_BY_ZERO = "division_by_zero"       # Division by a literal zero or zero-assigned variable
+    ASSERTION_MISUSE = "assertion_misuse"       # Incorrect/dangerous assert usage
+    MUTABLE_DEFAULT_ARG = "mutable_default_arg" # def f(x=[]) — shared mutable default
+    LATE_BINDING_CLOSURE = "late_binding_closure" # lambda/nested func in loop captures loop var
+    BUILTIN_SHADOWING = "builtin_shadowing"     # list=[], id=1 — shadows built-ins
+    IS_LITERAL_COMPARISON = "is_literal_comparison" # x is 1 — identity vs equality
+    EXCEPTION_SWALLOWING = "exception_swallowing"   # bare except: pass, or except E: pass
+    EXCEPTION_CHAINING = "exception_chaining"   # raise X in except without from e
+    TYPE_EROSION = "type_erosion"               # Any annotations, cast(), type: ignore, missing return types
+    DEAD_CODE = "dead_code"                     # Unused private methods / module vars
+    MAGIC_NUMBER = "magic_number"               # Hard-coded numeric literals
 
 
 class BugSeverity(str, Enum):
@@ -121,6 +131,12 @@ class BugDetectionConfig(BaseModel):
     detect_null_dereference: bool = Field(True, description="Enable null dereference detection")
     detect_unreachable_code: bool = Field(True, description="Enable unreachable code detection")
     detect_division_by_zero: bool = Field(True, description="Enable division by zero detection")
+    detect_assertion_misuse: bool = Field(True, description="Enable assertion misuse detection")
+    detect_python_footguns: bool = Field(True, description="Enable mutable defaults, late binding, builtin shadowing")
+    detect_exception_quality: bool = Field(True, description="Enable exception swallowing/chaining detection")
+    detect_type_erosion: bool = Field(True, description="Enable Any overuse, cast(), type:ignore scanning")
+    detect_dead_code: bool = Field(True, description="Enable unused private method/variable detection")
+    detect_magic_numbers: bool = Field(True, description="Enable magic number detection")
     exclude_patterns: List[str] = Field(
         default_factory=lambda: [
             "__pycache__",
