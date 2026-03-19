@@ -85,6 +85,9 @@ markers = [
     "verdandi: Verdandi package tests",
     "forseti: Forseti package tests",
     "backend_init: BackendInit package tests",
+    "setup_hooks: HooksSetup package tests",
+    "L0: level 0 unit tests (no I/O or network)",
+    "fast: fast tests with no I/O or network",
 ]
 
 [tool.ruff]

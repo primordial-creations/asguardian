@@ -5,6 +5,7 @@ Usage:
     asguardian <module> [command] [options]
     asguardian init [--format yaml|toml|json]
     asguardian init-backend <folder_name>
+    asguardian setup-hooks [--pre-push] [--vscode] [--path <dir>]
     asguardian heimdall analyze <path>
     asguardian freya crawl <url>
     asguardian forseti validate <spec>
@@ -19,6 +20,7 @@ from pathlib import Path
 from typing import Optional, cast
 
 from Asgard.BackendInit.service import init_backend
+from Asgard.HooksSetup.service import setup_hooks
 from Asgard.Forseti.cli import main as forseti_main
 from Asgard.Freya.cli import main as freya_main
 from Asgard.Heimdall.cli import main as heimdall_main
@@ -75,6 +77,7 @@ API validation, performance metrics, and infrastructure generation.
 
   asguardian init                    # Generate configuration file (asgard.yaml)
   asguardian init-backend <folder>   # Scaffold a standard backend project structure
+  asguardian setup-hooks             # Install pre-commit hooks (add --vscode for editor config)
   asguardian install-browsers        # Install Chromium for Freya (run once after install)
   asguardian heimdall quality <path> # Run code quality analysis
   asguardian heimdall security <path> # Run security scanning
@@ -103,6 +106,19 @@ API validation, performance metrics, and infrastructure generation.
   coding_standards.md, readme.md, .env, .env.example, and .gitignore.
   Existing files are never overwritten (except .gitignore which is updated
   to ensure .claude, "Claude Team", and .env are excluded).
+
+  asguardian setup-hooks [--pre-push] [--vscode] [--path <dir>]
+
+  Install pre-commit as a git hook so that linting, formatting, and type
+  checks run automatically before bad code reaches a reviewer.
+
+    --pre-push   Also add a pre-push hook (catches issues before git push).
+    --vscode     Write .vscode/settings.json + extensions.json so the editor
+                 runs ruff format-on-save and recommends the right extensions.
+    --path <dir> Target project root (defaults to current directory).
+
+  Requires pre-commit to be installed: pip install pre-commit
+  The project must already have a .pre-commit-config.yaml file.
 
 --------------------------------------------------------------------------------
   HEIMDALL - Code Quality & Security Analysis
@@ -323,6 +339,15 @@ Run 'asguardian init' to generate a default configuration file.
 """
 
 
+def handle_setup_hooks(args: argparse.Namespace) -> int:
+    """Handle the 'setup-hooks' command to install pre-commit git hooks."""
+    return setup_hooks(
+        project_path=Path(getattr(args, "path", ".")).resolve(),
+        install_pre_push=getattr(args, "pre_push", False),
+        setup_vscode=getattr(args, "vscode", False),
+    )
+
+
 def handle_init_backend(args: argparse.Namespace) -> int:
     """Handle the 'init-backend' command to scaffold a backend project."""
     return cast(int, init_backend(args.folder_name))
@@ -370,6 +395,7 @@ def main(args: Optional[list] = None) -> int:
 Subcommands:
   init              Initialize Asgard configuration file
   init-backend      Scaffold a standard backend project structure
+  setup-hooks       Install pre-commit git hooks (add --vscode for editor config)
   install-browsers  Install Playwright browsers for Freya
   heimdall          Code quality control and static analysis
   freya             Visual and UI testing
@@ -380,6 +406,7 @@ Subcommands:
 Examples:
   asguardian init --format yaml
   asguardian init-backend my_service
+  asguardian setup-hooks --pre-push --vscode  # Hooks + VS Code config
   asguardian install-browsers              # Required once for Freya
   asguardian heimdall analyze ./src
   asguardian freya crawl http://localhost:3000
@@ -437,6 +464,35 @@ Examples:
     init_backend_parser.add_argument(
         "folder_name",
         help="Name of the folder to create (or populate if it already exists)",
+    )
+
+    # Setup-hooks subcommand
+    hooks_parser = subparsers.add_parser(
+        "setup-hooks",
+        help="Install pre-commit git hooks and (optionally) configure VS Code",
+        description=(
+            "Install pre-commit as a git commit hook so that linting, formatting, "
+            "and type checks run automatically before code reaches a reviewer. "
+            "Use --pre-push to also run checks on git push, and --vscode to write "
+            ".vscode/settings.json and .vscode/extensions.json with matching editor config."
+        ),
+    )
+    hooks_parser.add_argument(
+        "--pre-push",
+        action="store_true",
+        dest="pre_push",
+        help="Also install a pre-push hook (runs checks before git push)",
+    )
+    hooks_parser.add_argument(
+        "--vscode",
+        action="store_true",
+        help="Write .vscode/settings.json and extensions.json for matching editor config",
+    )
+    hooks_parser.add_argument(
+        "--path",
+        default=".",
+        metavar="DIR",
+        help="Project root directory (default: current directory)",
     )
 
     # Install-browsers subcommand
@@ -530,6 +586,10 @@ Examples:
     # Handle init-backend command
     if parsed_args.module == "init-backend":
         return handle_init_backend(parsed_args)
+
+    # Handle setup-hooks command
+    if parsed_args.module == "setup-hooks":
+        return handle_setup_hooks(parsed_args)
 
     # Handle install-browsers command
     if parsed_args.module == "install-browsers":
