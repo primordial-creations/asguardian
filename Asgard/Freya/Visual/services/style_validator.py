@@ -17,6 +17,13 @@ from Asgard.Freya.Visual.models.visual_models import (
     StyleIssue,
     StyleIssueType,
 )
+from Asgard.Freya.Visual.services._style_validator_helpers import (
+    ThemeLoader,
+    extract_colors,
+    extract_fonts,
+    load_theme,
+    normalize_color,
+)
 
 
 class StyleValidator:
@@ -42,60 +49,19 @@ class StyleValidator:
 
     def _load_theme(self, theme_file: str) -> None:
         """Load theme/design tokens from file."""
-        try:
-            with open(theme_file, "r") as f:
-                theme = json.load(f)
-
-            if "colors" in theme:
-                self._extract_colors(theme["colors"])
-
-            if "fonts" in theme or "typography" in theme:
-                fonts = theme.get("fonts", theme.get("typography", {}))
-                self._extract_fonts(fonts)
-
-        except Exception:
-            pass
+        load_theme(theme_file, self.theme_colors, self.theme_fonts)
 
     def _extract_colors(self, colors_obj: dict, prefix: str = "") -> None:
         """Extract colors from nested theme object."""
-        for key, value in colors_obj.items():
-            if isinstance(value, str):
-                normalized = self._normalize_color(value)
-                if normalized:
-                    self.theme_colors.add(normalized)
-            elif isinstance(value, dict):
-                self._extract_colors(value, f"{prefix}{key}.")
+        extract_colors(colors_obj, self.theme_colors, prefix)
 
     def _extract_fonts(self, fonts_obj: dict) -> None:
         """Extract font families from theme object."""
-        for key, value in fonts_obj.items():
-            if isinstance(value, str):
-                self.theme_fonts.add(value.lower())
-            elif isinstance(value, dict):
-                if "family" in value:
-                    self.theme_fonts.add(value["family"].lower())
-                self._extract_fonts(value)
+        extract_fonts(fonts_obj, self.theme_fonts)
 
     def _normalize_color(self, color: str) -> Optional[str]:
         """Normalize color to lowercase hex."""
-        color = color.strip().lower()
-
-        if color.startswith("#"):
-            if len(color) == 4:
-                color = f"#{color[1]}{color[1]}{color[2]}{color[2]}{color[3]}{color[3]}"
-            return color
-
-        rgb_match = re.match(r"rgb\((\d+),\s*(\d+),\s*(\d+)\)", color)
-        if rgb_match:
-            r, g, b = map(int, rgb_match.groups())
-            return f"#{r:02x}{g:02x}{b:02x}"
-
-        rgba_match = re.match(r"rgba\((\d+),\s*(\d+),\s*(\d+)", color)
-        if rgba_match:
-            r, g, b = map(int, rgba_match.groups())
-            return f"#{r:02x}{g:02x}{b:02x}"
-
-        return None
+        return normalize_color(color)
 
     async def validate(self, url: str) -> StyleReport:
         """
@@ -133,7 +99,6 @@ class StyleValidator:
                         for (const el of elements) {
                             const style = getComputedStyle(el);
 
-                            // Collect colors
                             const colors = [
                                 style.color,
                                 style.backgroundColor,
@@ -146,13 +111,11 @@ class StyleValidator:
                                 }
                             }
 
-                            // Collect fonts
                             const fontFamily = style.fontFamily.split(',')[0].trim().replace(/["']/g, '').toLowerCase();
                             if (fontFamily) {
                                 results.fonts[fontFamily] = (results.fonts[fontFamily] || 0) + 1;
                             }
 
-                            // Sample some elements for detailed analysis
                             if (results.elements.length < 50) {
                                 const selector = el.id ? '#' + el.id :
                                                   el.className && typeof el.className === 'string' ?
@@ -179,7 +142,7 @@ class StyleValidator:
                 """)
 
                 for color, count in style_data["colors"].items():
-                    normalized = self._normalize_color(color)
+                    normalized = normalize_color(color)
                     if normalized:
                         colors_found[normalized] = colors_found.get(normalized, 0) + count
 
@@ -195,8 +158,8 @@ class StyleValidator:
                             unknown_fonts.append(font)
 
                 for elem in style_data["elements"]:
-                    normalized_color = self._normalize_color(elem["color"])
-                    normalized_bg = self._normalize_color(elem["backgroundColor"])
+                    normalized_color = normalize_color(elem["color"])
+                    normalized_bg = normalize_color(elem["backgroundColor"])
 
                     if self.theme_colors:
                         if normalized_color and normalized_color not in self.theme_colors:
@@ -292,48 +255,3 @@ class StyleValidator:
             ))
 
         return issues
-
-
-class ThemeLoader:
-    """Utility class to load various theme file formats."""
-
-    @staticmethod
-    def load_from_file(file_path: str) -> Dict:
-        """Load theme from various file formats."""
-        path = Path(file_path)
-
-        if path.suffix == ".json":
-            with open(path, "r") as f:
-                return cast(Dict[Any, Any], json.load(f))
-
-        elif path.suffix in [".ts", ".tsx", ".js"]:
-            return ThemeLoader._parse_js_theme(path)
-
-        elif path.suffix == ".css":
-            return ThemeLoader._parse_css_variables(path)
-
-        return {}
-
-    @staticmethod
-    def _parse_js_theme(path: Path) -> Dict:
-        """Parse JavaScript/TypeScript theme file."""
-        content = path.read_text()
-
-        colors = {}
-        color_pattern = r'["\']?([\w-]+)["\']?\s*:\s*["\']?(#[0-9a-fA-F]{3,8}|rgb\([^)]+\))["\']?'
-        for match in re.finditer(color_pattern, content):
-            colors[match.group(1)] = match.group(2)
-
-        return {"colors": colors}
-
-    @staticmethod
-    def _parse_css_variables(path: Path) -> Dict:
-        """Parse CSS custom properties."""
-        content = path.read_text()
-
-        colors = {}
-        var_pattern = r'--([\w-]+)\s*:\s*(#[0-9a-fA-F]{3,8}|rgb\([^)]+\)|rgba\([^)]+\))'
-        for match in re.finditer(var_pattern, content):
-            colors[match.group(1)] = match.group(2)
-
-        return {"colors": colors}

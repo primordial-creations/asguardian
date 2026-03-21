@@ -108,8 +108,8 @@ class DebtReport(BaseModel):
     debt_by_severity: Dict[str, int] = Field(default_factory=dict, description="Count by severity")
     debt_items: List[DebtItem] = Field(default_factory=list, description="All identified debt items")
     prioritized_items: List[DebtItem] = Field(default_factory=list, description="Items sorted by priority")
-    roi_analysis: ROIAnalysis = Field(default_factory=ROIAnalysis, description="ROI analysis")
-    time_projection: TimeProjection = Field(default_factory=TimeProjection, description="Time projection")
+    roi_analysis: ROIAnalysis = Field(default_factory=ROIAnalysis, description="ROI analysis")  # type: ignore[arg-type]
+    time_projection: TimeProjection = Field(default_factory=TimeProjection, description="Time projection")  # type: ignore[arg-type]
     most_indebted_files: List[Tuple[str, float]] = Field(default_factory=list, description="Files with most debt")
     remediation_priorities: List[str] = Field(default_factory=list, description="Priority actions")
     scan_path: str = Field("", description="Root path that was scanned")
@@ -192,11 +192,11 @@ class DebtConfig(BaseModel):
         description="Custom business value weights by path pattern"
     )
     effort_models: EffortModels = Field(
-        default_factory=EffortModels,
+        default_factory=EffortModels,  # type: ignore[arg-type]
         description="Effort estimation models"
     )
     interest_rates: InterestRates = Field(
-        default_factory=InterestRates,
+        default_factory=InterestRates,  # type: ignore[arg-type]
         description="Interest rates for debt growth"
     )
     include_extensions: Optional[List[str]] = Field(

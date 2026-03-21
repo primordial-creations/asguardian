@@ -104,7 +104,6 @@ from . import Dependencies
 from . import Architecture
 from . import Coverage
 from . import Ratings
-from . import QualityGate
 from . import Profiles
 from . import Issues
 from . import CodeFix

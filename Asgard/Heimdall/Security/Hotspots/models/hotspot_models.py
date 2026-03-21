@@ -125,9 +125,7 @@ class HotspotReport(BaseModel):
         self.hotspots.append(hotspot)
         self.total_hotspots += 1
 
-        priority = hotspot.review_priority
-        if isinstance(priority, ReviewPriority):
-            priority = priority.value
+        priority: str = hotspot.review_priority.value if isinstance(hotspot.review_priority, ReviewPriority) else hotspot.review_priority
 
         if priority == ReviewPriority.HIGH.value:
             self.high_priority_count += 1
@@ -136,7 +134,5 @@ class HotspotReport(BaseModel):
         else:
             self.low_priority_count += 1
 
-        category = hotspot.category
-        if isinstance(category, HotspotCategory):
-            category = category.value
+        category: str = hotspot.category.value if isinstance(hotspot.category, HotspotCategory) else hotspot.category
         self.hotspots_by_category[category] = self.hotspots_by_category.get(category, 0) + 1

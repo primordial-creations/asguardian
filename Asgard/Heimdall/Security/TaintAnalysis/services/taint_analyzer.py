@@ -19,449 +19,23 @@ from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import (
     TaintSinkType,
     TaintSourceType,
 )
-
-
-# --- Source pattern definitions ---
-
-# Mapping: attribute access patterns -> TaintSourceType
-# Keys are (object_attr, method) pairs or single attribute names
-SOURCE_PATTERNS: List[Tuple[str, TaintSourceType]] = [
-    # HTTP parameters
-    ("request.args", TaintSourceType.HTTP_PARAMETER),
-    ("request.form", TaintSourceType.HTTP_PARAMETER),
-    ("request.json", TaintSourceType.HTTP_PARAMETER),
-    ("request.data", TaintSourceType.HTTP_PARAMETER),
-    ("request.GET", TaintSourceType.HTTP_PARAMETER),
-    ("request.POST", TaintSourceType.HTTP_PARAMETER),
-    ("request.values", TaintSourceType.HTTP_PARAMETER),
-    ("request.params", TaintSourceType.HTTP_PARAMETER),
-    # Cookies
-    ("request.cookies", TaintSourceType.COOKIE),
-    # Headers
-    ("request.headers", TaintSourceType.HEADER),
-    # Environment variables
-    ("os.environ", TaintSourceType.ENV_VAR),
-    ("os.getenv", TaintSourceType.ENV_VAR),
-    ("environ.get", TaintSourceType.ENV_VAR),
-    # File reads - detected via open() call usage
-    # User input
-    ("input", TaintSourceType.USER_INPUT),
-    # Command line args
-    ("sys.argv", TaintSourceType.COMMAND_LINE_ARG),
-    ("args.parse_args", TaintSourceType.COMMAND_LINE_ARG),
-    ("parser.parse_args", TaintSourceType.COMMAND_LINE_ARG),
-    ("argparse.parse_args", TaintSourceType.COMMAND_LINE_ARG),
-]
-
-# Source function names (single-name calls, not attribute access)
-SOURCE_CALL_NAMES: Dict[str, TaintSourceType] = {
-    "input": TaintSourceType.USER_INPUT,
-}
-
-# --- Sink pattern definitions ---
-
-# Mapping: function/method call patterns -> (TaintSinkType, severity)
-SINK_PATTERNS: Dict[str, Tuple[TaintSinkType, str]] = {
-    # SQL sinks - CRITICAL
-    "cursor.execute": (TaintSinkType.SQL_QUERY, "critical"),
-    "cursor.executemany": (TaintSinkType.SQL_QUERY, "critical"),
-    "session.execute": (TaintSinkType.SQL_QUERY, "critical"),
-    "db.execute": (TaintSinkType.SQL_QUERY, "critical"),
-    "connection.execute": (TaintSinkType.SQL_QUERY, "critical"),
-    "conn.execute": (TaintSinkType.SQL_QUERY, "critical"),
-    "engine.execute": (TaintSinkType.SQL_QUERY, "critical"),
-    "db.query": (TaintSinkType.SQL_QUERY, "critical"),
-    # Shell command sinks - CRITICAL
-    "os.system": (TaintSinkType.SHELL_COMMAND, "critical"),
-    "os.popen": (TaintSinkType.SHELL_COMMAND, "critical"),
-    "subprocess.run": (TaintSinkType.SHELL_COMMAND, "critical"),
-    "subprocess.call": (TaintSinkType.SHELL_COMMAND, "critical"),
-    "subprocess.Popen": (TaintSinkType.SHELL_COMMAND, "critical"),
-    "subprocess.check_output": (TaintSinkType.SHELL_COMMAND, "critical"),
-    "subprocess.check_call": (TaintSinkType.SHELL_COMMAND, "critical"),
-    # Eval/Exec sinks - CRITICAL
-    "eval": (TaintSinkType.EVAL_EXEC, "critical"),
-    "exec": (TaintSinkType.EVAL_EXEC, "critical"),
-    # File path sinks - HIGH
-    "open": (TaintSinkType.FILE_PATH, "high"),
-    "pathlib.Path": (TaintSinkType.FILE_PATH, "high"),
-    "Path": (TaintSinkType.FILE_PATH, "high"),
-    # Template render sinks - HIGH
-    "render_template": (TaintSinkType.TEMPLATE_RENDER, "high"),
-    "template.render": (TaintSinkType.TEMPLATE_RENDER, "high"),
-    "jinja2.Template": (TaintSinkType.TEMPLATE_RENDER, "high"),
-    "Environment.get_template": (TaintSinkType.TEMPLATE_RENDER, "high"),
-    # LDAP sinks - HIGH
-    "ldap.search": (TaintSinkType.LDAP_QUERY, "high"),
-    "ldap.search_s": (TaintSinkType.LDAP_QUERY, "high"),
-    "connection.search": (TaintSinkType.LDAP_QUERY, "high"),
-    # HTML output sinks - MEDIUM
-    "render": (TaintSinkType.HTML_OUTPUT, "medium"),
-    "make_response": (TaintSinkType.HTML_OUTPUT, "medium"),
-    # File write sinks - MEDIUM
-    "write": (TaintSinkType.FILE_WRITE, "medium"),
-    "writelines": (TaintSinkType.FILE_WRITE, "medium"),
-    # Redirect sinks - MEDIUM
-    "redirect": (TaintSinkType.REDIRECT, "medium"),
-    "HttpResponseRedirect": (TaintSinkType.REDIRECT, "medium"),
-    # Log output sinks - MEDIUM
-    "logger.info": (TaintSinkType.LOG_OUTPUT, "medium"),
-    "logger.debug": (TaintSinkType.LOG_OUTPUT, "medium"),
-    "logger.warning": (TaintSinkType.LOG_OUTPUT, "medium"),
-    "logger.error": (TaintSinkType.LOG_OUTPUT, "medium"),
-    "logging.info": (TaintSinkType.LOG_OUTPUT, "medium"),
-    "logging.debug": (TaintSinkType.LOG_OUTPUT, "medium"),
-    "logging.warning": (TaintSinkType.LOG_OUTPUT, "medium"),
-    "logging.error": (TaintSinkType.LOG_OUTPUT, "medium"),
-}
-
-# Sanitizer function names that remove taint
-SANITIZER_NAMES: Set[str] = {
-    # SQL sanitizers
-    "sql.escape",
-    "escape_string",
-    "quote_plus",
-    "escape",
-    "sanitize",
-    "sanitize_sql",
-    "parameterize",
-    # HTML sanitizers
-    "html.escape",
-    "escape_html",
-    "bleach.clean",
-    "clean",
-    "markupsafe.escape",
-    "Markup.escape",
-    # Shell sanitizers
-    "shlex.quote",
-    "quote",
-    "escape_shell",
-    # General sanitizers
-    "validate",
-    "validate_input",
-    "sanitize_input",
-    "clean_input",
-}
-
-# Severity mapping
-SINK_SEVERITY: Dict[TaintSinkType, str] = {
-    TaintSinkType.SQL_QUERY: "critical",
-    TaintSinkType.SHELL_COMMAND: "critical",
-    TaintSinkType.EVAL_EXEC: "critical",
-    TaintSinkType.FILE_PATH: "high",
-    TaintSinkType.TEMPLATE_RENDER: "high",
-    TaintSinkType.LDAP_QUERY: "high",
-    TaintSinkType.HTML_OUTPUT: "medium",
-    TaintSinkType.FILE_WRITE: "medium",
-    TaintSinkType.LOG_OUTPUT: "medium",
-    TaintSinkType.REDIRECT: "medium",
-}
-
-# CWE and OWASP mappings for each sink type
-SINK_CWE: Dict[TaintSinkType, str] = {
-    TaintSinkType.SQL_QUERY: "CWE-89",
-    TaintSinkType.SHELL_COMMAND: "CWE-78",
-    TaintSinkType.HTML_OUTPUT: "CWE-79",
-    TaintSinkType.FILE_WRITE: "CWE-73",
-    TaintSinkType.FILE_PATH: "CWE-22",
-    TaintSinkType.TEMPLATE_RENDER: "CWE-94",
-    TaintSinkType.EVAL_EXEC: "CWE-95",
-    TaintSinkType.LDAP_QUERY: "CWE-90",
-    TaintSinkType.LOG_OUTPUT: "CWE-117",
-    TaintSinkType.REDIRECT: "CWE-601",
-}
-
-SINK_OWASP: Dict[TaintSinkType, str] = {
-    TaintSinkType.SQL_QUERY: "A03:2021",
-    TaintSinkType.SHELL_COMMAND: "A03:2021",
-    TaintSinkType.HTML_OUTPUT: "A03:2021",
-    TaintSinkType.FILE_WRITE: "A01:2021",
-    TaintSinkType.FILE_PATH: "A01:2021",
-    TaintSinkType.TEMPLATE_RENDER: "A03:2021",
-    TaintSinkType.EVAL_EXEC: "A03:2021",
-    TaintSinkType.LDAP_QUERY: "A03:2021",
-    TaintSinkType.LOG_OUTPUT: "A09:2021",
-    TaintSinkType.REDIRECT: "A01:2021",
-}
-
-SINK_TITLES: Dict[TaintSinkType, str] = {
-    TaintSinkType.SQL_QUERY: "SQL Injection",
-    TaintSinkType.SHELL_COMMAND: "Command Injection",
-    TaintSinkType.HTML_OUTPUT: "Cross-Site Scripting (XSS)",
-    TaintSinkType.FILE_WRITE: "Tainted File Write",
-    TaintSinkType.FILE_PATH: "Path Traversal",
-    TaintSinkType.TEMPLATE_RENDER: "Server-Side Template Injection",
-    TaintSinkType.EVAL_EXEC: "Code Injection via eval/exec",
-    TaintSinkType.LDAP_QUERY: "LDAP Injection",
-    TaintSinkType.LOG_OUTPUT: "Log Injection",
-    TaintSinkType.REDIRECT: "Open Redirect",
-}
-
-
-def _attr_chain(node: ast.AST) -> str:
-    """Flatten an attribute access chain into a dotted string (e.g. 'request.args.get')."""
-    if isinstance(node, ast.Attribute):
-        parent = _attr_chain(node.value)
-        if parent:
-            return f"{parent}.{node.attr}"
-        return node.attr
-    if isinstance(node, ast.Name):
-        return node.id
-    return ""
-
-
-def _get_code_snippet(lines: List[str], line_number: int) -> str:
-    """Get a code snippet around a given line number (1-indexed)."""
-    idx = line_number - 1
-    if 0 <= idx < len(lines):
-        return lines[idx].strip()
-    return ""
-
-
-def _is_sanitizer_call(node: ast.AST, custom_sanitizers: Set[str]) -> bool:
-    """Check if a node represents a call to a known sanitizer function."""
-    if not isinstance(node, ast.Call):
-        return False
-    call_name = _attr_chain(node.func)
-    all_sanitizers = SANITIZER_NAMES | custom_sanitizers
-    return call_name in all_sanitizers or any(s in call_name for s in all_sanitizers)
-
-
-def _get_source_type_for_node(node: ast.AST, custom_sources: Set[str]) -> Optional[TaintSourceType]:
-    """Check if an AST node represents a taint source, return the source type if so."""
-    chain = _attr_chain(node)
-
-    for pattern, source_type in SOURCE_PATTERNS:
-        if chain == pattern or chain.startswith(pattern):
-            return source_type
-
-    # Check single-name calls for source functions (e.g. input())
-    if isinstance(node, ast.Call):
-        func_name = _attr_chain(node.func)
-        if func_name in SOURCE_CALL_NAMES:
-            return SOURCE_CALL_NAMES[func_name]
-        for custom in custom_sources:
-            if func_name == custom or func_name.endswith(f".{custom}"):
-                return TaintSourceType.HTTP_PARAMETER
-
-    return None
-
-
-def _get_sink_type_for_call(func_chain: str, custom_sinks: Set[str]) -> Optional[Tuple[TaintSinkType, str]]:
-    """Check if a function call chain is a known taint sink."""
-    for pattern, (sink_type, severity) in SINK_PATTERNS.items():
-        if func_chain == pattern or func_chain.endswith(f".{pattern}") or func_chain.startswith(pattern):
-            return sink_type, severity
-    for custom in custom_sinks:
-        if func_chain == custom or func_chain.endswith(f".{custom}"):
-            return TaintSinkType.SQL_QUERY, "high"
-    return None
-
-
-class _FunctionTaintVisitor(ast.NodeVisitor):
-    """
-    AST visitor that tracks taint within a single function.
-
-    Builds a taint map: variable_name -> (TaintFlowStep, TaintSourceType)
-    as it walks the function body, and records sink hits.
-    """
-
-    def __init__(
-        self,
-        file_path: str,
-        func_name: str,
-        lines: List[str],
-        initial_taint: Optional[Dict[str, Tuple["TaintFlowStep", TaintSourceType]]] = None,
-        custom_sources: Optional[Set[str]] = None,
-        custom_sinks: Optional[Set[str]] = None,
-        custom_sanitizers: Optional[Set[str]] = None,
-    ):
-        self.file_path = file_path
-        self.func_name = func_name
-        self.lines = lines
-        self.taint_map: Dict[str, Tuple[TaintFlowStep, TaintSourceType]] = dict(initial_taint or {})
-        self.custom_sources: Set[str] = custom_sources or set()
-        self.custom_sinks: Set[str] = custom_sinks or set()
-        self.custom_sanitizers: Set[str] = custom_sanitizers or set()
-        self.found_flows: List[Tuple[TaintFlow, str]] = []  # (flow, variable_name)
-
-    def _make_step(self, line_number: int, step_type: str, variable_name: str) -> TaintFlowStep:
-        return TaintFlowStep(
-            file_path=self.file_path,
-            line_number=line_number,
-            function_name=self.func_name,
-            step_type=step_type,
-            code_snippet=_get_code_snippet(self.lines, line_number),
-            variable_name=variable_name,
-        )
-
-    def _is_tainted(self, node: ast.AST) -> bool:
-        """Check if an AST node refers to a tainted variable."""
-        if isinstance(node, ast.Name):
-            return node.id in self.taint_map
-        if isinstance(node, ast.Attribute):
-            chain = _attr_chain(node)
-            # Direct chain match
-            if chain in self.taint_map:
-                return True
-            # Check if the object is tainted (e.g. tainted_dict.method())
-            if isinstance(node.value, ast.Name) and node.value.id in self.taint_map:
-                return True
-        if isinstance(node, ast.Subscript):
-            # tainted_var[key]
-            return self._is_tainted(node.value)
-        if isinstance(node, ast.Call):
-            # method calls on tainted objects propagate taint
-            return self._is_tainted(node.func)
-        if isinstance(node, ast.JoinedStr):
-            # f-strings: tainted if any value is tainted
-            for val in ast.walk(node):
-                if isinstance(val, ast.FormattedValue) and self._is_tainted(val.value):
-                    return True
-        if isinstance(node, ast.BinOp):
-            return self._is_tainted(node.left) or self._is_tainted(node.right)
-        if isinstance(node, ast.IfExp):
-            return self._is_tainted(node.body) or self._is_tainted(node.orelse)
-        return False
-
-    def _get_taint_source(self, node: ast.AST) -> Optional[Tuple[TaintFlowStep, TaintSourceType]]:
-        """Get taint source for a tainted node (first tainted variable found)."""
-        if isinstance(node, ast.Name):
-            return self.taint_map.get(node.id)
-        if isinstance(node, ast.Attribute):
-            chain = _attr_chain(node)
-            if chain in self.taint_map:
-                return self.taint_map[chain]
-            if isinstance(node.value, ast.Name) and node.value.id in self.taint_map:
-                return self.taint_map[node.value.id]
-        if isinstance(node, ast.Subscript):
-            return self._get_taint_source(node.value)
-        if isinstance(node, ast.Call):
-            return self._get_taint_source(node.func)
-        if isinstance(node, ast.JoinedStr):
-            for val in ast.walk(node):
-                if isinstance(val, ast.FormattedValue):
-                    result = self._get_taint_source(val.value)
-                    if result:
-                        return result
-        if isinstance(node, ast.BinOp):
-            left = self._get_taint_source(node.left)
-            if left:
-                return left
-            return self._get_taint_source(node.right)
-        return None
-
-    def _taint_variable(
-        self,
-        var_name: str,
-        line_number: int,
-        source_step: TaintFlowStep,
-        source_type: TaintSourceType,
-    ) -> None:
-        """Mark a variable as tainted."""
-        propagation_step = self._make_step(line_number, "propagation", var_name)
-        self.taint_map[var_name] = (source_step, source_type)
-
-    def visit_Assign(self, node: ast.Assign) -> None:
-        """Handle assignments: detect sources and propagate taint."""
-        line_number = node.lineno
-
-        # Check if the RHS is a source
-        source_type = _get_source_type_for_node(node.value, self.custom_sources)
-        if source_type is not None:
-            source_step = self._make_step(line_number, "source", "")
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    source_step_named = self._make_step(line_number, "source", target.id)
-                    self.taint_map[target.id] = (source_step_named, source_type)
-
-        # Check if it's a call to a source function
-        if isinstance(node.value, ast.Call):
-            source_type = _get_source_type_for_node(node.value, self.custom_sources)
-            if source_type is not None:
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        source_step = self._make_step(line_number, "source", target.id)
-                        self.taint_map[target.id] = (source_step, source_type)
-
-        # Check if the RHS is a sanitizer call - if so, remove taint
-        if isinstance(node.value, ast.Call) and _is_sanitizer_call(
-            node.value, self.custom_sanitizers
-        ):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    self.taint_map.pop(target.id, None)
-        elif self._is_tainted(node.value):
-            # Propagate taint to targets
-            taint_info = self._get_taint_source(node.value)
-            if taint_info:
-                original_step, src_type = taint_info
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        self._taint_variable(target.id, line_number, original_step, src_type)
-
-        self.generic_visit(node)
-
-    def visit_AugAssign(self, node: ast.AugAssign) -> None:
-        """Handle augmented assignments (+=, etc.)."""
-        if self._is_tainted(node.value):
-            taint_info = self._get_taint_source(node.value)
-            if taint_info and isinstance(node.target, ast.Name):
-                original_step, src_type = taint_info
-                self._taint_variable(node.target.id, node.lineno, original_step, src_type)
-        self.generic_visit(node)
-
-    def visit_Call(self, node: ast.Call) -> None:
-        """Handle function calls: detect sinks and track cross-function taint."""
-        func_chain = _attr_chain(node.func)
-
-        # Check if this call is a known sink
-        sink_result = _get_sink_type_for_call(func_chain, self.custom_sinks)
-        if sink_result is not None:
-            sink_type, severity = sink_result
-
-            # Check each argument for taint
-            all_args = list(node.args) + [kw.value for kw in node.keywords]
-            for arg in all_args:
-                if self._is_tainted(arg):
-                    taint_info = self._get_taint_source(arg)
-                    if taint_info:
-                        original_step, src_type = taint_info
-                        sink_step = self._make_step(node.lineno, "sink", func_chain)
-
-                        # Check if any sanitizer is present in args
-                        sanitizer_present = any(
-                            _is_sanitizer_call(a, self.custom_sanitizers)
-                            for a in all_args
-                        )
-
-                        flow = TaintFlow(
-                            source_type=src_type,
-                            sink_type=sink_type,
-                            severity=severity,
-                            source_location=original_step,
-                            sink_location=sink_step,
-                            intermediate_steps=[],
-                            title=SINK_TITLES.get(sink_type, "Tainted Data Flow"),
-                            description=(
-                                f"Tainted data from {src_type} source reaches "
-                                f"{sink_type} sink without sanitization."
-                            ),
-                            cwe_id=SINK_CWE.get(sink_type, ""),
-                            owasp_category=SINK_OWASP.get(sink_type, ""),
-                            sanitizers_present=sanitizer_present,
-                        )
-                        var_name = ""
-                        if isinstance(arg, ast.Name):
-                            var_name = arg.id
-                        self.found_flows.append((flow, var_name))
-                        break  # One flow per call site
-
-        self.generic_visit(node)
-
-    def visit_Return(self, node: ast.Return) -> None:
-        """Track tainted return values (for cross-function propagation)."""
-        self.generic_visit(node)
+from Asgard.Heimdall.Security.TaintAnalysis.services._taint_patterns import (
+    SOURCE_PATTERNS,
+    SOURCE_CALL_NAMES,
+    SINK_PATTERNS,
+    SANITIZER_NAMES,
+    SINK_SEVERITY,
+    SINK_CWE,
+    SINK_OWASP,
+    SINK_TITLES,
+)
+from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import (
+    _FunctionTaintVisitor,
+    _attr_chain,
+    _get_source_type_for_node,
+    _get_sink_type_for_call,
+    _is_sanitizer_call,
+)
 
 
 def _should_exclude(path: Path, exclude_patterns: List[str]) -> bool:
@@ -543,7 +117,6 @@ class TaintAnalyzer:
                 if self._severity_meets_threshold(flow.severity):
                     report.add_flow(flow)
 
-        # Sort flows: critical first, then high, then medium
         severity_order = {"critical": 0, "high": 1, "medium": 2}
         report.flows.sort(
             key=lambda f: (
@@ -582,17 +155,11 @@ class TaintAnalyzer:
 
         file_path_str = str(file_path)
 
-        # First pass: collect all function definitions and their bodies
-        functions: Dict[str, ast.FunctionDef] = {}
+        functions: Dict[str, ast.FunctionDef | ast.AsyncFunctionDef] = {}
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 functions[node.name] = node
 
-        # Second pass: analyze each function for taint flows
-        # Also analyze module-level code
-        module_level_taint: Dict[str, Tuple[TaintFlowStep, TaintSourceType]] = {}
-
-        # Analyze module-level assignments (outside any function)
         module_visitor = _FunctionTaintVisitor(
             file_path=file_path_str,
             func_name="<module>",
@@ -608,7 +175,6 @@ class TaintAnalyzer:
             flows.append(flow)
         module_level_taint = module_visitor.taint_map
 
-        # Analyze each function
         for func_name, func_node in functions.items():
             func_flows = self._analyze_function(
                 func_node=func_node,
@@ -622,7 +188,7 @@ class TaintAnalyzer:
 
     def _analyze_function(
         self,
-        func_node: ast.FunctionDef,
+        func_node: ast.FunctionDef | ast.AsyncFunctionDef,
         file_path_str: str,
         lines: List[str],
         initial_taint: Optional[Dict[str, Tuple[TaintFlowStep, TaintSourceType]]] = None,

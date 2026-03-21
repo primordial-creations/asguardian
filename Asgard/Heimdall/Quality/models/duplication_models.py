@@ -149,7 +149,7 @@ class DuplicationResult(BaseModel):
 
     def get_families_by_severity(self) -> dict:
         """Group clone families by severity level."""
-        result = {
+        result: dict = {
             DuplicationSeverity.CRITICAL.value: [],
             DuplicationSeverity.HIGH.value: [],
             DuplicationSeverity.MODERATE.value: [],

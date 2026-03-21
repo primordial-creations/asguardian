@@ -24,6 +24,11 @@ from Asgard.Forseti.AsyncAPI.models.asyncapi_models import (
     OperationInfo,
     ServerInfo,
 )
+from Asgard.Forseti.AsyncAPI.services._asyncapi_parser_helpers import (
+    get_channels_from_spec,
+    get_messages_from_spec,
+    resolve_refs,
+)
 
 
 class AsyncAPIParserService:
@@ -88,10 +93,8 @@ class AsyncAPIParserService:
             ValueError: If the content cannot be parsed.
         """
         try:
-            # Try to parse as YAML (which also handles JSON)
             data = yaml.safe_load(content)
         except yaml.YAMLError as e:
-            # Try JSON as fallback
             try:
                 data = json.loads(content)
             except json.JSONDecodeError:
@@ -114,7 +117,6 @@ class AsyncAPIParserService:
         """
         self._raw_data = data
 
-        # Validate basic structure
         if not isinstance(data, dict):
             raise ValueError("Specification must be a dictionary")
 
@@ -124,7 +126,6 @@ class AsyncAPIParserService:
         if "info" not in data:
             raise ValueError("Missing required field: info")
 
-        # Parse info
         info_data = data.get("info", {})
         info = AsyncAPIInfo(
             title=info_data.get("title", "Untitled"),
@@ -135,7 +136,6 @@ class AsyncAPIParserService:
             license=info_data.get("license"),
         )
 
-        # Parse servers
         servers = None
         if "servers" in data:
             servers = {}
@@ -150,12 +150,10 @@ class AsyncAPIParserService:
                     bindings=server_data.get("bindings"),
                 )
 
-        # Resolve references if configured
         channels_data = data.get("channels", {})
         if self.config.resolve_refs:
-            channels_data = self._resolve_refs(channels_data, data)
+            channels_data = resolve_refs(channels_data, data)
 
-        # Create spec
         self._parsed_spec = AsyncAPISpec(
             asyncapi=data.get("asyncapi", "2.6.0"),
             id=data.get("id"),
@@ -183,33 +181,7 @@ class AsyncAPIParserService:
         if self._parsed_spec is None:
             raise ValueError("No specification has been parsed. Call parse() first.")
 
-        channels = []
-        for channel_name, channel_data in self._parsed_spec.channels.items():
-            if not isinstance(channel_data, dict):
-                continue
-
-            # Parse subscribe operation
-            subscribe = None
-            if "subscribe" in channel_data:
-                subscribe = self._parse_operation(channel_data["subscribe"])
-
-            # Parse publish operation
-            publish = None
-            if "publish" in channel_data:
-                publish = self._parse_operation(channel_data["publish"])
-
-            channel = Channel(
-                name=channel_name,
-                description=channel_data.get("description"),
-                subscribe=subscribe,
-                publish=publish,
-                parameters=channel_data.get("parameters"),
-                bindings=channel_data.get("bindings"),
-                servers=channel_data.get("servers"),
-            )
-            channels.append(channel)
-
-        return channels
+        return get_channels_from_spec(self._parsed_spec.channels)
 
     def get_messages(self) -> list[MessageInfo]:
         """
@@ -224,30 +196,10 @@ class AsyncAPIParserService:
         if self._parsed_spec is None:
             raise ValueError("No specification has been parsed. Call parse() first.")
 
-        messages = []
-
-        # Get messages from channels
-        for channel_data in self._parsed_spec.channels.values():
-            if not isinstance(channel_data, dict):
-                continue
-
-            for op_type in ["subscribe", "publish"]:
-                if op_type in channel_data:
-                    op_data = channel_data[op_type]
-                    if "message" in op_data:
-                        msg_data = op_data["message"]
-                        if isinstance(msg_data, list):
-                            for msg in msg_data:
-                                messages.append(self._parse_message(msg))
-                        elif isinstance(msg_data, dict):
-                            messages.append(self._parse_message(msg_data))
-
-        # Get messages from components
-        if self._parsed_spec.components and "messages" in self._parsed_spec.components:
-            for msg_data in self._parsed_spec.components["messages"].values():
-                messages.append(self._parse_message(msg_data))
-
-        return messages
+        return get_messages_from_spec(
+            self._parsed_spec.channels,
+            self._parsed_spec.components,
+        )
 
     def get_servers(self) -> dict[str, ServerInfo]:
         """
@@ -280,7 +232,6 @@ class AsyncAPIParserService:
         channels = self.get_channels()
         messages = self.get_messages()
 
-        # Count protocols
         protocol_summary: dict[str, int] = {}
         if self._parsed_spec.servers:
             for server in self._parsed_spec.servers.values():
@@ -297,109 +248,3 @@ class AsyncAPIParserService:
             message_count=len(messages),
             protocol_summary=protocol_summary,
         )
-
-    def _parse_operation(self, op_data: dict[str, Any]) -> OperationInfo:
-        """Parse an operation from channel data."""
-        message = None
-        if "message" in op_data:
-            msg_data = op_data["message"]
-            if isinstance(msg_data, list):
-                message = [self._parse_message(m) for m in msg_data]
-            elif isinstance(msg_data, dict):
-                message = self._parse_message(msg_data)
-
-        return OperationInfo(
-            operation_id=op_data.get("operationId"),
-            summary=op_data.get("summary"),
-            description=op_data.get("description"),
-            tags=op_data.get("tags"),
-            external_docs=op_data.get("externalDocs"),
-            bindings=op_data.get("bindings"),
-            traits=op_data.get("traits"),
-            message=message,
-            security=op_data.get("security"),
-        )
-
-    def _parse_message(self, msg_data: dict[str, Any]) -> MessageInfo:
-        """Parse a message definition."""
-        return MessageInfo(
-            name=msg_data.get("name"),
-            title=msg_data.get("title"),
-            summary=msg_data.get("summary"),
-            description=msg_data.get("description"),
-            content_type=msg_data.get("contentType"),
-            payload=msg_data.get("payload"),
-            headers=msg_data.get("headers"),
-            correlation_id=msg_data.get("correlationId"),
-            tags=msg_data.get("tags"),
-            bindings=msg_data.get("bindings"),
-            examples=msg_data.get("examples"),
-            traits=msg_data.get("traits"),
-        )
-
-    def _resolve_refs(
-        self,
-        data: Any,
-        root: dict[str, Any],
-        visited: Optional[set] = None
-    ) -> Any:
-        """
-        Resolve $ref references in the specification.
-
-        Args:
-            data: Data to resolve references in.
-            root: Root specification for reference resolution.
-            visited: Set of visited paths to prevent circular references.
-
-        Returns:
-            Data with resolved references.
-        """
-        if visited is None:
-            visited = set()
-
-        if isinstance(data, dict):
-            if "$ref" in data:
-                ref_path = data["$ref"]
-                if ref_path in visited:
-                    return data  # Prevent circular references
-                visited.add(ref_path)
-
-                resolved = self._get_ref(ref_path, root)
-                if resolved is not None:
-                    return self._resolve_refs(resolved, root, visited)
-                return data
-
-            return {
-                key: self._resolve_refs(value, root, visited)
-                for key, value in data.items()
-            }
-
-        elif isinstance(data, list):
-            return [self._resolve_refs(item, root, visited) for item in data]
-
-        return data
-
-    def _get_ref(self, ref_path: str, root: dict[str, Any]) -> Optional[Any]:
-        """
-        Get the value at a $ref path.
-
-        Args:
-            ref_path: Reference path (e.g., "#/components/messages/UserMessage").
-            root: Root specification.
-
-        Returns:
-            Referenced value or None if not found.
-        """
-        if not ref_path.startswith("#/"):
-            return None
-
-        parts = ref_path[2:].split("/")
-        current = root
-
-        for part in parts:
-            if isinstance(current, dict) and part in current:
-                current = current[part]
-            else:
-                return None
-
-        return current

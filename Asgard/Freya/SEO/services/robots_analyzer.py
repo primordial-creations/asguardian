@@ -18,6 +18,13 @@ from Asgard.Freya.SEO.models.seo_models import (
     SitemapEntry,
     SitemapReport,
 )
+from Asgard.Freya.SEO.services._robots_analyzer_helpers import (
+    analyze_robots_issues,
+    analyze_sitemap_issues,
+    get_elem_text,
+    parse_robots_txt,
+    parse_sitemap,
+)
 
 
 class RobotsAnalyzer:
@@ -62,7 +69,6 @@ class RobotsAnalyzer:
         Returns:
             RobotsTxtReport with analysis results
         """
-        # Build robots.txt URL
         parsed = urlparse(url)
         robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
 
@@ -79,11 +85,8 @@ class RobotsAnalyzer:
                 report.is_accessible = True
                 report.content_length = len(response.text)
 
-                # Parse robots.txt
-                self._parse_robots_txt(response.text, report)
-
-                # Analyze for issues
-                self._analyze_robots_issues(report)
+                parse_robots_txt(response.text, report)
+                analyze_robots_issues(report)
 
             elif response.status_code == 404:
                 report.exists = False
@@ -105,89 +108,6 @@ class RobotsAnalyzer:
 
         return report
 
-    def _parse_robots_txt(self, content: str, report: RobotsTxtReport) -> None:
-        """Parse robots.txt content."""
-        current_user_agent = None
-        line_number = 0
-
-        for line in content.split("\n"):
-            line_number += 1
-            line = line.strip()
-
-            # Skip empty lines and comments
-            if not line or line.startswith("#"):
-                continue
-
-            # Parse directive
-            match = re.match(r"^([^:]+):\s*(.*)$", line, re.IGNORECASE)
-            if not match:
-                continue
-
-            directive = match.group(1).lower()
-            value = match.group(2).strip()
-
-            if directive == "user-agent":
-                current_user_agent = value
-                if value not in report.user_agents:
-                    report.user_agents.append(value)
-
-            elif directive == "allow":
-                report.allow_directives.append(RobotDirective(
-                    directive="Allow",
-                    value=value,
-                    line_number=line_number,
-                ))
-
-            elif directive == "disallow":
-                report.disallow_directives.append(RobotDirective(
-                    directive="Disallow",
-                    value=value,
-                    line_number=line_number,
-                ))
-
-            elif directive == "sitemap":
-                if value not in report.sitemap_urls:
-                    report.sitemap_urls.append(value)
-
-            elif directive == "crawl-delay":
-                try:
-                    report.crawl_delay = float(value)
-                except ValueError:
-                    report.warnings.append(
-                        f"Invalid crawl-delay value on line {line_number}"
-                    )
-
-    def _analyze_robots_issues(self, report: RobotsTxtReport) -> None:
-        """Analyze robots.txt for potential issues."""
-        # Check for wildcard disallow
-        for directive in report.disallow_directives:
-            if directive.value == "/" and "*" in report.user_agents:
-                report.issues.append(
-                    "All crawlers are blocked from the entire site (Disallow: /)"
-                )
-
-        # Check for sitemap
-        if not report.sitemap_urls:
-            report.warnings.append("No sitemap URL specified in robots.txt")
-            report.suggestions.append(
-                "Add Sitemap: directive to help crawlers find your sitemap"
-            )
-
-        # Check crawl delay
-        if report.crawl_delay and report.crawl_delay > 10:
-            report.warnings.append(
-                f"Crawl-delay of {report.crawl_delay}s is quite high"
-            )
-
-        # Check for common patterns
-        for directive in report.disallow_directives:
-            if "/admin" in directive.value or "/wp-admin" in directive.value:
-                pass  # Common and expected
-            elif "/api" in directive.value:
-                report.warnings.append(
-                    "API endpoints are blocked - this may affect SEO for API-driven content"
-                )
-
     async def analyze_sitemap(self, url: str) -> SitemapReport:
         """
         Analyze sitemap.xml for a site.
@@ -198,7 +118,6 @@ class RobotsAnalyzer:
         Returns:
             SitemapReport with analysis results
         """
-        # Build sitemap URL
         parsed = urlparse(url)
         sitemap_url = f"{parsed.scheme}://{parsed.netloc}/sitemap.xml"
 
@@ -214,11 +133,8 @@ class RobotsAnalyzer:
                 report.exists = True
                 report.is_accessible = True
 
-                # Parse sitemap XML
-                self._parse_sitemap(response.text, report)
-
-                # Analyze for issues
-                self._analyze_sitemap_issues(report)
+                parse_sitemap(response.text, report)
+                analyze_sitemap_issues(report)
 
             elif response.status_code == 404:
                 report.exists = False
@@ -239,99 +155,27 @@ class RobotsAnalyzer:
 
         return report
 
+    def _parse_robots_txt(self, content: str, report: RobotsTxtReport) -> None:
+        """Parse robots.txt content."""
+        parse_robots_txt(content, report)
+
+    def _analyze_robots_issues(self, report: RobotsTxtReport) -> None:
+        """Analyze robots.txt for potential issues."""
+        analyze_robots_issues(report)
+
     def _parse_sitemap(self, content: str, report: SitemapReport) -> None:
         """Parse sitemap XML content."""
-        try:
-            root = ET.fromstring(content)
-            report.is_valid_xml = True
-
-            # Define namespace
-            ns = {"sm": "http://www.sitemaps.org/schemas/sitemap/0.9"}
-
-            # Check if it's a sitemap index
-            if root.tag.endswith("sitemapindex"):
-                report.is_sitemap_index = True
-
-                # Extract child sitemap URLs
-                for sitemap in root.findall(".//sm:sitemap/sm:loc", ns):
-                    if sitemap.text:
-                        report.child_sitemaps.append(sitemap.text)
-
-                report.total_urls = len(report.child_sitemaps)
-
-            else:
-                # Regular sitemap
-                report.is_sitemap_index = False
-
-                # Extract URL entries
-                for url_elem in root.findall(".//sm:url", ns):
-                    entry = SitemapEntry(
-                        loc=self._get_elem_text(url_elem, "sm:loc", ns) or ""
-                    )
-
-                    lastmod = self._get_elem_text(url_elem, "sm:lastmod", ns)
-                    if lastmod:
-                        entry.lastmod = lastmod
-                        report.urls_with_lastmod += 1
-
-                    changefreq = self._get_elem_text(url_elem, "sm:changefreq", ns)
-                    if changefreq:
-                        entry.changefreq = changefreq
-
-                    priority = self._get_elem_text(url_elem, "sm:priority", ns)
-                    if priority:
-                        try:
-                            entry.priority = float(priority)
-                            report.urls_with_priority += 1
-                        except ValueError:
-                            pass
-
-                    report.entries.append(entry)
-
-                report.total_urls = len(report.entries)
-
-        except ET.ParseError as e:
-            report.is_valid_xml = False
-            report.issues.append(f"Invalid XML: {str(e)}")
+        parse_sitemap(content, report)
 
     def _get_elem_text(
         self, parent: ET.Element, tag: str, ns: dict
     ) -> Optional[str]:
         """Get text content of a child element."""
-        elem = parent.find(tag, ns)
-        return elem.text if elem is not None else None
+        return get_elem_text(parent, tag, ns)
 
     def _analyze_sitemap_issues(self, report: SitemapReport) -> None:
         """Analyze sitemap for potential issues."""
-        if not report.is_valid_xml:
-            return
-
-        # Check URL count
-        if report.total_urls == 0:
-            report.issues.append("Sitemap contains no URLs")
-        elif report.total_urls > 50000:
-            report.warnings.append(
-                f"Sitemap has {report.total_urls} URLs - consider using sitemap index"
-            )
-
-        # Check for lastmod
-        if report.total_urls > 0:
-            lastmod_ratio = report.urls_with_lastmod / report.total_urls
-            if lastmod_ratio < 0.5:
-                report.warnings.append(
-                    f"Only {report.urls_with_lastmod}/{report.total_urls} URLs have lastmod"
-                )
-
-        # Check for priority usage
-        if report.urls_with_priority > 0:
-            # Check if all priorities are the same
-            priorities = set(
-                e.priority for e in report.entries if e.priority is not None
-            )
-            if len(priorities) == 1:
-                report.warnings.append(
-                    "All URLs have the same priority - consider differentiating"
-                )
+        analyze_sitemap_issues(report)
 
     async def close(self) -> None:
         """Close the HTTP client."""

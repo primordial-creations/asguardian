@@ -11,6 +11,14 @@ from Asgard.Verdandi.Web.models.web_models import (
     VitalsRating,
     WebVitalsResult,
 )
+from Asgard.Verdandi.Web.services._vitals_recommendations import (
+    cls_recommendations,
+    fcp_recommendations,
+    fid_recommendations,
+    inp_recommendations,
+    lcp_recommendations,
+    ttfb_recommendations,
+)
 
 
 class CoreWebVitalsCalculator:
@@ -79,37 +87,37 @@ class CoreWebVitalsCalculator:
         if lcp_ms is not None:
             lcp_rating = self._rate_lcp(lcp_ms)
             ratings.append(lcp_rating)
-            recommendations.extend(self._lcp_recommendations(lcp_ms, lcp_rating))
+            recommendations.extend(lcp_recommendations(lcp_ms, lcp_rating, self.LCP_POOR))
 
         fid_rating = None
         if fid_ms is not None:
             fid_rating = self._rate_fid(fid_ms)
             ratings.append(fid_rating)
-            recommendations.extend(self._fid_recommendations(fid_ms, fid_rating))
+            recommendations.extend(fid_recommendations(fid_ms, fid_rating))
 
         cls_rating = None
         if cls is not None:
             cls_rating = self._rate_cls(cls)
             ratings.append(cls_rating)
-            recommendations.extend(self._cls_recommendations(cls, cls_rating))
+            recommendations.extend(cls_recommendations(cls, cls_rating))
 
         inp_rating = None
         if inp_ms is not None:
             inp_rating = self._rate_inp(inp_ms)
             ratings.append(inp_rating)
-            recommendations.extend(self._inp_recommendations(inp_ms, inp_rating))
+            recommendations.extend(inp_recommendations(inp_ms, inp_rating))
 
         ttfb_rating = None
         if ttfb_ms is not None:
             ttfb_rating = self._rate_ttfb(ttfb_ms)
             ratings.append(ttfb_rating)
-            recommendations.extend(self._ttfb_recommendations(ttfb_ms, ttfb_rating))
+            recommendations.extend(ttfb_recommendations(ttfb_ms, ttfb_rating))
 
         fcp_rating = None
         if fcp_ms is not None:
             fcp_rating = self._rate_fcp(fcp_ms)
             ratings.append(fcp_rating)
-            recommendations.extend(self._fcp_recommendations(fcp_ms, fcp_rating))
+            recommendations.extend(fcp_recommendations(fcp_ms, fcp_rating))
 
         overall = self._calculate_overall(ratings)
         score = self._calculate_score(ratings)
@@ -223,79 +231,3 @@ class CoreWebVitalsCalculator:
 
         total = sum(score_map[r] for r in ratings)
         return round(total / len(ratings), 1)
-
-    def _lcp_recommendations(self, lcp_ms: float, rating: VitalsRating) -> List[str]:
-        """Generate LCP improvement recommendations."""
-        if rating == VitalsRating.GOOD:
-            return []
-
-        recs = []
-        if lcp_ms > self.LCP_POOR:
-            recs.append("Critical: LCP is poor. Optimize largest content element loading.")
-        recs.extend([
-            "Optimize server response time (TTFB)",
-            "Use a CDN for static assets",
-            "Preload critical resources with <link rel='preload'>",
-            "Optimize images with modern formats (WebP, AVIF)",
-        ])
-        return recs
-
-    def _fid_recommendations(self, fid_ms: float, rating: VitalsRating) -> List[str]:
-        """Generate FID improvement recommendations."""
-        if rating == VitalsRating.GOOD:
-            return []
-
-        return [
-            "Break up long JavaScript tasks into smaller chunks",
-            "Use web workers for heavy computations",
-            "Defer non-critical JavaScript",
-            "Minimize main thread work",
-        ]
-
-    def _cls_recommendations(self, cls: float, rating: VitalsRating) -> List[str]:
-        """Generate CLS improvement recommendations."""
-        if rating == VitalsRating.GOOD:
-            return []
-
-        return [
-            "Always include size attributes on images and videos",
-            "Reserve space for ad slots and embeds",
-            "Avoid inserting content above existing content",
-            "Use CSS transform for animations instead of layout properties",
-        ]
-
-    def _inp_recommendations(self, inp_ms: float, rating: VitalsRating) -> List[str]:
-        """Generate INP improvement recommendations."""
-        if rating == VitalsRating.GOOD:
-            return []
-
-        return [
-            "Optimize event handlers to respond quickly",
-            "Reduce JavaScript execution during interactions",
-            "Use requestIdleCallback for non-urgent work",
-            "Consider using a framework with efficient rendering",
-        ]
-
-    def _ttfb_recommendations(self, ttfb_ms: float, rating: VitalsRating) -> List[str]:
-        """Generate TTFB improvement recommendations."""
-        if rating == VitalsRating.GOOD:
-            return []
-
-        return [
-            "Optimize server-side processing",
-            "Use edge caching or CDN",
-            "Enable HTTP/2 or HTTP/3",
-            "Consider connection preloading with preconnect",
-        ]
-
-    def _fcp_recommendations(self, fcp_ms: float, rating: VitalsRating) -> List[str]:
-        """Generate FCP improvement recommendations."""
-        if rating == VitalsRating.GOOD:
-            return []
-
-        return [
-            "Eliminate render-blocking resources",
-            "Inline critical CSS",
-            "Defer non-critical CSS",
-            "Minimize document size",
-        ]

@@ -7,11 +7,13 @@ checks for required tool/extension availability.
 """
 
 import json
-import shutil
-import subprocess
 from pathlib import Path
 from typing import Optional
 
+from Asgard.Heimdall.Init._linter_tool_checker import (
+    check_tools as _check_tools,
+    check_vscode_extensions as _check_vscode_extensions,
+)
 from Asgard.Heimdall.Init.templates import (
     PYTHON_TEMPLATES,
     PYTHON_TOOL_REQUIREMENTS,
@@ -213,7 +215,6 @@ class LinterInitializer:
         """
         results = []
 
-        # Build merged settings
         settings: dict = {}
         if is_python:
             settings.update(VSCODE_SETTINGS_PYTHON)
@@ -223,7 +224,6 @@ class LinterInitializer:
         if settings:
             results.append(self._write_json_file(".vscode/settings.json", settings, merge=True))
 
-        # Build extension recommendations
         extensions: list[str] = []
         if is_python:
             extensions.extend(VSCODE_EXTENSIONS_PYTHON)
@@ -246,50 +246,14 @@ class LinterInitializer:
         Returns:
             List of dicts with keys: name, installed (bool), install, purpose.
         """
-        results = []
-
-        if is_python:
-            for tool in PYTHON_TOOL_REQUIREMENTS:
-                installed = shutil.which(tool["command"]) is not None
-                results.append({
-                    "name": tool["name"],
-                    "installed": installed,
-                    "install": tool["install"],
-                    "purpose": tool["purpose"],
-                })
-
-        if is_typescript:
-            for tool in TYPESCRIPT_TOOL_REQUIREMENTS:
-                installed = shutil.which(tool["command"]) is not None
-                results.append({
-                    "name": tool["name"],
-                    "installed": installed,
-                    "install": tool["install"],
-                    "purpose": tool["purpose"],
-                })
-
-            # Check npm packages in project's node_modules
-            npx_available = shutil.which("npx") is not None
-            if npx_available:
-                for pkg in TYPESCRIPT_NPM_REQUIREMENTS:
-                    pkg_path = self.project_path / "node_modules" / pkg["package"]
-                    installed = pkg_path.exists()
-                    results.append({
-                        "name": pkg["name"],
-                        "installed": installed,
-                        "install": pkg["install"],
-                        "purpose": pkg["purpose"],
-                    })
-            else:
-                for pkg in TYPESCRIPT_NPM_REQUIREMENTS:
-                    results.append({
-                        "name": pkg["name"],
-                        "installed": False,
-                        "install": pkg["install"],
-                        "purpose": pkg["purpose"],
-                    })
-
-        return results
+        return _check_tools(
+            self.project_path,
+            is_python,
+            is_typescript,
+            PYTHON_TOOL_REQUIREMENTS,
+            TYPESCRIPT_TOOL_REQUIREMENTS,
+            TYPESCRIPT_NPM_REQUIREMENTS,
+        )
 
     def check_vscode_extensions(self, is_python: bool, is_typescript: bool) -> list[dict]:
         """Check which recommended VSCode extensions are installed.
@@ -301,40 +265,12 @@ class LinterInitializer:
         Returns:
             List of dicts with keys: extension_id, installed (bool), name.
         """
-        results = []
-        extension_ids = []
-        if is_python:
-            extension_ids.extend(VSCODE_EXTENSIONS_PYTHON)
-        if is_typescript:
-            extension_ids.extend(VSCODE_EXTENSIONS_TYPESCRIPT)
-
-        if not extension_ids:
-            return results
-
-        # Try to get installed extensions from 'code' CLI
-        installed_extensions: set[str] = set()
-        code_cmd = shutil.which("code")
-        if code_cmd:
-            try:
-                proc = subprocess.run(
-                    [code_cmd, "--list-extensions"],
-                    capture_output=True,
-                    text=True,
-                    timeout=10,
-                )
-                if proc.returncode == 0:
-                    installed_extensions = {ext.strip().lower() for ext in proc.stdout.splitlines()}
-            except (subprocess.TimeoutExpired, OSError):
-                pass
-
-        for ext_id in sorted(set(extension_ids)):
-            installed = ext_id.lower() in installed_extensions
-            results.append({
-                "extension_id": ext_id,
-                "installed": installed,
-            })
-
-        return results
+        return _check_vscode_extensions(
+            is_python,
+            is_typescript,
+            VSCODE_EXTENSIONS_PYTHON,
+            VSCODE_EXTENSIONS_TYPESCRIPT,
+        )
 
     def init_all(self, project_type: Optional[str] = None) -> list[tuple[str, str]]:
         """Initialize linting configs based on detected or specified project type.
@@ -366,7 +302,6 @@ class LinterInitializer:
         if is_typescript:
             results.extend(self.init_typescript())
 
-        # Generate VSCode editor integration
         results.extend(self.init_vscode(is_python, is_typescript))
 
         return results

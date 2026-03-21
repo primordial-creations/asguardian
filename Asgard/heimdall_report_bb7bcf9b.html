@@ -1,0 +1,597 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - quality complexity</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - quality complexity</h1>
+  <pre>======================================================================
+  HEIMDALL COMPLEXITY ANALYSIS REPORT
+======================================================================
+
+  Scan Path:    /mnt/storage/home-data/Documents/GAIA/Asgard/Asgard
+  Scanned At:   2026-03-20 11:28:19
+  Duration:     6.45s
+
+----------------------------------------------------------------------
+  SUMMARY
+----------------------------------------------------------------------
+
+  Files Scanned:         339
+  Functions Analyzed:    4067
+  Files With Violations: 192
+  Total Violations:      512
+  Compliance Rate:       87.4%
+  Thresholds:            Cyclomatic=10, Cognitive=15
+  Averages:              CC=4.8, COG=5.7
+  Maximums:              CC=83, COG=216
+
+----------------------------------------------------------------------
+  METRIC DEFINITIONS
+----------------------------------------------------------------------
+
+  Cyclomatic Complexity (CC): Counts the number of independent paths through
+    a function. Each branch (if/for/while/except/and/or) adds 1. A function
+    with CC=1 is perfectly linear. Higher values mean harder to test and maintain.
+
+  Cognitive Complexity (COG): Measures how hard the code is for a human to
+    read. Penalises nesting depth and non-linear control flow more than CC does.
+
+  SEVERITY THRESHOLDS
+    (thresholds configured: CC=10, COG=15)
+    MODERATE  -- CC or COG exceeds threshold
+    HIGH      -- CC or COG exceeds threshold x 1.5
+    VERY_HIGH -- CC or COG exceeds threshold x 2
+    CRITICAL  -- CC or COG exceeds threshold x 3
+
+----------------------------------------------------------------------
+  VIOLATIONS (worst first)
+----------------------------------------------------------------------
+
+  [CRITICAL]
+    StaticSecurityService.get_summary                  Line   420  CC= 79 COG=216
+    run_full_scan                                      Line  4256  CC= 83 COG=128
+    SiteCrawler._discover_spa_items                    Line   281  CC= 22 COG=125
+    OOPAnalyzer.analyze                                Line    57  CC= 43 COG=106
+    HotspotDetector._detect_ast_hotspots               Line   138  CC= 37 COG=105
+    validate_schema_syntax                             Line   191  CC= 49 COG= 94
+    QualityGateEvaluator.evaluate_from_reports         Line   252  CC= 29 COG= 89
+    MigrationGeneratorService.generate                 Line    39  CC= 45 COG= 79
+    _dispatch                                          Line  1445  CC= 75 COG=  6
+    DaemonThreadVisitor._analyze_scope                 Line   160  CC= 30 COG= 74
+    PipelineGenerator._generate_github_actions         Line    86  CC= 33 COG= 72
+    PythonFootgunDetector._detect_late_binding         Line   130  CC= 22 COG= 68
+    main                                               Line  2922  CC= 68 COG= 15
+    ProtobufCompatibilityService._check_message_compatibility Line   273  CC= 38 COG= 65
+    DockerfileGenerator.generate                       Line    31  CC= 30 COG= 62
+    HexagonalAnalyzer._validate_dependency_direction   Line   350  CC= 14 COG= 60
+    SiteCrawler._crawl_site                            Line   168  CC= 25 COG= 59
+    main                                               Line  1120  CC= 58 COG= 15
+    CohesionAnalyzer.suggest_splits                    Line   268  CC= 17 COG= 58
+    LinkValidator._build_report                        Line   352  CC= 38 COG= 58
+    SchemaGeneratorService._type_to_schema             Line   228  CC= 33 COG= 55
+    PatternDetector._detect_adapter                    Line   246  CC= 12 COG= 55
+    LicenseChecker._classify_license                   Line   253  CC= 25 COG= 54
+    SchemaValidatorService._validate_array             Line   450  CC= 22 COG= 53
+    SchemaValidatorService._validate_object            Line   537  CC= 24 COG= 53
+    HexagonalAnalyzer._detect_cross_adapter_imports    Line   428  CC= 16 COG= 53
+    TypeChecker._parse_mypy_output                     Line   275  CC= 27 COG= 53
+    StyleValidator.validate                            Line   100  CC= 23 COG= 53
+    main                                               Line  1147  CC= 53 COG= 13
+    SecretsDetectionService._scan_file                 Line   340  CC= 14 COG= 52
+    LinkValidator._filter_links                        Line   161  CC= 20 COG= 52
+
+  [VERY_HIGH]
+    HTMLReportGenerator.generate_quality_dashboard     Line   549  CC= 29 COG= 50
+    TypingScanner._generate_text_report                Line   331  CC= 15 COG= 50
+    merge_specs                                        Line   123  CC= 20 COG= 49
+    SchemaDiffService._diff_tables                     Line   150  CC= 27 COG= 49
+    RaceConditionVisitor._analyze_method_body          Line   199  CC= 20 COG= 49
+    SmellVisitor._analyze_function                     Line   134  CC= 31 COG= 48
+    ComposeGenerator.generate                          Line    33  CC= 25 COG= 47
+    OverlayGenerator._generate_overlay_kustomization   Line   165  CC= 29 COG= 47
+    PatternSuggester._analyse_class                    Line   232  CC= 28 COG= 47
+    MagicNumbersDetector.analyze_file                  Line    76  CC= 31 COG= 47
+    _handle_mock                                       Line   871  CC= 24 COG= 46
+    SchemaAnalyzerService._parse_table                 Line   105  CC= 14 COG= 46
+    RatingsCalculator._calculate_security              Line   180  CC= 18 COG= 46
+    SBOMGenerator._parse_requirements_txt              Line   216  CC= 12 COG= 45
+    _scan_function_body_for_leaks                      Line   143  CC= 24 COG= 45
+    BaseGenerator._generate_base_kustomization         Line   230  CC= 24 COG= 44
+    IssueTracker.get_issues                            Line   356  CC= 18 COG= 44
+    GapAnalyzer._analyze_class_coverage                Line   284  CC= 15 COG= 44
+    TypeChecker._parse_pyright_output                  Line   497  CC= 24 COG= 44
+    TechnicalDebtAnalyzer._build_dependency_map        Line   540  CC= 13 COG= 44
+    run_codefix_suggestions                            Line  3921  CC= 17 COG= 43
+    ModularityAnalyzer.get_layering_analysis           Line   248  CC= 13 COG= 42
+    SOLIDValidator._check_lsp                          Line   289  CC= 16 COG= 42
+    CSPAnalyzer._analyze_issues                        Line   166  CC= 36 COG= 42
+    DocsGeneratorService._generate_markdown            Line   607  CC= 21 COG= 41
+    ComposeProjectGenerator._build_service_dict        Line   189  CC= 37 COG= 41
+    TypeChecker._collect_python_files                  Line   218  CC= 15 COG= 41
+    ThreadSafetyScanner._analyze_directory             Line   320  CC= 15 COG= 41
+    DaemonThreadScanner._analyze_directory             Line   385  CC= 15 COG= 41
+    run_compliance_analysis                            Line  2278  CC= 18 COG= 40
+    LayerAnalyzer._assign_layers                       Line   122  CC=  8 COG= 40
+    OOPAnalyzer.analyze_file                           Line   241  CC= 29 COG= 40
+    CouplingAnalyzer.analyze                           Line   151  CC= 19 COG= 40
+    DuplicationDetector._find_clone_families           Line   287  CC= 17 COG= 40
+    _json_type_to_typescript                           Line   324  CC= 26 COG= 39
+    run_init_linter                                    Line  2688  CC= 25 COG= 39
+    DocsGeneratorService._parse_endpoints_by_tag       Line   221  CC= 12 COG= 38
+    MaintainabilityVisitor._count_file_comments        Line   197  CC= 11 COG= 38
+    run_quality_analysis                               Line   516  CC= 28 COG= 37
+    run_coverage_analysis                              Line  1153  CC= 18 COG= 37
+    run_taint_analysis                                 Line  3206  CC= 16 COG= 37
+    run_bugs_analysis                                  Line  3324  CC= 17 COG= 37
+    InheritanceAnalyzer.analyze                        Line    56  CC= 23 COG= 37
+    EnvFallbackScanner._analyze_directory              Line   559  CC= 14 COG= 37
+    LibraryUsageScanner._analyze_directory             Line   241  CC= 14 COG= 37
+    TypingScanner._analyze_directory                   Line   266  CC= 14 COG= 37
+    DatetimeScanner._analyze_directory                 Line   323  CC= 14 COG= 37
+    LazyImportScanner._analyze_directory               Line   367  CC= 14 COG= 37
+    ErrorHandlingScanner._analyze_directory            Line   441  CC= 14 COG= 37
+    BlockingAsyncScanner._analyze_directory            Line   326  CC= 14 COG= 37
+    ResourceCleanupScanner._analyze_directory          Line   410  CC= 14 COG= 37
+    FutureLeakScanner._analyze_directory               Line   398  CC= 14 COG= 37
+    RaceConditionScanner._analyze_directory            Line   440  CC= 14 COG= 37
+    SchemaValidatorService._validate_value             Line   173  CC= 20 COG= 36
+    ProtobufValidatorService._validate_message         Line   607  CC= 21 COG= 36
+    EnvFallbackScanner._generate_text_report           Line   646  CC= 14 COG= 36
+    ErrorHandlingScanner._generate_text_report         Line   524  CC= 14 COG= 36
+    DaemonThreadScanner._generate_text_report          Line   466  CC= 14 COG= 36
+    WCAGValidator._check_forms                         Line   362  CC= 21 COG= 36
+    AsyncAPIParserService.get_messages                 Line   214  CC= 13 COG= 35
+    AvroCompatibilityService._check_record_compatibility Line   336  CC= 18 COG= 35
+    SOLIDValidator._extract_method_prefixes            Line   157  CC= 19 COG= 35
+    CryptographicValidationService._scan_file          Line   284  CC= 10 COG= 35
+    PythonFootgunDetector._detect_is_literal           Line   205  CC=  9 COG= 35
+    TypeChecker._invoke_pyright                        Line   442  CC= 12 COG= 35
+    TypeScriptGeneratorService._operation_to_method    Line   313  CC= 11 COG= 34
+    PythonGeneratorService._operation_to_method        Line   316  CC= 11 COG= 34
+    GolangGeneratorService._operation_to_method        Line   317  CC= 11 COG= 34
+    ProtobufValidatorService._validate_content         Line   160  CC= 22 COG= 34
+    run_hotspots_analysis                              Line  2175  CC= 15 COG= 34
+    run_js_analysis                                    Line  3436  CC= 14 COG= 34
+    run_ts_analysis                                    Line  3513  CC= 14 COG= 34
+    run_shell_analysis                                 Line  3590  CC= 14 COG= 34
+    HexagonalAnalyzer._detect_adapters                 Line   247  CC=  8 COG= 34
+    CredentialAnalyzer._scan_file                      Line   248  CC= 10 COG= 34
+    EnvFallbackVisitor.visit_Call                      Line   276  CC= 24 COG= 34
+    StructuredDataValidator._validate_type_specific    Line   235  CC= 34 COG= 18
+    SpecConverterService._convert_operation_2_to_3     Line   223  CC= 17 COG= 33
+    ManifestGenerator._validate_manifests              Line   412  CC= 16 COG= 33
+    LinterInitializer._write_file                      Line    87  CC=  9 COG= 33
+    _run_issues_list                                   Line  3681  CC= 16 COG= 33
+    RequirementsChecker._find_issues                   Line   418  CC= 15 COG= 33
+    ArchitectureAnalyzer._generate_markdown_report     Line   439  CC= 21 COG= 33
+    EnvFallbackScanner._generate_markdown_report       Line   748  CC= 13 COG= 33
+    ErrorHandlingScanner._generate_markdown_report     Line   632  CC= 13 COG= 33
+    DocumentationScanner._count_lines                  Line   173  CC= 10 COG= 33
+    DaemonThreadScanner._generate_markdown_report      Line   559  CC= 13 COG= 33
+    MockDataGeneratorService._infer_from_property_name Line   302  CC= 32 COG=  2
+    PatternDetector._detect_builder                    Line   205  CC= 11 COG= 32
+    StaticSecurityService.scan                         Line    70  CC= 23 COG= 32
+    PasswordAnalyzer._scan_file                        Line   229  CC=  9 COG= 32
+    _FunctionTaintVisitor.visit_Assign                 Line   365  CC= 16 COG= 32
+    TypeChecker._generate_text_report                  Line   631  CC= 17 COG= 32
+    TypingVisitor._analyze_function                    Line    67  CC= 32 COG= 20
+    TechnicalDebtAnalyzer._analyze_documentation_debt  Line   336  CC= 11 COG= 32
+    _find_mutable_collection_attrs                     Line    72  CC= 13 COG= 32
+    DocumentationScanner.scan                          Line    53  CC= 15 COG= 32
+    connected_components                               Line   390  CC= 15 COG= 32
+    UnifiedTester.test                                 Line    55  CC= 32 COG= 16
+    SecurityHeaderScanner._calculate_score             Line   549  CC= 20 COG= 32
+    MetaTagAnalyzer.analyze_page                       Line    56  CC= 26 COG= 32
+    SchemaGeneratorService._analyze_file               Line    97  CC= 10 COG= 31
+    MockServerGeneratorService._parse_openapi_endpoints Line   233  CC=  9 COG= 31
+    ManifestGenerator._calculate_best_practice_score   Line   467  CC= 22 COG= 31
+    ConfigSecretsScanner._generate_text_report         Line   448  CC= 13 COG= 31
+    scan_directory_for_security                        Line   144  CC= 13 COG= 31
+    ResourceCleanupScanner._generate_text_report       Line   493  CC= 13 COG= 31
+    RaceConditionScanner._generate_text_report         Line   506  CC= 12 COG= 31
+    RaceConditionScanner._generate_markdown_report     Line   593  CC= 12 COG= 31
+    AvroCompatibilityService.check                     Line    57  CC= 27 COG= 30
+    ProtobufCompatibilityService.check                 Line    52  CC= 21 COG= 30
+    SpecGeneratorService._build_operation              Line   155  CC= 16 COG= 30
+    SpecGeneratorService._extract_pydantic_schema      Line   267  CC= 15 COG= 30
+    run_logic_analysis                                 Line  1378  CC= 16 COG= 30
+    SecurityReport.calculate_totals                    Line   393  CC= 27 COG= 30
+    RequirementsParser.parse_pyproject_toml            Line    69  CC= 10 COG= 30
+    StaticSecurityService._generate_json_report        Line   724  CC= 15 COG= 30
+    JWTValidator._scan_file                            Line   203  CC=  8 COG= 30
+    BugDetector.scan                                   Line    79  CC= 16 COG= 30
+    TechnicalDebtAnalyzer._analyze_test_debt           Line   284  CC= 15 COG= 30
+    JSONSchemaSpec.to_dict                             Line   219  CC= 29 COG= 28
+    DockerfileValidator._validate_instruction          Line   254  CC= 22 COG= 29
+    StaticPerformanceService.get_summary               Line   234  CC= 16 COG= 29
+    HexagonalAnalyzer._assign_zones                    Line   149  CC=  8 COG= 29
+    ResourceTimingAnalyzer._build_report               Line   198  CC= 29 COG= 15
+    ComposeProjectGenerator._build_compose_dict        Line   131  CC= 17 COG= 28
+    DockerfileAnalyzer._find_dockerfiles               Line   184  CC= 14 COG= 28
+    ComposeAnalyzer._find_compose_files                Line    94  CC= 14 COG= 28
+    ConfigSecretsScanner._generate_markdown_report     Line   556  CC= 12 COG= 28
+    InjectionDetectionService._scan_file               Line   395  CC=  9 COG= 28
+    HardeningChecker._check_debug_endpoints            Line   371  CC= 10 COG= 28
+    HotspotDetector.scan                               Line    71  CC= 11 COG= 28
+    HotspotDetector._detect_regex_hotspots             Line   401  CC= 15 COG= 28
+    UnreachableCodeDetector._analyze_stmt_list         Line   156  CC= 16 COG= 28
+    EnvFallbackVisitor._is_os_environ_get              Line   129  CC=  9 COG= 28
+    MaintainabilityAnalyzer.analyze                    Line   305  CC= 13 COG= 28
+    ResourceCleanupScanner._generate_markdown_report   Line   598  CC= 12 COG= 28
+    SiteCrawler._test_page                             Line   538  CC= 21 COG= 28
+    RobotsAnalyzer._parse_sitemap                      Line   242  CC= 11 COG= 28
+    ModuleBuilder._calculate_best_practice_score       Line   583  CC= 21 COG= 27
+    run_baseline_command                               Line  1942  CC= 15 COG= 27
+    scan_directory_for_performance                     Line    80  CC= 11 COG= 27
+    parse_properties_file                              Line    88  CC= 11 COG= 27
+    _FunctionTaintVisitor.visit_Call                   Line   414  CC=  8 COG= 27
+    GapAnalyzer._collect_source_methods                Line   100  CC=  8 COG= 27
+    CodeSmellDetector._generate_text_report            Line   618  CC= 15 COG= 27
+    LinkValidator._check_single_link                   Line   269  CC= 12 COG= 27
+    ImageOptimizationScanner._extract_images           Line   186  CC= 12 COG= 27
+    AsyncAPIValidatorService.validate_file             Line    61  CC= 26 COG= 18
+    ArchitectureAnalyzer._generate_text_report         Line   188  CC= 16 COG= 26
+    _is_always_false                                   Line    33  CC= 18 COG= 26
+    LazyImportScanner._generate_text_report            Line   454  CC= 12 COG= 26
+    ThreadSafetyVisitor._analyze_class                 Line   148  CC= 13 COG= 26
+    ThreadSafetyScanner._generate_text_report          Line   401  CC= 12 COG= 26
+    ResourceCleanupVisitor._check_collection_usage     Line   237  CC= 10 COG= 26
+    component_bounding_boxes                           Line   450  CC= 10 COG= 26
+    WCAGValidator._check_links                         Line   442  CC= 14 COG= 26
+    _handle_codegen                                    Line   953  CC= 20 COG= 25
+    DocsGeneratorService._generate_html_endpoint       Line   488  CC= 15 COG= 25
+    SpecValidatorService._validate_structure           Line   197  CC= 14 COG= 25
+    HistoryStore.get_trend_report                      Line   171  CC= 15 COG= 25
+    ArgoCDGenerator._build_source_spec                 Line   267  CC= 15 COG= 25
+    ChartGenerator._generate_chart_yaml                Line   104  CC= 17 COG= 25
+    run_gate_evaluation                                Line  2541  CC= 13 COG= 25
+    ComposeAnalyzer._check_environment_secrets         Line   366  CC= 13 COG= 25
+    ConfigSecretsScanner._analyze_directory            Line   370  CC= 10 COG= 25
+    parse_ini_file                                     Line   141  CC= 14 COG= 25
+    ClassExtractor.visit_ClassDef                      Line    45  CC= 15 COG= 25
+    CoverageAnalyzer._generate_text_report             Line   155  CC= 15 COG= 25
+    DeadCodeDetector._detect_unused_private_methods    Line    81  CC=  9 COG= 25
+    ComplexityAnalyzer._get_parent_class               Line   413  CC=  9 COG= 25
+    CodeSmellDetector._analyze_directory               Line   477  CC= 10 COG= 25
+    KeyboardNavigationTester._get_focusable_elements   Line   139  CC=  9 COG= 25
+    AvroValidatorService._validate_enum                Line   573  CC= 15 COG= 24
+    ModuleBuilder._validate_module                     Line   552  CC= 15 COG= 24
+    RequirementsChecker._generate_text_report          Line   517  CC= 10 COG= 24
+    PatternSuggester.suggest                           Line   174  CC= 11 COG= 24
+    RequirementsParser.parse_requirements_txt          Line    30  CC= 10 COG= 24
+    _scan_recursive                                    Line   170  CC=  9 COG= 24
+    CouplingAnalyzer.analyze_file                      Line   273  CC= 15 COG= 24
+    _find_thread_targets                               Line    98  CC= 12 COG= 24
+    HtmlRenderer.render_history                        Line   749  CC= 16 COG= 24
+    ARIAValidator._validate_aria_ids                   Line   369  CC=  7 COG= 24
+    ImageOptimizationScanner._check_image              Line   369  CC= 16 COG= 24
+    ServiceMapBuilder.build_from_spans                 Line    58  CC= 15 COG= 24
+    PythonGeneratorService._generate_api_method        Line   670  CC= 23 COG= 21
+    GolangGeneratorService._json_type_to_go            Line   210  CC= 23 COG= 19
+    MockServerGeneratorService._parse_responses        Line   338  CC=  8 COG= 23
+    KubernetesValidator._validate_workload             Line   270  CC= 15 COG= 23
+    main                                               Line  1376  CC= 23 COG= 23
+    SBOMGenerator.generate                             Line    37  CC= 11 COG= 23
+    HexagonalAnalyzer._detect_ports                    Line   179  CC=  7 COG= 23
+    LazyImportScanner._generate_markdown_report        Line   547  CC= 11 COG= 23
+    ThreadTargetCollector.visit_Call                   Line   144  CC= 12 COG= 23
+    ThreadSafetyScanner._generate_markdown_report      Line   493  CC= 11 COG= 23
+    NamingConventionScanner.scan                       Line   102  CC= 10 COG= 23
+    ScreenshotCapture._capture                         Line   149  CC= 15 COG= 23
+    UnifiedTester._run_responsive_tests                Line   360  CC= 14 COG= 23
+    ARIAValidator._validate_required_attributes        Line   305  CC=  7 COG= 23
+    ImageOptimizationScanner._build_report             Line   679  CC= 21 COG= 23
+    ServiceMapBuilder.find_critical_path               Line   142  CC= 11 COG= 23
+    TypeScriptGeneratorService._parse_methods          Line   258  CC=  6 COG= 22
+    PythonGeneratorService._parse_methods              Line   261  CC=  6 COG= 22
+    GolangGeneratorService._parse_methods              Line   262  CC=  6 COG= 22
+    SpecValidatorService.validate                      Line    51  CC= 22 COG= 16
+    SpecConverterService._convert_schema_2_to_3        Line   170  CC= 13 COG= 22
+    SpecConverterService._convert_operation_3_to_2     Line   473  CC= 10 COG= 22
+    DockerfileValidator._validate_content              Line   148  CC= 20 COG= 22
+    PipelineGenerator._generate_gitlab_ci              Line   183  CC= 13 COG= 22
+    SBOMGenerator._parse_pyproject_toml                Line   264  CC= 10 COG= 22
+    CpuProfilerService._scan_file                      Line   205  CC= 10 COG= 22
+    CSPAnalyzer._analyze_csp                           Line   129  CC= 11 COG= 22
+    JWTValidator._is_intentional_no_verify             Line   341  CC= 12 COG= 22
+    DeadCodeDetector._detect_unused_module_vars        Line   126  CC= 16 COG= 22
+    MaintainabilityAnalyzer._generate_improvement_priorities Line   530  CC= 22 COG= 15
+    TechnicalDebtAnalyzer._analyze_code_debt           Line   188  CC=  9 COG= 22
+    _has_lock_enclosure                                Line   102  CC= 14 COG= 22
+    ConsoleCapture._build_report                       Line   301  CC= 22 COG= 14
+    SecurityHeaderScanner._calculate_summary           Line   505  CC= 12 COG= 22
+    StatisticalDetector.detect_iqr                     Line   155  CC= 12 COG= 22
+    AsyncAPIValidatorService.validate_spec_data        Line   165  CC= 21 COG= 13
+    AvroCompatibilityService._generate_markdown_report Line   650  CC= 15 COG= 21
+    ProtobufValidatorService._generate_text_report     Line   887  CC= 13 COG= 21
+    ProtobufCompatibilityService._generate_markdown_report Line   652  CC= 15 COG= 21
+    SpecGeneratorService._extract_route_info           Line   127  CC=  7 COG= 21
+    SchemaGeneratorService.generate_from_openapi       Line   328  CC= 11 COG= 21
+    parse_sdl                                          Line    50  CC= 17 COG= 21
+    DockerfileValidator._validate_run_instruction      Line   396  CC= 21 COG= 10
+    ComposeProjectGenerator._calculate_best_practice_score Line   477  CC= 14 COG= 21
+    _run_history_show                                  Line  3019  CC= 11 COG= 21
+    ArchitectureAnalyzer._generate_json_report         Line   318  CC= 14 COG= 21
+    ArchitectureAnalyzer._generate_recommendations     Line   569  CC= 15 COG= 21
+    PatternDetector._detect_singleton                  Line   114  CC= 13 COG= 21
+    CryptographicValidationService._is_iv_nonce_false_positive Line   382  CC= 13 COG= 21
+    _FunctionTaintVisitor._get_taint_source            Line   327  CC= 14 COG= 21
+    OOPReport.add_file_analysis                        Line   436  CC= 12 COG= 21
+    SyntaxChecker._run_flake8                          Line   266  CC=  7 COG= 21
+    SyntaxChecker._generate_text_report                Line   525  CC=  9 COG= 21
+    TypeChecker._run_mypy                              Line   118  CC= 15 COG= 21
+    DatetimeScanner._generate_text_report              Line   387  CC= 10 COG= 21
+    CodeSmellDetector._generate_markdown_report        Line   719  CC= 13 COG= 21
+    DocumentationScanner._analyze_file                 Line   112  CC= 21 COG= 20
+    ShellAnalyzer._discover_files                      Line   104  CC= 10 COG= 21
+    HtmlRenderer.render_issues                         Line   623  CC= 21 COG= 20
+    draw_rectangle                                     Line   551  CC= 10 COG= 21
+    SiteCrawler._generate_report                       Line   896  CC= 20 COG= 21
+    PageLoadAnalyzer._identify_issues                  Line   238  CC= 13 COG= 21
+    CSPAnalyzer._parse_directives                      Line   120  CC=  9 COG= 21
+    BurnRateAnalyzer.detect_incidents                  Line   245  CC= 11 COG= 21
+
+  [HIGH]
+    _resolve_refs_recursive                            Line   135  CC= 11 COG= 20
+    AvroValidatorService._generate_text_report         Line   899  CC= 13 COG= 20
+    AvroValidatorService._generate_markdown_report     Line   934  CC= 13 COG= 20
+    GolangGeneratorService._generate_api_method        Line   634  CC= 17 COG= 20
+    MockDataGeneratorService.generate_from_schema      Line    78  CC= 16 COG= 20
+    ComposeValidator._validate_service                 Line   155  CC= 20 COG= 17
+    _run_issues_show                                   Line  3733  CC= 11 COG= 20
+    ModularityAnalyzer.analyze                         Line    37  CC= 14 COG= 20
+    RequirementsChecker._parse_requirements_file       Line   279  CC= 10 COG= 20
+    LicenseChecker._generate_text_report               Line   401  CC= 10 COG= 20
+    _scan_recursive                                    Line   106  CC=  7 COG= 20
+    PatternDetector._detect_command                    Line   456  CC= 11 COG= 20
+    DockerfileAnalyzer._check_secrets_in_env           Line   328  CC=  6 COG= 20
+    DockerfileAnalyzer._scan_recursive                 Line   210  CC=  7 COG= 20
+    ComposeAnalyzer._scan_recursive                    Line   120  CC=  7 COG= 20
+    _FunctionTaintVisitor._is_tainted                  Line   298  CC= 16 COG= 20
+    TypingScanner._generate_markdown_report            Line   434  CC=  9 COG= 20
+    DuplicationDetector._generate_text_report          Line   388  CC=  9 COG= 20
+    run_crawl                                          Line  1734  CC= 16 COG= 20
+    load_image                                         Line   135  CC= 17 COG= 20
+    UnifiedTester._run_accessibility_tests             Line   146  CC= 13 COG= 20
+    ARIAValidator._validate_roles                      Line   162  CC=  7 COG= 20
+    SecurityHeaderScanner.scan                         Line    65  CC= 11 COG= 20
+    SecurityHeaderScanner._analyze_hsts                Line   178  CC=  9 COG= 20
+    PercentileCalculator.calculate_histogram           Line   137  CC=  9 COG= 20
+    CriticalPathAnalyzer.analyze                       Line    50  CC= 19 COG= 20
+    _handle_audit                                      Line   733  CC= 16 COG= 19
+    SchemaInferenceService._analyze_string_samples     Line   253  CC= 11 COG= 19
+    SchemaInferenceService._generate_object_schema     Line   383  CC=  9 COG= 19
+    get_schema_complexity                              Line   396  CC= 14 COG= 19
+    analyze                                            Line   414  CC= 14 COG= 19
+    AvroCompatibilityService._check_union_compatibility Line   548  CC=  9 COG= 19
+    TypeScriptGeneratorService._json_type_to_ts        Line   216  CC= 19 COG= 10
+    PythonGeneratorService._json_type_to_python        Line   218  CC= 19 COG= 12
+    ProtobufValidatorService._check_naming_conventions Line   804  CC= 11 COG= 19
+    SchemaDiffService.diff_schemas                     Line    70  CC= 13 COG= 19
+    HTMLReportGenerator.generate_typing_report         Line   454  CC= 14 COG= 19
+    ModuleBuilder._generate_examples                   Line   449  CC= 11 COG= 19
+    HexagonalAnalyzer._validate_domain_isolation       Line   302  CC=  6 COG= 19
+    StaticSecurityService._generate_markdown_report    Line   796  CC= 16 COG= 19
+    InheritanceAnalyzer.analyze_file                   Line   192  CC= 17 COG= 19
+    BlockingAsyncVisitor._detect_blocking_call         Line   140  CC= 18 COG= 19
+    CognitiveComplexityVisitor.visit_If                Line   128  CC=  7 COG= 19
+    TechnicalDebtAnalyzer._find_undocumented_functions Line   577  CC=  6 COG= 19
+    CodeSmellDetector._generate_remediation_priorities Line   533  CC= 15 COG= 19
+    ARIAValidator._validate_aria_attributes            Line   199  CC=  7 COG= 19
+    KeyboardNavigationTester._test_focus_indicators    Line   236  CC= 11 COG= 19
+    ColorContrastChecker._get_text_elements            Line   155  CC=  8 COG= 19
+    StatisticalDetector.detect_with_baseline           Line   270  CC= 12 COG= 19
+    _handle_docs                                       Line  1052  CC= 10 COG= 18
+    TypeScriptGeneratorService._generate_api_method    Line   632  CC= 17 COG= 18
+    CompatibilityCheckerService.check                  Line    46  CC= 12 COG= 18
+    compare_schemas                                    Line    88  CC= 10 COG= 18
+    ProtobufValidatorService._generate_markdown_report Line   922  CC= 12 COG= 18
+    ProtobufCompatibilityService.check_schemas         Line   193  CC= 13 COG= 18
+    SpecParserService._convert_operation               Line   169  CC= 14 COG= 18
+    IntrospectionService._parse_type                   Line   229  CC= 18 COG= 17
+    SchemaDiffService._generate_markdown_report        Line   331  CC= 13 COG= 18
+    PipelineGenerator._validate_pipeline               Line   311  CC= 15 COG= 18
+    LinterInitializer.detect_project_type              Line    49  CC=  9 COG= 18
+    ModularityAnalyzer.get_boundary_violations         Line   166  CC=  7 COG= 18
+    SBOMGenerator.to_spdx_json                         Line   104  CC= 13 COG= 18
+    find_loops                                         Line   252  CC= 10 COG= 18
+    HexagonalAnalyzer._generate_text_report            Line   571  CC= 12 COG= 18
+    SOLIDValidator._count_if_chain                     Line   260  CC=  7 COG= 18
+    get_imports                                        Line   187  CC=  9 COG= 18
+    ComposeAnalyzer._check_volumes                     Line   415  CC=  7 COG= 18
+    _compare_values                                    Line    92  CC= 18 COG= 12
+    IssueTracker.get_git_blame                         Line   492  CC=  8 COG= 18
+    _NullCheckVisitor.visit_Assign                     Line   132  CC= 11 COG= 18
+    TypeErosionScanner._detect_union_sprawl            Line   222  CC=  8 COG= 18
+    SyntaxChecker._run_ruff                            Line   179  CC=  8 COG= 18
+    ComplexityAnalyzer.analyze                         Line   282  CC=  9 COG= 18
+    DuplicationDetector.analyze                        Line    62  CC= 10 COG= 18
+    MobileCompatibilityTester.test                     Line    35  CC=  9 COG= 18
+    RobotsAnalyzer._parse_robots_txt                   Line   108  CC= 13 COG= 18
+    AsgardConfig._dict_to_toml                         Line   824  CC=  8 COG= 18
+    SchemaInferenceService._detect_common_pattern      Line   309  CC= 17 COG= 16
+    DocsGeneratorService._generate_html_schemas        Line   567  CC=  8 COG= 17
+    ProtobufValidatorService._parse_message_block      Line   381  CC= 12 COG= 17
+    ProtobufValidatorService._validate_enum            Line   711  CC= 10 COG= 17
+    SpecValidatorService.validate_spec_data            Line   150  CC= 17 COG= 11
+    TerraformValidator._build_report                   Line   550  CC= 17 COG= 15
+    KubernetesValidator._build_report                  Line   516  CC= 17 COG= 15
+    DockerfileValidator._build_report                  Line   548  CC= 17 COG= 15
+    PipelineGenerator._generate_azure_devops           Line   224  CC= 11 COG= 17
+    OverlayGenerator._calculate_overall_score          Line   359  CC= 11 COG= 17
+    ManifestGenerator._generate_workload               Line   100  CC= 14 COG= 17
+    RatingsCalculator._calculate_reliability           Line   135  CC= 10 COG= 17
+    _run_issues_summary                                Line  3833  CC=  9 COG= 17
+    RequirementsChecker._generate_markdown_report      Line   611  CC=  9 COG= 17
+    SOLIDValidator._find_instantiations                Line   462  CC=  7 COG= 17
+    get_abstract_methods                               Line   239  CC=  7 COG= 17
+    HeadersAnalyzer._recalculate_totals                Line   156  CC= 17 COG=  8
+    TLSAnalyzer._recalculate_totals                    Line   157  CC= 17 COG=  8
+    CredentialAnalyzer._check_default_credential_pairs Line   321  CC=  6 COG= 17
+    parse_env_file                                     Line    13  CC= 10 COG= 17
+    parse_yaml_simple                                  Line    50  CC= 10 COG= 17
+    ComplianceReporter._map_hotspots_to_cwe            Line   411  CC= 11 COG= 17
+    extract_methods                                    Line    14  CC= 10 COG= 17
+    DataCollector.collect                              Line    39  CC= 11 COG= 17
+    format_seo_text                                    Line  2423  CC= 11 COG= 17
+    ResourceTimingAnalyzer._get_resource_type          Line   165  CC= 17 COG=  2
+    ScreenReaderValidator._check_images                Line   228  CC=  8 COG= 17
+    KeyboardNavigationTester._test_interactive_elements Line   356  CC=  8 COG= 17
+    main                                               Line   511  CC= 16 COG=  8
+    SchemaGeneratorService._infer_schema_from_value    Line   383  CC= 12 COG= 16
+    resolve_references                                 Line   197  CC= 13 COG= 16
+    MockDataGeneratorService.generate_value            Line   178  CC= 16 COG=  3
+    run_deps_analysis                                  Line  1020  CC= 10 COG= 16
+    _generate_scan_html_report                         Line  4127  CC= 16 COG= 16
+    SBOMGenerator.to_cyclonedx_json                    Line   166  CC= 11 COG= 16
+    NewCodePeriodDetector._parse_name_status           Line   376  CC=  7 COG= 16
+    CacheAnalyzerService._scan_file                    Line   216  CC=  7 COG= 16
+    DatabaseAnalyzerService._scan_file                 Line   205  CC=  7 COG= 16
+    MemoryProfilerService._scan_file                   Line   203  CC=  7 COG= 16
+    LayerAnalyzer._analyze_file                        Line   175  CC= 12 COG= 16
+    HexagonalAnalyzer._generate_markdown_report        Line   682  CC= 10 COG= 16
+    PatternDetector._detect_factory                    Line   153  CC= 12 COG= 16
+    extract_csp_from_code                              Line   165  CC=  6 COG= 16
+    TypingScanner._analyze_file                        Line   209  CC= 13 COG= 16
+    _node_is_inside_try_except                         Line   105  CC=  7 COG= 16
+    NamingConventionScanner._generate_text_report      Line   346  CC=  7 COG= 16
+    gaussian_blur                                      Line   314  CC= 11 COG= 16
+    SLAChecker.check                                   Line    41  CC= 16 COG= 14
+    TraceAggregator.aggregate                          Line    53  CC= 16 COG= 13
+    TraceAggregator._calculate_service_metrics         Line   214  CC= 16 COG= 16
+    VolundrConfig.sync_legacy_fields                   Line   740  CC= 16 COG= 10
+    AsgardConfigLoader._load_env_overrides             Line   136  CC=  6 COG= 16
+    SchemaGeneratorService.from_dataclass              Line   138  CC= 14 COG= 15
+    SchemaGeneratorService._generate_object_schema     Line   329  CC= 15 COG= 14
+    SchemaValidatorService._validate_string            Line   333  CC= 11 COG= 15
+    SchemaValidatorService._validate_number            Line   387  CC= 11 COG= 15
+    AvroValidatorService._validate_field               Line   462  CC= 15 COG= 15
+    AvroCompatibilityService._generate_text_report     Line   612  CC= 12 COG= 15
+    BreakingChangeDetectorService.calculate_compatibility_score Line   725  CC= 15 COG= 14
+    ProtobufCompatibilityService._generate_text_report Line   615  CC= 12 COG= 15
+    SchemaValidatorService._validate_types             Line   215  CC= 11 COG= 15
+    run_deps_export                                    Line  1066  CC= 11 COG= 15
+    run_syntax_analysis                                Line  1222  CC= 11 COG= 15
+    run_documentation_analysis                         Line  2028  CC= 13 COG= 15
+    run_naming_analysis                                Line  2101  CC= 15 COG= 10
+    RequirementsChecker.sync                           Line   224  CC= 11 COG= 15
+    CacheAnalyzerService._detect_cache_systems         Line   188  CC= 14 COG= 15
+    InfraAnalyzer._recalculate_totals                  Line   161  CC= 15 COG=  7
+    AuthAnalyzer._recalculate_totals                   Line   157  CC= 15 COG=  7
+    QualityGateEvaluator.evaluate                      Line   174  CC= 11 COG= 15
+    ClassExtractor._extract_instance_attributes        Line   105  CC= 11 COG= 15
+    _is_none_check                                     Line    48  CC= 12 COG= 15
+    SyntaxChecker._group_issues_by_file                Line   448  CC= 14 COG= 15
+    TechnicalDebtAnalyzer._calculate_roi_analysis      Line   397  CC= 11 COG= 15
+    TechnicalDebtAnalyzer._generate_text_report        Line   632  CC= 11 COG= 15
+    _get_self_attr_assignments                         Line    36  CC= 11 COG= 15
+    ForecastCalculator.forecast                        Line    52  CC= 14 COG= 15
+    TypeScriptGeneratorService._generate_type          Line   425  CC= 11 COG= 14
+    ContractValidatorService.validate                  Line    41  CC= 11 COG= 14
+    GitHubDecorator.decorate                           Line    50  CC= 12 COG= 14
+    FluxGenerator._generate_kustomization_manifest     Line   305  CC= 14 COG= 13
+    PipelineGenerator._calculate_best_practice_score   Line   339  CC= 14 COG= 13
+    ComposeGenerator._calculate_best_practice_score    Line   162  CC= 13 COG= 14
+    StaticPerformanceService.scan                      Line    51  CC= 11 COG= 14
+    is_abstract_class                                  Line   263  CC= 12 COG= 14
+    _condition_repr                                    Line    67  CC= 13 COG= 14
+    VisualRegressionTester.run_suite                   Line   172  CC= 11 COG= 14
+    TraceAggregator.build_traces_from_spans            Line   155  CC= 11 COG= 14
+    SchemaInferenceService._analyze_scalar_samples     Line   220  CC= 13 COG= 13
+    FluxGenerator._calculate_git_repo_score            Line   396  CC= 13 COG= 13
+    ChartGenerator._calculate_best_practice_score      Line   723  CC= 13 COG= 11
+    DockerfileGenerator._calculate_best_practice_score Line   179  CC= 13 COG=  8
+    ContainerAnalyzer._recalculate_totals              Line   142  CC= 13 COG=  6
+    HeaderValidator._check_missing_headers             Line   250  CC= 13 COG= 11
+    suggest_csp_improvements                           Line   264  CC= 13 COG= 11
+    is_in_comment_or_docstring                         Line   371  CC= 13 COG=  8
+    OOPAnalyzer.get_design_smells                      Line   346  CC= 13 COG= 13
+    SyntaxChecker._filter_by_severity                  Line   492  CC= 13 COG= 12
+    TypeChecker._mypy_code_to_category                 Line   362  CC= 13 COG= 12
+    run_unified_test                                   Line  1582  CC= 13 COG= 11
+    _unfilter_row                                      Line   111  CC= 11 COG= 13
+    HTMLReporter._build_results_section                Line   198  CC= 12 COG= 13
+    ResourceTimingAnalyzer.get_issues                  Line   270  CC= 12 COG= 13
+    MetaTagAnalyzer._calculate_score                   Line   416  CC= 13 COG=  7
+    SLITracker.get_history                             Line    64  CC= 13 COG= 12
+    ForecastCalculator._exponential_forecast           Line   278  CC= 13 COG= 12
+    TrendAnalyzer.analyze                              Line    55  CC= 12 COG= 13
+    main                                               Line   388  CC= 12 COG=  8
+    IntrospectionService._type_to_sdl                  Line   432  CC= 12 COG=  5
+    MockDataGeneratorService._generate_formatted_string Line   277  CC= 12 COG=  2
+    GitLabDecorator._build_summary                     Line   150  CC= 12 COG= 11
+    GitHubDecorator._build_summary                     Line   147  CC= 12 COG= 11
+    KubernetesValidator._validate_manifest             Line   181  CC= 12 COG=  8
+    ChartGenerator.generate                            Line    33  CC= 12 COG= 10
+    BaseGenerator._calculate_best_practice_score       Line   320  CC= 12 COG= 11
+    run_new_code_detect                                Line  3125  CC= 11 COG= 12
+    _detail_str                                        Line  4101  CC= 11 COG= 12
+    PatternDetector._detect_observer                   Line   406  CC= 12 COG=  7
+    detect_config_format                               Line   306  CC= 12 COG= 12
+    get_branch_count                                   Line   181  CC= 11 COG= 12
+    MaintainabilityAnalyzer._generate_recommendations  Line   492  CC= 12 COG= 10
+    StructuredDataValidator._validate_json_ld_item     Line   191  CC= 11 COG= 12
+    RegressionDetector._welch_t_test                   Line   328  CC= 12 COG=  9
+    ErrorBudgetCalculator.calculate                    Line    48  CC= 12 COG= 10
+    ForecastCalculator._linear_forecast                Line   216  CC= 12 COG= 12
+    FileHashCache.is_changed                           Line   160  CC= 11 COG=  9
+    _handle_graphql                                    Line   597  CC= 11 COG=  7
+    SchemaInferenceService._analyze_samples            Line   124  CC= 11 COG= 10
+    AvroValidatorService._validate_record              Line   380  CC= 11 COG= 10
+    PythonGeneratorService._generate_client_file       Line   491  CC= 11 COG=  6
+    BreakingChangeDetectorService.estimate_impact      Line   213  CC= 11 COG=  7
+    SpecConverterService.convert_data                  Line    70  CC= 11 COG= 11
+    get_sql_dialect                                    Line   160  CC= 11 COG=  4
+    ArgoCDGenerator._calculate_best_practice_score     Line   329  CC= 11 COG=  9
+    ChartGenerator._generate_values_yaml               Line   157  CC= 11 COG= 10
+    DockerfileGenerator._validate_dockerfile           Line   156  CC= 11 COG=  6
+    ModuleBuilder._generate_resource_block             Line   259  CC= 11 COG= 11
+    GapAnalyzer._calculate_severity                    Line   248  CC= 11 COG=  8
+    AssertMisuseDetector._check                        Line    95  CC= 11 COG=  6
+    ExceptionQualityDetector._check_handler            Line   108  CC= 11 COG=  7
+    EnvFallbackVisitor._get_default_value_repr         Line   151  CC= 11 COG=  2
+    MaintainabilityVisitor._calculate_halstead_metrics Line   133  CC= 11 COG=  5
+    MaintainabilityVisitor.get_file_metrics            Line   244  CC= 11 COG= 10
+    RaceConditionVisitor._check_check_then_act         Line   287  CC= 11 COG=  7
+    VisualRegressionTester._histogram_comparison       Line   340  CC= 11 COG=  8
+    PlaywrightUtils.create_context                     Line   154  CC= 11 COG=  7
+    RobotsAnalyzer._analyze_robots_issues              Line   160  CC= 11 COG= 10
+    run_web_vitals                                     Line   613  CC= 11 COG= 11
+    run_apm_analyze                                    Line   808  CC= 11 COG= 10
+    BurnRateAnalyzer.analyze                           Line    60  CC= 11 COG= 10
+    IoMetricsCalculator._generate_recommendations      Line   146  CC= 11 COG=  5
+    QueryMetricsCalculator.analyze                     Line    39  CC= 11 COG=  7
+    TrendAnalyzer._generate_report_recommendations     Line   418  CC= 11 COG=  8
+    CriticalPathAnalyzer._generate_recommendations     Line   394  CC= 11 COG=  8
+    TraceParser.build_trace                            Line   152  CC= 11 COG=  9
+
+======================================================================
+
+</pre>
+</body>
+</html>

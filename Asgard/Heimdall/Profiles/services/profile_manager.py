@@ -10,7 +10,7 @@ Project-to-profile assignments are stored in ~/.asgard/profile_assignments.json.
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Optional, cast
 
 from Asgard.Heimdall.Profiles.builtin import BUILTIN_PROFILES
 from Asgard.Heimdall.Profiles.models.profile_models import (
@@ -276,7 +276,7 @@ class ProfileManager:
             return {}
         try:
             with open(_ASSIGNMENTS_FILE, "r", encoding="utf-8") as fh:
-                return json.load(fh)
+                return cast(Dict[Any, Any], json.load(fh))
         except (OSError, ValueError):
             return {}
 

@@ -30,71 +30,21 @@ Programmatic Usage:
     from Heimdall.Quality import CodeSmellDetector, SmellConfig
     from Heimdall.Quality import TechnicalDebtAnalyzer, DebtConfig
     from Heimdall.Quality import MaintainabilityAnalyzer, MaintainabilityConfig
-
-    # File length analysis
-    config = AnalysisConfig(threshold=300)
-    analyzer = FileAnalyzer(config)
-    result = analyzer.analyze()
-
-    for violation in result.violations:
-        print(f"{violation.relative_path}: {violation.line_count} lines")
-
-    # Complexity analysis
-    complexity_config = ComplexityConfig(cyclomatic_threshold=10)
-    complexity_analyzer = ComplexityAnalyzer(complexity_config)
-    complexity_result = complexity_analyzer.analyze()
-
-    for violation in complexity_result.violations:
-        print(f"{violation.qualified_name}: CC={violation.cyclomatic_complexity}")
-
-    # Duplication detection
-    dup_config = DuplicationConfig(min_block_size=6)
-    dup_detector = DuplicationDetector(dup_config)
-    dup_result = dup_detector.analyze()
-
-    for family in dup_result.clone_families:
-        print(f"Clone family with {family.block_count} blocks")
-
-    # Code smell detection
-    smell_config = SmellConfig()
-    smell_detector = CodeSmellDetector(smell_config)
-    smell_result = smell_detector.analyze(Path("./src"))
-
-    for smell in smell_result.detected_smells:
-        print(f"{smell.name} at {smell.location}")
-
-    # Technical debt analysis
-    debt_config = DebtConfig()
-    debt_analyzer = TechnicalDebtAnalyzer(debt_config)
-    debt_result = debt_analyzer.analyze(Path("./src"))
-
-    print(f"Total debt: {debt_result.total_debt_hours} hours")
-
-    # Maintainability index
-    mi_config = MaintainabilityConfig()
-    mi_analyzer = MaintainabilityAnalyzer(mi_config)
-    mi_result = mi_analyzer.analyze(Path("./src"))
-
-    print(f"Overall MI: {mi_result.overall_index:.2f}")
 """
 
 __version__ = "1.0.0"
 __author__ = "Asgard Contributors"
 
-from Asgard.Heimdall.Quality.models.analysis_models import (
+from Asgard.Heimdall.Quality._quality_models_imports import (
     AnalysisConfig,
     AnalysisResult,
     FileAnalysis,
     SeverityLevel,
-)
-from Asgard.Heimdall.Quality.models.complexity_models import (
     ComplexityConfig,
     ComplexityResult,
     ComplexitySeverity,
     FileComplexityAnalysis,
     FunctionComplexity,
-)
-from Asgard.Heimdall.Quality.models.duplication_models import (
     CloneFamily,
     CodeBlock,
     DuplicationConfig,
@@ -102,16 +52,12 @@ from Asgard.Heimdall.Quality.models.duplication_models import (
     DuplicationResult,
     DuplicationSeverity,
     DuplicationType,
-)
-from Asgard.Heimdall.Quality.models.smell_models import (
     CodeSmell,
     SmellCategory,
     SmellConfig,
     SmellReport,
     SmellSeverity,
     SmellThresholds,
-)
-from Asgard.Heimdall.Quality.models.debt_models import (
     DebtConfig,
     DebtItem,
     DebtReport,
@@ -122,8 +68,6 @@ from Asgard.Heimdall.Quality.models.debt_models import (
     ROIAnalysis,
     TimeHorizon,
     TimeProjection,
-)
-from Asgard.Heimdall.Quality.models.maintainability_models import (
     FileMaintainability,
     FunctionMaintainability,
     HalsteadMetrics,
@@ -133,54 +77,31 @@ from Asgard.Heimdall.Quality.models.maintainability_models import (
     MaintainabilityLevel,
     MaintainabilityReport,
     MaintainabilityThresholds,
-)
-from Asgard.Heimdall.Quality.models.lazy_import_models import (
     LazyImport,
     LazyImportConfig,
     LazyImportReport,
     LazyImportSeverity,
     LazyImportType,
-)
-from Asgard.Heimdall.Quality.models.env_fallback_models import (
     EnvFallbackConfig,
     EnvFallbackReport,
     EnvFallbackSeverity,
     EnvFallbackType,
     EnvFallbackViolation,
-)
-from Asgard.Heimdall.Quality.models.syntax_models import (
-    FileAnalysis as SyntaxFileAnalysis,
+    SyntaxFileAnalysis,
     LinterType,
     SyntaxConfig,
     SyntaxIssue,
     SyntaxResult,
     SyntaxSeverity,
-)
-from Asgard.Heimdall.Quality.services.file_length_analyzer import FileAnalyzer
-from Asgard.Heimdall.Quality.services.complexity_analyzer import ComplexityAnalyzer
-from Asgard.Heimdall.Quality.services.duplication_detector import DuplicationDetector
-from Asgard.Heimdall.Quality.services.code_smell_detector import CodeSmellDetector
-from Asgard.Heimdall.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
-from Asgard.Heimdall.Quality.services.maintainability_analyzer import MaintainabilityAnalyzer
-from Asgard.Heimdall.Quality.services.lazy_import_scanner import LazyImportScanner
-from Asgard.Heimdall.Quality.services.env_fallback_scanner import EnvFallbackScanner
-from Asgard.Heimdall.Quality.services.syntax_checker import SyntaxChecker
-from Asgard.Heimdall.Quality.models.documentation_models import (
     DocumentationConfig,
-    FileDocumentation,
     DocumentationReport,
-    FunctionDocumentation as DocFunctionDocumentation,
-    ClassDocumentation as DocClassDocumentation,
-)
-from Asgard.Heimdall.Quality.models.naming_models import (
+    DocClassDocumentation,
+    DocFunctionDocumentation,
+    FileDocumentation,
     NamingConfig,
     NamingConvention,
     NamingViolation,
     NamingReport,
-)
-from Asgard.Heimdall.Quality.services.documentation_scanner import DocumentationScanner
-from Asgard.Heimdall.Quality.services.naming_convention_scanner import NamingConventionScanner
-from Asgard.Heimdall.Quality.models.type_check_models import (
     FileTypeCheckStats,
     TypeCheckCategory,
     TypeCheckConfig,
@@ -188,8 +109,19 @@ from Asgard.Heimdall.Quality.models.type_check_models import (
     TypeCheckReport,
     TypeCheckSeverity,
 )
-from Asgard.Heimdall.Quality.services.type_checker import TypeChecker
-from Asgard.Heimdall.Quality.BugDetection import (
+from Asgard.Heimdall.Quality._quality_services_imports import (
+    FileAnalyzer,
+    ComplexityAnalyzer,
+    DuplicationDetector,
+    CodeSmellDetector,
+    TechnicalDebtAnalyzer,
+    MaintainabilityAnalyzer,
+    LazyImportScanner,
+    EnvFallbackScanner,
+    SyntaxChecker,
+    DocumentationScanner,
+    NamingConventionScanner,
+    TypeChecker,
     BugCategory,
     BugDetectionConfig,
     BugDetector,
@@ -198,8 +130,6 @@ from Asgard.Heimdall.Quality.BugDetection import (
     BugSeverity,
     NullDereferenceDetector,
     UnreachableCodeDetector,
-)
-from Asgard.Heimdall.Quality.languages import (
     JSAnalysisConfig,
     JSAnalyzer,
     JSFinding,

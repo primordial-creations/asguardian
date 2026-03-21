@@ -14,12 +14,11 @@ Detects:
 import configparser
 import fnmatch
 import json
-import math
 import os
 from collections import defaultdict
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 import tomllib
 
@@ -32,83 +31,18 @@ from Asgard.Heimdall.Security.models.config_secrets_models import (
     ConfigSecretsConfig,
     ConfigSecretsReport,
 )
-
-
-# Values that look like placeholders and should be ignored
-PLACEHOLDER_FRAGMENTS = [
-    "${", "{{", "<", "changeme", "todo", "replace", "your-", "your_",
-    "example", "placeholder", "xxxxx", "00000", "insert",
-]
-
-
-def _is_placeholder(value: str) -> bool:
-    """Return True if a string looks like a placeholder, not a real secret."""
-    if not value:
-        return True
-    value_lower = value.lower()
-    for fragment in PLACEHOLDER_FRAGMENTS:
-        if fragment in value_lower:
-            return True
-    return False
-
-
-def _shannon_entropy(text: str) -> float:
-    """Calculate the Shannon entropy of a string."""
-    if not text:
-        return 0.0
-    freq: Dict[str, int] = {}
-    for char in text:
-        freq[char] = freq.get(char, 0) + 1
-    length = len(text)
-    entropy = 0.0
-    for count in freq.values():
-        probability = count / length
-        if probability > 0:
-            entropy -= probability * math.log2(probability)
-    return entropy
-
-
-def _mask_value(value: str) -> str:
-    """Return a masked version of the value for safe display."""
-    if len(value) <= 4:
-        return "****"
-    visible = max(2, len(value) // 6)
-    return value[:visible] + "****" + value[-visible:]
-
-
-def _is_credential_key(key: str, credential_key_names: List[str]) -> bool:
-    """Return True if the key name suggests it holds a credential."""
-    key_lower = key.lower()
-    for fragment in credential_key_names:
-        if fragment in key_lower:
-            return True
-    return False
-
-
-def _flatten_dict(
-    data: Any, prefix: str = ""
-) -> Iterator[Tuple[str, str, Any]]:
-    """
-    Recursively yield (context_path, key, value) tuples from a nested dict/list structure.
-
-    Args:
-        data: The data structure to flatten
-        prefix: Dot-notation path prefix for context
-    """
-    if isinstance(data, dict):
-        for key, value in data.items():
-            full_path = f"{prefix}.{key}" if prefix else key
-            if isinstance(value, (dict, list)):
-                yield from _flatten_dict(value, full_path)
-            else:
-                yield full_path, key, value
-    elif isinstance(data, list):
-        for idx, item in enumerate(data):
-            full_path = f"{prefix}[{idx}]"
-            if isinstance(item, (dict, list)):
-                yield from _flatten_dict(item, full_path)
-            else:
-                yield full_path, str(idx), item
+from Asgard.Heimdall.Security.services._config_secrets_helpers import (
+    flatten_dict,
+    is_credential_key,
+    is_placeholder,
+    mask_value,
+    shannon_entropy,
+)
+from Asgard.Heimdall.Security.services._config_secrets_report import (
+    generate_json_report,
+    generate_markdown_report,
+    generate_text_report,
+)
 
 
 class ConfigSecretsScanner:
@@ -180,16 +114,7 @@ class ConfigSecretsScanner:
     def _analyze_file(
         self, file_path: Path, root_path: Path
     ) -> List[ConfigSecretFinding]:
-        """
-        Analyze a single config file for hardcoded secrets.
-
-        Args:
-            file_path: Path to config file
-            root_path: Root path for calculating relative paths
-
-        Returns:
-            List of detected findings
-        """
+        """Analyze a single config file for hardcoded secrets."""
         suffix = file_path.suffix.lower()
 
         try:
@@ -227,21 +152,9 @@ class ConfigSecretsScanner:
         value: Any,
         context_path: str,
     ) -> List[ConfigSecretFinding]:
-        """
-        Check a key/value pair for potential secrets.
+        """Check a key/value pair for potential secrets."""
+        findings: List[ConfigSecretFinding] = []
 
-        Args:
-            file_path: Path to the config file
-            key: The key name
-            value: The value to check
-            context_path: Dot-notation path to this key
-
-        Returns:
-            List of findings (0, 1, or more)
-        """
-        findings = []
-
-        # Only check string values
         if not isinstance(value, str):
             return findings
 
@@ -249,15 +162,13 @@ class ConfigSecretsScanner:
         if not str_value:
             return findings
 
-        # Skip placeholders
-        if _is_placeholder(str_value):
+        if is_placeholder(str_value):
             return findings
 
         file_path_str = str(file_path.absolute())
 
-        # Check 1: credential key name with non-placeholder value
-        if _is_credential_key(key, self.config.credential_key_names):
-            masked = _mask_value(str_value)
+        if is_credential_key(key, self.config.credential_key_names):
+            masked = mask_value(str_value)
             findings.append(ConfigSecretFinding(
                 file_path=file_path_str,
                 key_name=key,
@@ -270,14 +181,12 @@ class ConfigSecretsScanner:
                     f"with a non-placeholder value: {masked}"
                 ),
             ))
-            # Return after credential key match to avoid duplicate
             return findings
 
-        # Check 2: high-entropy string regardless of key name
         if len(str_value) >= self.config.entropy_min_length:
-            entropy = _shannon_entropy(str_value)
+            entropy = shannon_entropy(str_value)
             if entropy > self.config.entropy_threshold:
-                masked = _mask_value(str_value)
+                masked = mask_value(str_value)
                 findings.append(ConfigSecretFinding(
                     file_path=file_path_str,
                     key_name=key,
@@ -337,7 +246,6 @@ class ConfigSecretsScanner:
                         self._check_value(file_path, key, value, context_path)
                     )
 
-            # Also check DEFAULT section
             for key, value in parser.defaults().items():
                 context_path = f"DEFAULT.{key}"
                 findings.extend(
@@ -352,29 +260,14 @@ class ConfigSecretsScanner:
     def _scan_data(
         self, file_path: Path, data: Any
     ) -> List[ConfigSecretFinding]:
-        """
-        Scan a parsed data structure for secrets.
-
-        Args:
-            file_path: Path to the config file
-            data: Parsed data (dict, list, etc.)
-
-        Returns:
-            List of detected findings
-        """
+        """Scan a parsed data structure for secrets."""
         findings = []
-        for context_path, key, value in _flatten_dict(data):
+        for context_path, key, value in flatten_dict(data):
             findings.extend(self._check_value(file_path, key, value, context_path))
         return findings
 
     def _analyze_directory(self, directory: Path, report: ConfigSecretsReport) -> None:
-        """
-        Analyze all config files in a directory.
-
-        Args:
-            directory: Directory to analyze
-            report: Report to add findings to
-        """
+        """Analyze all config files in a directory."""
         files_scanned = 0
 
         for root, dirs, files in os.walk(directory):
@@ -437,201 +330,10 @@ class ConfigSecretsScanner:
         """
         format_lower = output_format.lower()
         if format_lower == "json":
-            return self._generate_json_report(report)
+            return generate_json_report(report)
         elif format_lower in ("markdown", "md"):
-            return self._generate_markdown_report(report)
+            return generate_markdown_report(report)
         elif format_lower == "text":
-            return self._generate_text_report(report)
+            return generate_text_report(report)
         else:
             raise ValueError(f"Unsupported format: {output_format}. Use: text, json, markdown")
-
-    def _generate_text_report(self, report: ConfigSecretsReport) -> str:
-        """Generate plain text report."""
-        lines = [
-            "=" * 70,
-            "CONFIG SECRETS FINDINGS REPORT",
-            "=" * 70,
-            "",
-            f"Scan Path: {report.scan_path}",
-            f"Scan Time: {report.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Duration: {report.scan_duration_seconds:.2f} seconds",
-            f"Files Scanned: {report.files_scanned}",
-            "",
-            "SUMMARY",
-            "-" * 40,
-            f"Total Findings: {report.total_findings}",
-            f"Clean: {'Yes' if report.is_clean else 'No'}",
-            "",
-        ]
-
-        if report.has_findings:
-            lines.append("By Severity:")
-            for severity in [
-                ConfigSecretSeverity.CRITICAL,
-                ConfigSecretSeverity.HIGH,
-                ConfigSecretSeverity.MEDIUM,
-                ConfigSecretSeverity.LOW,
-            ]:
-                count = report.findings_by_severity.get(severity.value, 0)
-                if count > 0:
-                    lines.append(f"  {severity.value.upper()}: {count}")
-
-            lines.extend(["", "By Type:"])
-            for secret_type in ConfigSecretType:
-                count = report.findings_by_type.get(secret_type.value, 0)
-                if count > 0:
-                    lines.append(f"  {secret_type.value.replace('_', ' ').title()}: {count}")
-
-            if report.most_problematic_files:
-                lines.extend(["", "Most Problematic Files:", "-" * 40])
-                for file_path, count in report.most_problematic_files[:5]:
-                    filename = os.path.basename(file_path)
-                    lines.append(f"  {filename}: {count} findings")
-
-            lines.extend(["", "FINDINGS", "-" * 40])
-
-            for severity in [
-                ConfigSecretSeverity.CRITICAL,
-                ConfigSecretSeverity.HIGH,
-                ConfigSecretSeverity.MEDIUM,
-                ConfigSecretSeverity.LOW,
-            ]:
-                severity_findings = report.get_findings_by_severity(severity)
-                if severity_findings:
-                    lines.extend(["", f"[{severity.value.upper()}]"])
-                    for f in severity_findings:
-                        lines.append(f"  {f.location}")
-                        lines.append(f"    Key: {f.key_name}")
-                        lines.append(f"    Path: {f.context_path}")
-                        lines.append(f"    Value: {f.masked_value}")
-                        if f.entropy is not None:
-                            lines.append(f"    Entropy: {f.entropy:.2f}")
-                        lines.append(f"    Context: {f.context_description}")
-                        lines.append(f"    Fix: {f.remediation}")
-                        lines.append("")
-
-        lines.append("=" * 70)
-        return "\n".join(lines)
-
-    def _generate_json_report(self, report: ConfigSecretsReport) -> str:
-        """Generate JSON report."""
-        findings_data = []
-        for f in report.detected_findings:
-            findings_data.append({
-                "file_path": f.file_path,
-                "relative_path": f.relative_path,
-                "line_number": f.line_number,
-                "key_name": f.key_name,
-                "masked_value": f.masked_value,
-                "secret_type": f.secret_type if isinstance(f.secret_type, str) else f.secret_type.value,
-                "severity": f.severity if isinstance(f.severity, str) else f.severity.value,
-                "entropy": f.entropy,
-                "context_path": f.context_path,
-                "context_description": f.context_description,
-                "remediation": f.remediation,
-            })
-
-        report_data = {
-            "scan_info": {
-                "scan_path": report.scan_path,
-                "scanned_at": report.scanned_at.isoformat(),
-                "duration_seconds": report.scan_duration_seconds,
-                "files_scanned": report.files_scanned,
-            },
-            "summary": {
-                "total_findings": report.total_findings,
-                "is_clean": report.is_clean,
-                "findings_by_severity": report.findings_by_severity,
-                "findings_by_type": report.findings_by_type,
-            },
-            "findings": findings_data,
-            "most_problematic_files": [
-                {"file": fp, "finding_count": count}
-                for fp, count in report.most_problematic_files
-            ],
-        }
-
-        return json.dumps(report_data, indent=2)
-
-    def _generate_markdown_report(self, report: ConfigSecretsReport) -> str:
-        """Generate Markdown report."""
-        lines = [
-            "# Config Secrets Findings Report",
-            "",
-            f"**Scan Path:** `{report.scan_path}`",
-            f"**Generated:** {report.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}",
-            f"**Duration:** {report.scan_duration_seconds:.2f} seconds",
-            f"**Files Scanned:** {report.files_scanned}",
-            "",
-            "## Summary",
-            "",
-            f"**Total Findings:** {report.total_findings}",
-            f"**Clean:** {'Yes' if report.is_clean else 'No'}",
-            "",
-        ]
-
-        if report.has_findings:
-            lines.extend([
-                "### By Severity",
-                "",
-                "| Severity | Count |",
-                "|----------|-------|",
-            ])
-            for severity in [
-                ConfigSecretSeverity.CRITICAL,
-                ConfigSecretSeverity.HIGH,
-                ConfigSecretSeverity.MEDIUM,
-                ConfigSecretSeverity.LOW,
-            ]:
-                count = report.findings_by_severity.get(severity.value, 0)
-                lines.append(f"| {severity.value.title()} | {count} |")
-
-            lines.extend([
-                "",
-                "### By Type",
-                "",
-                "| Type | Count |",
-                "|------|-------|",
-            ])
-            for secret_type in ConfigSecretType:
-                count = report.findings_by_type.get(secret_type.value, 0)
-                if count > 0:
-                    lines.append(f"| {secret_type.value.replace('_', ' ').title()} | {count} |")
-
-            if report.most_problematic_files:
-                lines.extend(["", "## Most Problematic Files", ""])
-                for file_path, count in report.most_problematic_files[:10]:
-                    filename = os.path.basename(file_path)
-                    lines.append(f"- `{filename}`: {count} findings")
-
-            lines.extend(["", "## Findings", ""])
-
-            for severity in [
-                ConfigSecretSeverity.CRITICAL,
-                ConfigSecretSeverity.HIGH,
-                ConfigSecretSeverity.MEDIUM,
-                ConfigSecretSeverity.LOW,
-            ]:
-                severity_findings = report.get_findings_by_severity(severity)
-                if severity_findings:
-                    lines.extend([f"### {severity.value.title()} Severity", ""])
-                    for f in severity_findings[:20]:
-                        filename = os.path.basename(f.file_path)
-                        lines.extend([
-                            f"#### `{filename}` - `{f.key_name}`",
-                            "",
-                            f"**Key:** `{f.key_name}`",
-                            f"**Path:** `{f.context_path}`",
-                            f"**Masked Value:** `{f.masked_value}`",
-                        ])
-                        if f.entropy is not None:
-                            lines.append(f"**Entropy:** {f.entropy:.2f}")
-                        lines.extend([
-                            "",
-                            f"**Context:** {f.context_description}",
-                            "",
-                            f"**Remediation:** {f.remediation}",
-                            "",
-                        ])
-
-        return "\n".join(lines)

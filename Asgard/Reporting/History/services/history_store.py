@@ -10,7 +10,6 @@ in-process before writing to the database.
 """
 
 import json
-import sqlite3
 import uuid
 from datetime import datetime
 from pathlib import Path
@@ -23,33 +22,13 @@ from Asgard.Reporting.History.models.history_models import (
     TrendDirection,
     TrendReport,
 )
-
-_DB_PATH = Path.home() / ".asgard" / "history.db"
-
-_LOWER_IS_BETTER_METRICS = {
-    "duplication_percentage",
-    "cyclomatic_complexity",
-    "technical_debt_hours",
-    "critical_vulnerabilities",
-    "high_vulnerabilities",
-    "naming_violations",
-}
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS snapshots (
-    id TEXT PRIMARY KEY,
-    project_path TEXT NOT NULL,
-    scan_timestamp TEXT NOT NULL,
-    git_commit TEXT,
-    git_branch TEXT,
-    quality_gate_status TEXT,
-    ratings_json TEXT NOT NULL,
-    metrics_json TEXT NOT NULL
-);
-
-CREATE INDEX IF NOT EXISTS idx_snapshots_project ON snapshots (project_path);
-CREATE INDEX IF NOT EXISTS idx_snapshots_timestamp ON snapshots (project_path, scan_timestamp);
-"""
+from Asgard.Reporting.History.services._history_db import (
+    connect,
+    ensure_db,
+    get_default_db_path,
+    get_lower_is_better_metrics,
+    row_to_snapshot,
+)
 
 
 class HistoryStore:
@@ -80,8 +59,8 @@ class HistoryStore:
         Args:
             db_path: Path to the SQLite database file. Defaults to ~/.asgard/history.db.
         """
-        self._db_path = db_path or _DB_PATH
-        self._ensure_db()
+        self._db_path = db_path or get_default_db_path()
+        ensure_db(self._db_path)
 
     def save_snapshot(self, snapshot: AnalysisSnapshot) -> str:
         """
@@ -102,7 +81,7 @@ class HistoryStore:
             for m in snapshot.metrics
         ]
 
-        with self._connect() as conn:
+        with connect(self._db_path) as conn:
             conn.execute(
                 """
                 INSERT OR REPLACE INTO snapshots
@@ -139,7 +118,7 @@ class HistoryStore:
         """
         resolved = str(Path(project_path).resolve())
 
-        with self._connect() as conn:
+        with connect(self._db_path) as conn:
             cursor = conn.execute(
                 """
                 SELECT id, project_path, scan_timestamp, git_commit, git_branch,
@@ -153,7 +132,7 @@ class HistoryStore:
             )
             rows = cursor.fetchall()
 
-        return [self._row_to_snapshot(row) for row in rows]
+        return [row_to_snapshot(row) for row in rows]
 
     def get_latest_snapshot(self, project_path: str) -> Optional[AnalysisSnapshot]:
         """
@@ -276,7 +255,7 @@ class HistoryStore:
             TrendDirection value.
         """
         threshold = 5.0
-        lower_is_better = metric_name in _LOWER_IS_BETTER_METRICS
+        lower_is_better = metric_name in get_lower_is_better_metrics()
 
         if abs(change_percentage) < threshold:
             return TrendDirection.STABLE
@@ -289,62 +268,3 @@ class HistoryStore:
             if change_percentage >= threshold:
                 return TrendDirection.IMPROVING
             return TrendDirection.DEGRADING
-
-    def _ensure_db(self) -> None:
-        """Create the database and schema if they do not already exist."""
-        self._db_path.parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as conn:
-            conn.executescript(_SCHEMA)
-
-    def _connect(self) -> sqlite3.Connection:
-        """Open a database connection with WAL mode for concurrency safety."""
-        conn = sqlite3.connect(str(self._db_path))
-        conn.execute("PRAGMA journal_mode=WAL")
-        return conn
-
-    def _row_to_snapshot(self, row: tuple) -> AnalysisSnapshot:
-        """Convert a database row tuple into an AnalysisSnapshot."""
-        (
-            snapshot_id,
-            project_path,
-            scan_timestamp_str,
-            git_commit,
-            git_branch,
-            quality_gate_status,
-            ratings_json,
-            metrics_json,
-        ) = row
-
-        try:
-            scan_timestamp = datetime.fromisoformat(scan_timestamp_str)
-        except (ValueError, TypeError):
-            scan_timestamp = datetime.now()
-
-        try:
-            ratings = json.loads(ratings_json)
-        except (ValueError, TypeError):
-            ratings = {}
-
-        try:
-            metrics_data = json.loads(metrics_json)
-            metrics = [
-                MetricSnapshot(
-                    metric_name=m["metric_name"],
-                    value=float(m["value"]),
-                    unit=m.get("unit", ""),
-                )
-                for m in metrics_data
-            ]
-        except (ValueError, TypeError, KeyError):
-            metrics = []
-
-        return AnalysisSnapshot(
-            snapshot_id=snapshot_id,
-            project_path=project_path,
-            scan_timestamp=scan_timestamp,
-            git_commit=git_commit,
-            git_branch=git_branch,
-            quality_gate_status=quality_gate_status,
-            ratings=ratings,
-            metrics=metrics,
-        )

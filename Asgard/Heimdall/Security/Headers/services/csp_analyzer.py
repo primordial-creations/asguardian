@@ -4,7 +4,6 @@ Heimdall CSP Analyzer Service
 Service for analyzing Content-Security-Policy configurations.
 """
 
-import re
 import time
 from pathlib import Path
 from typing import List, Optional
@@ -12,8 +11,11 @@ from typing import List, Optional
 from Asgard.Heimdall.Security.Headers.models.header_models import (
     HeaderConfig,
     HeaderFinding,
-    HeaderFindingType,
     HeaderReport,
+)
+from Asgard.Heimdall.Security.Headers.services._csp_checks import (
+    analyze_csp,
+    check_inline_patterns,
 )
 from Asgard.Heimdall.Security.Headers.utilities.csp_parser import (
     ParsedCSP,
@@ -118,177 +120,21 @@ class CSPAnalyzer:
 
         for line_number, csp_value in csp_occurrences:
             parsed_csp = parse_csp(csp_value)
-            csp_findings = self._analyze_csp(parsed_csp, line_number, csp_value, lines, file_path, root_path)
+            csp_findings = analyze_csp(
+                parsed_csp,
+                line_number,
+                csp_value,
+                lines,
+                file_path,
+                root_path,
+                self.config.required_csp_directives,
+            )
             findings.extend(csp_findings)
 
-        inline_findings = self._check_inline_patterns(content, lines, file_path, root_path)
+        inline_findings = check_inline_patterns(
+            content, lines, file_path, root_path, self._is_in_comment
+        )
         findings.extend(inline_findings)
-
-        return findings
-
-    def _analyze_csp(
-        self,
-        csp: ParsedCSP,
-        line_number: int,
-        csp_value: str,
-        lines: List[str],
-        file_path: Path,
-        root_path: Path,
-    ) -> List[HeaderFinding]:
-        """
-        Analyze a parsed CSP for security issues.
-
-        Args:
-            csp: Parsed CSP object
-            line_number: Line number where CSP was found
-            csp_value: Raw CSP value
-            lines: File lines
-            file_path: Path to file
-            root_path: Root path
-
-        Returns:
-            List of findings
-        """
-        findings = []
-        code_snippet = extract_code_snippet(lines, line_number)
-
-        for directive_name, directive in csp.directives.items():
-            if directive.has_unsafe_inline:
-                findings.append(HeaderFinding(
-                    file_path=str(file_path.relative_to(root_path)),
-                    line_number=line_number,
-                    finding_type=HeaderFindingType.CSP_UNSAFE_INLINE,
-                    severity=SecuritySeverity.HIGH,
-                    title=f"CSP {directive_name} Uses unsafe-inline",
-                    description=f"The {directive_name} directive allows 'unsafe-inline' which defeats CSP protection against XSS.",
-                    code_snippet=code_snippet,
-                    header_name="Content-Security-Policy",
-                    header_value=csp_value[:200] if len(csp_value) > 200 else csp_value,
-                    cwe_id="CWE-79",
-                    confidence=0.9,
-                    remediation=f"Remove 'unsafe-inline' from {directive_name}. Use nonces or hashes for inline scripts/styles.",
-                    references=[
-                        "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-                        "https://cwe.mitre.org/data/definitions/79.html",
-                    ],
-                ))
-
-            if directive.has_unsafe_eval:
-                findings.append(HeaderFinding(
-                    file_path=str(file_path.relative_to(root_path)),
-                    line_number=line_number,
-                    finding_type=HeaderFindingType.CSP_UNSAFE_EVAL,
-                    severity=SecuritySeverity.HIGH,
-                    title=f"CSP {directive_name} Uses unsafe-eval",
-                    description=f"The {directive_name} directive allows 'unsafe-eval' which permits eval() and similar methods.",
-                    code_snippet=code_snippet,
-                    header_name="Content-Security-Policy",
-                    header_value=csp_value[:200] if len(csp_value) > 200 else csp_value,
-                    cwe_id="CWE-95",
-                    confidence=0.9,
-                    remediation=f"Remove 'unsafe-eval' from {directive_name}. Refactor code to avoid eval(), Function(), and similar.",
-                    references=[
-                        "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-                        "https://cwe.mitre.org/data/definitions/95.html",
-                    ],
-                ))
-
-            if directive.has_wildcard:
-                findings.append(HeaderFinding(
-                    file_path=str(file_path.relative_to(root_path)),
-                    line_number=line_number,
-                    finding_type=HeaderFindingType.CSP_WILDCARD_SOURCE,
-                    severity=SecuritySeverity.MEDIUM,
-                    title=f"CSP {directive_name} Uses Wildcard Source",
-                    description=f"The {directive_name} directive uses wildcard (*) which allows loading from any origin.",
-                    code_snippet=code_snippet,
-                    header_name="Content-Security-Policy",
-                    header_value=csp_value[:200] if len(csp_value) > 200 else csp_value,
-                    cwe_id="CWE-693",
-                    confidence=0.85,
-                    remediation=f"Replace wildcard in {directive_name} with specific trusted origins.",
-                    references=[
-                        "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-                    ],
-                ))
-
-        for missing_directive in csp.missing_recommended_directives:
-            if missing_directive in self.config.required_csp_directives:
-                findings.append(HeaderFinding(
-                    file_path=str(file_path.relative_to(root_path)),
-                    line_number=line_number,
-                    finding_type=HeaderFindingType.CSP_MISSING_DIRECTIVE,
-                    severity=SecuritySeverity.MEDIUM,
-                    title=f"CSP Missing {missing_directive} Directive",
-                    description=f"The Content-Security-Policy is missing the recommended {missing_directive} directive.",
-                    code_snippet=code_snippet,
-                    header_name="Content-Security-Policy",
-                    header_value=csp_value[:200] if len(csp_value) > 200 else csp_value,
-                    cwe_id="CWE-693",
-                    confidence=0.7,
-                    remediation=f"Add the {missing_directive} directive to your CSP policy.",
-                    references=[
-                        "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-                    ],
-                ))
-
-        return findings
-
-    def _check_inline_patterns(
-        self,
-        content: str,
-        lines: List[str],
-        file_path: Path,
-        root_path: Path,
-    ) -> List[HeaderFinding]:
-        """
-        Check for patterns that suggest CSP issues.
-
-        Args:
-            content: File content
-            lines: File lines
-            file_path: Path to file
-            root_path: Root path
-
-        Returns:
-            List of findings
-        """
-        findings = []
-
-        weak_csp_patterns = [
-            (r"default-src\s+['\"]?\*['\"]?", "default-src allows all sources"),
-            (r"script-src\s+['\"]?\*['\"]?", "script-src allows all sources"),
-            (r"Content-Security-Policy[^;]*['\"]?unsafe-inline['\"]?[^;]*script", "CSP allows inline scripts"),
-        ]
-
-        for pattern, issue_desc in weak_csp_patterns:
-            for match in re.finditer(pattern, content, re.IGNORECASE):
-                line_number, column = find_line_column(content, match.start())
-
-                if self._is_in_comment(lines, line_number):
-                    continue
-
-                code_snippet = extract_code_snippet(lines, line_number)
-
-                findings.append(HeaderFinding(
-                    file_path=str(file_path.relative_to(root_path)),
-                    line_number=line_number,
-                    column_start=column,
-                    column_end=column + len(match.group(0)),
-                    finding_type=HeaderFindingType.WEAK_CSP,
-                    severity=SecuritySeverity.HIGH,
-                    title="Weak Content-Security-Policy",
-                    description=f"Content-Security-Policy has a weak configuration: {issue_desc}.",
-                    code_snippet=code_snippet,
-                    header_name="Content-Security-Policy",
-                    cwe_id="CWE-693",
-                    confidence=0.8,
-                    remediation="Strengthen the CSP by using specific sources and removing unsafe directives.",
-                    references=[
-                        "https://developer.mozilla.org/en-US/docs/Web/HTTP/CSP",
-                        "https://csp-evaluator.withgoogle.com/",
-                    ],
-                ))
 
         return findings
 

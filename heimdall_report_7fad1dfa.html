@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - quality lazy-imports</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - quality lazy-imports</h1>
+  <pre>============================================================
+LAZY IMPORT VIOLATIONS REPORT
+============================================================
+
+Scan Path: /mnt/storage/home-data/Documents/GAIA/Asgard/Asgard_Test
+Scan Time: 2026-03-20 09:01:10
+Duration: 0.01 seconds
+Files Scanned: 23
+
+SUMMARY
+----------------------------------------
+Total Violations: 8
+Compliant: No
+
+By Severity:
+  HIGH: 5
+  MEDIUM: 3
+
+By Type:
+  Function: 5
+  Try Except: 3
+
+Most Problematic Files:
+----------------------------------------
+  validate_package.py: 7 violations
+  conftest.py: 1 violations
+
+VIOLATIONS
+----------------------------------------
+
+[HIGH]
+  conftest.py:57
+    Import: import math
+    Context: inside function 'normal_distribution_data'
+
+  validate_package.py:53
+    Import: from test_utils import create_temp_python_file, create_temp_json_file
+    Context: inside function 'validate_file_utils'
+
+  validate_package.py:79
+    Import: from test_utils import mock_playwright_page, mock_http_response
+    Context: inside function 'validate_mock_utils'
+
+  validate_package.py:105
+    Import: from test_utils import assert_json_valid, assert_approximate
+    Context: inside function 'validate_assertion_utils'
+
+  validate_package.py:134
+    Import: from test_utils import generate_python_class, generate_metrics_data
+    Context: inside function 'validate_generators'
+
+
+[MEDIUM]
+  validate_package.py:21
+    Import: import test_utils
+    Context: inside try/except block 'validate_imports'
+
+  validate_package.py:28
+    Import: from test_utils import file_utils, mock_utils, assertion_utils, generators
+    Context: inside try/except block 'validate_imports'
+
+  validate_package.py:35
+    Import: from test_utils import (
+    Context: inside try/except block 'validate_imports'
+
+============================================================
+</pre>
+</body>
+</html>

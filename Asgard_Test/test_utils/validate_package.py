@@ -6,11 +6,24 @@ Quick validation that all modules can be imported and basic functionality works.
 Run this script to verify the package is properly set up.
 """
 
+import importlib
 import sys
 from pathlib import Path
 
 # Add parent directory to path for imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from test_utils import (
+    assert_approximate,
+    assert_json_valid,
+    create_temp_json_file,
+    create_temp_python_file,
+    generate_metrics_data,
+    generate_python_class,
+    mock_http_response,
+    mock_playwright_page,
+)
+from test_utils import file_utils, mock_utils, assertion_utils, generators
 
 
 def validate_imports():
@@ -18,26 +31,25 @@ def validate_imports():
     print("Validating imports...")
 
     try:
-        import test_utils
+        importlib.import_module("test_utils")
         print("  ✓ test_utils package imported")
     except ImportError as e:
         print(f"  ✗ Failed to import test_utils: {e}")
         return False
 
     try:
-        from test_utils import file_utils, mock_utils, assertion_utils, generators
+        for submodule in ("test_utils.file_utils", "test_utils.mock_utils", "test_utils.assertion_utils", "test_utils.generators"):
+            importlib.import_module(submodule)
         print("  ✓ All submodules imported")
     except ImportError as e:
         print(f"  ✗ Failed to import submodules: {e}")
         return False
 
     try:
-        from test_utils import (
-            create_temp_python_file,
-            mock_playwright_page,
-            assert_json_valid,
-            generate_python_class,
-        )
+        for name in ("create_temp_python_file", "mock_playwright_page", "assert_json_valid", "generate_python_class"):
+            importlib.import_module("test_utils")
+            if not hasattr(importlib.import_module("test_utils"), name):
+                raise ImportError(f"{name} not found in test_utils")
         print("  ✓ All utility functions imported from root")
     except ImportError as e:
         print(f"  ✗ Failed to import functions: {e}")
@@ -49,8 +61,6 @@ def validate_imports():
 def validate_file_utils():
     """Validate file_utils functionality."""
     print("\nValidating file_utils...")
-
-    from test_utils import create_temp_python_file, create_temp_json_file
 
     try:
         # Create a Python file
@@ -76,8 +86,6 @@ def validate_mock_utils():
     """Validate mock_utils functionality."""
     print("\nValidating mock_utils...")
 
-    from test_utils import mock_playwright_page, mock_http_response
-
     try:
         # Create a mock page
         page = mock_playwright_page()
@@ -101,8 +109,6 @@ def validate_mock_utils():
 def validate_assertion_utils():
     """Validate assertion_utils functionality."""
     print("\nValidating assertion_utils...")
-
-    from test_utils import assert_json_valid, assert_approximate
 
     try:
         # Test JSON validation
@@ -130,8 +136,6 @@ def validate_assertion_utils():
 def validate_generators():
     """Validate generators functionality."""
     print("\nValidating generators...")
-
-    from test_utils import generate_python_class, generate_metrics_data
 
     try:
         # Test Python class generation
@@ -172,7 +176,7 @@ def main():
 
     all_passed = True
     for name, passed in results:
-        status = "✓ PASSED" if passed else "✗ FAILED"
+        status = "PASSED" if passed else "FAILED"
         print(f"  {name:20s} {status}")
         if not passed:
             all_passed = False
@@ -180,10 +184,10 @@ def main():
     print("=" * 60)
 
     if all_passed:
-        print("\n✓ All validations passed! Package is ready to use.")
+        print("\nAll validations passed! Package is ready to use.")
         return 0
     else:
-        print("\n✗ Some validations failed. Check errors above.")
+        print("\nSome validations failed. Check errors above.")
         return 1
 
 

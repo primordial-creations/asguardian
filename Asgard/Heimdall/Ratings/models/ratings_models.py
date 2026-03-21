@@ -89,7 +89,7 @@ class RatingsConfig(BaseModel):
     """Configuration for the ratings calculator."""
     scan_path: Path = Field(default_factory=lambda: Path("."), description="Root path to rate")
     debt_thresholds: DebtThresholds = Field(
-        default_factory=DebtThresholds,
+        default_factory=DebtThresholds,  # type: ignore[arg-type]
         description="Thresholds used for maintainability rating"
     )
     enable_maintainability: bool = Field(True, description="Enable maintainability rating")

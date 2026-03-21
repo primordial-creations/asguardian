@@ -15,6 +15,13 @@ from Asgard.Freya.Integration.models.integration_models import (
     BaselineConfig,
     BaselineEntry,
 )
+from Asgard.Freya.Integration.services._baseline_manager_helpers import (
+    calculate_hash,
+    generate_key,
+    load_index,
+    save_index,
+    version_baseline,
+)
 from Asgard.Freya.Visual.models.visual_models import ComparisonConfig
 from Asgard.Freya.Visual.services import ScreenshotCapture, VisualRegressionTester
 
@@ -41,20 +48,11 @@ class BaselineManager:
 
     def _load_index(self) -> None:
         """Load baseline index from file."""
-        if self.index_file.exists():
-            with open(self.index_file, "r") as f:
-                data = json.load(f)
-                self.baselines: Dict[str, BaselineEntry] = {
-                    k: BaselineEntry(**v) for k, v in data.items()
-                }
-        else:
-            self.baselines = {}
+        self.baselines: Dict[str, BaselineEntry] = load_index(self.index_file)
 
     def _save_index(self) -> None:
         """Save baseline index to file."""
-        data = {k: v.model_dump() for k, v in self.baselines.items()}
-        with open(self.index_file, "w") as f:
-            json.dump(data, f, indent=2, default=str)
+        save_index(self.index_file, self.baselines)
 
     async def create_baseline(
         self,
@@ -87,7 +85,7 @@ class BaselineManager:
         else:
             screenshot = await capture.capture_full_page(url)
 
-        baseline_key = self._generate_key(url, name, device)
+        baseline_key = generate_key(url, name, device)
         baseline_dir = self.storage_dir / baseline_key
         baseline_dir.mkdir(parents=True, exist_ok=True)
 
@@ -96,7 +94,7 @@ class BaselineManager:
 
         shutil.copy(screenshot.file_path, baseline_path)
 
-        image_hash = self._calculate_hash(str(baseline_path))
+        image_hash = calculate_hash(str(baseline_path))
 
         entry = BaselineEntry(
             url=url,
@@ -118,7 +116,9 @@ class BaselineManager:
         self._save_index()
 
         if self.config.version_baselines:
-            self._version_baseline(baseline_key, str(baseline_path))
+            version_baseline(
+                self.storage_dir, baseline_key, str(baseline_path), self.config.max_versions
+            )
 
         return entry
 
@@ -139,7 +139,7 @@ class BaselineManager:
         Returns:
             Updated BaselineEntry
         """
-        baseline_key = self._generate_key(url, name, device)
+        baseline_key = generate_key(url, name, device)
 
         if baseline_key in self.baselines:
             existing = self.baselines[baseline_key]
@@ -170,7 +170,7 @@ class BaselineManager:
         Returns:
             Comparison result dict
         """
-        baseline_key = self._generate_key(url, name, device)
+        baseline_key = generate_key(url, name, device)
 
         if baseline_key not in self.baselines:
             return {
@@ -214,15 +214,7 @@ class BaselineManager:
         }
 
     def list_baselines(self, url: Optional[str] = None) -> List[BaselineEntry]:
-        """
-        List all baselines.
-
-        Args:
-            url: Optional URL filter
-
-        Returns:
-            List of baseline entries
-        """
+        """List all baselines."""
         if url:
             return [b for b in self.baselines.values() if b.url == url]
         return list(self.baselines.values())
@@ -233,18 +225,8 @@ class BaselineManager:
         name: str,
         device: Optional[str] = None
     ) -> Optional[BaselineEntry]:
-        """
-        Get a specific baseline.
-
-        Args:
-            url: URL
-            name: Baseline name
-            device: Optional device name
-
-        Returns:
-            BaselineEntry if found
-        """
-        baseline_key = self._generate_key(url, name, device)
+        """Get a specific baseline."""
+        baseline_key = generate_key(url, name, device)
         return self.baselines.get(baseline_key)
 
     def delete_baseline(
@@ -253,18 +235,8 @@ class BaselineManager:
         name: str,
         device: Optional[str] = None
     ) -> bool:
-        """
-        Delete a baseline.
-
-        Args:
-            url: URL
-            name: Baseline name
-            device: Optional device name
-
-        Returns:
-            True if deleted
-        """
-        baseline_key = self._generate_key(url, name, device)
+        """Delete a baseline."""
+        baseline_key = generate_key(url, name, device)
 
         if baseline_key not in self.baselines:
             return False
@@ -290,18 +262,8 @@ class BaselineManager:
         name: str,
         device: Optional[str] = None
     ) -> List[str]:
-        """
-        Get all versions of a baseline.
-
-        Args:
-            url: URL
-            name: Baseline name
-            device: Optional device name
-
-        Returns:
-            List of version paths
-        """
-        baseline_key = self._generate_key(url, name, device)
+        """Get all versions of a baseline."""
+        baseline_key = generate_key(url, name, device)
         versions_dir = self.storage_dir / baseline_key / "versions"
 
         if not versions_dir.exists():
@@ -312,29 +274,14 @@ class BaselineManager:
 
     def _generate_key(self, url: str, name: str, device: Optional[str]) -> str:
         """Generate a unique key for a baseline."""
-        key_parts = [url, name]
-        if device:
-            key_parts.append(device)
-
-        key_string = ":".join(key_parts)
-        return hashlib.md5(key_string.encode()).hexdigest()[:16]
+        return generate_key(url, name, device)
 
     def _calculate_hash(self, image_path: str) -> str:
         """Calculate hash of an image file."""
-        with open(image_path, "rb") as f:
-            return hashlib.sha256(f.read()).hexdigest()[:32]
+        return calculate_hash(image_path)
 
     def _version_baseline(self, baseline_key: str, screenshot_path: str) -> None:
         """Create a versioned copy of a baseline."""
-        versions_dir = self.storage_dir / baseline_key / "versions"
-        versions_dir.mkdir(parents=True, exist_ok=True)
-
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        version_path = versions_dir / f"v_{timestamp}.png"
-
-        shutil.copy(screenshot_path, version_path)
-
-        versions = sorted(versions_dir.glob("*.png"))
-        if len(versions) > self.config.max_versions:
-            for old_version in versions[:-self.config.max_versions]:
-                old_version.unlink()
+        version_baseline(
+            self.storage_dir, baseline_key, screenshot_path, self.config.max_versions
+        )

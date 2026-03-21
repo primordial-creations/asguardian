@@ -148,7 +148,7 @@ class SmellConfig(BaseModel):
         description="Minimum severity to report"
     )
     thresholds: SmellThresholds = Field(
-        default_factory=SmellThresholds,
+        default_factory=SmellThresholds,  # type: ignore[arg-type]
         description="Detection thresholds"
     )
     output_format: str = Field("text", description="Output format: text, json, markdown, html")

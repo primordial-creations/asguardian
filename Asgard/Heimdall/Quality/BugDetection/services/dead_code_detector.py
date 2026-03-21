@@ -124,7 +124,7 @@ class DeadCodeDetector:
     # ── 2. Unused module-level private variables ──────────────────────────────
 
     def _detect_unused_module_vars(
-        self, tree: ast.AST, fp: str, lines: List[str]
+        self, tree: ast.Module, fp: str, lines: List[str]
     ) -> List[BugFinding]:
         """
         Detect module-level private variables (_VAR = ...) that are never

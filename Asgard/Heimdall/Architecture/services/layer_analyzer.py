@@ -4,11 +4,9 @@ Heimdall Layer Analyzer Service
 Analyzes adherence to layered architecture patterns.
 """
 
-import ast
-import json
 import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional, cast
 
 from Asgard.Heimdall.Architecture.models.architecture_models import (
     ArchitectureConfig,
@@ -17,8 +15,19 @@ from Asgard.Heimdall.Architecture.models.architecture_models import (
     LayerViolation,
     ViolationSeverity,
 )
-from Asgard.Heimdall.Architecture.utilities.ast_utils import get_imports
 from Asgard.Heimdall.Quality.utilities.file_utils import scan_directory
+from Asgard.Heimdall.Architecture.services._layer_reporter import (
+    generate_text_report as _gen_text,
+    generate_json_report as _gen_json,
+    generate_markdown_report as _gen_markdown,
+)
+from Asgard.Heimdall.Architecture.services._layer_checks import (
+    path_to_module as _path_to_module_fn,
+    get_layer_for_import as _get_layer_for_import,
+    calculate_severity as _calculate_severity,
+    check_layer_violation as _check_layer_violation,
+    analyze_file as _analyze_file_fn,
+)
 
 
 class LayerAnalyzer:
@@ -155,95 +164,21 @@ class LayerAnalyzer:
 
     def _path_to_module(self, file_path: Path, root_path: Path) -> Optional[str]:
         """Convert file path to module name."""
-        try:
-            relative = file_path.relative_to(root_path)
-            parts = list(relative.parts)
-
-            if parts[-1].endswith(".py"):
-                parts[-1] = parts[-1][:-3]
-
-            if parts[-1] == "__init__":
-                parts = parts[:-1]
-
-            if not parts:
-                return None
-
-            return ".".join(parts)
-        except ValueError:
-            return None
+        return _path_to_module_fn(file_path, root_path)
 
     def _analyze_file(
         self,
         file_path: Path,
         root_path: Path,
         module_layers: Dict[str, str],
-        layers: List[LayerDefinition]
+        layers: List[LayerDefinition],
     ) -> List[LayerViolation]:
         """Analyze a single file for layer violations."""
-        violations = []
+        return _analyze_file_fn(file_path, root_path, module_layers, layers)
 
-        source = file_path.read_text(encoding="utf-8", errors="ignore")
-        source_module = self._path_to_module(file_path, root_path)
-
-        if not source_module:
-            return violations
-
-        source_layer = module_layers.get(source_module)
-        if not source_layer:
-            return violations
-
-        # Get layer definition
-        source_layer_def = next(
-            (l for l in layers if l.name == source_layer), None
-        )
-        if not source_layer_def:
-            return violations
-
-        # Parse imports
-        imports, from_imports = get_imports(source)
-
-        # Check direct imports
-        for imp in imports:
-            target_layer = self._get_layer_for_import(imp, module_layers)
-            if target_layer:
-                violation = self._check_layer_violation(
-                    source_module, source_layer, source_layer_def,
-                    imp, target_layer,
-                    file_path, 0, layers
-                )
-                if violation:
-                    violations.append(violation)
-
-        # Check from imports
-        for module, names in from_imports.items():
-            target_layer = self._get_layer_for_import(module, module_layers)
-            if target_layer:
-                violation = self._check_layer_violation(
-                    source_module, source_layer, source_layer_def,
-                    module, target_layer,
-                    file_path, 0, layers
-                )
-                if violation:
-                    violations.append(violation)
-
-        return violations
-
-    def _get_layer_for_import(
-        self,
-        import_name: str,
-        module_layers: Dict[str, str]
-    ) -> Optional[str]:
+    def _get_layer_for_import(self, import_name: str, module_layers: Dict[str, str]) -> Optional[str]:
         """Get the layer for an imported module."""
-        # Try exact match
-        if import_name in module_layers:
-            return module_layers[import_name]
-
-        # Try prefix match
-        for module, layer in module_layers.items():
-            if module.startswith(import_name + ".") or import_name.startswith(module + "."):
-                return layer
-
-        return None
+        return _get_layer_for_import(import_name, module_layers)
 
     def _check_layer_violation(
         self,
@@ -254,57 +189,19 @@ class LayerAnalyzer:
         target_layer: str,
         file_path: Path,
         line_number: int,
-        layers: List[LayerDefinition]
+        layers: List[LayerDefinition],
     ) -> Optional[LayerViolation]:
         """Check if an import violates layer rules."""
-        if source_layer == target_layer:
-            return None  # Same layer is OK
-
-        # Check if target is in allowed dependencies
-        if target_layer in source_layer_def.allowed_dependencies:
-            return None
-
-        # This is a violation
-        severity = self._calculate_severity(source_layer, target_layer, layers)
-
-        return LayerViolation(
-            source_module=source_module,
-            source_layer=source_layer,
-            target_module=target_module,
-            target_layer=target_layer,
-            file_path=str(file_path),
-            line_number=line_number,
-            message=f"Layer '{source_layer}' should not depend on '{target_layer}'",
-            severity=severity,
+        return _check_layer_violation(
+            source_module, source_layer, source_layer_def,
+            target_module, target_layer, file_path, line_number, layers
         )
 
     def _calculate_severity(
-        self,
-        source_layer: str,
-        target_layer: str,
-        layers: List[LayerDefinition]
+        self, source_layer: str, target_layer: str, layers: List[LayerDefinition]
     ) -> ViolationSeverity:
         """Calculate violation severity based on layer distance."""
-        layer_names = [l.name for l in layers]
-
-        if source_layer not in layer_names or target_layer not in layer_names:
-            return ViolationSeverity.MODERATE
-
-        source_idx = layer_names.index(source_layer)
-        target_idx = layer_names.index(target_layer)
-
-        # Upward dependency (lower layer depending on higher)
-        if source_idx > target_idx:
-            distance = source_idx - target_idx
-            if distance >= 3:
-                return ViolationSeverity.CRITICAL
-            elif distance >= 2:
-                return ViolationSeverity.HIGH
-            else:
-                return ViolationSeverity.MODERATE
-
-        # Downward but not allowed
-        return ViolationSeverity.LOW
+        return _calculate_severity(source_layer, target_layer, layers)
 
     def get_layer_summary(
         self,
@@ -359,139 +256,15 @@ class LayerAnalyzer:
         for layer in layers:
             for pattern in layer.patterns:
                 if pattern.lower() in parts:
-                    return layer.name
+                    return cast(str, layer.name)
 
         return None
 
     def generate_report(self, result: LayerReport, format: str = "text") -> str:
-        """
-        Generate a formatted report.
-
-        Args:
-            result: LayerReport to format
-            format: Output format ("text", "json", "markdown")
-
-        Returns:
-            Formatted report string
-        """
+        """Generate a formatted report."""
         if format == "json":
-            return self._generate_json_report(result)
+            return _gen_json(result)
         elif format == "markdown":
-            return self._generate_markdown_report(result)
+            return _gen_markdown(result)
         else:
-            return self._generate_text_report(result)
-
-    def _generate_text_report(self, result: LayerReport) -> str:
-        """Generate text format report."""
-        lines = []
-        lines.append("")
-        lines.append("=" * 70)
-        lines.append("  HEIMDALL LAYER ARCHITECTURE REPORT")
-        lines.append("=" * 70)
-        lines.append("")
-        lines.append(f"  Scan Path:        {result.scan_path}")
-        lines.append(f"  Total Violations: {result.total_violations}")
-        lines.append(f"  Architecture:     {'VALID' if result.is_valid else 'INVALID'}")
-        lines.append("")
-
-        # Layer definitions
-        lines.append("-" * 70)
-        lines.append("  LAYER DEFINITIONS")
-        lines.append("-" * 70)
-        lines.append("")
-
-        for layer in result.layers:
-            lines.append(f"  {layer.name}")
-            lines.append(f"    Patterns: {', '.join(layer.patterns)}")
-            lines.append(f"    Allowed:  {', '.join(layer.allowed_dependencies) or '(none)'}")
-            lines.append("")
-
-        # Violations
-        if result.violations:
-            lines.append("-" * 70)
-            lines.append("  VIOLATIONS")
-            lines.append("-" * 70)
-            lines.append("")
-
-            for v in result.violations:
-                lines.append(f"  [{v.severity.value.upper()}] {v.message}")
-                lines.append(f"    Source: {v.source_module} ({v.source_layer})")
-                lines.append(f"    Target: {v.target_module} ({v.target_layer})")
-                lines.append(f"    File:   {v.file_path}")
-                lines.append("")
-
-        lines.append("=" * 70)
-        return "\n".join(lines)
-
-    def _generate_json_report(self, result: LayerReport) -> str:
-        """Generate JSON format report."""
-        output = {
-            "scan_path": result.scan_path,
-            "scanned_at": result.scanned_at.isoformat(),
-            "is_valid": result.is_valid,
-            "total_violations": result.total_violations,
-            "layers": [
-                {
-                    "name": l.name,
-                    "patterns": l.patterns,
-                    "allowed_dependencies": l.allowed_dependencies,
-                    "description": l.description,
-                }
-                for l in result.layers
-            ],
-            "layer_assignments": result.layer_assignments,
-            "violations": [
-                {
-                    "source_module": v.source_module,
-                    "source_layer": v.source_layer,
-                    "target_module": v.target_module,
-                    "target_layer": v.target_layer,
-                    "file_path": v.file_path,
-                    "line_number": v.line_number,
-                    "message": v.message,
-                    "severity": v.severity.value,
-                }
-                for v in result.violations
-            ],
-        }
-
-        return json.dumps(output, indent=2)
-
-    def _generate_markdown_report(self, result: LayerReport) -> str:
-        """Generate Markdown format report."""
-        lines = []
-        lines.append("# Heimdall Layer Architecture Report")
-        lines.append("")
-        lines.append(f"- **Scan Path:** `{result.scan_path}`")
-        lines.append(f"- **Architecture Status:** {'Valid' if result.is_valid else 'Invalid'}")
-        lines.append(f"- **Total Violations:** {result.total_violations}")
-        lines.append("")
-
-        lines.append("## Layer Definitions")
-        lines.append("")
-        lines.append("| Layer | Patterns | Allowed Dependencies |")
-        lines.append("|-------|----------|---------------------|")
-
-        for layer in result.layers:
-            lines.append(
-                f"| {layer.name} | {', '.join(layer.patterns)} | "
-                f"{', '.join(layer.allowed_dependencies) or '(none)'} |"
-            )
-
-        lines.append("")
-
-        if result.violations:
-            lines.append("## Violations")
-            lines.append("")
-            lines.append("| Source | Target | Severity | Message |")
-            lines.append("|--------|--------|----------|---------|")
-
-            for v in result.violations:
-                lines.append(
-                    f"| {v.source_module} | {v.target_module} | "
-                    f"{v.severity.value.upper()} | {v.message} |"
-                )
-
-            lines.append("")
-
-        return "\n".join(lines)
+            return _gen_text(result)

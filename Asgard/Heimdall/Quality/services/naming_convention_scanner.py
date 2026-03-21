@@ -16,12 +16,10 @@ Rules enforced:
 
 import ast
 import fnmatch
-import json
 import os
-import re
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Tuple
+from typing import List, Optional
 
 from Asgard.Heimdall.Quality.models.naming_models import (
     NamingConfig,
@@ -29,48 +27,18 @@ from Asgard.Heimdall.Quality.models.naming_models import (
     NamingReport,
     NamingViolation,
 )
-
-# Regex patterns for naming conventions
-_RE_SNAKE_CASE = re.compile(r"^_*[a-z][a-z0-9_]*$|^_+$")
-_RE_PASCAL_CASE = re.compile(r"^_*[A-Z][a-zA-Z0-9]*$")
-_RE_UPPER_CASE = re.compile(r"^_*[A-Z][A-Z0-9_]*$")
-# Type alias: single uppercase letter, optionally followed by digits, or common generics
-_RE_TYPE_ALIAS = re.compile(r"^[A-Z][A-Z0-9]?$|^T_[A-Z]|^TypeVar")
-
-
-def _is_snake_case(name: str) -> bool:
-    """Return True if name follows snake_case convention."""
-    return bool(_RE_SNAKE_CASE.match(name))
-
-
-def _is_pascal_case(name: str) -> bool:
-    """Return True if name follows PascalCase convention."""
-    return bool(_RE_PASCAL_CASE.match(name))
-
-
-def _is_upper_case(name: str) -> bool:
-    """Return True if name follows UPPER_CASE convention."""
-    return bool(_RE_UPPER_CASE.match(name))
-
-
-def _is_dunder(name: str) -> bool:
-    """Return True if name is a dunder (double underscore on both sides)."""
-    return name.startswith("__") and name.endswith("__")
-
-
-def _is_type_alias(name: str) -> bool:
-    """Return True if name looks like a type alias (single uppercase letter, etc.)."""
-    return bool(_RE_TYPE_ALIAS.match(name))
-
-
-def _looks_like_constant(name: str) -> bool:
-    """
-    Determine whether a module-level assignment target looks like a constant.
-
-    A name is treated as a constant if it is entirely uppercase (with optional
-    underscores and digits), indicating an intentional constant per PEP 8.
-    """
-    return bool(re.match(r"^[A-Z][A-Z0-9_]*$", name))
+from Asgard.Heimdall.Quality.services._naming_helpers import (
+    _is_dunder,
+    _is_pascal_case,
+    _is_snake_case,
+    check_ann_assignment,
+    check_module_assignment,
+)
+from Asgard.Heimdall.Quality.services._naming_report import (
+    generate_json_report,
+    generate_markdown_report,
+    generate_text_report,
+)
 
 
 class NamingConventionScanner:
@@ -153,7 +121,6 @@ class NamingConventionScanner:
         violations: List[NamingViolation] = []
         str_path = str(file_path)
 
-        # Check top-level and nested definitions
         self._check_module(tree, str_path, violations)
 
         return violations
@@ -176,7 +143,7 @@ class NamingConventionScanner:
 
     def _check_function(
         self,
-        node: ast.FunctionDef,
+        node: ast.FunctionDef | ast.AsyncFunctionDef,
         file_path: str,
         violations: List[NamingViolation],
         in_class: bool = False,
@@ -203,7 +170,6 @@ class NamingConventionScanner:
                 ),
             ))
 
-        # Recurse into nested functions
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if self.config.check_functions:
@@ -228,7 +194,6 @@ class NamingConventionScanner:
                 description=f"Class '{name}' does not follow PascalCase convention",
             ))
 
-        # Check methods inside the class
         for child in ast.iter_child_nodes(node):
             if isinstance(child, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 if self.config.check_functions:
@@ -241,62 +206,13 @@ class NamingConventionScanner:
         self, node: ast.Assign, file_path: str, violations: List[NamingViolation]
     ) -> None:
         """Check module-level assignment targets for naming compliance."""
-        for target in node.targets:
-            if isinstance(target, ast.Name):
-                self._check_assignment_name(
-                    target.id, target.lineno if hasattr(target, 'lineno') else node.lineno,
-                    file_path, violations
-                )
+        check_module_assignment(node, file_path, violations, self.config)
 
     def _check_ann_assignment(
         self, node: ast.AnnAssign, file_path: str, violations: List[NamingViolation]
     ) -> None:
         """Check annotated module-level assignment targets for naming compliance."""
-        target = node.target
-        if isinstance(target, ast.Name):
-            self._check_assignment_name(
-                target.id, target.lineno if hasattr(target, 'lineno') else node.lineno,
-                file_path, violations
-            )
-
-    def _check_assignment_name(
-        self,
-        name: str,
-        line_number: int,
-        file_path: str,
-        violations: List[NamingViolation],
-    ) -> None:
-        """Check a single assignment target name against naming rules."""
-        if name in self.config.allow_list:
-            return
-
-        if _is_dunder(name):
-            return
-
-        if _is_type_alias(name):
-            return
-
-        # Determine if this looks like a constant (all uppercase)
-        if _looks_like_constant(name):
-            if self.config.check_constants and not _is_upper_case(name):
-                violations.append(NamingViolation(
-                    file_path=file_path,
-                    line_number=line_number,
-                    element_type="constant",
-                    element_name=name,
-                    expected_convention=NamingConvention.UPPER_CASE,
-                    description=f"Constant '{name}' does not follow UPPER_CASE convention",
-                ))
-        else:
-            if self.config.check_variables and not _is_snake_case(name):
-                violations.append(NamingViolation(
-                    file_path=file_path,
-                    line_number=line_number,
-                    element_type="variable",
-                    element_name=name,
-                    expected_convention=NamingConvention.SNAKE_CASE,
-                    description=f"Variable '{name}' does not follow snake_case convention",
-                ))
+        check_ann_assignment(node, file_path, violations, self.config)
 
     def _should_analyze_file(self, filename: str) -> bool:
         """Determine whether a file should be analyzed."""
@@ -333,119 +249,12 @@ class NamingConventionScanner:
         """
         format_lower = output_format.lower()
         if format_lower == "json":
-            return self._generate_json_report(report)
+            return generate_json_report(report)
         elif format_lower in ("markdown", "md"):
-            return self._generate_markdown_report(report)
+            return generate_markdown_report(report)
         elif format_lower == "text":
-            return self._generate_text_report(report)
+            return generate_text_report(report)
         else:
             raise ValueError(
                 f"Unsupported format: {output_format}. Use: text, json, markdown"
             )
-
-    def _generate_text_report(self, report: NamingReport) -> str:
-        """Generate plain text report."""
-        lines = [
-            "=" * 60,
-            "NAMING CONVENTION REPORT",
-            "=" * 60,
-            "",
-            f"Scan Path: {report.scan_path}",
-            f"Scan Time: {report.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}",
-            f"Duration: {report.scan_duration_seconds:.2f} seconds",
-            "",
-            "SUMMARY",
-            "-" * 40,
-            f"Total Violations: {report.total_violations}",
-            f"Files With Violations: {report.files_with_violations}",
-            "",
-        ]
-
-        if report.violations_by_type:
-            lines.append("Violations by Type:")
-            for element_type, count in sorted(report.violations_by_type.items()):
-                lines.append(f"  {element_type}: {count}")
-            lines.append("")
-
-        if report.has_violations:
-            lines.extend(["VIOLATIONS", "-" * 40, ""])
-            for file_path, violations in sorted(report.file_results.items()):
-                if not violations:
-                    continue
-                lines.append(f"  {file_path}")
-                for v in sorted(violations, key=lambda x: x.line_number):
-                    lines.append(f"    Line {v.line_number:4d}: [{v.element_type}] {v.element_name}")
-                    lines.append(f"             {v.description}")
-                lines.append("")
-        else:
-            lines.extend(["No naming violations found.", ""])
-
-        lines.append("=" * 60)
-        return "\n".join(lines)
-
-    def _generate_json_report(self, report: NamingReport) -> str:
-        """Generate JSON report."""
-        def serialize_violation(v: NamingViolation) -> Dict:
-            return {
-                "file_path": v.file_path,
-                "line_number": v.line_number,
-                "element_type": v.element_type,
-                "element_name": v.element_name,
-                "expected_convention": v.expected_convention,
-                "description": v.description,
-            }
-
-        output = {
-            "scan_info": {
-                "scan_path": report.scan_path,
-                "scanned_at": report.scanned_at.isoformat(),
-                "duration_seconds": report.scan_duration_seconds,
-            },
-            "summary": {
-                "total_violations": report.total_violations,
-                "files_with_violations": report.files_with_violations,
-                "violations_by_type": report.violations_by_type,
-            },
-            "file_results": {
-                file_path: [serialize_violation(v) for v in violations]
-                for file_path, violations in sorted(report.file_results.items())
-                if violations
-            },
-        }
-
-        return json.dumps(output, indent=2)
-
-    def _generate_markdown_report(self, report: NamingReport) -> str:
-        """Generate Markdown report."""
-        lines = [
-            "# Naming Convention Report",
-            "",
-            f"**Scan Path:** `{report.scan_path}`",
-            f"**Generated:** {report.scanned_at.strftime('%Y-%m-%d %H:%M:%S')}",
-            f"**Duration:** {report.scan_duration_seconds:.2f} seconds",
-            "",
-            "## Summary",
-            "",
-            f"| Metric | Value |",
-            f"|--------|-------|",
-            f"| Total Violations | {report.total_violations} |",
-            f"| Files With Violations | {report.files_with_violations} |",
-            "",
-        ]
-
-        if report.has_violations:
-            lines.extend(["## Violations", ""])
-            for file_path, violations in sorted(report.file_results.items()):
-                if not violations:
-                    continue
-                lines.extend([f"### `{file_path}`", ""])
-                for v in sorted(violations, key=lambda x: x.line_number):
-                    lines.append(
-                        f"- Line {v.line_number}: `{v.element_name}` "
-                        f"[{v.element_type}] - {v.description}"
-                    )
-                lines.append("")
-        else:
-            lines.extend(["No naming violations found.", ""])
-
-        return "\n".join(lines)

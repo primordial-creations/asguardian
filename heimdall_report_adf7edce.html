@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - quality env-fallback</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - quality env-fallback</h1>
+  <pre>======================================================================
+ENVIRONMENT VARIABLE FALLBACK VIOLATIONS REPORT
+======================================================================
+
+Scan Path: /mnt/storage/home-data/Documents/GAIA/Asgard/Asgard
+Scan Time: 2026-03-20 09:23:25
+Duration: 1.03 seconds
+Files Scanned: 627
+
+SUMMARY
+----------------------------------------
+Total Violations: 1
+Compliant: No
+
+By Severity:
+  HIGH: 1
+
+By Type:
+  Config Get Default: 1
+
+Most Problematic Files:
+----------------------------------------
+  compose_generator.py: 1 violations
+
+VIOLATIONS
+----------------------------------------
+
+[HIGH]
+  compose_generator.py:435
+    Code: config = env_configs.get(environment, env_configs["development"])
+    Default: &lt;expression&gt;
+    Context: Config/secrets fallback in class ComposeProjectGenerator, function _build_override_dict
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+======================================================================
+</pre>
+</body>
+</html>

@@ -180,8 +180,8 @@ class ExceptionQualityDetector:
             isinstance(handler.type, ast.Name)
             and handler.type.id in ("Exception", "BaseException")
         )
-        if is_broad and not _handler_has_bare_reraise(handler):
-            broad_name = handler.type.id  # type: ignore[union-attr]
+        if is_broad and not _handler_has_bare_reraise(handler) and isinstance(handler.type, ast.Name):
+            broad_name = handler.type.id
             findings.append(BugFinding(
                 file_path=fp,
                 line_number=handler.lineno,

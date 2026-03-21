@@ -1,0 +1,1197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - oop analyze</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - oop analyze</h1>
+  <pre>
+======================================================================
+  HEIMDALL OOP METRICS REPORT
+======================================================================
+
+  Scan Path:    /mnt/storage/home-data/Documents/GAIA/Asgard/Asgard
+  Scanned At:   2026-03-20 11:24:49
+  Duration:     10.84s
+
+  METRIC DEFINITIONS
+  -----------------------------------------------
+  Coupling Between Objects (CBO): Number of classes a class is coupled to.
+    High CBO means the class is hard to reuse and changes ripple widely.
+  Depth of Inheritance Tree (DIT): How deep this class is in the inheritance
+    hierarchy. Deep hierarchies are harder to understand and maintain.
+  Number of Children (NOC): Number of direct subclasses. High NOC means the
+    base class is heavily relied upon — changes break many subclasses.
+  Lack of Cohesion of Methods (LCOM): Measures how well the methods of a class
+    relate to each other. High LCOM means the class is doing too many things.
+  Response for a Class (RFC): Number of methods that can be executed in
+    response to a message. High RFC means high complexity and testing burden.
+  Weighted Methods per Class (WMC): Sum of complexities of all methods.
+    High WMC means the class is too complex and should be split.
+
+  Thresholds:
+    Coupling Between Objects (CBO):  14    Depth of Inheritance Tree (DIT): 5    Number of Children (NOC): 10
+    Lack of Cohesion of Methods (LCOM): 0.8  Response for a Class (RFC): 50   Weighted Methods per Class (WMC): 50
+
+----------------------------------------------------------------------
+  VIOLATIONS
+----------------------------------------------------------------------
+
+  [CRITICAL] HexagonalAnalyzer
+    File: Heimdall/Architecture/services/hexagonal_analyzer.py:50
+    Coupling Between Objects (CBO)=19 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=30 Weighted Methods per Class (WMC)=112
+    - Coupling Between Objects (CBO) 19 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 112 exceeds threshold 50
+
+  [CRITICAL] AvroValidatorService
+    File: Forseti/Avro/services/avro_validator_service.py:25
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=42 Weighted Methods per Class (WMC)=135
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 135 exceeds threshold 50
+
+  [CRITICAL] ComplianceReporter
+    File: Heimdall/Security/Compliance/services/compliance_reporter.py:158
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=31 Weighted Methods per Class (WMC)=86
+    - Weighted Methods per Class (WMC) 86 exceeds threshold 50
+
+  [CRITICAL] BreakingChangeDetectorService
+    File: Forseti/Contracts/services/breaking_change_detector_service.py:67
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=31 Weighted Methods per Class (WMC)=82
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 82 exceeds threshold 50
+
+  [CRITICAL] SiteCrawler
+    File: Freya/Integration/services/site_crawler.py:32
+    Coupling Between Objects (CBO)=20 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=40 Weighted Methods per Class (WMC)=112
+    - Coupling Between Objects (CBO) 20 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 112 exceeds threshold 50
+
+  [CRITICAL] CodeSmellDetector
+    File: Heimdall/Quality/services/code_smell_detector.py:352
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=25 Weighted Methods per Class (WMC)=76
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 76 exceeds threshold 50
+
+  [CRITICAL] SyntaxChecker
+    File: Heimdall/Quality/services/syntax_checker.py:24
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=43 Weighted Methods per Class (WMC)=89
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 89 exceeds threshold 50
+
+  [CRITICAL] MockServerGeneratorService
+    File: Forseti/MockServer/services/mock_server_generator.py:28
+    Coupling Between Objects (CBO)=14 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=46 Weighted Methods per Class (WMC)=86
+    - Weighted Methods per Class (WMC) 86 exceeds threshold 50
+
+  [CRITICAL] IntrospectionService
+    File: Forseti/GraphQL/services/introspection_service.py:24
+    Coupling Between Objects (CBO)=14 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=25 Weighted Methods per Class (WMC)=76
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 76 exceeds threshold 50
+
+  [CRITICAL] ComposeAnalyzer
+    File: Heimdall/Security/Container/services/compose_analyzer.py:25
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=32 Weighted Methods per Class (WMC)=78
+    - Weighted Methods per Class (WMC) 78 exceeds threshold 50
+
+  [CRITICAL] PipelineGenerator
+    File: Volundr/CICD/services/pipeline_generator.py:23
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=89
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 89 exceeds threshold 50
+
+  [CRITICAL] AsgardMCPServer
+    File: MCP/server/asgard_mcp_server.py:120
+    Coupling Between Objects (CBO)=25 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=19 Weighted Methods per Class (WMC)=41
+    - Coupling Between Objects (CBO) 25 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [CRITICAL] PythonGeneratorService
+    File: Forseti/CodeGen/services/python_generator.py:28
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=40 Weighted Methods per Class (WMC)=120
+    - Weighted Methods per Class (WMC) 120 exceeds threshold 50
+
+  [CRITICAL] DocsGeneratorService
+    File: Forseti/Documentation/services/docs_generator.py:28
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=35 Weighted Methods per Class (WMC)=107
+    - Weighted Methods per Class (WMC) 107 exceeds threshold 50
+
+  [CRITICAL] ImageOptimizationScanner
+    File: Freya/Images/services/image_optimization_scanner.py:28
+    Coupling Between Objects (CBO)=16 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.90 Response for a Class (RFC)=42 Weighted Methods per Class (WMC)=128
+    - Coupling Between Objects (CBO) 16 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 0.90 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 128 exceeds threshold 50
+
+  [CRITICAL] ComposeProjectGenerator
+    File: Volundr/Compose/services/compose_generator.py:28
+    Coupling Between Objects (CBO)=15 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=28 Weighted Methods per Class (WMC)=110
+    - Coupling Between Objects (CBO) 15 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 110 exceeds threshold 50
+
+  [CRITICAL] SOLIDValidator
+    File: Heimdall/Architecture/services/solid_validator.py:35
+    Coupling Between Objects (CBO)=17 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=30 Weighted Methods per Class (WMC)=106
+    - Coupling Between Objects (CBO) 17 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 106 exceeds threshold 50
+
+  [CRITICAL] ProtobufValidatorService
+    File: Forseti/Protobuf/services/protobuf_validator_service.py:28
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=48 Weighted Methods per Class (WMC)=164
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 164 exceeds threshold 50
+
+  [CRITICAL] VisualRegressionTester
+    File: Freya/Visual/services/visual_regression.py:58
+    Coupling Between Objects (CBO)=30 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=20 Weighted Methods per Class (WMC)=39
+    - Coupling Between Objects (CBO) 30 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [CRITICAL] PatternDetector
+    File: Heimdall/Architecture/services/pattern_detector.py:32
+    Coupling Between Objects (CBO)=16 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=28 Weighted Methods per Class (WMC)=103
+    - Coupling Between Objects (CBO) 16 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 103 exceeds threshold 50
+
+  [CRITICAL] TypeScriptGeneratorService
+    File: Forseti/CodeGen/services/typescript_generator.py:28
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=41 Weighted Methods per Class (WMC)=105
+    - Weighted Methods per Class (WMC) 105 exceeds threshold 50
+
+  [CRITICAL] TypeChecker
+    File: Heimdall/Quality/services/type_checker.py:52
+    Coupling Between Objects (CBO)=14 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=33 Weighted Methods per Class (WMC)=126
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 126 exceeds threshold 50
+
+  [CRITICAL] TechnicalDebtAnalyzer
+    File: Heimdall/Quality/services/technical_debt_analyzer.py:85
+    Coupling Between Objects (CBO)=16 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=47 Weighted Methods per Class (WMC)=121
+    - Coupling Between Objects (CBO) 16 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 121 exceeds threshold 50
+
+  [CRITICAL] AvroCompatibilityService
+    File: Forseti/Avro/services/avro_compatibility_service.py:27
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.67 Response for a Class (RFC)=30 Weighted Methods per Class (WMC)=101
+    - Weighted Methods per Class (WMC) 101 exceeds threshold 50
+
+  [CRITICAL] SecurityHeaderScanner
+    File: Freya/Security/services/security_header_scanner.py:23
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=33 Weighted Methods per Class (WMC)=98
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 98 exceeds threshold 50
+
+  [CRITICAL] StaticSecurityService
+    File: Heimdall/Security/services/static_security_service.py:30
+    Coupling Between Objects (CBO)=15 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.40 Response for a Class (RFC)=21 Weighted Methods per Class (WMC)=129
+    - Coupling Between Objects (CBO) 15 exceeds threshold 14
+    - Weighted Methods per Class (WMC) 129 exceeds threshold 50
+
+  [CRITICAL] LicenseChecker
+    File: Heimdall/Dependencies/services/license_checker.py:56
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=27 Weighted Methods per Class (WMC)=89
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 89 exceeds threshold 50
+
+  [CRITICAL] SchemaGeneratorService
+    File: Forseti/GraphQL/services/schema_generator_service.py:21
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=20 Weighted Methods per Class (WMC)=76
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 76 exceeds threshold 50
+
+  [CRITICAL] DockerfileValidator
+    File: Volundr/Validation/services/dockerfile_validator.py:25
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=83
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 83 exceeds threshold 50
+
+  [CRITICAL] EnvFallbackVisitor
+    File: Heimdall/Quality/services/env_fallback_scanner.py:80
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=27 Weighted Methods per Class (WMC)=82
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 82 exceeds threshold 50
+
+  [CRITICAL] SchemaInferenceService
+    File: Forseti/JSONSchema/services/schema_inference_service.py:20
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=33 Weighted Methods per Class (WMC)=97
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 97 exceeds threshold 50
+
+  [CRITICAL] RequirementsChecker
+    File: Heimdall/Dependencies/services/requirements_checker.py:171
+    Coupling Between Objects (CBO)=14 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.67 Response for a Class (RFC)=28 Weighted Methods per Class (WMC)=88
+    - Weighted Methods per Class (WMC) 88 exceeds threshold 50
+
+  [CRITICAL] MaintainabilityAnalyzer
+    File: Heimdall/Quality/services/maintainability_analyzer.py:276
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=24 Weighted Methods per Class (WMC)=76
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 76 exceeds threshold 50
+
+  [CRITICAL] SpecConverterService
+    File: Forseti/OpenAPI/services/spec_converter_service.py:23
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=37 Weighted Methods per Class (WMC)=137
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 137 exceeds threshold 50
+
+  [CRITICAL] AsyncAPIValidatorService
+    File: Forseti/AsyncAPI/services/asyncapi_validator_service.py:25
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=32 Weighted Methods per Class (WMC)=101
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 101 exceeds threshold 50
+
+  [CRITICAL] TerraformValidator
+    File: Volundr/Validation/services/terraform_validator.py:25
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=30 Weighted Methods per Class (WMC)=80
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 80 exceeds threshold 50
+
+  [CRITICAL] MockDataGeneratorService
+    File: Forseti/MockServer/services/mock_data_generator.py:22
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=59 Weighted Methods per Class (WMC)=124
+    - Response for a Class (RFC) 59 exceeds threshold 50
+    - Weighted Methods per Class (WMC) 124 exceeds threshold 50
+
+  [CRITICAL] ProtobufCompatibilityService
+    File: Forseti/Protobuf/services/protobuf_compatibility_service.py:27
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=16 Weighted Methods per Class (WMC)=100
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 100 exceeds threshold 50
+
+  [CRITICAL] GolangGeneratorService
+    File: Forseti/CodeGen/services/golang_generator.py:28
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=40 Weighted Methods per Class (WMC)=99
+    - Weighted Methods per Class (WMC) 99 exceeds threshold 50
+
+  [CRITICAL] LinkValidator
+    File: Freya/Links/services/link_validator.py:30
+    Coupling Between Objects (CBO)=19 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.67 Response for a Class (RFC)=22 Weighted Methods per Class (WMC)=91
+    - Coupling Between Objects (CBO) 19 exceeds threshold 14
+    - Weighted Methods per Class (WMC) 91 exceeds threshold 50
+
+  [CRITICAL] ModuleBuilder
+    File: Volundr/Terraform/services/module_builder.py:22
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=27 Weighted Methods per Class (WMC)=105
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 105 exceeds threshold 50
+
+  [CRITICAL] ShellAnalyzer
+    File: Heimdall/Quality/languages/shell/services/shell_analyzer.py:55
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=36 Weighted Methods per Class (WMC)=76
+    - Weighted Methods per Class (WMC) 76 exceeds threshold 50
+
+  [CRITICAL] HotspotDetector
+    File: Heimdall/Security/Hotspots/services/hotspot_detector.py:46
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=18 Weighted Methods per Class (WMC)=80
+    - Weighted Methods per Class (WMC) 80 exceeds threshold 50
+
+  [HIGH] AsgardConfigLoader
+    File: config/loader.py:26
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.81 Response for a Class (RFC)=23 Weighted Methods per Class (WMC)=43
+    - Lack of Cohesion of Methods (LCOM) 0.81 exceeds threshold 0.8
+
+  [HIGH] FunctionComplexity
+    File: Heimdall/Quality/models/complexity_models.py:24
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=4 Weighted Methods per Class (WMC)=9
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+
+  [HIGH] OOPAnalyzer
+    File: Heimdall/OOP/services/oop_analyzer.py:39
+    Coupling Between Objects (CBO)=20 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.40 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=67
+    - Coupling Between Objects (CBO) 20 exceeds threshold 14
+    - Weighted Methods per Class (WMC) 67 exceeds threshold 50
+
+  [HIGH] FileOOPAnalysis
+    File: Heimdall/OOP/models/oop_models.py:332
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ClassOOPMetrics
+    File: Heimdall/OOP/models/oop_models.py:262
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ClassCouplingMetrics
+    File: Heimdall/OOP/models/oop_models.py:81
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=10
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ClassCohesionMetrics
+    File: Heimdall/OOP/models/oop_models.py:172
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=10
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] DebtItem
+    File: Heimdall/Quality/models/debt_models.py:47
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] AsyncAPISpec
+    File: Forseti/AsyncAPI/models/asyncapi_models.py:328
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=11
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] Channel
+    File: Forseti/AsyncAPI/models/asyncapi_models.py:220
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] AsyncAPIValidationResult
+    File: Forseti/AsyncAPI/models/asyncapi_models.py:403
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] RequirementsResult
+    File: Heimdall/Dependencies/models/requirements_models.py:94
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.82 Response for a Class (RFC)=11 Weighted Methods per Class (WMC)=13
+    - Lack of Cohesion of Methods (LCOM) 0.82 exceeds threshold 0.8
+
+  [HIGH] ComplexityAnalyzer
+    File: Heimdall/Quality/services/complexity_analyzer.py:265
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=49
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] CognitiveComplexityVisitor
+    File: Heimdall/Quality/services/complexity_analyzer.py:99
+    Coupling Between Objects (CBO)=0 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=23 Weighted Methods per Class (WMC)=35
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] Severity
+    File: common/output_formatter.py:24
+    Coupling Between Objects (CBO)=1 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] UnifiedFormatter
+    File: common/output_formatter.py:86
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=32 Weighted Methods per Class (WMC)=61
+    - Weighted Methods per Class (WMC) 61 exceeds threshold 50
+
+  [HIGH] GeneratedKustomization
+    File: Volundr/Kustomize/models/kustomize_models.py:145
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ComposeGenerator
+    File: Volundr/Docker/services/compose_generator.py:21
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=7 Weighted Methods per Class (WMC)=48
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] CoverageMetrics
+    File: Heimdall/Coverage/models/coverage_models.py:150
+    Coupling Between Objects (CBO)=1 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=4
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] GapAnalyzer
+    File: Heimdall/Coverage/services/gap_analyzer.py:28
+    Coupling Between Objects (CBO)=15 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=23 Weighted Methods per Class (WMC)=58
+    - Coupling Between Objects (CBO) 15 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 58 exceeds threshold 50
+
+  [HIGH] TraceSpan
+    File: Verdandi/Tracing/models/tracing_models.py:26
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=4 Weighted Methods per Class (WMC)=4
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ProtobufCompatibilityResult
+    File: Forseti/Protobuf/models/protobuf_models.py:404
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ProtobufSchema
+    File: Forseti/Protobuf/models/protobuf_models.py:244
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=5 Weighted Methods per Class (WMC)=6
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ProtobufValidationResult
+    File: Forseti/Protobuf/models/protobuf_models.py:313
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] FileAnalysis
+    File: Heimdall/Quality/models/syntax_models.py:52
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] DependencyVulnerabilityService
+    File: Heimdall/Security/services/dependency_vulnerability_service.py:369
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=11 Weighted Methods per Class (WMC)=23
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] PageLoadMetrics
+    File: Freya/Performance/models/performance_models.py:71
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=4 Weighted Methods per Class (WMC)=16
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] PerformanceReport
+    File: Freya/Performance/models/performance_models.py:255
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ResourceTiming
+    File: Freya/Performance/models/performance_models.py:156
+    Coupling Between Objects (CBO)=3 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=4
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] TypingVisitor
+    File: Heimdall/Quality/services/typing_scanner.py:25
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=7 Weighted Methods per Class (WMC)=30
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] TypingScanner
+    File: Heimdall/Quality/services/typing_scanner.py:146
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=45
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] StructuredDataReport
+    File: Freya/SEO/models/seo_models.py:109
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] GeneratedGitOpsConfig
+    File: Volundr/GitOps/models/gitops_models.py:191
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] OpenAPIValidationResult
+    File: Forseti/OpenAPI/models/openapi_models.py:108
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ImageReport
+    File: Freya/Images/models/image_models.py:93
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] SchemaValidatorService
+    File: Forseti/GraphQL/services/schema_validator_service.py:22
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=47
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] GeneratedManifest
+    File: Volundr/Kubernetes/models/kubernetes_models.py:107
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] BurnRateAnalyzer
+    File: Verdandi/SLO/services/burn_rate_analyzer.py:18
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.90 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=45
+    - Lack of Cohesion of Methods (LCOM) 0.90 exceeds threshold 0.8
+
+  [HIGH] Span
+    File: Verdandi/APM/models/apm_models.py:33
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] Trace
+    File: Verdandi/APM/models/apm_models.py:103
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] FunctionMaintainability
+    File: Heimdall/Quality/models/maintainability_models.py:83
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] SecretsDetectionService
+    File: Heimdall/Security/services/secrets_detection_service.py:256
+    Coupling Between Objects (CBO)=15 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=16 Weighted Methods per Class (WMC)=44
+    - Coupling Between Objects (CBO) 15 exceeds threshold 14
+
+  [HIGH] WCAGValidator
+    File: Freya/Accessibility/services/wcag_validator.py:154
+    Coupling Between Objects (CBO)=14 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=24 Weighted Methods per Class (WMC)=73
+    - Weighted Methods per Class (WMC) 73 exceeds threshold 50
+
+  [HIGH] HTMLReporter
+    File: Freya/Integration/services/html_reporter.py:20
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=16 Weighted Methods per Class (WMC)=21
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ThreadSafetyScanner
+    File: Heimdall/Quality/services/thread_safety_scanner.py:228
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=21 Weighted Methods per Class (WMC)=57
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 57 exceeds threshold 50
+
+  [HIGH] DockerfileGenerator
+    File: Volundr/Docker/services/dockerfile_generator.py:19
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=7 Weighted Methods per Class (WMC)=56
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 56 exceeds threshold 50
+
+  [HIGH] ArchitectureReport
+    File: Heimdall/Architecture/models/architecture_models.py:378
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=7
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ResourceCleanupViolation
+    File: Heimdall/Quality/models/resource_cleanup_models.py:37
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] JSAnalyzer
+    File: Heimdall/Quality/languages/javascript/services/js_analyzer.py:51
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=34 Weighted Methods per Class (WMC)=65
+    - Weighted Methods per Class (WMC) 65 exceeds threshold 50
+
+  [HIGH] AsgardConfig
+    File: config/models.py:774
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=7 Weighted Methods per Class (WMC)=14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] SchemaDiffService
+    File: Forseti/Database/services/schema_diff_service.py:22
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=13 Weighted Methods per Class (WMC)=61
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 61 exceeds threshold 50
+
+  [HIGH] CompatibilityCheckerService
+    File: Forseti/Contracts/services/compatibility_checker_service.py:22
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=21 Weighted Methods per Class (WMC)=74
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 74 exceeds threshold 50
+
+  [HIGH] ProgressReporter
+    File: common/progress.py:38
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.67 Response for a Class (RFC)=29 Weighted Methods per Class (WMC)=55
+    - Weighted Methods per Class (WMC) 55 exceeds threshold 50
+
+  [HIGH] GeneratedModule
+    File: Volundr/Terraform/models/terraform_models.py:81
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] AvroSchema
+    File: Forseti/Avro/models/avro_models.py:178
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] AvroField
+    File: Forseti/Avro/models/avro_models.py:139
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] AvroValidationResult
+    File: Forseti/Avro/models/avro_models.py:250
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] AvroCompatibilityResult
+    File: Forseti/Avro/models/avro_models.py:341
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] DocumentationScanner
+    File: Heimdall/Quality/services/documentation_scanner.py:27
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=23 Weighted Methods per Class (WMC)=68
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 68 exceeds threshold 50
+
+  [HIGH] _AsgardHandler
+    File: Dashboard/services/dashboard_server.py:31
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=10 Weighted Methods per Class (WMC)=10
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] OverlayGenerator
+    File: Volundr/Kustomize/services/overlay_generator.py:23
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.67 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=67
+    - Weighted Methods per Class (WMC) 67 exceeds threshold 50
+
+  [HIGH] ResourceTimingAnalyzer
+    File: Freya/Performance/services/resource_timing_analyzer.py:21
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=14 Weighted Methods per Class (WMC)=41
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+
+  [HIGH] GeneratedHelmChart
+    File: Volundr/Helm/models/helm_models.py:169
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] CryptographicValidationService
+    File: Heimdall/Security/services/cryptographic_validation_service.py:209
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=47
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] FunctionAnnotation
+    File: Heimdall/Quality/models/typing_models.py:30
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] SuggestionEngine
+    File: Heimdall/Coverage/services/suggestion_engine.py:21
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=20 Weighted Methods per Class (WMC)=53
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 53 exceeds threshold 50
+
+  [HIGH] StyleValidator
+    File: Freya/Visual/services/style_validator.py:22
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=12 Weighted Methods per Class (WMC)=53
+    - Weighted Methods per Class (WMC) 53 exceeds threshold 50
+
+  [HIGH] DaemonThreadIssue
+    File: Heimdall/Quality/models/daemon_thread_models.py:32
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] DatetimeViolation
+    File: Heimdall/Quality/models/datetime_models.py:31
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] TraceAggregator
+    File: Verdandi/APM/services/trace_aggregator.py:20
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=20 Weighted Methods per Class (WMC)=43
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] LazyImportScanner
+    File: Heimdall/Quality/services/lazy_import_scanner.py:244
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=21 Weighted Methods per Class (WMC)=56
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 56 exceeds threshold 50
+
+  [HIGH] DatetimeScanner
+    File: Heimdall/Quality/services/datetime_scanner.py:204
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=47
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] DatetimeVisitor
+    File: Heimdall/Quality/services/datetime_scanner.py:26
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=0.93 Response for a Class (RFC)=22 Weighted Methods per Class (WMC)=44
+    - Lack of Cohesion of Methods (LCOM) 0.93 exceeds threshold 0.8
+
+  [HIGH] DaemonThreadVisitor
+    File: Heimdall/Quality/services/daemon_thread_scanner.py:113
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=9 Weighted Methods per Class (WMC)=34
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] DaemonThreadScanner
+    File: Heimdall/Quality/services/daemon_thread_scanner.py:293
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=21 Weighted Methods per Class (WMC)=59
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 59 exceeds threshold 50
+
+  [HIGH] RegressionDetector
+    File: Verdandi/Anomaly/services/regression_detector.py:18
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=31 Weighted Methods per Class (WMC)=67
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 67 exceeds threshold 50
+
+  [HIGH] LazyImport
+    File: Heimdall/Quality/models/lazy_import_models.py:35
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] CoreWebVitalsCalculator
+    File: Verdandi/Web/services/vitals_calculator.py:16
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=31 Weighted Methods per Class (WMC)=45
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ChartGenerator
+    File: Volundr/Helm/services/chart_generator.py:21
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=37 Weighted Methods per Class (WMC)=72
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 72 exceeds threshold 50
+
+  [HIGH] FluxGenerator
+    File: Volundr/GitOps/services/flux_generator.py:23
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=20 Weighted Methods per Class (WMC)=67
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 67 exceeds threshold 50
+
+  [HIGH] UnifiedTester
+    File: Freya/Integration/services/unified_tester.py:37
+    Coupling Between Objects (CBO)=21 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=14 Weighted Methods per Class (WMC)=54
+    - Coupling Between Objects (CBO) 21 exceeds threshold 14
+    - Weighted Methods per Class (WMC) 54 exceeds threshold 50
+
+  [HIGH] CriticalPathAnalyzer
+    File: Verdandi/Tracing/services/critical_path_analyzer.py:18
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=39
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ArchitectureAnalyzer
+    File: Heimdall/Architecture/services/architecture_analyzer.py:29
+    Coupling Between Objects (CBO)=14 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.82 Response for a Class (RFC)=18 Weighted Methods per Class (WMC)=71
+    - Lack of Cohesion of Methods (LCOM) 0.82 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 71 exceeds threshold 50
+
+  [HIGH] TrendReport
+    File: Verdandi/Trend/models/trend_models.py:135
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] SpecParserService
+    File: Forseti/OpenAPI/services/spec_parser_service.py:23
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=47
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] BaseGenerator
+    File: Volundr/Kustomize/services/base_generator.py:22
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=56
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 56 exceeds threshold 50
+
+  [HIGH] FileDocumentation
+    File: Heimdall/Quality/models/documentation_models.py:102
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=3 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ClassDocumentation
+    File: Heimdall/Quality/models/documentation_models.py:76
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=4
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] GitHubActionsFormatter
+    File: Reporting/github_formatter.py:56
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=19 Weighted Methods per Class (WMC)=32
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ArgoCDGenerator
+    File: Volundr/GitOps/services/argocd_generator.py:25
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=51
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 51 exceeds threshold 50
+
+  [HIGH] MonorepoScaffold
+    File: Volundr/Scaffold/services/monorepo_scaffold.py:24
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=57 Weighted Methods per Class (WMC)=55
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Response for a Class (RFC) 57 exceeds threshold 50
+    - Weighted Methods per Class (WMC) 55 exceeds threshold 50
+
+  [HIGH] FutureLeak
+    File: Heimdall/Quality/models/future_leak_models.py:32
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] GraphQLValidationResult
+    File: Forseti/GraphQL/models/graphql_models.py:119
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] PatternSuggester
+    File: Heimdall/Architecture/services/pattern_suggester.py:155
+    Coupling Between Objects (CBO)=15 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=12 Weighted Methods per Class (WMC)=50
+    - Coupling Between Objects (CBO) 15 exceeds threshold 14
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] RaceConditionIssue
+    File: Heimdall/Quality/models/race_condition_models.py:31
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] EnvFallbackViolation
+    File: Heimdall/Quality/models/env_fallback_models.py:52
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] CpuMetricsCalculator
+    File: Verdandi/System/services/cpu_calculator.py:12
+    Coupling Between Objects (CBO)=3 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=6 Weighted Methods per Class (WMC)=20
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] MetaTagAnalyzer
+    File: Freya/SEO/services/meta_tag_analyzer.py:20
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=24 Weighted Methods per Class (WMC)=69
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 69 exceeds threshold 50
+
+  [HIGH] LayerAnalyzer
+    File: Heimdall/Architecture/services/layer_analyzer.py:24
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.40 Response for a Class (RFC)=24 Weighted Methods per Class (WMC)=67
+    - Weighted Methods per Class (WMC) 67 exceeds threshold 50
+
+  [HIGH] ConsoleCapture
+    File: Freya/Console/services/console_capture.py:27
+    Coupling Between Objects (CBO)=15 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=11 Weighted Methods per Class (WMC)=44
+    - Coupling Between Objects (CBO) 15 exceeds threshold 14
+
+  [HIGH] StructuredDataValidator
+    File: Freya/SEO/services/structured_data_validator.py:22
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=14 Weighted Methods per Class (WMC)=64
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 64 exceeds threshold 50
+
+  [HIGH] DuplicationDetector
+    File: Heimdall/Quality/services/duplication_detector.py:33
+    Coupling Between Objects (CBO)=14 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.67 Response for a Class (RFC)=28 Weighted Methods per Class (WMC)=71
+    - Weighted Methods per Class (WMC) 71 exceeds threshold 50
+
+  [HIGH] FutureLeakScanner
+    File: Heimdall/Quality/services/future_leak_scanner.py:298
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=45
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] FutureLeakVisitor
+    File: Heimdall/Quality/services/future_leak_scanner.py:242
+    Coupling Between Objects (CBO)=3 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=7 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ErrorHandlingViolation
+    File: Heimdall/Quality/models/error_handling_models.py:37
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ConfigSecretsScanner
+    File: Heimdall/Security/services/config_secrets_scanner.py:114
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=31 Weighted Methods per Class (WMC)=75
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 75 exceeds threshold 50
+
+  [HIGH] SchemaAnalyzerService
+    File: Forseti/Database/services/schema_analyzer_service.py:22
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=51
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 51 exceeds threshold 50
+
+  [HIGH] ThreadSafetyIssue
+    File: Heimdall/Quality/models/thread_safety_models.py:31
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] SLIMetric
+    File: Verdandi/SLO/models/slo_models.py:74
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=3
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ErrorBudget
+    File: Verdandi/SLO/models/slo_models.py:109
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=2
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ImportAnalyzer
+    File: Heimdall/Dependencies/services/import_analyzer.py:61
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=11 Weighted Methods per Class (WMC)=32
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] BlockingCall
+    File: Heimdall/Quality/models/blocking_async_models.py:33
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=2 Weighted Methods per Class (WMC)=5
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] CSPAnalyzer
+    File: Freya/Security/services/csp_analyzer.py:18
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=13 Weighted Methods per Class (WMC)=58
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 58 exceeds threshold 50
+
+  [HIGH] RaceConditionVisitor
+    File: Heimdall/Quality/services/race_condition_scanner.py:152
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=11 Weighted Methods per Class (WMC)=36
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] RaceConditionScanner
+    File: Heimdall/Quality/services/race_condition_scanner.py:349
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=51
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 51 exceeds threshold 50
+
+  [HIGH] ComposeValidator
+    File: Volundr/Compose/services/compose_validator.py:20
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=56
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 56 exceeds threshold 50
+
+  [HIGH] CacheMetricsCalculator
+    File: Verdandi/Cache/services/cache_calculator.py:12
+    Coupling Between Objects (CBO)=4 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=9 Weighted Methods per Class (WMC)=33
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ErrorHandlingScanner
+    File: Heimdall/Quality/services/error_handling_scanner.py:330
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=19 Weighted Methods per Class (WMC)=58
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 58 exceeds threshold 50
+
+  [HIGH] TrendAnalyzer
+    File: Verdandi/Trend/services/trend_analyzer.py:19
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=18 Weighted Methods per Class (WMC)=36
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ComplexityVisitor
+    File: Heimdall/Quality/services/technical_debt_analyzer.py:37
+    Coupling Between Objects (CBO)=2 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=8 Weighted Methods per Class (WMC)=10
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ServiceMapBuilder
+    File: Verdandi/APM/services/service_map_builder.py:17
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=11 Weighted Methods per Class (WMC)=53
+    - Weighted Methods per Class (WMC) 53 exceeds threshold 50
+
+  [HIGH] LinterInitializer
+    File: Heimdall/Init/linter_initializer.py:28
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.86 Response for a Class (RFC)=18 Weighted Methods per Class (WMC)=63
+    - Lack of Cohesion of Methods (LCOM) 0.86 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 63 exceeds threshold 50
+
+  [HIGH] NamingConventionScanner
+    File: Heimdall/Quality/services/naming_convention_scanner.py:76
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=27 Weighted Methods per Class (WMC)=72
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 72 exceeds threshold 50
+
+  [HIGH] _FunctionTaintVisitor
+    File: Heimdall/Security/TaintAnalysis/services/taint_analyzer.py:261
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=14 Weighted Methods per Class (WMC)=64
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 64 exceeds threshold 50
+
+  [HIGH] MigrationGeneratorService
+    File: Forseti/Database/services/migration_generator_service.py:18
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=8 Weighted Methods per Class (WMC)=51
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 51 exceeds threshold 50
+
+  [HIGH] AsyncAPIParserService
+    File: Forseti/AsyncAPI/services/asyncapi_parser_service.py:29
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.52 Response for a Class (RFC)=20 Weighted Methods per Class (WMC)=57
+    - Weighted Methods per Class (WMC) 57 exceeds threshold 50
+
+  [HIGH] RatingsCalculator
+    File: Heimdall/Ratings/services/ratings_calculator.py:27
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=20 Weighted Methods per Class (WMC)=60
+    - Weighted Methods per Class (WMC) 60 exceeds threshold 50
+
+  [HIGH] SpecGeneratorService
+    File: Forseti/OpenAPI/services/spec_generator_service.py:21
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=16 Weighted Methods per Class (WMC)=60
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 60 exceeds threshold 50
+
+  [HIGH] HistoryStore
+    File: Reporting/History/services/history_store.py:55
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=14 Weighted Methods per Class (WMC)=29
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ForbiddenImportVisitor
+    File: Heimdall/Quality/services/library_usage_scanner.py:24
+    Coupling Between Objects (CBO)=5 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=12 Weighted Methods per Class (WMC)=16
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] LibraryUsageScanner
+    File: Heimdall/Quality/services/library_usage_scanner.py:124
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=43
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] IssueTracker
+    File: Heimdall/Issues/services/issue_tracker.py:83
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=14 Weighted Methods per Class (WMC)=42
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] EnvFallbackScanner
+    File: Heimdall/Quality/services/env_fallback_scanner.py:436
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=21 Weighted Methods per Class (WMC)=60
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 60 exceeds threshold 50
+
+  [HIGH] PageLoadAnalyzer
+    File: Freya/Performance/services/page_load_analyzer.py:23
+    Coupling Between Objects (CBO)=14 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=23 Weighted Methods per Class (WMC)=39
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] GraphBuilder
+    File: Heimdall/Dependencies/services/graph_builder.py:21
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.96 Response for a Class (RFC)=11 Weighted Methods per Class (WMC)=29
+    - Lack of Cohesion of Methods (LCOM) 0.96 exceeds threshold 0.8
+
+  [HIGH] SpanAnalyzer
+    File: Verdandi/APM/services/span_analyzer.py:17
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.96 Response for a Class (RFC)=16 Weighted Methods per Class (WMC)=35
+    - Lack of Cohesion of Methods (LCOM) 0.96 exceeds threshold 0.8
+
+  [HIGH] ScreenshotCapture
+    File: Freya/Visual/services/screenshot_capture.py:23
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=11 Weighted Methods per Class (WMC)=30
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] InheritanceAnalyzer
+    File: Heimdall/OOP/services/inheritance_analyzer.py:35
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=6 Weighted Methods per Class (WMC)=45
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+
+  [HIGH] PatchGenerator
+    File: Volundr/Kustomize/services/patch_generator.py:23
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=14 Weighted Methods per Class (WMC)=28
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] CohesionAnalyzer
+    File: Heimdall/OOP/services/cohesion_analyzer.py:45
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=14 Weighted Methods per Class (WMC)=48
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+
+  [HIGH] MemoryMetricsCalculator
+    File: Verdandi/System/services/memory_calculator.py:12
+    Coupling Between Objects (CBO)=3 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=7 Weighted Methods per Class (WMC)=20
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] DockerfileAnalyzer
+    File: Heimdall/Security/Container/services/dockerfile_analyzer.py:114
+    Coupling Between Objects (CBO)=17 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=24 Weighted Methods per Class (WMC)=58
+    - Coupling Between Objects (CBO) 17 exceeds threshold 14
+    - Weighted Methods per Class (WMC) 58 exceeds threshold 50
+
+  [HIGH] SLAChecker
+    File: Verdandi/Analysis/services/sla_checker.py:17
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=5 Weighted Methods per Class (WMC)=18
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ForecastCalculator
+    File: Verdandi/Trend/services/forecast_calculator.py:19
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=37
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ErrorBudgetCalculator
+    File: Verdandi/SLO/services/error_budget_calculator.py:18
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=10 Weighted Methods per Class (WMC)=21
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] SpecValidatorService
+    File: Forseti/OpenAPI/services/spec_validator_service.py:27
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.67 Response for a Class (RFC)=22 Weighted Methods per Class (WMC)=75
+    - Weighted Methods per Class (WMC) 75 exceeds threshold 50
+
+  [HIGH] ColorContrastChecker
+    File: Freya/Accessibility/services/color_contrast.py:42
+    Coupling Between Objects (CBO)=15 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=33 Weighted Methods per Class (WMC)=59
+    - Coupling Between Objects (CBO) 15 exceeds threshold 14
+    - Weighted Methods per Class (WMC) 59 exceeds threshold 50
+
+  [HIGH] BlockingAsyncScanner
+    File: Heimdall/Quality/services/blocking_async_scanner.py:225
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=17 Weighted Methods per Class (WMC)=45
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] BlockingAsyncVisitor
+    File: Heimdall/Quality/services/blocking_async_scanner.py:75
+    Coupling Between Objects (CBO)=6 Depth of Inheritance Tree (DIT)=1 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=16 Weighted Methods per Class (WMC)=34
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+
+  [HIGH] TraceParser
+    File: Verdandi/Tracing/services/trace_parser.py:17
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=27 Weighted Methods per Class (WMC)=75
+    - Weighted Methods per Class (WMC) 75 exceeds threshold 50
+
+  [HIGH] BugDetector
+    File: Heimdall/Quality/BugDetection/services/bug_detector.py:53
+    Coupling Between Objects (CBO)=16 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.00 Response for a Class (RFC)=5 Weighted Methods per Class (WMC)=19
+    - Coupling Between Objects (CBO) 16 exceeds threshold 14
+
+  [HIGH] SBOMGenerator
+    File: Heimdall/Dependencies/services/sbom_generator.py:25
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=12 Weighted Methods per Class (WMC)=44
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] ResourceCleanupScanner
+    File: Heimdall/Quality/services/resource_cleanup_scanner.py:303
+    Coupling Between Objects (CBO)=12 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=19 Weighted Methods per Class (WMC)=56
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 56 exceeds threshold 50
+
+  [HIGH] ManifestGenerator
+    File: Volundr/Kubernetes/services/manifest_generator.py:26
+    Coupling Between Objects (CBO)=10 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=21 Weighted Methods per Class (WMC)=66
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 66 exceeds threshold 50
+
+  [HIGH] DependencyAnalyzer
+    File: Heimdall/Dependencies/services/dependency_analyzer.py:26
+    Coupling Between Objects (CBO)=16 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.67 Response for a Class (RFC)=15 Weighted Methods per Class (WMC)=33
+    - Coupling Between Objects (CBO) 16 exceeds threshold 14
+
+  [HIGH] AggregationService
+    File: Verdandi/Analysis/services/aggregation_service.py:18
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.83 Response for a Class (RFC)=6 Weighted Methods per Class (WMC)=21
+    - Lack of Cohesion of Methods (LCOM) 0.83 exceeds threshold 0.8
+
+  [HIGH] MicroserviceScaffold
+    File: Volundr/Scaffold/services/microservice_scaffold.py:23
+    Coupling Between Objects (CBO)=8 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=63 Weighted Methods per Class (WMC)=65
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Response for a Class (RFC) 63 exceeds threshold 50
+    - Weighted Methods per Class (WMC) 65 exceeds threshold 50
+
+  [HIGH] ContractValidatorService
+    File: Forseti/Contracts/services/contract_validator_service.py:20
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=19 Weighted Methods per Class (WMC)=50
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+
+  [HIGH] BaselineComparator
+    File: Verdandi/Anomaly/services/baseline_comparator.py:20
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.90 Response for a Class (RFC)=19 Weighted Methods per Class (WMC)=54
+    - Lack of Cohesion of Methods (LCOM) 0.90 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 54 exceeds threshold 50
+
+  [HIGH] StatisticalDetector
+    File: Verdandi/Anomaly/services/statistical_detector.py:19
+    Coupling Between Objects (CBO)=9 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.53 Response for a Class (RFC)=21 Weighted Methods per Class (WMC)=52
+    - Weighted Methods per Class (WMC) 52 exceeds threshold 50
+
+  [HIGH] KubernetesValidator
+    File: Volundr/Validation/services/kubernetes_validator.py:26
+    Coupling Between Objects (CBO)=11 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=19 Weighted Methods per Class (WMC)=56
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 56 exceeds threshold 50
+
+  [HIGH] RobotsAnalyzer
+    File: Freya/SEO/services/robots_analyzer.py:23
+    Coupling Between Objects (CBO)=7 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=1.00 Response for a Class (RFC)=16 Weighted Methods per Class (WMC)=58
+    - Lack of Cohesion of Methods (LCOM) 1.00 exceeds threshold 0.8
+    - Weighted Methods per Class (WMC) 58 exceeds threshold 50
+
+  [HIGH] PlaywrightUtils
+    File: Freya/Integration/services/playwright_utils.py:103
+    Coupling Between Objects (CBO)=13 Depth of Inheritance Tree (DIT)=0 Lack of Cohesion of Methods (LCOM)=0.92 Response for a Class (RFC)=20 Weighted Methods per Class (WMC)=36
+    - Lack of Cohesion of Methods (LCOM) 0.92 exceeds threshold 0.8
+
+----------------------------------------------------------------------
+  SUMMARY
+----------------------------------------------------------------------
+
+  Files Analyzed:     324
+  Classes Analyzed:   1069
+  Violations:         206
+  Compliance Rate:    80.7%
+
+  Averages:
+    Coupling Between Objects (CBO):  5.19    Depth of Inheritance Tree (DIT): 0.70
+    Lack of Cohesion of Methods (LCOM): 0.20  Response for a Class (RFC): 4.60  Weighted Methods per Class (WMC): 12.14
+
+  Maximums:
+    Coupling Between Objects (CBO):  30    Depth of Inheritance Tree (DIT): 1
+    Lack of Cohesion of Methods (LCOM): 1.00  Response for a Class (RFC): 63  Weighted Methods per Class (WMC): 164
+
+======================================================================
+</pre>
+</body>
+</html>

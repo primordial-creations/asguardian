@@ -14,7 +14,6 @@ from Asgard.Forseti.Database.models.database_models import (
     ChangeType,
 )
 
-
 class MigrationGeneratorService:
     """
     Service for generating database migration scripts.
@@ -62,7 +61,6 @@ class MigrationGeneratorService:
             lines.append(f"-- Target: {diff_result.target_schema}")
         lines.append(f"-- Changes: {diff_result.change_count}")
         lines.append("")
-
         # Group changes by type for better organization
         table_drops = []
         table_creates = []

@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - quality env-fallback</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - quality env-fallback</h1>
+  <pre>======================================================================
+ENVIRONMENT VARIABLE FALLBACK VIOLATIONS REPORT
+======================================================================
+
+Scan Path: /mnt/storage/home-data/Documents/GAIA/Asgard
+Scan Time: 2026-03-20 08:26:29
+Duration: 1.93 seconds
+Files Scanned: 1255
+
+SUMMARY
+----------------------------------------
+Total Violations: 46
+Compliant: No
+
+By Severity:
+  HIGH: 46
+
+By Type:
+  Config Get Default: 46
+
+Most Problematic Files:
+----------------------------------------
+  compose_analyzer.py: 10 violations
+  compose_analyzer.py: 10 violations
+  openapi_utils.py: 6 violations
+  openapi_utils.py: 6 violations
+  compose_validator.py: 5 violations
+
+VIOLATIONS
+----------------------------------------
+
+[HIGH]
+  openapi_utils.py:146
+    Code: merged["info"] = {**merged.get("info", {}), **overlay_spec["info"]}
+    Variable: info
+    Default: {...}
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:153
+    Code: merged["servers"] = merged.get("servers", []) + overlay_spec["servers"]
+    Variable: servers
+    Default: [...]
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:157
+    Code: merged_paths = dict(merged.get("paths", {}))
+    Variable: paths
+    Default: {...}
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:171
+    Code: merged_components = dict(merged.get("components", {}))
+    Variable: components
+    Default: {...}
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:187
+    Code: existing_tags = {t.get("name") for t in merged.get("tags", [])}
+    Variable: tags
+    Default: [...]
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:188
+    Code: merged_tags = list(merged.get("tags", []))
+    Variable: tags
+    Default: [...]
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_generator.py:435
+    Code: config = env_configs.get(environment, env_configs["development"])
+    Default: &lt;expression&gt;
+    Context: Config/secrets fallback in class ComposeProjectGenerator, function _build_override_dict
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:174
+    Code: image = config.get("image", "")
+    Variable: image
+    Default: ''
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_service
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:216
+    Code: deploy = config.get("deploy", {})
+    Variable: deploy
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_service
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:228
+    Code: environment = config.get("environment", {})
+    Variable: environment
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_service
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:313
+    Code: driver = config.get("driver", "local")
+    Variable: driver
+    Default: 'local'
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_volume
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:315
+    Code: opts = config.get("driver_opts", {})
+    Variable: driver_opts
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_volume
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_generator.py:179
+    Code: if svc_config.get("deploy", {}).get("resources"):
+    Variable: deploy
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeGenerator, function _calculate_best_practice_score
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:238
+    Code: if service_config.get("privileged", False):
+    Variable: privileged
+    Default: False
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_privileged
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:270
+    Code: network_mode = service_config.get("network_mode", "")
+    Variable: network_mode
+    Default: ''
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_network_mode
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:302
+    Code: pid_mode = service_config.get("pid", "")
+    Variable: pid
+    Default: ''
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_pid_mode
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:342
+    Code: cap_add = service_config.get("cap_add", [])
+    Variable: cap_add
+    Default: [...]
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_capabilities
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:377
+    Code: environment = service_config.get("environment", {})
+    Variable: environment
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_environment_secrets
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:434
+    Code: volumes = service_config.get("volumes", [])
+    Variable: volumes
+    Default: [...]
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_volumes
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:478
+    Code: security_opt = service_config.get("security_opt", [])
+    Variable: security_opt
+    Default: [...]
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_security_opt
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:532
+    Code: image = service_config.get("image", "")
+    Variable: image
+    Default: ''
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_image_tag
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:565
+    Code: if not service_config.get("read_only", False):
+    Variable: read_only
+    Default: False
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_read_only
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:599
+    Code: ports = service_config.get("ports", [])
+    Variable: ports
+    Default: [...]
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_exposed_ports
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:146
+    Code: merged["info"] = {**merged.get("info", {}), **overlay_spec["info"]}
+    Variable: info
+    Default: {...}
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:153
+    Code: merged["servers"] = merged.get("servers", []) + overlay_spec["servers"]
+    Variable: servers
+    Default: [...]
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:157
+    Code: merged_paths = dict(merged.get("paths", {}))
+    Variable: paths
+    Default: {...}
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:171
+    Code: merged_components = dict(merged.get("components", {}))
+    Variable: components
+    Default: {...}
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:187
+    Code: existing_tags = {t.get("name") for t in merged.get("tags", [])}
+    Variable: tags
+    Default: [...]
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  openapi_utils.py:188
+    Code: merged_tags = list(merged.get("tags", []))
+    Variable: tags
+    Default: [...]
+    Context: Config/secrets fallback in function merge_specs
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_generator.py:435
+    Code: config = env_configs.get(environment, env_configs["development"])
+    Default: &lt;expression&gt;
+    Context: Config/secrets fallback in class ComposeProjectGenerator, function _build_override_dict
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:174
+    Code: image = config.get("image", "")
+    Variable: image
+    Default: ''
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_service
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:216
+    Code: deploy = config.get("deploy", {})
+    Variable: deploy
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_service
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:228
+    Code: environment = config.get("environment", {})
+    Variable: environment
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_service
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:313
+    Code: driver = config.get("driver", "local")
+    Variable: driver
+    Default: 'local'
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_volume
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_validator.py:315
+    Code: opts = config.get("driver_opts", {})
+    Variable: driver_opts
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeValidator, function _validate_volume
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_generator.py:179
+    Code: if svc_config.get("deploy", {}).get("resources"):
+    Variable: deploy
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeGenerator, function _calculate_best_practice_score
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:238
+    Code: if service_config.get("privileged", False):
+    Variable: privileged
+    Default: False
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_privileged
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:270
+    Code: network_mode = service_config.get("network_mode", "")
+    Variable: network_mode
+    Default: ''
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_network_mode
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:302
+    Code: pid_mode = service_config.get("pid", "")
+    Variable: pid
+    Default: ''
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_pid_mode
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:342
+    Code: cap_add = service_config.get("cap_add", [])
+    Variable: cap_add
+    Default: [...]
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_capabilities
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:377
+    Code: environment = service_config.get("environment", {})
+    Variable: environment
+    Default: {...}
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_environment_secrets
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:434
+    Code: volumes = service_config.get("volumes", [])
+    Variable: volumes
+    Default: [...]
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_volumes
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:478
+    Code: security_opt = service_config.get("security_opt", [])
+    Variable: security_opt
+    Default: [...]
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_security_opt
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:532
+    Code: image = service_config.get("image", "")
+    Variable: image
+    Default: ''
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_image_tag
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:565
+    Code: if not service_config.get("read_only", False):
+    Variable: read_only
+    Default: False
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_read_only
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+  compose_analyzer.py:599
+    Code: ports = service_config.get("ports", [])
+    Variable: ports
+    Default: [...]
+    Context: Config/secrets fallback in class ComposeAnalyzer, function _check_exposed_ports
+    Fix: Remove the default value. Environment variables should fail explicitly if not set.
+
+======================================================================
+</pre>
+</body>
+</html>

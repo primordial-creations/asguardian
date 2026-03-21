@@ -12,6 +12,7 @@ from Asgard.Verdandi.SLO.models.slo_models import (
     SLIMetric,
     SLOType,
 )
+from Asgard.Verdandi.SLO.services._sli_aggregation import aggregate_by_period
 
 
 class SLITracker:
@@ -87,7 +88,6 @@ class SLITracker:
         if days is not None:
             start_time = end_time - timedelta(days=days)
 
-        # Start with all metrics or filter by service/type
         if service_name and slo_type:
             metrics = [
                 m
@@ -101,7 +101,6 @@ class SLITracker:
         else:
             metrics = self._metrics
 
-        # Apply time filter
         if start_time:
             metrics = [
                 m for m in metrics if m.timestamp >= start_time and m.timestamp <= end_time
@@ -151,7 +150,7 @@ class SLITracker:
             Dictionary mapping hour timestamp to aggregated metrics
         """
         metrics = self.get_history(service_name, slo_type, days=days)
-        return self._aggregate_by_period(metrics, hours=1)
+        return aggregate_by_period(metrics, hours=1)
 
     def aggregate_by_day(
         self,
@@ -171,7 +170,7 @@ class SLITracker:
             Dictionary mapping day timestamp to aggregated metrics
         """
         metrics = self.get_history(service_name, slo_type, days=days)
-        return self._aggregate_by_period(metrics, hours=24)
+        return aggregate_by_period(metrics, hours=24)
 
     def calculate_sli(
         self,
@@ -275,11 +274,9 @@ class SLITracker:
             service_name: If provided, only clear metrics for this service
         """
         if service_name:
-            # Remove from main list
             self._metrics = [
                 m for m in self._metrics if m.service_name != service_name
             ]
-            # Clear service-specific list
             if service_name in self._metrics_by_service:
                 for metric in self._metrics_by_service[service_name]:
                     self._metrics_by_type[metric.slo_type] = [
@@ -292,45 +289,3 @@ class SLITracker:
             self._metrics = []
             self._metrics_by_service = defaultdict(list)
             self._metrics_by_type = defaultdict(list)
-
-    def _aggregate_by_period(
-        self,
-        metrics: List[SLIMetric],
-        hours: int,
-    ) -> Dict[datetime, Dict[str, float]]:
-        """Aggregate metrics by time period."""
-        if not metrics:
-            return {}
-
-        aggregated: Dict[datetime, Dict[str, float]] = {}
-        period_seconds = hours * 3600
-
-        for metric in metrics:
-            # Round down to period start
-            ts = metric.timestamp.timestamp()
-            period_start_ts = ts - (ts % period_seconds)
-            period_start = datetime.fromtimestamp(period_start_ts)
-
-            if period_start not in aggregated:
-                aggregated[period_start] = {
-                    "total_events": 0,
-                    "good_events": 0,
-                    "bad_events": 0,
-                    "measurement_count": 0,
-                }
-
-            aggregated[period_start]["total_events"] += metric.total_events
-            aggregated[period_start]["good_events"] += metric.good_events
-            aggregated[period_start]["bad_events"] += (
-                metric.total_events - metric.good_events
-            )
-            aggregated[period_start]["measurement_count"] += 1
-
-        # Calculate success rates
-        for period_data in aggregated.values():
-            total = period_data["total_events"]
-            good = period_data["good_events"]
-            period_data["success_rate"] = good / total if total > 0 else 1.0
-            period_data["failure_rate"] = 1.0 - period_data["success_rate"]
-
-        return dict(sorted(aggregated.items()))

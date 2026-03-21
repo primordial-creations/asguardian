@@ -9,35 +9,25 @@ Low cohesion (high LCOM) indicates:
 - Class is doing too many unrelated things
 - Should potentially be split into multiple classes
 - Methods don't work together on shared data
-
-LCOM Calculation (Chidamber-Kemerer):
-- P = pairs of methods that don't share instance variables
-- Q = pairs of methods that share at least one instance variable
-- LCOM = (P - Q) / max(P - Q, 0) if P > Q, else 0
-
-LCOM4 Calculation (Henderson-Sellers):
-- LCOM4 = (m - sum(mA)/a) / (m - 1)
-- Where m = number of methods, a = number of attributes
-- mA = number of methods accessing attribute A
 """
 
-import ast
-import time
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 from Asgard.Heimdall.OOP.models.oop_models import (
     ClassCohesionMetrics,
-    CohesionLevel,
     OOPConfig,
-    OOPSeverity,
 )
 from Asgard.Heimdall.OOP.utilities.class_utils import (
     ClassInfo,
     extract_classes_from_file,
-    get_class_methods,
     get_class_attributes,
-    MethodInfo,
+    get_class_methods,
+)
+from Asgard.Heimdall.OOP.services._cohesion_helpers import (
+    calculate_lcom_ck,
+    calculate_lcom_hs,
+    suggest_splits as _suggest_splits,
 )
 from Asgard.Heimdall.Quality.utilities.file_utils import scan_directory
 
@@ -77,7 +67,6 @@ class CohesionAnalyzer:
 
         results: List[ClassCohesionMetrics] = []
 
-        # Build exclude patterns
         exclude_patterns = list(self.config.exclude_patterns)
         if not self.config.include_tests:
             exclude_patterns.extend(["test_", "_test.py", "tests/", "conftest.py"])
@@ -111,29 +100,21 @@ class CohesionAnalyzer:
         self, cls: ClassInfo, file_path: Path, root_path: Path
     ) -> Optional[ClassCohesionMetrics]:
         """Analyze cohesion for a single class."""
-        # Get methods and attributes
         methods = get_class_methods(cls)
         attributes = get_class_attributes(cls)
 
-        # Filter out special methods for cohesion calculation
         regular_methods = [m for m in methods if not m.name.startswith("_")]
 
-        # If too few methods or attributes, cohesion is undefined
         if len(regular_methods) < 2 or len(attributes) < 1:
             lcom = 0.0
             lcom4 = 0.0
         else:
-            # Build method-attribute usage matrix
             method_attr_usage: Dict[str, Set[str]] = {}
-
             for method in regular_methods:
                 method_attr_usage[method.name] = method.accessed_attributes & attributes
 
-            # Calculate LCOM (Chidamber-Kemerer)
-            lcom = self._calculate_lcom_ck(method_attr_usage)
-
-            # Calculate LCOM4 (Henderson-Sellers)
-            lcom4 = self._calculate_lcom_hs(method_attr_usage, len(attributes))
+            lcom = calculate_lcom_ck(method_attr_usage)
+            lcom4 = calculate_lcom_hs(method_attr_usage, len(attributes))
 
         cohesion_level = ClassCohesionMetrics.calculate_cohesion_level(lcom)
         severity = ClassCohesionMetrics.calculate_severity(lcom, self.config.lcom_threshold)
@@ -158,78 +139,6 @@ class CohesionAnalyzer:
             cohesion_level=cohesion_level,
             severity=severity,
         )
-
-    def _calculate_lcom_ck(self, method_attr_usage: Dict[str, Set[str]]) -> float:
-        """
-        Calculate LCOM using Chidamber-Kemerer method.
-
-        LCOM = (P - Q) if P > Q else 0
-        Where:
-        - P = number of method pairs that don't share any attributes
-        - Q = number of method pairs that share at least one attribute
-
-        Normalized to 0-1 range.
-        """
-        methods = list(method_attr_usage.keys())
-        n = len(methods)
-
-        if n < 2:
-            return 0.0
-
-        p = 0  # Pairs not sharing attributes
-        q = 0  # Pairs sharing attributes
-
-        for i in range(n):
-            for j in range(i + 1, n):
-                attrs_i = method_attr_usage[methods[i]]
-                attrs_j = method_attr_usage[methods[j]]
-
-                if attrs_i & attrs_j:  # Share at least one attribute
-                    q += 1
-                else:
-                    p += 1
-
-        total_pairs = p + q
-        if total_pairs == 0:
-            return 0.0
-
-        # Normalize: LCOM = P / total_pairs
-        # This gives 0 when all pairs share (good) and 1 when none share (bad)
-        return p / total_pairs
-
-    def _calculate_lcom_hs(
-        self, method_attr_usage: Dict[str, Set[str]], num_attributes: int
-    ) -> float:
-        """
-        Calculate LCOM using Henderson-Sellers method.
-
-        LCOM4 = (m - sum(mA)/a) / (m - 1)
-        Where:
-        - m = number of methods
-        - a = number of attributes
-        - mA = number of methods accessing attribute A
-        """
-        m = len(method_attr_usage)
-        a = num_attributes
-
-        if m <= 1 or a == 0:
-            return 0.0
-
-        # Count how many methods access each attribute
-        attr_access_count: Dict[str, int] = {}
-
-        for method_name, accessed in method_attr_usage.items():
-            for attr in accessed:
-                attr_access_count[attr] = attr_access_count.get(attr, 0) + 1
-
-        # Sum of mA for all attributes
-        sum_ma = sum(attr_access_count.values())
-
-        # LCOM4 = (m - sum_ma/a) / (m - 1)
-        lcom4 = (m - sum_ma / a) / (m - 1)
-
-        # Clamp to 0-1 range
-        return max(0.0, min(1.0, lcom4))
 
     def analyze_file(self, file_path: Path) -> List[ClassCohesionMetrics]:
         """
@@ -262,7 +171,6 @@ class CohesionAnalyzer:
         """
         threshold = threshold or self.config.lcom_threshold
         metrics = self.analyze(scan_path)
-
         return [m for m in metrics if m.lcom > threshold]
 
     def suggest_splits(
@@ -280,60 +188,4 @@ class CohesionAnalyzer:
         Returns:
             List of (group_name, method_set) tuples
         """
-        if cls_metrics.lcom < 0.5:
-            # Already reasonably cohesive
-            return []
-
-        # Build a graph of methods connected by shared attributes
-        methods = list(cls_metrics.method_attribute_usage.keys())
-        method_groups: List[Set[str]] = []
-
-        for method in methods:
-            attrs = cls_metrics.method_attribute_usage[method]
-
-            # Find existing group that shares attributes
-            found_group = False
-            for group in method_groups:
-                for existing_method in group:
-                    existing_attrs = cls_metrics.method_attribute_usage[existing_method]
-                    if attrs & existing_attrs:
-                        group.add(method)
-                        found_group = True
-                        break
-                if found_group:
-                    break
-
-            if not found_group:
-                method_groups.append({method})
-
-        # Merge groups that share methods
-        merged = True
-        while merged:
-            merged = False
-            for i, group_i in enumerate(method_groups):
-                for j, group_j in enumerate(method_groups[i + 1:], i + 1):
-                    # Check if groups share any attributes
-                    attrs_i = set()
-                    for m in group_i:
-                        attrs_i.update(cls_metrics.method_attribute_usage[m])
-
-                    attrs_j = set()
-                    for m in group_j:
-                        attrs_j.update(cls_metrics.method_attribute_usage[m])
-
-                    if attrs_i & attrs_j:
-                        method_groups[i] = group_i | group_j
-                        method_groups.pop(j)
-                        merged = True
-                        break
-                if merged:
-                    break
-
-        # Name the groups
-        suggestions = []
-        for idx, group in enumerate(method_groups):
-            if len(group) >= 2:
-                name = f"{cls_metrics.class_name}Part{idx + 1}"
-                suggestions.append((name, group))
-
-        return suggestions
+        return _suggest_splits(cls_metrics)

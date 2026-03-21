@@ -14,6 +14,14 @@ from Asgard.Verdandi.Trend.models.trend_models import (
     TrendDirection,
     TrendReport,
 )
+from Asgard.Verdandi.Trend.services._trend_helpers import (
+    calculate_trend_confidence,
+    detect_change_points_in_data,
+    determine_direction,
+    generate_report_recommendations,
+    generate_trend_description,
+    linear_regression,
+)
 
 
 class TrendAnalyzer:
@@ -75,28 +83,22 @@ class TrendAnalyzer:
                 description="Insufficient data points for trend analysis",
             )
 
-        # Sort by timestamp
         sorted_data = sorted(data, key=lambda d: d.timestamp)
         values = [d.value for d in sorted_data]
         timestamps = [d.timestamp for d in sorted_data]
 
-        # Convert timestamps to numeric (seconds from start)
         t0 = timestamps[0].timestamp()
         x_values = [(t.timestamp() - t0) for t in timestamps]
 
-        # Calculate linear regression
-        slope, intercept, r_squared = self._linear_regression(x_values, values)
+        slope, intercept, r_squared = linear_regression(x_values, values)
 
-        # Calculate slope per day
-        slope_per_day = slope * 86400  # seconds in a day
+        slope_per_day = slope * 86400
 
-        # Calculate statistics
         mean = sum(values) / len(values)
         variance = sum((v - mean) ** 2 for v in values) / len(values)
         std_dev = math.sqrt(variance)
         volatility = std_dev / mean if mean != 0 else 0
 
-        # Calculate change
         start_value = values[0]
         end_value = values[-1]
         change_absolute = end_value - start_value
@@ -104,27 +106,21 @@ class TrendAnalyzer:
             change_absolute / abs(start_value) * 100 if start_value != 0 else 0
         )
 
-        # Determine trend direction
-        direction = self._determine_direction(
-            slope, change_percent, r_squared, metric_name
+        direction = determine_direction(
+            slope, change_percent, r_squared, metric_name,
+            self.r_squared_threshold, self.significance_threshold,
         )
 
-        # Calculate confidence
-        confidence = self._calculate_confidence(r_squared, len(data), slope)
+        confidence = calculate_trend_confidence(r_squared, len(data), slope)
 
-        # Check for significance
         is_significant = (
             abs(change_percent) >= self.significance_threshold
             and r_squared >= self.r_squared_threshold
         )
 
-        # Generate description
-        description = self._generate_description(
+        description = generate_trend_description(
             direction, change_percent, slope_per_day, r_squared
         )
-
-        # Calculate period duration
-        period_seconds = x_values[-1] - x_values[0] if x_values else 0
 
         return TrendAnalysis(
             metric_name=metric_name,
@@ -224,33 +220,7 @@ class TrendAnalyzer:
         Returns:
             List of (timestamp, change_magnitude) tuples
         """
-        if len(data) < 2 * window_size:
-            return []
-
-        sorted_data = sorted(data, key=lambda d: d.timestamp)
-        values = [d.value for d in sorted_data]
-        timestamps = [d.timestamp for d in sorted_data]
-
-        change_points = []
-
-        for i in range(window_size, len(values) - window_size):
-            before = values[i - window_size : i]
-            after = values[i : i + window_size]
-
-            before_mean = sum(before) / len(before)
-            after_mean = sum(after) / len(after)
-
-            # Pooled standard deviation
-            before_var = sum((x - before_mean) ** 2 for x in before) / len(before)
-            after_var = sum((x - after_mean) ** 2 for x in after) / len(after)
-            pooled_std = math.sqrt((before_var + after_var) / 2)
-
-            if pooled_std > 0:
-                change_magnitude = abs(after_mean - before_mean) / pooled_std
-                if change_magnitude >= threshold:
-                    change_points.append((timestamps[i], change_magnitude))
-
-        return change_points
+        return detect_change_points_in_data(list(data), window_size, threshold)
 
     def generate_report(
         self,
@@ -279,7 +249,6 @@ class TrendAnalyzer:
             else:
                 stable.append(name)
 
-        # Determine overall health
         if len(degrading) > len(improving):
             overall_health = "degrading"
         elif len(improving) > len(degrading):
@@ -287,10 +256,8 @@ class TrendAnalyzer:
         else:
             overall_health = "stable"
 
-        # Generate recommendations
-        recommendations = self._generate_report_recommendations(analyses)
+        recommendations = generate_report_recommendations(analyses)
 
-        # Get period from first metric
         first_analysis = list(analyses.values())[0] if analyses else None
 
         return TrendReport(
@@ -309,151 +276,3 @@ class TrendAnalyzer:
             overall_health=overall_health,
             recommendations=recommendations,
         )
-
-    def _linear_regression(
-        self,
-        x: Sequence[float],
-        y: Sequence[float],
-    ) -> Tuple[float, float, float]:
-        """
-        Calculate linear regression (slope, intercept, r_squared).
-        """
-        n = len(x)
-        if n < 2:
-            return 0.0, y[0] if y else 0.0, 0.0
-
-        sum_x = sum(x)
-        sum_y = sum(y)
-        sum_xy = sum(xi * yi for xi, yi in zip(x, y))
-        sum_x2 = sum(xi * xi for xi in x)
-        sum_y2 = sum(yi * yi for yi in y)
-
-        # Slope
-        denom = n * sum_x2 - sum_x * sum_x
-        if denom == 0:
-            return 0.0, sum_y / n, 0.0
-
-        slope = (n * sum_xy - sum_x * sum_y) / denom
-        intercept = (sum_y - slope * sum_x) / n
-
-        # R-squared
-        mean_y = sum_y / n
-        ss_tot = sum((yi - mean_y) ** 2 for yi in y)
-        ss_res = sum((yi - (slope * xi + intercept)) ** 2 for xi, yi in zip(x, y))
-
-        r_squared = 1 - (ss_res / ss_tot) if ss_tot > 0 else 0.0
-        r_squared = max(0.0, min(1.0, r_squared))  # Clamp to [0, 1]
-
-        return slope, intercept, r_squared
-
-    def _determine_direction(
-        self,
-        slope: float,
-        change_percent: float,
-        r_squared: float,
-        metric_name: str,
-    ) -> TrendDirection:
-        """Determine trend direction."""
-        # If R-squared is too low, trend is uncertain
-        if r_squared < self.r_squared_threshold:
-            if abs(change_percent) < self.significance_threshold:
-                return TrendDirection.STABLE
-            return TrendDirection.UNKNOWN
-
-        # Determine if change is significant
-        if abs(change_percent) < self.significance_threshold:
-            return TrendDirection.STABLE
-
-        # For latency metrics, increase is degrading
-        # For throughput metrics, increase is improving
-        is_latency_metric = any(
-            term in metric_name.lower()
-            for term in ["latency", "duration", "time", "delay", "response"]
-        )
-
-        if is_latency_metric:
-            return TrendDirection.DEGRADING if slope > 0 else TrendDirection.IMPROVING
-        else:
-            # Assume higher is better for other metrics
-            return TrendDirection.IMPROVING if slope > 0 else TrendDirection.DEGRADING
-
-    def _calculate_confidence(
-        self,
-        r_squared: float,
-        data_points: int,
-        slope: float,
-    ) -> float:
-        """Calculate confidence in trend detection."""
-        # R-squared contributes to confidence
-        r_confidence = r_squared
-
-        # More data points increase confidence
-        data_confidence = min(1.0, data_points / 30)
-
-        # Combine confidences
-        return (0.7 * r_confidence + 0.3 * data_confidence)
-
-    def _generate_description(
-        self,
-        direction: TrendDirection,
-        change_percent: float,
-        slope_per_day: float,
-        r_squared: float,
-    ) -> str:
-        """Generate human-readable trend description."""
-        if direction == TrendDirection.STABLE:
-            return f"Metric is stable (R2={r_squared:.2f})"
-        elif direction == TrendDirection.UNKNOWN:
-            return (
-                f"Trend unclear due to high variability "
-                f"(change={change_percent:+.1f}%, R2={r_squared:.2f})"
-            )
-        else:
-            dir_word = "improving" if direction == TrendDirection.IMPROVING else "degrading"
-            return (
-                f"Metric is {dir_word}: {change_percent:+.1f}% change, "
-                f"{abs(slope_per_day):.2f}/day (R2={r_squared:.2f})"
-            )
-
-    def _generate_report_recommendations(
-        self,
-        analyses: Dict[str, TrendAnalysis],
-    ) -> List[str]:
-        """Generate recommendations for trend report."""
-        recommendations = []
-
-        # Find most degrading metric
-        degrading = [
-            (name, a) for name, a in analyses.items()
-            if a.direction == TrendDirection.DEGRADING
-        ]
-        if degrading:
-            worst = max(degrading, key=lambda x: abs(x[1].change_percent))
-            recommendations.append(
-                f"Investigate '{worst[0]}': degrading by {abs(worst[1].change_percent):.1f}% "
-                f"over the analysis period."
-            )
-
-        # Count critical trends
-        critical_count = sum(
-            1 for a in analyses.values()
-            if a.is_significant and a.direction == TrendDirection.DEGRADING
-        )
-        if critical_count > 0:
-            recommendations.append(
-                f"{critical_count} metric(s) showing significant degradation. "
-                f"Review recent changes and resource utilization."
-            )
-
-        # Check for high volatility
-        volatile = [
-            name for name, a in analyses.items()
-            if a.volatility > 0.5
-        ]
-        if volatile:
-            recommendations.append(
-                f"High volatility in: {', '.join(volatile[:3])}. "
-                f"Consider investigating inconsistent performance."
-            )
-
-        return recommendations

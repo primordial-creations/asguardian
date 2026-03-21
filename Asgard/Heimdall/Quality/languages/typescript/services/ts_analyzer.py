@@ -18,10 +18,8 @@ from Asgard.Heimdall.Quality.languages.javascript.models.js_models import (
     JSRuleCategory,
     JSSeverity,
 )
-from Asgard.Heimdall.Quality.languages.javascript.services.js_analyzer import (
-    JSAnalyzer,
-    _make_finding,
-)
+from Asgard.Heimdall.Quality.languages.javascript.services.js_analyzer import JSAnalyzer
+from Asgard.Heimdall.Quality.languages.javascript.services._js_rules import _make_finding
 
 
 class TSAnalyzer:

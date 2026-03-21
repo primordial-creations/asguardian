@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - quality file-length</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - quality file-length</h1>
+  <pre>
+======================================================================
+  HEIMDALL CODE QUALITY REPORT
+  File Length Analysis
+======================================================================
+
+  Scan Path:    /mnt/storage/home-data/Documents/GAIA/Asgard/Asgard
+  Scanned At:   2026-03-20 12:29:40
+  Duration:     0.21s
+
+----------------------------------------------------------------------
+  FILES EXCEEDING THRESHOLD
+----------------------------------------------------------------------
+
+  [CRITICAL]
+
+    heimdall_report_642b3e4b.html
+      4049 lines (+3749 over 300-line threshold)
+
+    heimdall_report_eab467e6.html
+      3698 lines (+3398 over 300-line threshold)
+
+    Heimdall/cli/main.py
+      1817 lines (+1517 over 300-line threshold)
+
+    Freya/Integration/services/site_crawler.py
+      1272 lines (+972 over 300-line threshold)
+
+    heimdall_report_77a505d7.html
+      1197 lines (+897 over 300-line threshold)
+
+    Heimdall/Quality/services/code_smell_detector.py
+      1001 lines (+701 over 300-line threshold)
+
+    Forseti/Avro/services/avro_validator_service.py
+      967 lines (+667 over 300-line threshold)
+
+    heimdall_report_8cc7e4b2.html
+      963 lines (+663 over 300-line threshold)
+
+    Forseti/Protobuf/services/protobuf_validator_service.py
+      954 lines (+654 over 300-line threshold)
+
+    heimdall_report_b41a6657.html
+      951 lines (+651 over 300-line threshold)
+
+    heimdall_report_49f1dc16.html
+      947 lines (+647 over 300-line threshold)
+
+    heimdall_report_b977c74c.html
+      943 lines (+643 over 300-line threshold)
+
+    Forseti/Contracts/services/breaking_change_detector_service.py
+      942 lines (+642 over 300-line threshold)
+
+    heimdall_report_de7d7598.html
+      923 lines (+623 over 300-line threshold)
+
+    heimdall_report_79c15a3d.html
+      919 lines (+619 over 300-line threshold)
+
+    Volundr/Scaffold/services/microservice_scaffold.py
+      918 lines (+618 over 300-line threshold)
+
+    heimdall_report_70684e66.html
+      911 lines (+611 over 300-line threshold)
+
+    Dashboard/services/html_renderer.py
+      873 lines (+573 over 300-line threshold)
+
+    Heimdall/Security/services/static_security_service.py
+      869 lines (+569 over 300-line threshold)
+
+    Volundr/Scaffold/services/monorepo_scaffold.py
+      866 lines (+566 over 300-line threshold)
+
+    Forseti/MockServer/services/mock_server_generator.py
+      860 lines (+560 over 300-line threshold)
+
+    config/models.py
+      853 lines (+553 over 300-line threshold)
+
+    Heimdall/Quality/services/technical_debt_analyzer.py
+      830 lines (+530 over 300-line threshold)
+
+    Freya/Images/services/image_optimization_scanner.py
+      828 lines (+528 over 300-line threshold)
+
+    Heimdall/Quality/services/env_fallback_scanner.py
+      822 lines (+522 over 300-line threshold)
+
+    Volundr/Helm/services/chart_generator.py
+      794 lines (+494 over 300-line threshold)
+
+    Heimdall/Quality/services/type_checker.py
+      791 lines (+491 over 300-line threshold)
+
+    Heimdall/Quality/services/maintainability_analyzer.py
+      779 lines (+479 over 300-line threshold)
+
+    Forseti/CodeGen/services/python_generator.py
+      775 lines (+475 over 300-line threshold)
+
+    Forseti/Documentation/services/docs_generator.py
+      745 lines (+445 over 300-line threshold)
+
+    Forseti/CodeGen/services/typescript_generator.py
+      735 lines (+435 over 300-line threshold)
+
+    Heimdall/Architecture/services/hexagonal_analyzer.py
+      735 lines (+435 over 300-line threshold)
+
+    Forseti/CodeGen/services/golang_generator.py
+      728 lines (+428 over 300-line threshold)
+
+    Heimdall/Quality/services/error_handling_scanner.py
+      712 lines (+412 over 300-line threshold)
+
+    Forseti/JSONSchema/services/schema_validator_service.py
+      693 lines (+393 over 300-line threshold)
+
+    Forseti/Protobuf/services/protobuf_compatibility_service.py
+      690 lines (+390 over 300-line threshold)
+
+    Forseti/Avro/services/avro_compatibility_service.py
+      689 lines (+389 over 300-line threshold)
+
+    Reporting/html_generator.py
+      682 lines (+382 over 300-line threshold)
+
+    Volundr/Terraform/services/module_builder.py
+      676 lines (+376 over 300-line threshold)
+
+    Heimdall/Quality/services/resource_cleanup_scanner.py
+      676 lines (+376 over 300-line threshold)
+
+    Heimdall/Quality/services/syntax_checker.py
+      674 lines (+374 over 300-line threshold)
+
+    Heimdall/Dependencies/services/requirements_checker.py
+      669 lines (+369 over 300-line threshold)
+
+    Heimdall/Security/TaintAnalysis/services/taint_analyzer.py
+      659 lines (+359 over 300-line threshold)
+
+    Heimdall/Architecture/services/architecture_analyzer.py
+      651 lines (+351 over 300-line threshold)
+
+    Heimdall/Architecture/services/pattern_detector.py
+      651 lines (+351 over 300-line threshold)
+
+    Heimdall/Security/Container/services/compose_analyzer.py
+      651 lines (+351 over 300-line threshold)
+
+    Heimdall/Quality/services/race_condition_scanner.py
+      651 lines (+351 over 300-line threshold)
+
+    Heimdall/Quality/services/complexity_analyzer.py
+      643 lines (+343 over 300-line threshold)
+
+    Heimdall/Security/services/config_secrets_scanner.py
+      637 lines (+337 over 300-line threshold)
+
+    Forseti/AsyncAPI/services/asyncapi_validator_service.py
+      631 lines (+331 over 300-line threshold)
+
+    Freya/Accessibility/services/wcag_validator.py
+      630 lines (+330 over 300-line threshold)
+
+    Heimdall/Quality/services/daemon_thread_scanner.py
+      625 lines (+325 over 300-line threshold)
+
+    Freya/Security/services/security_header_scanner.py
+      624 lines (+324 over 300-line threshold)
+
+    cli.py
+      618 lines (+318 over 300-line threshold)
+
+    Heimdall/Architecture/services/solid_validator.py
+      616 lines (+316 over 300-line threshold)
+
+    Heimdall/Quality/services/lazy_import_scanner.py
+      613 lines (+313 over 300-line threshold)
+
+    Forseti/OpenAPI/services/spec_converter_service.py
+      611 lines (+311 over 300-line threshold)
+
+    Freya/Visual/services/image_ops.py
+      608 lines (+308 over 300-line threshold)
+
+    Volundr/Validation/services/terraform_validator.py
+      606 lines (+306 over 300-line threshold)
+
+    Volundr/Validation/services/dockerfile_validator.py
+      604 lines (+304 over 300-line threshold)
+
+    Heimdall/Quality/services/future_leak_scanner.py
+      604 lines (+304 over 300-line threshold)
+
+    heimdall_report_8f33363c.html
+      597 lines (+297 over 300-line threshold)
+
+    heimdall_report_9c340b95.html
+      597 lines (+297 over 300-line threshold)
+
+    heimdall_report_bb7bcf9b.html
+      597 lines (+297 over 300-line threshold)
+
+    heimdall_report_ff9fbacb.html
+      597 lines (+297 over 300-line threshold)
+
+    heimdall_report_374acc19.html
+      597 lines (+297 over 300-line threshold)
+
+    heimdall_report_ba470e07.html
+      597 lines (+297 over 300-line threshold)
+
+    heimdall_report_51173d58.html
+      597 lines (+297 over 300-line threshold)
+
+    heimdall_report_b9fa52d0.html
+      597 lines (+297 over 300-line threshold)
+
+    heimdall_report_1e9e2998.html
+      597 lines (+297 over 300-line threshold)
+
+    Freya/Integration/services/html_reporter.py
+      597 lines (+297 over 300-line threshold)
+
+    Heimdall/Architecture/services/pattern_suggester.py
+      584 lines (+284 over 300-line threshold)
+
+    Heimdall/Security/Hotspots/services/hotspot_detector.py
+      578 lines (+278 over 300-line threshold)
+
+    Heimdall/OOP/services/oop_analyzer.py
+      578 lines (+278 over 300-line threshold)
+
+    Volundr/Validation/services/kubernetes_validator.py
+      574 lines (+274 over 300-line threshold)
+
+    Heimdall/Security/services/injection_detection_service.py
+      572 lines (+272 over 300-line threshold)
+
+    Heimdall/Quality/services/duplication_detector.py
+      563 lines (+263 over 300-line threshold)
+
+    Forseti/MockServer/services/mock_data_generator.py
+      561 lines (+261 over 300-line threshold)
+
+    Volundr/Compose/services/compose_generator.py
+      559 lines (+259 over 300-line threshold)
+
+    Verdandi/Tracing/services/trace_parser.py
+      559 lines (+259 over 300-line threshold)
+
+    Verdandi/Anomaly/services/regression_detector.py
+      558 lines (+258 over 300-line threshold)
+
+    Heimdall/Dependencies/services/license_checker.py
+      556 lines (+256 over 300-line threshold)
+
+    Heimdall/Quality/services/thread_safety_scanner.py
+      556 lines (+256 over 300-line threshold)
+
+    Freya/Integration/services/unified_tester.py
+      556 lines (+256 over 300-line threshold)
+
+    Heimdall/Security/services/secrets_detection_service.py
+      555 lines (+255 over 300-line threshold)
+
+    Volundr/Kubernetes/services/manifest_generator.py
+      545 lines (+245 over 300-line threshold)
+
+    Forseti/JSONSchema/services/schema_inference_service.py
+      542 lines (+242 over 300-line threshold)
+
+    MCP/server/asgard_mcp_server.py
+      538 lines (+238 over 300-line threshold)
+
+    Heimdall/Quality/services/blocking_async_scanner.py
+      534 lines (+234 over 300-line threshold)
+
+    Heimdall/Security/services/cryptographic_validation_service.py
+      529 lines (+229 over 300-line threshold)
+
+    Heimdall/Issues/services/issue_tracker.py
+      529 lines (+229 over 300-line threshold)
+
+    Heimdall/Security/services/dependency_vulnerability_service.py
+      528 lines (+228 over 300-line threshold)
+
+    Heimdall/Security/Container/services/dockerfile_analyzer.py
+      523 lines (+223 over 300-line threshold)
+
+    Heimdall/Security/utilities/security_utils.py
+      521 lines (+221 over 300-line threshold)
+
+    Volundr/GitOps/services/flux_generator.py
+      513 lines (+213 over 300-line threshold)
+
+    Heimdall/Quality/services/datetime_scanner.py
+      511 lines (+211 over 300-line threshold)
+
+    Freya/Visual/services/visual_regression.py
+      509 lines (+209 over 300-line threshold)
+
+    Freya/Accessibility/services/color_contrast.py
+      509 lines (+209 over 300-line threshold)
+
+    Forseti/OpenAPI/services/spec_validator_service.py
+      507 lines (+207 over 300-line threshold)
+
+    Volundr/Kustomize/services/patch_generator.py
+      503 lines (+203 over 300-line threshold)
+
+    Heimdall/Security/Compliance/services/compliance_reporter.py
+      503 lines (+203 over 300-line threshold)
+
+  [SEVERE]
+
+    Freya/Links/services/link_validator.py
+      498 lines (+198 over 300-line threshold)
+
+    Heimdall/Architecture/services/layer_analyzer.py
+      497 lines (+197 over 300-line threshold)
+
+    Heimdall/Security/models/security_models.py
+      497 lines (+197 over 300-line threshold)
+
+    Heimdall/OOP/models/oop_models.py
+      491 lines (+191 over 300-line threshold)
+
+    Heimdall/Quality/services/typing_scanner.py
+      489 lines (+189 over 300-line threshold)
+
+    Forseti/GraphQL/services/introspection_service.py
+      488 lines (+188 over 300-line threshold)
+
+    common/baseline.py
+      487 lines (+187 over 300-line threshold)
+
+    common/output_formatter.py
+      487 lines (+187 over 300-line threshold)
+
+    Forseti/AsyncAPI/models/asyncapi_models.py
+      486 lines (+186 over 300-line threshold)
+
+    Forseti/Contracts/services/compatibility_checker_service.py
+      482 lines (+182 over 300-line threshold)
+
+    Verdandi/Trend/services/forecast_calculator.py
+      478 lines (+178 over 300-line threshold)
+
+    Forseti/JSONSchema/services/schema_generator_service.py
+      476 lines (+176 over 300-line threshold)
+
+    Forseti/GraphQL/services/schema_generator_service.py
+      476 lines (+176 over 300-line threshold)
+
+    Heimdall/Security/Infrastructure/services/hardening_checker.py
+      476 lines (+176 over 300-line threshold)
+
+    Heimdall/Quality/services/documentation_scanner.py
+      466 lines (+166 over 300-line threshold)
+
+    Forseti/OpenAPI/models/openapi_models.py
+      465 lines (+165 over 300-line threshold)
+
+    Forseti/Protobuf/models/protobuf_models.py
+      461 lines (+161 over 300-line threshold)
+
+    Heimdall/Quality/languages/shell/services/shell_analyzer.py
+      460 lines (+160 over 300-line threshold)
+
+    Verdandi/Trend/services/trend_analyzer.py
+      459 lines (+159 over 300-line threshold)
+
+    Freya/SEO/services/meta_tag_analyzer.py
+      457 lines (+157 over 300-line threshold)
+
+    Verdandi/Anomaly/services/statistical_detector.py
+      454 lines (+154 over 300-line threshold)
+
+    Freya/Accessibility/services/aria_validator.py
+      452 lines (+152 over 300-line threshold)
+
+    Heimdall/Quality/services/naming_convention_scanner.py
+      451 lines (+151 over 300-line threshold)
+
+    Heimdall/common/new_code_period.py
+      448 lines (+148 over 300-line threshold)
+
+    Freya/Accessibility/services/screen_reader.py
+      448 lines (+148 over 300-line threshold)
+
+    Baseline/baseline_manager.py
+      447 lines (+147 over 300-line threshold)
+
+    Forseti/JSONSchema/utilities/jsonschema_utils.py
+      446 lines (+146 over 300-line threshold)
+
+    Freya/Performance/services/resource_timing_analyzer.py
+      446 lines (+146 over 300-line threshold)
+
+    Heimdall/Security/Infrastructure/utilities/config_utils.py
+      445 lines (+145 over 300-line threshold)
+
+    Heimdall/Security/Infrastructure/services/credential_analyzer.py
+      437 lines (+137 over 300-line threshold)
+
+    Verdandi/Tracing/services/critical_path_analyzer.py
+      437 lines (+137 over 300-line threshold)
+
+    Heimdall/Security/Infrastructure/services/config_validator.py
+      435 lines (+135 over 300-line threshold)
+
+    Forseti/MockServer/models/mock_models.py
+      434 lines (+134 over 300-line threshold)
+
+    Verdandi/Anomaly/services/baseline_comparator.py
+      434 lines (+134 over 300-line threshold)
+
+    Heimdall/Quality/languages/javascript/services/js_analyzer.py
+      428 lines (+128 over 300-line threshold)
+
+    Heimdall/Security/Auth/services/jwt_validator.py
+      424 lines (+124 over 300-line threshold)
+
+    Heimdall/Quality/services/library_usage_scanner.py
+      422 lines (+122 over 300-line threshold)
+
+    Volundr/Compose/services/compose_validator.py
+      421 lines (+121 over 300-line threshold)
+
+    Freya/Performance/services/page_load_analyzer.py
+      421 lines (+121 over 300-line threshold)
+
+    Verdandi/SLO/services/burn_rate_analyzer.py
+      417 lines (+117 over 300-line threshold)
+
+    Freya/Accessibility/services/keyboard_nav.py
+      416 lines (+116 over 300-line threshold)
+
+    Heimdall/Init/templates.py
+      415 lines (+115 over 300-line threshold)
+
+    Heimdall/Architecture/models/architecture_models.py
+      412 lines (+112 over 300-line threshold)
+
+    Heimdall/Security/Headers/services/header_validator.py
+      412 lines (+112 over 300-line threshold)
+
+    Freya/Visual/services/layout_validator.py
+      412 lines (+112 over 300-line threshold)
+
+    Freya/SEO/services/structured_data_validator.py
+      410 lines (+110 over 300-line threshold)
+
+    Heimdall/CodeFix/services/codefix_service.py
+      409 lines (+109 over 300-line threshold)
+
+    Heimdall/Security/Auth/services/password_analyzer.py
+      408 lines (+108 over 300-line threshold)
+
+    Freya/Integration/services/playwright_utils.py
+      408 lines (+108 over 300-line threshold)
+
+    Heimdall/QualityGate/services/quality_gate_evaluator.py
+      406 lines (+106 over 300-line threshold)
+
+    Freya/Responsive/services/mobile_compatibility.py
+      406 lines (+106 over 300-line threshold)
+
+    Forseti/AsyncAPI/services/asyncapi_parser_service.py
+      405 lines (+105 over 300-line threshold)
+
+    Volundr/Kustomize/services/overlay_generator.py
+      405 lines (+105 over 300-line threshold)
+
+    Heimdall/Coverage/services/coverage_analyzer.py
+      403 lines (+103 over 300-line threshold)
+
+    Forseti/Avro/models/avro_models.py
+      402 lines (+102 over 300-line threshold)
+
+    Heimdall/Security/TLS/services/certificate_validator.py
+      401 lines (+101 over 300-line threshold)
+
+  [MODERATE]
+
+    Forseti/OpenAPI/utilities/openapi_utils.py
+      399 lines (+99 over 300-line threshold)
+
+    Volundr/GitOps/services/argocd_generator.py
+      397 lines (+97 over 300-line threshold)
+
+    Heimdall/Security/TLS/services/cipher_validator.py
+      397 lines (+97 over 300-line threshold)
+
+    config/defaults.py
+      397 lines (+97 over 300-line threshold)
+
+    Volundr/CICD/services/pipeline_generator.py
+      396 lines (+96 over 300-line threshold)
+
+    Heimdall/OOP/utilities/class_utils.py
+      395 lines (+95 over 300-line threshold)
+
+    Verdandi/APM/services/trace_aggregator.py
+      390 lines (+90 over 300-line threshold)
+
+    Forseti/GraphQL/services/schema_validator_service.py
+      385 lines (+85 over 300-line threshold)
+
+    common/incremental.py
+      384 lines (+84 over 300-line threshold)
+
+    Volundr/Kustomize/services/base_generator.py
+      383 lines (+83 over 300-line threshold)
+
+    Heimdall/Coverage/services/gap_analyzer.py
+      383 lines (+83 over 300-line threshold)
+
+    Freya/Console/services/console_capture.py
+      381 lines (+81 over 300-line threshold)
+
+    Heimdall/Performance/utilities/performance_utils.py
+      378 lines (+78 over 300-line threshold)
+
+    Verdandi/APM/services/service_map_builder.py
+      374 lines (+74 over 300-line threshold)
+
+    Heimdall/Init/linter_initializer.py
+      372 lines (+72 over 300-line threshold)
+
+    Heimdall/Security/Headers/services/cors_analyzer.py
+      370 lines (+70 over 300-line threshold)
+
+    Heimdall/Coverage/services/suggestion_engine.py
+      366 lines (+66 over 300-line threshold)
+
+    Forseti/Database/models/database_models.py
+      365 lines (+65 over 300-line threshold)
+
+    Forseti/GraphQL/utilities/graphql_utils.py
+      364 lines (+64 over 300-line threshold)
+
+    Forseti/Database/services/schema_diff_service.py
+      363 lines (+63 over 300-line threshold)
+
+    Forseti/JSONSchema/models/jsonschema_models.py
+      362 lines (+62 over 300-line threshold)
+
+    Forseti/OpenAPI/services/spec_generator_service.py
+      362 lines (+62 over 300-line threshold)
+
+    Freya/Integration/models/integration_models.py
+      362 lines (+62 over 300-line threshold)
+
+    Forseti/CodeGen/models/codegen_models.py
+      359 lines (+59 over 300-line threshold)
+
+    Heimdall/Quality/services/incremental_scanner.py
+      359 lines (+59 over 300-line threshold)
+
+    Reporting/github_formatter.py
+      358 lines (+58 over 300-line threshold)
+
+    common/progress.py
+      356 lines (+56 over 300-line threshold)
+
+    Forseti/Database/services/schema_analyzer_service.py
+      356 lines (+56 over 300-line threshold)
+
+    Freya/Security/services/csp_analyzer.py
+      356 lines (+56 over 300-line threshold)
+
+    Heimdall/Dependencies/services/sbom_generator.py
+      355 lines (+55 over 300-line threshold)
+
+    Heimdall/Security/Headers/services/csp_analyzer.py
+      355 lines (+55 over 300-line threshold)
+
+    Heimdall/Security/Container/utilities/dockerfile_parser.py
+      354 lines (+54 over 300-line threshold)
+
+    Heimdall/Architecture/utilities/ast_utils.py
+      352 lines (+52 over 300-line threshold)
+
+  [WARNING]
+
+    Reporting/History/services/history_store.py
+      350 lines (+50 over 300-line threshold)
+
+    Heimdall/Dependencies/services/dependency_analyzer.py
+      349 lines (+49 over 300-line threshold)
+
+    Forseti/Contracts/services/contract_validator_service.py
+      348 lines (+48 over 300-line threshold)
+
+    Heimdall/Performance/models/performance_models.py
+      348 lines (+48 over 300-line threshold)
+
+    Heimdall/OOP/services/coupling_analyzer.py
+      348 lines (+48 over 300-line threshold)
+
+    Heimdall/Performance/services/static_performance_service.py
+      347 lines (+47 over 300-line threshold)
+
+    Freya/Responsive/services/breakpoint_tester.py
+      347 lines (+47 over 300-line threshold)
+
+    Freya/Accessibility/models/accessibility_models.py
+      341 lines (+41 over 300-line threshold)
+
+    Freya/Integration/services/baseline_manager.py
+      340 lines (+40 over 300-line threshold)
+
+    Freya/SEO/services/robots_analyzer.py
+      340 lines (+40 over 300-line threshold)
+
+    Forseti/OpenAPI/services/spec_parser_service.py
+      339 lines (+39 over 300-line threshold)
+
+    Heimdall/OOP/services/cohesion_analyzer.py
+      339 lines (+39 over 300-line threshold)
+
+    Heimdall/Quality/__init__.py
+      339 lines (+39 over 300-line threshold)
+
+    Freya/Visual/services/style_validator.py
+      339 lines (+39 over 300-line threshold)
+
+    Verdandi/SLO/services/sli_tracker.py
+      336 lines (+36 over 300-line threshold)
+
+    Heimdall/Performance/services/cpu_profiler_service.py
+      335 lines (+35 over 300-line threshold)
+
+    Heimdall/Security/TLS/services/protocol_analyzer.py
+      335 lines (+35 over 300-line threshold)
+
+    Freya/Performance/models/performance_models.py
+      334 lines (+34 over 300-line threshold)
+
+    Verdandi/APM/services/span_analyzer.py
+      330 lines (+30 over 300-line threshold)
+
+    Heimdall/OOP/services/inheritance_analyzer.py
+      326 lines (+26 over 300-line threshold)
+
+    Freya/Visual/services/screenshot_capture.py
+      324 lines (+24 over 300-line threshold)
+
+    Heimdall/Dependencies/services/modularity_analyzer.py
+      322 lines (+22 over 300-line threshold)
+
+    Forseti/Documentation/models/docs_models.py
+      319 lines (+19 over 300-line threshold)
+
+    BackendInit/templates.py
+      312 lines (+12 over 300-line threshold)
+
+    Heimdall/Quality/models/maintainability_models.py
+      308 lines (+8 over 300-line threshold)
+
+    Heimdall/Security/Headers/utilities/csp_parser.py
+      305 lines (+5 over 300-line threshold)
+
+    Heimdall/Ratings/services/ratings_calculator.py
+      304 lines (+4 over 300-line threshold)
+
+    Heimdall/Performance/services/cache_analyzer_service.py
+      302 lines (+2 over 300-line threshold)
+
+    common/parallel.py
+      301 lines (+1 over 300-line threshold)
+
+    Forseti/Database/services/migration_generator_service.py
+      301 lines (+1 over 300-line threshold)
+
+    Verdandi/Web/services/vitals_calculator.py
+      301 lines (+1 over 300-line threshold)
+
+----------------------------------------------------------------------
+  SUMMARY
+----------------------------------------------------------------------
+
+  Files Scanned:          4787
+  Files Over Threshold:   221
+  Compliance Rate:        95.4%
+
+----------------------------------------------------------------------
+  VIOLATIONS (longest first)
+  -----------------------------------------------
+
+  heimdall_report_642b3e4b.html   4049 lines  (limit: 300, over by 3749)
+  heimdall_report_eab467e6.html   3698 lines  (limit: 300, over by 3398)
+  Heimdall/cli/main.py   1817 lines  (limit: 300, over by 1517)
+  Freya/Integration/services/site_crawler.py   1272 lines  (limit: 300, over by 972)
+  heimdall_report_77a505d7.html   1197 lines  (limit: 300, over by 897)
+  Heimdall/Quality/services/code_smell_detector.py   1001 lines  (limit: 300, over by 701)
+  Forseti/Avro/services/avro_validator_service.py   967 lines  (limit: 300, over by 667)
+  heimdall_report_8cc7e4b2.html   963 lines  (limit: 300, over by 663)
+  Forseti/Protobuf/services/protobuf_validator_service.py   954 lines  (limit: 300, over by 654)
+  heimdall_report_b41a6657.html   951 lines  (limit: 300, over by 651)
+  heimdall_report_49f1dc16.html   947 lines  (limit: 300, over by 647)
+  heimdall_report_b977c74c.html   943 lines  (limit: 300, over by 643)
+  Forseti/Contracts/services/breaking_change_detector_service.py   942 lines  (limit: 300, over by 642)
+  heimdall_report_de7d7598.html   923 lines  (limit: 300, over by 623)
+  heimdall_report_79c15a3d.html   919 lines  (limit: 300, over by 619)
+  Volundr/Scaffold/services/microservice_scaffold.py   918 lines  (limit: 300, over by 618)
+  heimdall_report_70684e66.html   911 lines  (limit: 300, over by 611)
+  Dashboard/services/html_renderer.py   873 lines  (limit: 300, over by 573)
+  Heimdall/Security/services/static_security_service.py   869 lines  (limit: 300, over by 569)
+  Volundr/Scaffold/services/monorepo_scaffold.py   866 lines  (limit: 300, over by 566)
+  Forseti/MockServer/services/mock_server_generator.py   860 lines  (limit: 300, over by 560)
+  config/models.py   853 lines  (limit: 300, over by 553)
+  Heimdall/Quality/services/technical_debt_analyzer.py   830 lines  (limit: 300, over by 530)
+  Freya/Images/services/image_optimization_scanner.py   828 lines  (limit: 300, over by 528)
+  Heimdall/Quality/services/env_fallback_scanner.py   822 lines  (limit: 300, over by 522)
+  Volundr/Helm/services/chart_generator.py   794 lines  (limit: 300, over by 494)
+  Heimdall/Quality/services/type_checker.py   791 lines  (limit: 300, over by 491)
+  Heimdall/Quality/services/maintainability_analyzer.py   779 lines  (limit: 300, over by 479)
+  Forseti/CodeGen/services/python_generator.py   775 lines  (limit: 300, over by 475)
+  Forseti/Documentation/services/docs_generator.py   745 lines  (limit: 300, over by 445)
+  Forseti/CodeGen/services/typescript_generator.py   735 lines  (limit: 300, over by 435)
+  Heimdall/Architecture/services/hexagonal_analyzer.py   735 lines  (limit: 300, over by 435)
+  Forseti/CodeGen/services/golang_generator.py   728 lines  (limit: 300, over by 428)
+  Heimdall/Quality/services/error_handling_scanner.py   712 lines  (limit: 300, over by 412)
+  Forseti/JSONSchema/services/schema_validator_service.py   693 lines  (limit: 300, over by 393)
+  Forseti/Protobuf/services/protobuf_compatibility_service.py   690 lines  (limit: 300, over by 390)
+  Forseti/Avro/services/avro_compatibility_service.py   689 lines  (limit: 300, over by 389)
+  Reporting/html_generator.py   682 lines  (limit: 300, over by 382)
+  Volundr/Terraform/services/module_builder.py   676 lines  (limit: 300, over by 376)
+  Heimdall/Quality/services/resource_cleanup_scanner.py   676 lines  (limit: 300, over by 376)
+  Heimdall/Quality/services/syntax_checker.py   674 lines  (limit: 300, over by 374)
+  Heimdall/Dependencies/services/requirements_checker.py   669 lines  (limit: 300, over by 369)
+  Heimdall/Security/TaintAnalysis/services/taint_analyzer.py   659 lines  (limit: 300, over by 359)
+  Heimdall/Architecture/services/architecture_analyzer.py   651 lines  (limit: 300, over by 351)
+  Heimdall/Architecture/services/pattern_detector.py   651 lines  (limit: 300, over by 351)
+  Heimdall/Security/Container/services/compose_analyzer.py   651 lines  (limit: 300, over by 351)
+  Heimdall/Quality/services/race_condition_scanner.py   651 lines  (limit: 300, over by 351)
+  Heimdall/Quality/services/complexity_analyzer.py   643 lines  (limit: 300, over by 343)
+  Heimdall/Security/services/config_secrets_scanner.py   637 lines  (limit: 300, over by 337)
+  Forseti/AsyncAPI/services/asyncapi_validator_service.py   631 lines  (limit: 300, over by 331)
+  Freya/Accessibility/services/wcag_validator.py   630 lines  (limit: 300, over by 330)
+  Heimdall/Quality/services/daemon_thread_scanner.py   625 lines  (limit: 300, over by 325)
+  Freya/Security/services/security_header_scanner.py   624 lines  (limit: 300, over by 324)
+  cli.py   618 lines  (limit: 300, over by 318)
+  Heimdall/Architecture/services/solid_validator.py   616 lines  (limit: 300, over by 316)
+  Heimdall/Quality/services/lazy_import_scanner.py   613 lines  (limit: 300, over by 313)
+  Forseti/OpenAPI/services/spec_converter_service.py   611 lines  (limit: 300, over by 311)
+  Freya/Visual/services/image_ops.py   608 lines  (limit: 300, over by 308)
+  Volundr/Validation/services/terraform_validator.py   606 lines  (limit: 300, over by 306)
+  Volundr/Validation/services/dockerfile_validator.py   604 lines  (limit: 300, over by 304)
+  Heimdall/Quality/services/future_leak_scanner.py   604 lines  (limit: 300, over by 304)
+  heimdall_report_8f33363c.html   597 lines  (limit: 300, over by 297)
+  heimdall_report_9c340b95.html   597 lines  (limit: 300, over by 297)
+  heimdall_report_bb7bcf9b.html   597 lines  (limit: 300, over by 297)
+  heimdall_report_ff9fbacb.html   597 lines  (limit: 300, over by 297)
+  heimdall_report_374acc19.html   597 lines  (limit: 300, over by 297)
+  heimdall_report_ba470e07.html   597 lines  (limit: 300, over by 297)
+  heimdall_report_51173d58.html   597 lines  (limit: 300, over by 297)
+  heimdall_report_b9fa52d0.html   597 lines  (limit: 300, over by 297)
+  heimdall_report_1e9e2998.html   597 lines  (limit: 300, over by 297)
+  Freya/Integration/services/html_reporter.py   597 lines  (limit: 300, over by 297)
+  Heimdall/Architecture/services/pattern_suggester.py   584 lines  (limit: 300, over by 284)
+  Heimdall/Security/Hotspots/services/hotspot_detector.py   578 lines  (limit: 300, over by 278)
+  Heimdall/OOP/services/oop_analyzer.py   578 lines  (limit: 300, over by 278)
+  Volundr/Validation/services/kubernetes_validator.py   574 lines  (limit: 300, over by 274)
+  Heimdall/Security/services/injection_detection_service.py   572 lines  (limit: 300, over by 272)
+  Heimdall/Quality/services/duplication_detector.py   563 lines  (limit: 300, over by 263)
+  Forseti/MockServer/services/mock_data_generator.py   561 lines  (limit: 300, over by 261)
+  Volundr/Compose/services/compose_generator.py   559 lines  (limit: 300, over by 259)
+  Verdandi/Tracing/services/trace_parser.py   559 lines  (limit: 300, over by 259)
+  Verdandi/Anomaly/services/regression_detector.py   558 lines  (limit: 300, over by 258)
+  Heimdall/Dependencies/services/license_checker.py   556 lines  (limit: 300, over by 256)
+  Heimdall/Quality/services/thread_safety_scanner.py   556 lines  (limit: 300, over by 256)
+  Freya/Integration/services/unified_tester.py   556 lines  (limit: 300, over by 256)
+  Heimdall/Security/services/secrets_detection_service.py   555 lines  (limit: 300, over by 255)
+  Volundr/Kubernetes/services/manifest_generator.py   545 lines  (limit: 300, over by 245)
+  Forseti/JSONSchema/services/schema_inference_service.py   542 lines  (limit: 300, over by 242)
+  MCP/server/asgard_mcp_server.py   538 lines  (limit: 300, over by 238)
+  Heimdall/Quality/services/blocking_async_scanner.py   534 lines  (limit: 300, over by 234)
+  Heimdall/Security/services/cryptographic_validation_service.py   529 lines  (limit: 300, over by 229)
+  Heimdall/Issues/services/issue_tracker.py   529 lines  (limit: 300, over by 229)
+  Heimdall/Security/services/dependency_vulnerability_service.py   528 lines  (limit: 300, over by 228)
+  Heimdall/Security/Container/services/dockerfile_analyzer.py   523 lines  (limit: 300, over by 223)
+  Heimdall/Security/utilities/security_utils.py   521 lines  (limit: 300, over by 221)
+  Volundr/GitOps/services/flux_generator.py   513 lines  (limit: 300, over by 213)
+  Heimdall/Quality/services/datetime_scanner.py   511 lines  (limit: 300, over by 211)
+  Freya/Visual/services/visual_regression.py   509 lines  (limit: 300, over by 209)
+  Freya/Accessibility/services/color_contrast.py   509 lines  (limit: 300, over by 209)
+  Forseti/OpenAPI/services/spec_validator_service.py   507 lines  (limit: 300, over by 207)
+  Volundr/Kustomize/services/patch_generator.py   503 lines  (limit: 300, over by 203)
+  Heimdall/Security/Compliance/services/compliance_reporter.py   503 lines  (limit: 300, over by 203)
+  Freya/Links/services/link_validator.py   498 lines  (limit: 300, over by 198)
+  Heimdall/Architecture/services/layer_analyzer.py   497 lines  (limit: 300, over by 197)
+  Heimdall/Security/models/security_models.py   497 lines  (limit: 300, over by 197)
+  Heimdall/OOP/models/oop_models.py   491 lines  (limit: 300, over by 191)
+  Heimdall/Quality/services/typing_scanner.py   489 lines  (limit: 300, over by 189)
+  Forseti/GraphQL/services/introspection_service.py   488 lines  (limit: 300, over by 188)
+  common/baseline.py   487 lines  (limit: 300, over by 187)
+  common/output_formatter.py   487 lines  (limit: 300, over by 187)
+  Forseti/AsyncAPI/models/asyncapi_models.py   486 lines  (limit: 300, over by 186)
+  Forseti/Contracts/services/compatibility_checker_service.py   482 lines  (limit: 300, over by 182)
+  Verdandi/Trend/services/forecast_calculator.py   478 lines  (limit: 300, over by 178)
+  Forseti/JSONSchema/services/schema_generator_service.py   476 lines  (limit: 300, over by 176)
+  Forseti/GraphQL/services/schema_generator_service.py   476 lines  (limit: 300, over by 176)
+  Heimdall/Security/Infrastructure/services/hardening_checker.py   476 lines  (limit: 300, over by 176)
+  Heimdall/Quality/services/documentation_scanner.py   466 lines  (limit: 300, over by 166)
+  Forseti/OpenAPI/models/openapi_models.py   465 lines  (limit: 300, over by 165)
+  Forseti/Protobuf/models/protobuf_models.py   461 lines  (limit: 300, over by 161)
+  Heimdall/Quality/languages/shell/services/shell_analyzer.py   460 lines  (limit: 300, over by 160)
+  Verdandi/Trend/services/trend_analyzer.py   459 lines  (limit: 300, over by 159)
+  Freya/SEO/services/meta_tag_analyzer.py   457 lines  (limit: 300, over by 157)
+  Verdandi/Anomaly/services/statistical_detector.py   454 lines  (limit: 300, over by 154)
+  Freya/Accessibility/services/aria_validator.py   452 lines  (limit: 300, over by 152)
+  Heimdall/Quality/services/naming_convention_scanner.py   451 lines  (limit: 300, over by 151)
+  Heimdall/common/new_code_period.py   448 lines  (limit: 300, over by 148)
+  Freya/Accessibility/services/screen_reader.py   448 lines  (limit: 300, over by 148)
+  Baseline/baseline_manager.py   447 lines  (limit: 300, over by 147)
+  Forseti/JSONSchema/utilities/jsonschema_utils.py   446 lines  (limit: 300, over by 146)
+  Freya/Performance/services/resource_timing_analyzer.py   446 lines  (limit: 300, over by 146)
+  Heimdall/Security/Infrastructure/utilities/config_utils.py   445 lines  (limit: 300, over by 145)
+  Heimdall/Security/Infrastructure/services/credential_analyzer.py   437 lines  (limit: 300, over by 137)
+  Verdandi/Tracing/services/critical_path_analyzer.py   437 lines  (limit: 300, over by 137)
+  Heimdall/Security/Infrastructure/services/config_validator.py   435 lines  (limit: 300, over by 135)
+  Forseti/MockServer/models/mock_models.py   434 lines  (limit: 300, over by 134)
+  Verdandi/Anomaly/services/baseline_comparator.py   434 lines  (limit: 300, over by 134)
+  Heimdall/Quality/languages/javascript/services/js_analyzer.py   428 lines  (limit: 300, over by 128)
+  Heimdall/Security/Auth/services/jwt_validator.py   424 lines  (limit: 300, over by 124)
+  Heimdall/Quality/services/library_usage_scanner.py   422 lines  (limit: 300, over by 122)
+  Volundr/Compose/services/compose_validator.py   421 lines  (limit: 300, over by 121)
+  Freya/Performance/services/page_load_analyzer.py   421 lines  (limit: 300, over by 121)
+  Verdandi/SLO/services/burn_rate_analyzer.py   417 lines  (limit: 300, over by 117)
+  Freya/Accessibility/services/keyboard_nav.py   416 lines  (limit: 300, over by 116)
+  Heimdall/Init/templates.py   415 lines  (limit: 300, over by 115)
+  Heimdall/Architecture/models/architecture_models.py   412 lines  (limit: 300, over by 112)
+  Heimdall/Security/Headers/services/header_validator.py   412 lines  (limit: 300, over by 112)
+  Freya/Visual/services/layout_validator.py   412 lines  (limit: 300, over by 112)
+  Freya/SEO/services/structured_data_validator.py   410 lines  (limit: 300, over by 110)
+  Heimdall/CodeFix/services/codefix_service.py   409 lines  (limit: 300, over by 109)
+  Heimdall/Security/Auth/services/password_analyzer.py   408 lines  (limit: 300, over by 108)
+  Freya/Integration/services/playwright_utils.py   408 lines  (limit: 300, over by 108)
+  Heimdall/QualityGate/services/quality_gate_evaluator.py   406 lines  (limit: 300, over by 106)
+  Freya/Responsive/services/mobile_compatibility.py   406 lines  (limit: 300, over by 106)
+  Forseti/AsyncAPI/services/asyncapi_parser_service.py   405 lines  (limit: 300, over by 105)
+  Volundr/Kustomize/services/overlay_generator.py   405 lines  (limit: 300, over by 105)
+  Heimdall/Coverage/services/coverage_analyzer.py   403 lines  (limit: 300, over by 103)
+  Forseti/Avro/models/avro_models.py   402 lines  (limit: 300, over by 102)
+  Heimdall/Security/TLS/services/certificate_validator.py   401 lines  (limit: 300, over by 101)
+  Forseti/OpenAPI/utilities/openapi_utils.py   399 lines  (limit: 300, over by 99)
+  Volundr/GitOps/services/argocd_generator.py   397 lines  (limit: 300, over by 97)
+  Heimdall/Security/TLS/services/cipher_validator.py   397 lines  (limit: 300, over by 97)
+  config/defaults.py   397 lines  (limit: 300, over by 97)
+  Volundr/CICD/services/pipeline_generator.py   396 lines  (limit: 300, over by 96)
+  Heimdall/OOP/utilities/class_utils.py   395 lines  (limit: 300, over by 95)
+  Verdandi/APM/services/trace_aggregator.py   390 lines  (limit: 300, over by 90)
+  Forseti/GraphQL/services/schema_validator_service.py   385 lines  (limit: 300, over by 85)
+  common/incremental.py   384 lines  (limit: 300, over by 84)
+  Volundr/Kustomize/services/base_generator.py   383 lines  (limit: 300, over by 83)
+  Heimdall/Coverage/services/gap_analyzer.py   383 lines  (limit: 300, over by 83)
+  Freya/Console/services/console_capture.py   381 lines  (limit: 300, over by 81)
+  Heimdall/Performance/utilities/performance_utils.py   378 lines  (limit: 300, over by 78)
+  Verdandi/APM/services/service_map_builder.py   374 lines  (limit: 300, over by 74)
+  Heimdall/Init/linter_initializer.py   372 lines  (limit: 300, over by 72)
+  Heimdall/Security/Headers/services/cors_analyzer.py   370 lines  (limit: 300, over by 70)
+  Heimdall/Coverage/services/suggestion_engine.py   366 lines  (limit: 300, over by 66)
+  Forseti/Database/models/database_models.py   365 lines  (limit: 300, over by 65)
+  Forseti/GraphQL/utilities/graphql_utils.py   364 lines  (limit: 300, over by 64)
+  Forseti/Database/services/schema_diff_service.py   363 lines  (limit: 300, over by 63)
+  Forseti/JSONSchema/models/jsonschema_models.py   362 lines  (limit: 300, over by 62)
+  Forseti/OpenAPI/services/spec_generator_service.py   362 lines  (limit: 300, over by 62)
+  Freya/Integration/models/integration_models.py   362 lines  (limit: 300, over by 62)
+  Forseti/CodeGen/models/codegen_models.py   359 lines  (limit: 300, over by 59)
+  Heimdall/Quality/services/incremental_scanner.py   359 lines  (limit: 300, over by 59)
+  Reporting/github_formatter.py   358 lines  (limit: 300, over by 58)
+  common/progress.py   356 lines  (limit: 300, over by 56)
+  Forseti/Database/services/schema_analyzer_service.py   356 lines  (limit: 300, over by 56)
+  Freya/Security/services/csp_analyzer.py   356 lines  (limit: 300, over by 56)
+  Heimdall/Dependencies/services/sbom_generator.py   355 lines  (limit: 300, over by 55)
+  Heimdall/Security/Headers/services/csp_analyzer.py   355 lines  (limit: 300, over by 55)
+  Heimdall/Security/Container/utilities/dockerfile_parser.py   354 lines  (limit: 300, over by 54)
+  Heimdall/Architecture/utilities/ast_utils.py   352 lines  (limit: 300, over by 52)
+  Reporting/History/services/history_store.py   350 lines  (limit: 300, over by 50)
+  Heimdall/Dependencies/services/dependency_analyzer.py   349 lines  (limit: 300, over by 49)
+  Forseti/Contracts/services/contract_validator_service.py   348 lines  (limit: 300, over by 48)
+  Heimdall/Performance/models/performance_models.py   348 lines  (limit: 300, over by 48)
+  Heimdall/OOP/services/coupling_analyzer.py   348 lines  (limit: 300, over by 48)
+  Heimdall/Performance/services/static_performance_service.py   347 lines  (limit: 300, over by 47)
+  Freya/Responsive/services/breakpoint_tester.py   347 lines  (limit: 300, over by 47)
+  Freya/Accessibility/models/accessibility_models.py   341 lines  (limit: 300, over by 41)
+  Freya/Integration/services/baseline_manager.py   340 lines  (limit: 300, over by 40)
+  Freya/SEO/services/robots_analyzer.py   340 lines  (limit: 300, over by 40)
+  Forseti/OpenAPI/services/spec_parser_service.py   339 lines  (limit: 300, over by 39)
+  Heimdall/OOP/services/cohesion_analyzer.py   339 lines  (limit: 300, over by 39)
+  Heimdall/Quality/__init__.py   339 lines  (limit: 300, over by 39)
+  Freya/Visual/services/style_validator.py   339 lines  (limit: 300, over by 39)
+  Verdandi/SLO/services/sli_tracker.py   336 lines  (limit: 300, over by 36)
+  Heimdall/Performance/services/cpu_profiler_service.py   335 lines  (limit: 300, over by 35)
+  Heimdall/Security/TLS/services/protocol_analyzer.py   335 lines  (limit: 300, over by 35)
+  Freya/Performance/models/performance_models.py   334 lines  (limit: 300, over by 34)
+  Verdandi/APM/services/span_analyzer.py   330 lines  (limit: 300, over by 30)
+  Heimdall/OOP/services/inheritance_analyzer.py   326 lines  (limit: 300, over by 26)
+  Freya/Visual/services/screenshot_capture.py   324 lines  (limit: 300, over by 24)
+  Heimdall/Dependencies/services/modularity_analyzer.py   322 lines  (limit: 300, over by 22)
+  Forseti/Documentation/models/docs_models.py   319 lines  (limit: 300, over by 19)
+  BackendInit/templates.py   312 lines  (limit: 300, over by 12)
+  Heimdall/Quality/models/maintainability_models.py   308 lines  (limit: 300, over by 8)
+  Heimdall/Security/Headers/utilities/csp_parser.py   305 lines  (limit: 300, over by 5)
+  Heimdall/Ratings/services/ratings_calculator.py   304 lines  (limit: 300, over by 4)
+  Heimdall/Performance/services/cache_analyzer_service.py   302 lines  (limit: 300, over by 2)
+  common/parallel.py   301 lines  (limit: 300, over by 1)
+  Forseti/Database/services/migration_generator_service.py   301 lines  (limit: 300, over by 1)
+  Verdandi/Web/services/vitals_calculator.py   301 lines  (limit: 300, over by 1)
+
+======================================================================
+
+</pre>
+</body>
+</html>

@@ -207,7 +207,7 @@ class CycleDetector:
         """
         cycles = self.detect(scan_path)
 
-        cycle_graph = {}
+        cycle_graph: Dict[str, List[str]] = {}
 
         for cycle in cycles:
             for i, module in enumerate(cycle.cycle):

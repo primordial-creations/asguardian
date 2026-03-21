@@ -208,15 +208,11 @@ class MaintainabilityReport(BaseModel):
         self.total_lines_of_code += file_result.code_lines
 
         # Update level counts
-        level = file_result.maintainability_level
-        if isinstance(level, MaintainabilityLevel):
-            level = level.value
+        level: str = file_result.maintainability_level.value if isinstance(file_result.maintainability_level, MaintainabilityLevel) else file_result.maintainability_level
         self.files_by_level[level] = self.files_by_level.get(level, 0) + 1
 
         for func in file_result.functions:
-            func_level = func.maintainability_level
-            if isinstance(func_level, MaintainabilityLevel):
-                func_level = func_level.value
+            func_level: str = func.maintainability_level.value if isinstance(func.maintainability_level, MaintainabilityLevel) else func.maintainability_level
             self.functions_by_level[func_level] = self.functions_by_level.get(func_level, 0) + 1
 
     @property
@@ -262,7 +258,7 @@ class MaintainabilityConfig(BaseModel):
         description="Language-specific scoring profile"
     )
     thresholds: MaintainabilityThresholds = Field(
-        default_factory=MaintainabilityThresholds,
+        default_factory=MaintainabilityThresholds,  # type: ignore[arg-type]
         description="Maintainability level thresholds"
     )
     language_weights: Optional[LanguageWeights] = Field(
@@ -302,13 +298,11 @@ class MaintainabilityConfig(BaseModel):
 
         # Default weights by language
         defaults = {
-            "python": LanguageWeights(complexity_weight=0.23, volume_weight=5.2),
-            "java": LanguageWeights(complexity_weight=0.25, volume_weight=5.5),
-            "javascript": LanguageWeights(complexity_weight=0.20, volume_weight=4.8),
+            "python": LanguageWeights(complexity_weight=0.23, volume_weight=5.2, loc_weight=16.2, comment_factor=50.0),
+            "java": LanguageWeights(complexity_weight=0.25, volume_weight=5.5, loc_weight=16.2, comment_factor=50.0),
+            "javascript": LanguageWeights(complexity_weight=0.20, volume_weight=4.8, loc_weight=16.2, comment_factor=50.0),
         }
 
-        profile = self.language_profile
-        if isinstance(profile, LanguageProfile):
-            profile = profile.value
+        profile: str = self.language_profile.value if isinstance(self.language_profile, LanguageProfile) else self.language_profile
 
-        return defaults.get(profile, LanguageWeights())
+        return defaults.get(profile, LanguageWeights())  # type: ignore[call-arg]

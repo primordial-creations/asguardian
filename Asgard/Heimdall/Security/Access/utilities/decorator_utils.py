@@ -33,7 +33,7 @@ class RouteHandler:
         return f"line {self.line_number}"
 
 
-def extract_decorators(node: ast.FunctionDef) -> List[str]:
+def extract_decorators(node: ast.FunctionDef | ast.AsyncFunctionDef) -> List[str]:
     """
     Extract decorator names from an AST function definition.
 
@@ -68,7 +68,7 @@ def _get_attribute_chain(node: ast.Attribute) -> str:
         Full attribute chain as a string (e.g., "app.route")
     """
     parts = []
-    current = node
+    current: ast.expr = node
     while isinstance(current, ast.Attribute):
         parts.append(current.attr)
         current = current.value
@@ -109,7 +109,7 @@ def find_route_handlers(
     Returns:
         List of RouteHandler objects
     """
-    handlers = []
+    handlers: List[RouteHandler] = []
 
     try:
         tree = ast.parse(content)
@@ -155,7 +155,7 @@ def _find_route_decorator(decorators: List[str], route_decorators: List[str]) ->
     return None
 
 
-def _extract_endpoint(node: ast.FunctionDef, route_decorator: str) -> Optional[str]:
+def _extract_endpoint(node: ast.FunctionDef | ast.AsyncFunctionDef, route_decorator: str) -> Optional[str]:
     """
     Extract the endpoint path from a route decorator.
 

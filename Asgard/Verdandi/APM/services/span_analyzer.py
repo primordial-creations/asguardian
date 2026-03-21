@@ -12,6 +12,13 @@ from Asgard.Verdandi.APM.models.apm_models import (
     SpanAnalysis,
     SpanStatus,
 )
+from Asgard.Verdandi.APM.services._span_helpers import (
+    build_parent_map,
+    generate_span_recommendations,
+    group_spans_by_operation,
+    group_spans_by_service,
+    percentile,
+)
 
 
 class SpanAnalyzer:
@@ -61,8 +68,6 @@ class SpanAnalyzer:
         child_count = len(child_spans)
         total_child_duration = sum(cs.duration_ms for cs in child_spans)
 
-        # Calculate self-time (time spent in span itself, excluding children)
-        # This is simplified - actual implementation would need to handle overlapping spans
         self_time_ms = max(0.0, span.duration_ms - total_child_duration)
 
         is_slow = span.duration_ms > self.slow_threshold_ms
@@ -73,8 +78,9 @@ class SpanAnalyzer:
         )
         is_error = span.status == SpanStatus.ERROR
 
-        recommendations = self._generate_recommendations(
-            span, is_slow, slowness_factor, is_error, self_time_ms, child_count
+        recommendations = generate_span_recommendations(
+            span, is_slow, slowness_factor, is_error, self_time_ms,
+            child_count, self.slow_threshold_ms,
         )
 
         return SpanAnalysis(
@@ -104,7 +110,7 @@ class SpanAnalyzer:
             List of SpanAnalysis objects
         """
         if spans_by_parent is None:
-            spans_by_parent = self._build_parent_map(spans)
+            spans_by_parent = build_parent_map(spans)
 
         results = []
         for span in spans:
@@ -161,11 +167,11 @@ class SpanAnalyzer:
 
         durations = sorted([s.duration_ms for s in spans])
         return {
-            "p50": self._percentile(durations, 50),
-            "p75": self._percentile(durations, 75),
-            "p90": self._percentile(durations, 90),
-            "p95": self._percentile(durations, 95),
-            "p99": self._percentile(durations, 99),
+            "p50": percentile(durations, 50),
+            "p75": percentile(durations, 75),
+            "p90": percentile(durations, 90),
+            "p95": percentile(durations, 95),
+            "p99": percentile(durations, 99),
         }
 
     def calculate_statistics(
@@ -223,12 +229,7 @@ class SpanAnalyzer:
         Returns:
             Dictionary mapping operation name to list of spans
         """
-        result: Dict[str, List[Span]] = {}
-        for span in spans:
-            if span.operation_name not in result:
-                result[span.operation_name] = []
-            result[span.operation_name].append(span)
-        return result
+        return group_spans_by_operation(spans)
 
     def group_by_service(
         self,
@@ -243,88 +244,4 @@ class SpanAnalyzer:
         Returns:
             Dictionary mapping service name to list of spans
         """
-        result: Dict[str, List[Span]] = {}
-        for span in spans:
-            if span.service_name not in result:
-                result[span.service_name] = []
-            result[span.service_name].append(span)
-        return result
-
-    def _build_parent_map(
-        self,
-        spans: Sequence[Span],
-    ) -> Dict[str, List[Span]]:
-        """Build mapping of parent span IDs to child spans."""
-        parent_map: Dict[str, List[Span]] = {}
-        for span in spans:
-            if span.parent_span_id:
-                if span.parent_span_id not in parent_map:
-                    parent_map[span.parent_span_id] = []
-                parent_map[span.parent_span_id].append(span)
-        return parent_map
-
-    def _percentile(
-        self,
-        sorted_values: List[float],
-        percentile: float,
-    ) -> float:
-        """Calculate percentile from sorted values."""
-        if not sorted_values:
-            return 0.0
-
-        n = len(sorted_values)
-        if n == 1:
-            return sorted_values[0]
-
-        rank = (percentile / 100) * (n - 1)
-        lower_idx = int(rank)
-        upper_idx = min(lower_idx + 1, n - 1)
-        fraction = rank - lower_idx
-
-        return sorted_values[lower_idx] + fraction * (
-            sorted_values[upper_idx] - sorted_values[lower_idx]
-        )
-
-    def _generate_recommendations(
-        self,
-        span: Span,
-        is_slow: bool,
-        slowness_factor: float,
-        is_error: bool,
-        self_time_ms: float,
-        child_count: int,
-    ) -> List[str]:
-        """Generate recommendations based on span analysis."""
-        recommendations = []
-
-        if is_error:
-            recommendations.append(
-                f"Span '{span.operation_name}' has error status. "
-                f"Error: {span.error_message or 'Unknown error'}"
-            )
-
-        if is_slow:
-            if slowness_factor > 5:
-                recommendations.append(
-                    f"CRITICAL: Span '{span.operation_name}' is {slowness_factor:.1f}x "
-                    f"slower than threshold ({span.duration_ms:.0f}ms vs {self.slow_threshold_ms}ms)"
-                )
-            elif slowness_factor > 2:
-                recommendations.append(
-                    f"Span '{span.operation_name}' is {slowness_factor:.1f}x "
-                    f"slower than threshold"
-                )
-
-        if child_count > 0 and self_time_ms > span.duration_ms * 0.8:
-            recommendations.append(
-                f"Span '{span.operation_name}' has high self-time ({self_time_ms:.0f}ms) "
-                f"despite having {child_count} child spans"
-            )
-
-        if child_count > 10:
-            recommendations.append(
-                f"Span '{span.operation_name}' has many child spans ({child_count}). "
-                f"Consider batching operations"
-            )
-
-        return recommendations
+        return group_spans_by_service(spans)

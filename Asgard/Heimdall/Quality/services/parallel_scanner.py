@@ -232,7 +232,7 @@ class ParallelScannerMixin:
         Returns:
             ChunkedResult with all results
         """
-        scanner = ParallelScanner(analyze_func, self.parallel_config)
+        scanner: ParallelScanner = ParallelScanner(analyze_func, self.parallel_config)
         return scanner.scan(files, config_dict)
 
 

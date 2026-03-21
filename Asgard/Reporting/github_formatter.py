@@ -10,6 +10,16 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Protocol
 
+from Asgard.Reporting._github_format_helpers import (
+    format_complexity_tuples,
+    format_datetime_tuples,
+    format_forbidden_imports_tuples,
+    format_lazy_imports_tuples,
+    format_security_tuples,
+    format_smells_tuples,
+    format_typing_tuples,
+)
+
 
 class AnnotationLevel(str, Enum):
     """GitHub annotation levels."""
@@ -99,6 +109,12 @@ class GitHubActionsFormatter:
         except ValueError:
             return path
 
+    def _make_annotation(self, tup: tuple) -> Annotation:
+        """Build an Annotation from a helper tuple."""
+        level_str, file, line, message, title, col = tup
+        level = AnnotationLevel(level_str)
+        return Annotation(level=level, file=file, line=line, message=message, title=title, col=col)
+
     def format_annotations(self, annotations: List[Annotation]) -> str:
         """
         Format a list of annotations as workflow commands.
@@ -112,215 +128,77 @@ class GitHubActionsFormatter:
         return "\n".join(ann.to_workflow_command() for ann in annotations)
 
     def format_lazy_imports(self, report) -> str:
-        """
-        Format lazy import report for GitHub Actions.
-
-        Args:
-            report: LazyImportReport object
-
-        Returns:
-            GitHub Actions workflow commands
-        """
-        annotations = []
-
-        for violation in report.detected_imports:
-            level = self._severity_to_level(violation.severity)
-            annotations.append(Annotation(
-                level=level,
-                file=self._relative_path(violation.file_path),
-                line=violation.line_number,
-                message=f"Lazy import: {violation.import_statement}",
-                title="Lazy Import Detected",
-            ))
-
-        return self.format_annotations(annotations)
+        """Format lazy import report for GitHub Actions."""
+        tuples = format_lazy_imports_tuples(report, self._relative_path, self._severity_to_level_str)
+        return self.format_annotations([self._make_annotation(t) for t in tuples])
 
     def format_forbidden_imports(self, report) -> str:
-        """
-        Format forbidden imports report for GitHub Actions.
-
-        Args:
-            report: ForbiddenImportReport object
-
-        Returns:
-            GitHub Actions workflow commands
-        """
-        annotations = []
-
-        for violation in report.detected_violations:
-            annotations.append(Annotation(
-                level=AnnotationLevel.ERROR,
-                file=self._relative_path(violation.file_path),
-                line=violation.line_number,
-                col=violation.column if violation.column else None,
-                message=f"Forbidden import '{violation.module_name}': {violation.remediation}",
-                title="Forbidden Import",
-            ))
-
-        return self.format_annotations(annotations)
+        """Format forbidden imports report for GitHub Actions."""
+        tuples = format_forbidden_imports_tuples(report, self._relative_path)
+        return self.format_annotations([self._make_annotation(t) for t in tuples])
 
     def format_datetime(self, report) -> str:
-        """
-        Format datetime usage report for GitHub Actions.
-
-        Args:
-            report: DatetimeReport object
-
-        Returns:
-            GitHub Actions workflow commands
-        """
-        annotations = []
-
-        for violation in report.detected_violations:
-            level = self._severity_to_level(violation.severity)
-            annotations.append(Annotation(
-                level=level,
-                file=self._relative_path(violation.file_path),
-                line=violation.line_number,
-                col=violation.column if violation.column else None,
-                message=f"{violation.issue_type}: {violation.remediation}",
-                title="Datetime Issue",
-            ))
-
-        return self.format_annotations(annotations)
+        """Format datetime usage report for GitHub Actions."""
+        tuples = format_datetime_tuples(report, self._relative_path, self._severity_to_level_str)
+        return self.format_annotations([self._make_annotation(t) for t in tuples])
 
     def format_typing(self, report) -> str:
-        """
-        Format typing coverage report for GitHub Actions.
-
-        Args:
-            report: TypingReport object
-
-        Returns:
-            GitHub Actions workflow commands
-        """
-        annotations = []
-
-        # Add summary notice
-        annotations.append(Annotation(
-            level=AnnotationLevel.NOTICE if report.is_passing else AnnotationLevel.ERROR,
-            file=".",
-            line=1,
-            message=f"Typing coverage: {report.coverage_percentage:.1f}% (threshold: {report.threshold:.1f}%)",
-            title="Typing Coverage Summary",
-        ))
-
-        # Add warnings for unannotated functions (limit to 50)
-        for func in report.unannotated_functions[:50]:
-            level = self._severity_to_level(func.severity)
-            missing = ", ".join(func.missing_parameter_names) if func.missing_parameter_names else ""
-            ret_msg = " (missing return type)" if not func.has_return_annotation else ""
-            param_msg = f" (missing params: {missing})" if missing else ""
-
-            annotations.append(Annotation(
-                level=level,
-                file=self._relative_path(func.file_path),
-                line=func.line_number,
-                message=f"Function '{func.qualified_name}' needs annotations{param_msg}{ret_msg}",
-                title="Missing Type Annotations",
-            ))
-
-        return self.format_annotations(annotations)
+        """Format typing coverage report for GitHub Actions."""
+        tuples = format_typing_tuples(report, self._relative_path, self._severity_to_level_str)
+        return self.format_annotations([self._make_annotation(t) for t in tuples])
 
     def format_complexity(self, report) -> str:
-        """
-        Format complexity report for GitHub Actions.
-
-        Args:
-            report: ComplexityResult object
-
-        Returns:
-            GitHub Actions workflow commands
-        """
-        annotations = []
-
-        for file_analysis in report.file_analyses:
-            for func in file_analysis.functions:
-                if func.cyclomatic_severity not in ("low", "moderate"):
-                    level = self._complexity_to_level(func.cyclomatic_severity)
-                    annotations.append(Annotation(
-                        level=level,
-                        file=self._relative_path(file_analysis.file_path),
-                        line=func.line_number,
-                        message=f"High cyclomatic complexity ({func.cyclomatic_complexity}) in '{func.name}'",
-                        title="Complex Function",
-                    ))
-
-        return self.format_annotations(annotations)
+        """Format complexity report for GitHub Actions."""
+        tuples = format_complexity_tuples(report, self._relative_path, self._complexity_to_level_str)
+        return self.format_annotations([self._make_annotation(t) for t in tuples])
 
     def format_smells(self, report) -> str:
-        """
-        Format code smell report for GitHub Actions.
-
-        Args:
-            report: SmellReport object
-
-        Returns:
-            GitHub Actions workflow commands
-        """
-        annotations = []
-
-        for smell in report.smells:
-            level = self._severity_to_level(smell.severity)
-            annotations.append(Annotation(
-                level=level,
-                file=self._relative_path(smell.file_path),
-                line=smell.line_number,
-                message=f"{smell.smell_type}: {smell.description}",
-                title=f"Code Smell ({smell.category})",
-            ))
-
-        return self.format_annotations(annotations)
+        """Format code smell report for GitHub Actions."""
+        tuples = format_smells_tuples(report, self._relative_path, self._severity_to_level_str)
+        return self.format_annotations([self._make_annotation(t) for t in tuples])
 
     def format_security(self, report) -> str:
-        """
-        Format security report for GitHub Actions.
+        """Format security report for GitHub Actions."""
+        tuples = format_security_tuples(report, self._relative_path, self._security_to_level_str)
+        return self.format_annotations([self._make_annotation(t) for t in tuples])
 
-        Args:
-            report: SecurityScanResult object
-
-        Returns:
-            GitHub Actions workflow commands
-        """
-        annotations = []
-
-        for vuln in getattr(report, 'vulnerabilities', []):
-            level = self._security_to_level(vuln.severity)
-            annotations.append(Annotation(
-                level=level,
-                file=self._relative_path(vuln.file_path),
-                line=vuln.line_number,
-                message=f"{vuln.vulnerability_type}: {vuln.description}",
-                title=f"Security ({vuln.severity.upper()})",
-            ))
-
-        return self.format_annotations(annotations)
-
-    def _severity_to_level(self, severity) -> AnnotationLevel:
+    def _severity_to_level(self, severity: Any) -> AnnotationLevel:
         """Map generic severity to GitHub annotation level."""
+        return AnnotationLevel(self._severity_to_level_str(severity))
+
+    def _severity_to_level_str(self, severity: Any) -> str:
+        """Map generic severity to GitHub annotation level string."""
         severity_str = severity if isinstance(severity, str) else severity.value
         if severity_str in ("high", "critical"):
-            return AnnotationLevel.ERROR
+            return "error"
         elif severity_str in ("medium", "moderate"):
-            return AnnotationLevel.WARNING
-        return AnnotationLevel.NOTICE
+            return "warning"
+        return "notice"
 
     def _complexity_to_level(self, severity_str: str) -> AnnotationLevel:
         """Map complexity severity to GitHub annotation level."""
-        if severity_str in ("critical", "very_high"):
-            return AnnotationLevel.ERROR
-        elif severity_str == "high":
-            return AnnotationLevel.WARNING
-        return AnnotationLevel.NOTICE
+        return AnnotationLevel(self._complexity_to_level_str(severity_str))
 
-    def _security_to_level(self, severity) -> AnnotationLevel:
+    def _complexity_to_level_str(self, severity_str: str) -> str:
+        """Map complexity severity to GitHub annotation level string."""
+        if severity_str in ("critical", "very_high"):
+            return "error"
+        elif severity_str == "high":
+            return "warning"
+        return "notice"
+
+    def _security_to_level(self, severity: Any) -> AnnotationLevel:
         """Map security severity to GitHub annotation level."""
+        return AnnotationLevel(self._security_to_level_str(severity))
+
+    def _security_to_level_str(self, severity: Any) -> str:
+        """Map security severity to GitHub annotation level string."""
         severity_str = severity if isinstance(severity, str) else severity.value
         if severity_str in ("critical", "high"):
-            return AnnotationLevel.ERROR
+            return "error"
         elif severity_str == "medium":
-            return AnnotationLevel.WARNING
-        return AnnotationLevel.NOTICE
+            return "warning"
+        return "notice"
 
     def format_summary(
         self,

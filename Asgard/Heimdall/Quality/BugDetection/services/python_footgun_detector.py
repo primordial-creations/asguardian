@@ -159,7 +159,7 @@ class PythonFootgunDetector:
                         closure_params.add(arg.arg)
                     for arg in body_node.args.kwonlyargs:
                         closure_params.add(arg.arg)
-                    for arg in body_node.args.defaults:
+                    for _ in body_node.args.defaults:
                         pass  # defaults evaluated at def time — not free vars
                 else:
                     for arg in body_node.args.args:

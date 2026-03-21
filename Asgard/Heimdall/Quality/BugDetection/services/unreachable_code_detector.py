@@ -139,7 +139,7 @@ class UnreachableCodeDetector:
 
     def _analyze_function(
         self,
-        func_node: ast.FunctionDef,
+        func_node: ast.FunctionDef | ast.AsyncFunctionDef,
         lines: List[str],
         file_path_str: str,
     ) -> List[BugFinding]:

@@ -146,14 +146,15 @@ class MagicNumbersDetector:
             if found is not None and found.lineno not in reported_lines:
                 reported_lines.add(found.lineno)
                 suggested = _suggest_name(found.value)
+                value_str = str(found.value)
                 findings.append(BugFinding(
                     file_path=fp,
                     line_number=found.lineno,
                     category=BugCategory.MAGIC_NUMBER,
                     severity=BugSeverity.LOW,
-                    title=f"Magic Number `{found.value}` in {context.title()}",
+                    title=f"Magic Number `{value_str}` in {context.title()}",
                     description=(
-                        f"Line {found.lineno}: The literal `{found.value}` appears directly "
+                        f"Line {found.lineno}: The literal `{value_str}` appears directly "
                         f"in a {context}. Magic numbers reduce readability and make future "
                         "maintenance harder — if the value needs to change, every occurrence "
                         "must be found and updated individually."
@@ -161,7 +162,7 @@ class MagicNumbersDetector:
                     code_snippet=_snippet(lines, found.lineno),
                     fix_suggestion=(
                         f"Extract to a named constant at the top of the module or class: "
-                        f"`{suggested} = {found.value}` and reference `{suggested}` by name."
+                        f"`{suggested} = {value_str}` and reference `{suggested}` by name."
                     ),
                 ))
 

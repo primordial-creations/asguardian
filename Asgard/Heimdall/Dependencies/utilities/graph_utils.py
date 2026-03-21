@@ -4,7 +4,7 @@ Heimdall Dependencies Graph Utilities
 Utility functions for working with dependency graphs.
 """
 
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple, cast
 
 import networkx as nx
 
@@ -80,7 +80,7 @@ def calculate_modularity(
     undirected = graph.to_undirected()
 
     try:
-        return nx.algorithms.community.modularity(undirected, communities)
+        return cast(float, nx.algorithms.community.modularity(undirected, communities))
     except Exception:
         return 0.0
 
@@ -175,7 +175,7 @@ def find_shortest_path(
         List of nodes in the path, or None if no path exists
     """
     try:
-        return nx.shortest_path(graph, source, target)
+        return cast(List[str], nx.shortest_path(graph, source, target))
     except nx.NetworkXNoPath:
         return None
     except nx.NodeNotFound:

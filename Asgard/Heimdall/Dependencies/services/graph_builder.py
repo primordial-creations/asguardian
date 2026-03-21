@@ -103,7 +103,7 @@ class GraphBuilder:
         """
         forward_graph = self.build_dict_graph(scan_path)
 
-        reverse = {module: set() for module in forward_graph}
+        reverse: Dict[str, Set[str]] = {module: set() for module in forward_graph}
 
         for module, deps in forward_graph.items():
             for dep in deps:

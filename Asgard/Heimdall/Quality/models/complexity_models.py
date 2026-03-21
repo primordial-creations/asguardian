@@ -183,7 +183,7 @@ class ComplexityResult(BaseModel):
 
     def get_violations_by_severity(self) -> dict:
         """Group violations by severity level."""
-        result = {
+        result: dict = {
             ComplexitySeverity.CRITICAL.value: [],
             ComplexitySeverity.VERY_HIGH.value: [],
             ComplexitySeverity.HIGH.value: [],

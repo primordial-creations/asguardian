@@ -57,7 +57,7 @@ def _is_top_level(tree: ast.Module, func: ast.FunctionDef) -> bool:
 
 
 def _create_method_info(
-    node: ast.FunctionDef,
+    node: ast.FunctionDef | ast.AsyncFunctionDef,
     class_name: Optional[str],
     file_path: str
 ) -> MethodInfo:
@@ -88,7 +88,7 @@ def _create_method_info(
     )
 
 
-def _get_method_type(node: ast.FunctionDef) -> MethodType:
+def _get_method_type(node: ast.FunctionDef | ast.AsyncFunctionDef) -> MethodType:
     """Determine the type of method."""
     name = node.name
 
@@ -143,7 +143,7 @@ def extract_classes_with_methods(
     return classes
 
 
-def get_method_complexity(node: ast.FunctionDef) -> int:
+def get_method_complexity(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
     """
     Calculate cyclomatic complexity of a method.
 
@@ -178,7 +178,7 @@ def get_method_complexity(node: ast.FunctionDef) -> int:
     return complexity
 
 
-def get_branch_count(node: ast.FunctionDef) -> int:
+def get_branch_count(node: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
     """
     Count the number of branches in a method.
 

@@ -15,116 +15,16 @@ from Asgard.Heimdall.Security.Headers.models.header_models import (
     HeaderFindingType,
     HeaderReport,
 )
+from Asgard.Heimdall.Security.Headers.services._header_patterns import (
+    HEADER_PATTERNS,
+    HeaderPattern,
+)
 from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
 from Asgard.Heimdall.Security.utilities.security_utils import (
     extract_code_snippet,
     find_line_column,
     scan_directory_for_security,
 )
-
-
-class HeaderPattern:
-    """Defines a pattern for detecting security header issues."""
-
-    def __init__(
-        self,
-        name: str,
-        pattern: str,
-        finding_type: HeaderFindingType,
-        severity: SecuritySeverity,
-        title: str,
-        description: str,
-        header_name: str,
-        cwe_id: str,
-        remediation: str,
-        confidence: float = 0.7,
-    ):
-        self.name = name
-        self.pattern = re.compile(pattern, re.IGNORECASE | re.MULTILINE)
-        self.finding_type = finding_type
-        self.severity = severity
-        self.title = title
-        self.description = description
-        self.header_name = header_name
-        self.cwe_id = cwe_id
-        self.remediation = remediation
-        self.confidence = confidence
-
-
-HEADER_PATTERNS: List[HeaderPattern] = [
-    HeaderPattern(
-        name="missing_x_frame_options",
-        pattern=r"""(?:set_header|setHeader|add_header|addHeader|headers\[)[^;]*X-Frame-Options[^;]*(?:ALLOW-FROM|ALLOWALL)""",
-        finding_type=HeaderFindingType.WEAK_X_FRAME_OPTIONS,
-        severity=SecuritySeverity.MEDIUM,
-        title="Weak X-Frame-Options Value",
-        description="X-Frame-Options is set to a weak value that may allow clickjacking.",
-        header_name="X-Frame-Options",
-        cwe_id="CWE-1021",
-        remediation="Set X-Frame-Options to 'DENY' or 'SAMEORIGIN' to prevent clickjacking attacks.",
-        confidence=0.85,
-    ),
-    HeaderPattern(
-        name="hsts_short_max_age",
-        pattern=r"""Strict-Transport-Security[^;]*max-age\s*=\s*(\d{1,5})(?!\d)""",
-        finding_type=HeaderFindingType.HSTS_SHORT_MAX_AGE,
-        severity=SecuritySeverity.MEDIUM,
-        title="HSTS Max-Age Too Short",
-        description="Strict-Transport-Security max-age is set to less than one year.",
-        header_name="Strict-Transport-Security",
-        cwe_id="CWE-319",
-        remediation="Set HSTS max-age to at least 31536000 (1 year) for adequate protection.",
-        confidence=0.8,
-    ),
-    HeaderPattern(
-        name="hsts_missing_subdomains",
-        pattern=r"""Strict-Transport-Security[^;]*max-age\s*=\s*\d+(?![^;]*includeSubDomains)""",
-        finding_type=HeaderFindingType.HSTS_MISSING_SUBDOMAINS,
-        severity=SecuritySeverity.LOW,
-        title="HSTS Missing includeSubDomains",
-        description="Strict-Transport-Security is configured without includeSubDomains directive.",
-        header_name="Strict-Transport-Security",
-        cwe_id="CWE-319",
-        remediation="Add 'includeSubDomains' to the HSTS header to protect all subdomains.",
-        confidence=0.7,
-    ),
-    HeaderPattern(
-        name="insecure_cookie_set",
-        pattern=r"""(?:set[_-]?cookie|Set-Cookie)[^;]*(?!.*(?:Secure|secure)).*(?:;|$)""",
-        finding_type=HeaderFindingType.COOKIE_MISSING_SECURE,
-        severity=SecuritySeverity.HIGH,
-        title="Cookie Missing Secure Flag",
-        description="Cookie is set without the Secure flag, allowing transmission over HTTP.",
-        header_name="Set-Cookie",
-        cwe_id="CWE-614",
-        remediation="Add the 'Secure' flag to all cookies to ensure they are only sent over HTTPS.",
-        confidence=0.75,
-    ),
-    HeaderPattern(
-        name="cookie_missing_httponly",
-        pattern=r"""(?:set[_-]?cookie|Set-Cookie)[^;]*=\s*[^;]+(?!.*(?:HttpOnly|httponly))""",
-        finding_type=HeaderFindingType.COOKIE_MISSING_HTTPONLY,
-        severity=SecuritySeverity.MEDIUM,
-        title="Cookie Missing HttpOnly Flag",
-        description="Cookie is set without the HttpOnly flag, making it accessible to JavaScript.",
-        header_name="Set-Cookie",
-        cwe_id="CWE-1004",
-        remediation="Add the 'HttpOnly' flag to cookies that don't need JavaScript access.",
-        confidence=0.7,
-    ),
-    HeaderPattern(
-        name="cookie_missing_samesite",
-        pattern=r"""(?:set[_-]?cookie|Set-Cookie)[^;]*=\s*[^;]+(?!.*(?:SameSite|samesite))""",
-        finding_type=HeaderFindingType.COOKIE_MISSING_SAMESITE,
-        severity=SecuritySeverity.MEDIUM,
-        title="Cookie Missing SameSite Attribute",
-        description="Cookie is set without SameSite attribute, potentially vulnerable to CSRF.",
-        header_name="Set-Cookie",
-        cwe_id="CWE-1275",
-        remediation="Add 'SameSite=Strict' or 'SameSite=Lax' to prevent CSRF attacks.",
-        confidence=0.7,
-    ),
-]
 
 
 class HeaderValidator:
@@ -255,10 +155,7 @@ class HeaderValidator:
         root_path: Path,
     ) -> List[HeaderFinding]:
         """
-        Check for missing security headers in response configurations.
-
-        Only checks files that explicitly configure HTTP headers (middleware, app config).
-        Does NOT flag general router/endpoint files that just return Response objects.
+        Check for missing security headers in files that configure security headers.
 
         Args:
             content: File content
@@ -269,25 +166,19 @@ class HeaderValidator:
         Returns:
             List of findings for missing headers
         """
-        findings = []
+        findings: List[HeaderFinding] = []
 
-        # Only check files that explicitly configure SECURITY headers
-        # This avoids false positives on files that just set operational headers
-        # (like correlation IDs, rate limits, etc.)
         security_header_patterns = [
-            # Direct security header references
             r'Content-Security-Policy',
             r'X-Frame-Options',
             r'X-Content-Type-Options',
             r'Strict-Transport-Security',
             r'X-XSS-Protection',
             r'Referrer-Policy',
-            # Security middleware/config patterns
             r'add_middleware.*Security',
             r'SecurityMiddleware',
-            r'helmet',  # Node.js security headers package
+            r'helmet',
             r'secure_headers',
-            # Server config patterns for security headers
             r'add_header\s+(?:Content-Security-Policy|X-Frame-Options|X-Content-Type|Strict-Transport)',
             r'Header\s+(?:set|always)\s+(?:Content-Security-Policy|X-Frame-Options)',
         ]
@@ -296,7 +187,6 @@ class HeaderValidator:
             re.search(p, content, re.IGNORECASE) for p in security_header_patterns
         )
 
-        # Only flag files that are already dealing with security headers but missing some
         if not has_security_header_config:
             return findings
 
@@ -329,14 +219,9 @@ class HeaderValidator:
 
         return findings
 
-    def _create_missing_header_finding(
-        self,
-        header_name: str,
-        finding_type: HeaderFindingType,
-        severity: SecuritySeverity,
-        file_path: Path,
-        root_path: Path,
-    ) -> HeaderFinding:
+    def _create_missing_header_finding(self, header_name: str, finding_type: HeaderFindingType,
+                                        severity: SecuritySeverity, file_path: Path,
+                                        root_path: Path) -> HeaderFinding:
         """Create a finding for a missing security header."""
         remediation_map = {
             "Content-Security-Policy": "Add Content-Security-Policy header with appropriate directives.",

@@ -77,7 +77,7 @@ def find_verify_false_patterns(content: str) -> List[Tuple[int, str, str]]:
     return matches
 
 
-def find_tls_version_usage(content: str) -> List[Tuple[int, str, Optional[str]]]:
+def find_tls_version_usage(content: str) -> List[Tuple[int, str, str]]:
     """
     Find TLS/SSL version specifications in code.
 

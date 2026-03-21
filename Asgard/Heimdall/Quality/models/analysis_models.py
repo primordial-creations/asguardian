@@ -7,7 +7,7 @@ Pydantic models for code quality analysis operations and results.
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, cast
 
 from pydantic import BaseModel, Field
 
@@ -94,7 +94,7 @@ class AnalysisResult(BaseModel):
 
     def get_violations_by_severity(self) -> dict:
         """Group violations by severity level."""
-        result = {
+        result: dict = {
             SeverityLevel.CRITICAL.value: [],
             SeverityLevel.SEVERE.value: [],
             SeverityLevel.MODERATE.value: [],
@@ -167,4 +167,4 @@ class AnalysisConfig(BaseModel):
             The threshold for that extension, or the default threshold
         """
         ext_lower = extension.lower()
-        return self.extension_thresholds.get(ext_lower, self.threshold)
+        return cast(int, self.extension_thresholds.get(ext_lower, self.threshold))

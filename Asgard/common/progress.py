@@ -7,32 +7,12 @@ Supports spinners, progress bars, and status updates.
 
 import sys
 import time
-from dataclasses import dataclass, field
-from enum import Enum
 from threading import Event, Thread
-from typing import Callable, Iterator, List, Optional, TypeVar
+from typing import Iterator, List, Optional, TypeVar
+
+from Asgard.common._progress_types import ProgressConfig, ProgressStyle
 
 T = TypeVar('T')
-
-
-class ProgressStyle(str, Enum):
-    """Progress indicator styles."""
-    SPINNER = "spinner"
-    BAR = "bar"
-    DOTS = "dots"
-    NONE = "none"
-
-
-@dataclass
-class ProgressConfig:
-    """Configuration for progress reporting."""
-    enabled: bool = True
-    style: ProgressStyle = ProgressStyle.SPINNER
-    show_count: bool = True
-    show_percentage: bool = True
-    show_elapsed: bool = True
-    refresh_rate: float = 0.1  # seconds
-    bar_width: int = 40
 
 
 class ProgressReporter:

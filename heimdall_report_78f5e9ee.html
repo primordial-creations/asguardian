@@ -1,0 +1,629 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - quality lazy-imports</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - quality lazy-imports</h1>
+  <pre>============================================================
+LAZY IMPORT VIOLATIONS REPORT
+============================================================
+
+Scan Path: /mnt/storage/home-data/Documents/GAIA/Asgard
+Scan Time: 2026-03-20 08:32:40
+Duration: 2.04 seconds
+Files Scanned: 1255
+
+SUMMARY
+----------------------------------------
+Total Violations: 138
+Compliant: No
+
+By Severity:
+  HIGH: 65
+  MEDIUM: 70
+  LOW: 3
+
+By Type:
+  Function: 22
+  Method: 43
+  Conditional: 46
+  Try Except: 24
+  Loop: 3
+
+Most Problematic Files:
+----------------------------------------
+  cli.py: 34 violations
+  validate_package.py: 7 violations
+  validate_package.py: 7 violations
+  schema_generator_service.py: 6 violations
+  handlers.py: 6 violations
+
+VIOLATIONS
+----------------------------------------
+
+[HIGH]
+  conftest.py:57
+    Import: import math
+    Context: inside function 'normal_distribution_data'
+
+  validate_package.py:53
+    Import: from test_utils import create_temp_python_file, create_temp_json_file
+    Context: inside function 'validate_file_utils'
+
+  validate_package.py:79
+    Import: from test_utils import mock_playwright_page, mock_http_response
+    Context: inside function 'validate_mock_utils'
+
+  validate_package.py:105
+    Import: from test_utils import assert_json_valid, assert_approximate
+    Context: inside function 'validate_assertion_utils'
+
+  validate_package.py:134
+    Import: from test_utils import generate_python_class, generate_metrics_data
+    Context: inside function 'validate_generators'
+
+  cli.py:508
+    Import: from Asgard.Forseti.OpenAPI import SpecValidatorService, OpenAPIConfig
+    Context: inside function '_handle_openapi'
+
+  cli.py:556
+    Import: from Asgard.Forseti.GraphQL import SchemaValidatorService, GraphQLConfig
+    Context: inside function '_handle_graphql'
+
+  cli.py:814
+    Import: from Asgard.Forseti.AsyncAPI import AsyncAPIValidatorService, AsyncAPIParserService, AsyncAPIConfig
+    Context: inside function '_handle_asyncapi'
+
+  schema_inference_service.py:106
+    Import: import json
+    Context: inside class method 'SchemaInferenceService.infer_from_file'
+
+  schema_inference_service.py:107
+    Import: import yaml
+    Context: inside class method 'SchemaInferenceService.infer_from_file'
+
+  schema_inference_service.py:507
+    Import: import json
+    Context: inside class method 'SchemaInferenceService._generate_text_report'
+
+  schema_inference_service.py:530
+    Import: import json
+    Context: inside class method 'SchemaInferenceService._generate_markdown_report'
+
+  schema_generator_service.py:153
+    Import: import dataclasses
+    Context: inside class method 'SchemaGeneratorService.from_dataclass'
+
+  schema_generator_service.py:423
+    Import: import re
+    Context: inside class method 'SchemaGeneratorService._infer_string_format'
+
+  schema_generator_service.py:474
+    Import: import json
+    Context: inside class method 'SchemaGeneratorService.save_schema'
+
+  schema_generator_service.py:475
+    Import: import yaml
+    Context: inside class method 'SchemaGeneratorService.save_schema'
+
+  schema_validator_service.py:144
+    Import: import json
+    Context: inside class method 'SchemaValidatorService.validate_file'
+
+  schema_validator_service.py:145
+    Import: import yaml
+    Context: inside class method 'SchemaValidatorService.validate_file'
+
+  spec_validator_service.py:318
+    Import: import re
+    Context: inside class method 'SpecValidatorService._extract_path_parameters'
+
+  spec_generator_service.py:347
+    Import: import yaml
+    Context: inside class method 'SpecGeneratorService.to_yaml'
+
+  spec_generator_service.py:361
+    Import: import json
+    Context: inside class method 'SpecGeneratorService.to_json'
+
+  cli.py:884
+    Import: from Asgard.Volundr.GitOps import FluxGitRepository
+    Context: inside function 'run_flux_source'
+
+  cli.py:910
+    Import: from Asgard.Volundr.GitOps import FluxKustomization
+    Context: inside function 'run_flux_kustomization'
+
+  cli.py:989
+    Import: from Asgard.Volundr.Validation import ValidationContext
+    Context: inside function 'run_validate_kubernetes'
+
+  handlers.py:2460
+    Import: from Asgard.Heimdall.Init.linter_initializer import LinterInitializer
+    Context: inside function 'run_init_linter'
+
+  cpu_profiler_service.py:281
+    Import: import re
+    Context: inside class method 'CpuProfilerService._find_function_line'
+
+  layer_analyzer.py:427
+    Import: import json
+    Context: inside class method 'LayerAnalyzer._generate_json_report'
+
+  architecture_analyzer.py:233
+    Import: import json
+    Context: inside class method 'ArchitectureAnalyzer._generate_json_report'
+
+  solid_validator.py:568
+    Import: import json
+    Context: inside class method 'SOLIDValidator._generate_json_report'
+
+  pattern_detector.py:606
+    Import: import json
+    Context: inside class method 'PatternDetector._generate_json_report'
+
+  access_analyzer.py:146
+    Import: from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
+    Context: inside class method 'AccessAnalyzer._recalculate_totals'
+
+  access_analyzer.py:171
+    Import: from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
+    Context: inside class method 'AccessAnalyzer._severity_order'
+
+  config_secrets_models.py:60
+    Import: import os
+    Context: inside class method 'ConfigSecretFinding.location'
+
+  config_secrets_scanner.py:336
+    Import: import configparser
+    Context: inside class method 'ConfigSecretsScanner._analyze_ini'
+
+  credential_analyzer.py:404
+    Import: import re
+    Context: inside class method 'CredentialAnalyzer._is_enum_value'
+
+  security_utils.py:291
+    Import: import math
+    Context: inside function 'calculate_entropy'
+
+  security_utils.py:292
+    Import: from collections import Counter
+    Context: inside function 'calculate_entropy'
+
+  security_utils.py:344
+    Import: import re
+    Context: inside function 'is_inside_docstring'
+
+  security_utils.py:442
+    Import: import re
+    Context: inside function 'is_example_or_placeholder'
+
+  security_utils.py:502
+    Import: import re
+    Context: inside function 'is_parameterized_sql'
+
+  auth_analyzer.py:162
+    Import: from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
+    Context: inside class method 'AuthAnalyzer._recalculate_totals'
+
+  auth_analyzer.py:163
+    Import: from Asgard.Heimdall.Security.Auth.models.auth_models import AuthFindingType
+    Context: inside class method 'AuthAnalyzer._recalculate_totals'
+
+  auth_analyzer.py:209
+    Import: from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
+    Context: inside class method 'AuthAnalyzer._severity_order'
+
+  oop_analyzer.py:477
+    Import: import json
+    Context: inside class method 'OOPAnalyzer._generate_json_report'
+
+  coverage_analyzer.py:243
+    Import: import json
+    Context: inside class method 'CoverageAnalyzer._generate_json_report'
+
+  env_fallback_models.py:76
+    Import: import os
+    Context: inside class method 'EnvFallbackViolation.location'
+
+  smell_models.py:57
+    Import: import os
+    Context: inside class method 'CodeSmell.location'
+
+  resource_cleanup_models.py:60
+    Import: import os
+    Context: inside class method 'ResourceCleanupViolation.location'
+
+  debt_models.py:78
+    Import: import os
+    Context: inside class method 'DebtItem.location'
+
+  maintainability_models.py:64
+    Import: import math
+    Context: inside class method 'HalsteadMetrics.volume'
+
+  maintainability_models.py:117
+    Import: import os
+    Context: inside class method 'FunctionMaintainability.location'
+
+  maintainability_models.py:154
+    Import: import os
+    Context: inside class method 'FileMaintainability.filename'
+
+  lazy_import_models.py:56
+    Import: import os
+    Context: inside class method 'LazyImport.location'
+
+  datetime_models.py:49
+    Import: import os
+    Context: inside class method 'DatetimeViolation.location'
+
+  library_usage_models.py:41
+    Import: import os
+    Context: inside class method 'ForbiddenImportViolation.location'
+
+  typing_models.py:53
+    Import: import os
+    Context: inside class method 'FunctionAnnotation.location'
+
+  error_handling_models.py:61
+    Import: import os
+    Context: inside class method 'ErrorHandlingViolation.location'
+
+  site_crawler.py:961
+    Import: import json
+    Context: inside class method 'SiteCrawler._save_report'
+
+  regression_detector.py:271
+    Import: import random
+    Context: inside class method 'RegressionDetector.bootstrap_comparison'
+
+  models.py:813
+    Import: import yaml
+    Context: inside class method 'AsgardConfig.to_yaml'
+
+  conftest.py:57
+    Import: import math
+    Context: inside function 'normal_distribution_data'
+
+  validate_package.py:53
+    Import: from test_utils import create_temp_python_file, create_temp_json_file
+    Context: inside function 'validate_file_utils'
+
+  validate_package.py:79
+    Import: from test_utils import mock_playwright_page, mock_http_response
+    Context: inside function 'validate_mock_utils'
+
+  validate_package.py:105
+    Import: from test_utils import assert_json_valid, assert_approximate
+    Context: inside function 'validate_assertion_utils'
+
+  validate_package.py:134
+    Import: from test_utils import generate_python_class, generate_metrics_data
+    Context: inside function 'validate_generators'
+
+
+[MEDIUM]
+  validate_package.py:21
+    Import: import test_utils
+    Context: inside try/except block 'validate_imports'
+
+  validate_package.py:28
+    Import: from test_utils import file_utils, mock_utils, assertion_utils, generators
+    Context: inside try/except block 'validate_imports'
+
+  validate_package.py:35
+    Import: from test_utils import (
+    Context: inside try/except block 'validate_imports'
+
+  cli.py:499
+    Import: from Asgard.Heimdall.cli import main as heimdall_main
+    Context: inside conditional block (if/elif/else) 'main'
+
+  cli.py:504
+    Import: from Asgard.Freya.cli import main as freya_main
+    Context: inside conditional block (if/elif/else) 'main'
+
+  cli.py:509
+    Import: from Asgard.Forseti.cli import main as forseti_main
+    Context: inside conditional block (if/elif/else) 'main'
+
+  cli.py:514
+    Import: from Asgard.Verdandi.cli import main as verdandi_main
+    Context: inside conditional block (if/elif/else) 'main'
+
+  cli.py:519
+    Import: from Asgard.Volundr.cli import main as volundr_main
+    Context: inside conditional block (if/elif/else) 'main'
+
+  cli.py:501
+    Import: import traceback
+    Context: inside conditional block (if/elif/else) 'main'
+
+  cli.py:522
+    Import: from Asgard.Forseti.OpenAPI import SpecGeneratorService
+    Context: inside conditional block (if/elif/else) '_handle_openapi'
+
+  cli.py:533
+    Import: from Asgard.Forseti.OpenAPI import SpecConverterService
+    Context: inside conditional block (if/elif/else) '_handle_openapi'
+
+  cli.py:546
+    Import: from Asgard.Forseti.OpenAPI.utilities import compare_specs
+    Context: inside conditional block (if/elif/else) '_handle_openapi'
+
+  cli.py:570
+    Import: from Asgard.Forseti.GraphQL import SchemaGeneratorService
+    Context: inside conditional block (if/elif/else) '_handle_graphql'
+
+  cli.py:577
+    Import: from Asgard.Forseti.GraphQL import IntrospectionService
+    Context: inside conditional block (if/elif/else) '_handle_graphql'
+
+  cli.py:602
+    Import: from Asgard.Forseti.Database import SchemaAnalyzerService
+    Context: inside conditional block (if/elif/else) '_handle_database'
+
+  cli.py:614
+    Import: from Asgard.Forseti.Database import SchemaDiffService
+    Context: inside conditional block (if/elif/else) '_handle_database'
+
+  cli.py:621
+    Import: from Asgard.Forseti.Database import MigrationGeneratorService
+    Context: inside conditional block (if/elif/else) '_handle_database'
+
+  cli.py:640
+    Import: from Asgard.Forseti.Contracts import ContractValidatorService
+    Context: inside conditional block (if/elif/else) '_handle_contract'
+
+  cli.py:647
+    Import: from Asgard.Forseti.Contracts import CompatibilityCheckerService
+    Context: inside conditional block (if/elif/else) '_handle_contract'
+
+  cli.py:654
+    Import: from Asgard.Forseti.Contracts import BreakingChangeDetectorService
+    Context: inside conditional block (if/elif/else) '_handle_contract'
+
+  cli.py:672
+    Import: from Asgard.Forseti.JSONSchema import SchemaValidatorService, JSONSchemaConfig
+    Context: inside conditional block (if/elif/else) '_handle_jsonschema'
+
+  cli.py:680
+    Import: from Asgard.Forseti.JSONSchema import SchemaGeneratorService
+    Context: inside conditional block (if/elif/else) '_handle_jsonschema'
+
+  cli.py:688
+    Import: from Asgard.Forseti.JSONSchema import SchemaInferenceService
+    Context: inside conditional block (if/elif/else) '_handle_jsonschema'
+
+  cli.py:716
+    Import: from Asgard.Forseti.OpenAPI import SpecValidatorService
+    Context: inside conditional block (if/elif/else) '_handle_audit'
+
+  cli.py:854
+    Import: from Asgard.Forseti.MockServer import MockServerGeneratorService, MockServerConfig
+    Context: inside conditional block (if/elif/else) '_handle_mock'
+
+  cli.py:896
+    Import: from Asgard.Forseti.MockServer import MockDataGeneratorService, MockDataConfig
+    Context: inside conditional block (if/elif/else) '_handle_mock'
+
+  cli.py:942
+    Import: from Asgard.Forseti.CodeGen import TypeScriptGeneratorService, CodeGenConfig, HttpClientType
+    Context: inside conditional block (if/elif/else) '_handle_codegen'
+
+  cli.py:972
+    Import: from Asgard.Forseti.CodeGen import PythonGeneratorService, CodeGenConfig, HttpClientType
+    Context: inside conditional block (if/elif/else) '_handle_codegen'
+
+  cli.py:1008
+    Import: from Asgard.Forseti.CodeGen import GolangGeneratorService, CodeGenConfig
+    Context: inside conditional block (if/elif/else) '_handle_codegen'
+
+  cli.py:1045
+    Import: from Asgard.Forseti.Documentation import DocsGeneratorService, APIDocConfig, DocumentationFormat
+    Context: inside conditional block (if/elif/else) '_handle_docs'
+
+  cli.py:1098
+    Import: from Asgard.Forseti.Protobuf import ProtobufValidatorService, ProtobufConfig
+    Context: inside conditional block (if/elif/else) '_handle_protobuf'
+
+  cli.py:1110
+    Import: from Asgard.Forseti.Protobuf import ProtobufCompatibilityService
+    Context: inside conditional block (if/elif/else) '_handle_protobuf'
+
+  cli.py:1127
+    Import: from Asgard.Forseti.Avro import AvroValidatorService, AvroConfig
+    Context: inside conditional block (if/elif/else) '_handle_avro'
+
+  cli.py:1139
+    Import: from Asgard.Forseti.Avro import AvroCompatibilityService, CompatibilityMode
+    Context: inside conditional block (if/elif/else) '_handle_avro'
+
+  cli.py:1159
+    Import: import yaml
+    Context: inside try/except block '_looks_like_openapi'
+
+  cli.py:1172
+    Import: import yaml
+    Context: inside try/except block '_looks_like_asyncapi'
+
+  schema_inference_service.py:498
+    Import: import json
+    Context: inside conditional block (if/elif/else) 'SchemaInferenceService.generate_report'
+
+  schema_generator_service.py:78
+    Import: from pydantic import BaseModel
+    Context: inside try/except block 'SchemaGeneratorService.from_pydantic'
+
+  schema_generator_service.py:319
+    Import: from typing import Literal
+    Context: inside try/except block 'SchemaGeneratorService._type_to_schema'
+
+  schema_validator_service.py:644
+    Import: import json
+    Context: inside conditional block (if/elif/else) 'SchemaValidatorService.generate_report'
+
+  jsonschema_utils.py:268
+    Import: import re
+    Context: inside conditional block (if/elif/else) 'validate_schema_syntax'
+
+  compatibility_checker_service.py:417
+    Import: import json
+    Context: inside conditional block (if/elif/else) 'CompatibilityCheckerService.generate_report'
+
+  contract_validator_service.py:297
+    Import: import json
+    Context: inside conditional block (if/elif/else) 'ContractValidatorService.generate_report'
+
+  spec_validator_service.py:448
+    Import: import json
+    Context: inside conditional block (if/elif/else) 'SpecValidatorService.generate_report'
+
+  spec_converter_service.py:404
+    Import: import re
+    Context: inside conditional block (if/elif/else) 'SpecConverterService._convert_3_0_to_2'
+
+  schema_validator_service.py:324
+    Import: import json
+    Context: inside conditional block (if/elif/else) 'SchemaValidatorService.generate_report'
+
+  schema_diff_service.py:295
+    Import: import json
+    Context: inside conditional block (if/elif/else) 'SchemaDiffService.generate_report'
+
+  handlers.py:347
+    Import: from Asgard.Heimdall.Quality.utilities.file_utils import discover_files
+    Context: inside conditional block (if/elif/else) 'run_quality_analysis'
+
+  handlers.py:1966
+    Import: import json as _json
+    Context: inside conditional block (if/elif/else) 'run_hotspots_analysis'
+
+  handlers.py:2070
+    Import: import json as _json
+    Context: inside conditional block (if/elif/else) 'run_compliance_analysis'
+
+  handlers.py:2197
+    Import: import json as _json
+    Context: inside conditional block (if/elif/else) 'run_ratings_analysis'
+
+  handlers.py:2348
+    Import: import json as _json
+    Context: inside conditional block (if/elif/else) 'run_gate_evaluation'
+
+  modularity_analyzer.py:20
+    Import: import networkx as nx
+    Context: inside try/except block
+
+  graph_builder.py:19
+    Import: import networkx as nx
+    Context: inside try/except block
+
+  graph_builder.py:255
+    Import: import matplotlib.pyplot as plt
+    Context: inside try/except block 'GraphBuilder.visualize'
+
+  cycle_detector.py:20
+    Import: import networkx as nx
+    Context: inside try/except block
+
+  license_checker.py:224
+    Import: import urllib.request
+    Context: inside try/except block 'LicenseChecker._get_license_from_pypi'
+
+  license_checker.py:225
+    Import: import urllib.error
+    Context: inside try/except block 'LicenseChecker._get_license_from_pypi'
+
+  graph_utils.py:11
+    Import: import networkx as nx
+    Context: inside try/except block
+
+  dependency_vulnerability_service.py:80
+    Import: import tomllib
+    Context: inside try/except block 'RequirementsParser.parse_pyproject_toml'
+
+  dependency_vulnerability_service.py:83
+    Import: import tomli as tomllib
+    Context: inside try/except block 'RequirementsParser.parse_pyproject_toml'
+
+  config_secrets_scanner.py:295
+    Import: import yaml
+    Context: inside try/except block 'ConfigSecretsScanner._analyze_yaml'
+
+  config_secrets_scanner.py:320
+    Import: import tomllib
+    Context: inside try/except block 'ConfigSecretsScanner._analyze_toml'
+
+  config_secrets_scanner.py:323
+    Import: import tomli as tomllib
+    Context: inside try/except block 'ConfigSecretsScanner._analyze_toml'
+
+  cli.py:1027
+    Import: import shutil
+    Context: inside conditional block (if/elif/else) 'run_visual_capture'
+
+  loader.py:130
+    Import: import tomllib
+    Context: inside try/except block 'AsgardConfigLoader._load_pyproject_toml'
+
+  loader.py:133
+    Import: import tomli as tomllib
+    Context: inside try/except block 'AsgardConfigLoader._load_pyproject_toml'
+
+  validate_package.py:21
+    Import: import test_utils
+    Context: inside try/except block 'validate_imports'
+
+  validate_package.py:28
+    Import: from test_utils import file_utils, mock_utils, assertion_utils, generators
+    Context: inside try/except block 'validate_imports'
+
+  validate_package.py:35
+    Import: from test_utils import (
+    Context: inside try/except block 'validate_imports'
+
+
+[LOW]
+  cli.py:728
+    Import: from Asgard.Forseti.JSONSchema.utilities import load_schema_file, validate_schema_syntax
+    Context: inside loop (for/while) '_handle_audit'
+
+  cli.py:749
+    Import: from Asgard.Forseti.Protobuf import ProtobufValidatorService
+    Context: inside loop (for/while) '_handle_audit'
+
+  cli.py:770
+    Import: from Asgard.Forseti.Avro import AvroValidatorService
+    Context: inside loop (for/while) '_handle_audit'
+
+============================================================
+</pre>
+</body>
+</html>

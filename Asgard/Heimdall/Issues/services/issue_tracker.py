@@ -23,61 +23,14 @@ from Asgard.Heimdall.Issues.models.issue_models import (
     IssuesSummary,
     TrackedIssue,
 )
-
-_CREATE_TABLE_SQL = """
-CREATE TABLE IF NOT EXISTS issues (
-    issue_id TEXT PRIMARY KEY,
-    project_path TEXT NOT NULL,
-    rule_id TEXT NOT NULL,
-    issue_type TEXT NOT NULL,
-    file_path TEXT NOT NULL,
-    line_number INTEGER NOT NULL,
-    severity TEXT NOT NULL,
-    title TEXT NOT NULL,
-    description TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'open',
-    first_detected TEXT NOT NULL,
-    last_seen TEXT NOT NULL,
-    resolved_at TEXT,
-    false_positive_reason TEXT,
-    assigned_to TEXT,
-    git_blame_author TEXT,
-    git_blame_commit TEXT,
-    tags_json TEXT DEFAULT '[]',
-    comments_json TEXT DEFAULT '[]',
-    scan_count INTEGER DEFAULT 1
-);
-"""
-
-_CREATE_IDX_PROJECT_SQL = "CREATE INDEX IF NOT EXISTS idx_issues_project ON issues(project_path);"
-_CREATE_IDX_STATUS_SQL = "CREATE INDEX IF NOT EXISTS idx_issues_status ON issues(status);"
-
-_LINE_PROXIMITY = 5
-
-
-def _row_to_issue(row: sqlite3.Row) -> TrackedIssue:
-    """Convert a database row to a TrackedIssue model."""
-    return TrackedIssue(
-        issue_id=row["issue_id"],
-        rule_id=row["rule_id"],
-        issue_type=row["issue_type"],
-        file_path=row["file_path"],
-        line_number=row["line_number"],
-        severity=row["severity"],
-        title=row["title"],
-        description=row["description"],
-        status=row["status"],
-        first_detected=datetime.fromisoformat(row["first_detected"]),
-        last_seen=datetime.fromisoformat(row["last_seen"]),
-        resolved_at=datetime.fromisoformat(row["resolved_at"]) if row["resolved_at"] else None,
-        false_positive_reason=row["false_positive_reason"],
-        assigned_to=row["assigned_to"],
-        git_blame_author=row["git_blame_author"],
-        git_blame_commit=row["git_blame_commit"],
-        tags=json.loads(row["tags_json"] or "[]"),
-        comments=json.loads(row["comments_json"] or "[]"),
-        scan_count=row["scan_count"],
-    )
+from Asgard.Heimdall.Issues.services._issue_db import (
+    _CREATE_IDX_PROJECT_SQL,
+    _CREATE_IDX_STATUS_SQL,
+    _CREATE_TABLE_SQL,
+    _LINE_PROXIMITY,
+    row_to_issue,
+)
+from Asgard.Heimdall.Issues.services._issue_queries import build_summary, query_issues
 
 
 class IssueTracker:
@@ -93,10 +46,6 @@ class IssueTracker:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._init_db()
 
-    # ------------------------------------------------------------------
-    # Initialisation
-    # ------------------------------------------------------------------
-
     def _init_db(self) -> None:
         """Create the issues table and indexes if they do not yet exist."""
         with self._get_connection() as conn:
@@ -111,10 +60,6 @@ class IssueTracker:
         conn.row_factory = sqlite3.Row
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
-
-    # ------------------------------------------------------------------
-    # Core issue operations
-    # ------------------------------------------------------------------
 
     def upsert_issue(
         self,
@@ -153,7 +98,6 @@ class IssueTracker:
         severity_val = severity if isinstance(severity, str) else severity.value
 
         with self._get_connection() as conn:
-            # Search for existing issue within line proximity
             rows = conn.execute(
                 """
                 SELECT * FROM issues
@@ -185,9 +129,8 @@ class IssueTracker:
                     "SELECT * FROM issues WHERE issue_id = ?",
                     (existing["issue_id"],),
                 ).fetchone()
-                return _row_to_issue(updated)
+                return row_to_issue(updated)
 
-            # Create new issue
             new_id = str(uuid.uuid4())
             conn.execute(
                 """
@@ -210,7 +153,7 @@ class IssueTracker:
                 "SELECT * FROM issues WHERE issue_id = ?",
                 (new_id,),
             ).fetchone()
-            return _row_to_issue(row)
+            return row_to_issue(row)
 
     def mark_resolved(self, project_path: str, scan_start_time: datetime) -> int:
         """
@@ -291,7 +234,7 @@ class IssueTracker:
                 "SELECT * FROM issues WHERE issue_id = ?",
                 (issue_id,),
             ).fetchone()
-            return _row_to_issue(updated)
+            return row_to_issue(updated)
 
     def assign_issue(self, issue_id: str, assignee: str) -> Optional[TrackedIssue]:
         """
@@ -316,7 +259,7 @@ class IssueTracker:
                 "SELECT * FROM issues WHERE issue_id = ?",
                 (issue_id,),
             ).fetchone()
-            return _row_to_issue(row)
+            return row_to_issue(row)
 
     def add_comment(self, issue_id: str, comment: str) -> Optional[TrackedIssue]:
         """
@@ -347,11 +290,7 @@ class IssueTracker:
                 "SELECT * FROM issues WHERE issue_id = ?",
                 (issue_id,),
             ).fetchone()
-            return _row_to_issue(updated)
-
-    # ------------------------------------------------------------------
-    # Query operations
-    # ------------------------------------------------------------------
+            return row_to_issue(updated)
 
     def get_issues(
         self,
@@ -368,54 +307,8 @@ class IssueTracker:
         Returns:
             List of matching TrackedIssue objects.
         """
-        query = "SELECT * FROM issues WHERE project_path = ?"
-        params: List = [project_path]
-
-        if issue_filter:
-            if issue_filter.status:
-                placeholders = ",".join("?" for _ in issue_filter.status)
-                values = [
-                    s if isinstance(s, str) else s.value
-                    for s in issue_filter.status
-                ]
-                query += f" AND status IN ({placeholders})"
-                params.extend(values)
-
-            if issue_filter.severity:
-                placeholders = ",".join("?" for _ in issue_filter.severity)
-                values = [
-                    s if isinstance(s, str) else s.value
-                    for s in issue_filter.severity
-                ]
-                query += f" AND severity IN ({placeholders})"
-                params.extend(values)
-
-            if issue_filter.issue_type:
-                placeholders = ",".join("?" for _ in issue_filter.issue_type)
-                values = [
-                    t if isinstance(t, str) else t.value
-                    for t in issue_filter.issue_type
-                ]
-                query += f" AND issue_type IN ({placeholders})"
-                params.extend(values)
-
-            if issue_filter.file_path_contains:
-                query += " AND file_path LIKE ?"
-                params.append(f"%{issue_filter.file_path_contains}%")
-
-            if issue_filter.assigned_to:
-                query += " AND assigned_to = ?"
-                params.append(issue_filter.assigned_to)
-
-            if issue_filter.rule_id:
-                query += " AND rule_id = ?"
-                params.append(issue_filter.rule_id)
-
-        query += " ORDER BY first_detected DESC"
-
         with self._get_connection() as conn:
-            rows = conn.execute(query, params).fetchall()
-            return [_row_to_issue(row) for row in rows]
+            return query_issues(conn, project_path, issue_filter)
 
     def get_summary(self, project_path: str) -> IssuesSummary:
         """
@@ -428,43 +321,7 @@ class IssueTracker:
             IssuesSummary with counts broken down by status, severity, and type.
         """
         with self._get_connection() as conn:
-            rows = conn.execute(
-                "SELECT * FROM issues WHERE project_path = ?",
-                (project_path,),
-            ).fetchall()
-
-        summary = IssuesSummary(project_path=project_path)
-        oldest: Optional[datetime] = None
-
-        for row in rows:
-            status = row["status"]
-            severity = row["severity"]
-            issue_type = row["issue_type"]
-
-            if status == IssueStatus.OPEN.value:
-                summary.total_open += 1
-                summary.open_by_severity[severity] = summary.open_by_severity.get(severity, 0) + 1
-                summary.open_by_type[issue_type] = summary.open_by_type.get(issue_type, 0) + 1
-                first = datetime.fromisoformat(row["first_detected"])
-                if oldest is None or first < oldest:
-                    oldest = first
-
-            elif status == IssueStatus.CONFIRMED.value:
-                summary.total_confirmed += 1
-                summary.open_by_severity[severity] = summary.open_by_severity.get(severity, 0) + 1
-                summary.open_by_type[issue_type] = summary.open_by_type.get(issue_type, 0) + 1
-
-            elif status == IssueStatus.FALSE_POSITIVE.value:
-                summary.total_false_positives += 1
-
-            elif status == IssueStatus.WONT_FIX.value:
-                summary.total_wont_fix += 1
-
-            elif status in (IssueStatus.RESOLVED.value, IssueStatus.CLOSED.value):
-                summary.total_resolved += 1
-
-        summary.oldest_open_issue = oldest
-        return summary
+            return build_summary(conn, project_path)
 
     def get_issue(self, issue_id: str) -> Optional[TrackedIssue]:
         """
@@ -483,11 +340,7 @@ class IssueTracker:
             ).fetchone()
             if not row:
                 return None
-            return _row_to_issue(row)
-
-    # ------------------------------------------------------------------
-    # Git blame enrichment
-    # ------------------------------------------------------------------
+            return row_to_issue(row)
 
     def get_git_blame(self, file_path: str, line_number: int) -> Optional[Dict[str, str]]:
         """

@@ -13,6 +13,12 @@ from Asgard.Verdandi.Tracing.models.tracing_models import (
     DistributedTrace,
     TraceSpan,
 )
+from Asgard.Verdandi.Tracing.services._path_helpers import (
+    calculate_parallelization_opportunity,
+    find_critical_path,
+    generate_path_recommendations,
+    percentile,
+)
 
 
 class CriticalPathAnalyzer:
@@ -67,7 +73,6 @@ class CriticalPathAnalyzer:
                 critical_path_duration_ms=0.0,
             )
 
-        # Build span lookup and parent-child relationships
         span_lookup = {s.span_id: s for s in trace.spans}
         children: Dict[str, List[TraceSpan]] = defaultdict(list)
 
@@ -75,7 +80,6 @@ class CriticalPathAnalyzer:
             if span.parent_span_id:
                 children[span.parent_span_id].append(span)
 
-        # Find root span
         root_span = trace.root_span
         if root_span is None:
             root_span = next(
@@ -83,19 +87,14 @@ class CriticalPathAnalyzer:
             )
 
         if root_span is None:
-            # No clear root, use the earliest span
             root_span = min(trace.spans, key=lambda s: s.start_time_unix_nano)
 
-        # Find critical path using DFS
-        critical_path_spans = self._find_critical_path(root_span, children)
+        critical_path_spans = find_critical_path(root_span, children)
 
-        # Calculate contributions
         total_duration = trace.total_duration_ms
         segments = []
 
         for span in critical_path_spans:
-            # Calculate this span's contribution
-            # Self-time = span duration - sum of child durations on critical path
             child_spans = children.get(span.span_id, [])
             child_duration = sum(
                 cs.duration_ms for cs in child_spans if cs in critical_path_spans
@@ -116,10 +115,8 @@ class CriticalPathAnalyzer:
                     )
                 )
 
-        # Calculate critical path duration (should equal trace duration for serial path)
         critical_path_duration = sum(s.contribution_ms for s in segments)
 
-        # Find bottlenecks
         bottleneck_segment = (
             max(segments, key=lambda s: s.contribution_ms) if segments else None
         )
@@ -130,14 +127,11 @@ class CriticalPathAnalyzer:
             bottleneck_segment.span.operation_name if bottleneck_segment else None
         )
 
-        # Calculate parallelization opportunity
-        # (time spent in spans that could potentially run in parallel)
-        parallel_opportunity = self._calculate_parallelization_opportunity(
+        parallel_opportunity = calculate_parallelization_opportunity(
             trace.spans, children
         )
 
-        # Generate recommendations
-        recommendations = self._generate_recommendations(
+        recommendations = generate_path_recommendations(
             segments, bottleneck_service, bottleneck_operation, parallel_opportunity
         )
 
@@ -190,13 +184,11 @@ class CriticalPathAnalyzer:
                 key = (segment.span.service_name, segment.span.operation_name)
                 bottleneck_stats[key].append(segment.contribution_ms)
 
-        # Calculate averages
         averages = [
             (service, op, sum(contribs) / len(contribs))
             for (service, op), contribs in bottleneck_stats.items()
         ]
 
-        # Sort by average contribution
         averages.sort(key=lambda x: x[2], reverse=True)
 
         return averages[:top_n]
@@ -223,7 +215,6 @@ class CriticalPathAnalyzer:
                     segment.contribution_ms
                 )
 
-        # Calculate statistics per service
         results = {}
         for service, contributions in service_stats.items():
             sorted_contrib = sorted(contributions)
@@ -232,8 +223,8 @@ class CriticalPathAnalyzer:
                 "avg_contribution_ms": sum(contributions) / len(contributions),
                 "max_contribution_ms": max(contributions),
                 "occurrence_count": len(contributions),
-                "p50_contribution_ms": self._percentile(sorted_contrib, 50),
-                "p99_contribution_ms": self._percentile(sorted_contrib, 99),
+                "p50_contribution_ms": percentile(sorted_contrib, 50),
+                "p99_contribution_ms": percentile(sorted_contrib, 99),
             }
 
         return results
@@ -256,7 +247,6 @@ class CriticalPathAnalyzer:
         result_a = self.analyze(trace_a)
         result_b = self.analyze(trace_b)
 
-        # Build operation contribution maps
         contrib_a = {
             (s.span.service_name, s.span.operation_name): s.contribution_ms
             for s in result_a.segments
@@ -266,7 +256,6 @@ class CriticalPathAnalyzer:
             for s in result_b.segments
         }
 
-        # Find differences
         all_ops = set(contrib_a.keys()) | set(contrib_b.keys())
         differences = []
 
@@ -274,7 +263,7 @@ class CriticalPathAnalyzer:
             time_a = contrib_a.get(op, 0.0)
             time_b = contrib_b.get(op, 0.0)
             diff = time_b - time_a
-            if abs(diff) > 1.0:  # Only significant differences
+            if abs(diff) > 1.0:
                 differences.append({
                     "service": op[0],
                     "operation": op[1],
@@ -296,142 +285,3 @@ class CriticalPathAnalyzer:
             "trace_b_bottleneck": result_b.bottleneck_operation,
             "operation_differences": differences,
         }
-
-    def _find_critical_path(
-        self,
-        root: TraceSpan,
-        children: Dict[str, List[TraceSpan]],
-    ) -> List[TraceSpan]:
-        """
-        Find the critical path starting from root span.
-
-        Uses a DFS approach following the longest child at each level.
-        """
-        path = [root]
-        current = root
-
-        while current.span_id in children:
-            child_spans = children[current.span_id]
-            if not child_spans:
-                break
-
-            # Find the child that ends latest (determines critical path)
-            # For true critical path, we should consider span start/end times
-            latest_child = max(
-                child_spans, key=lambda s: s.end_time_unix_nano
-            )
-
-            # Also consider overlapping spans - the one with most impact
-            longest_child = max(child_spans, key=lambda s: s.duration_ms)
-
-            # Use the one that contributes more to total duration
-            if latest_child.end_time_unix_nano > longest_child.end_time_unix_nano:
-                critical_child = latest_child
-            else:
-                critical_child = longest_child
-
-            path.append(critical_child)
-            current = critical_child
-
-        return path
-
-    def _calculate_parallelization_opportunity(
-        self,
-        spans: List[TraceSpan],
-        children: Dict[str, List[TraceSpan]],
-    ) -> float:
-        """
-        Calculate potential time savings from parallelization.
-
-        Looks for sequential children that could run in parallel.
-        """
-        total_opportunity = 0.0
-
-        for parent_id, child_spans in children.items():
-            if len(child_spans) <= 1:
-                continue
-
-            # Check if children are sequential (non-overlapping)
-            sorted_children = sorted(
-                child_spans, key=lambda s: s.start_time_unix_nano
-            )
-
-            for i in range(len(sorted_children) - 1):
-                current = sorted_children[i]
-                next_span = sorted_children[i + 1]
-
-                # If next starts after current ends, they're sequential
-                if next_span.start_time_unix_nano >= current.end_time_unix_nano:
-                    # Could save time by parallelizing
-                    # Savings = min(current.duration, next.duration)
-                    potential_savings = min(
-                        current.duration_ms, next_span.duration_ms
-                    )
-                    total_opportunity += potential_savings
-
-        return total_opportunity
-
-    def _percentile(
-        self, sorted_values: List[float], percentile: float
-    ) -> float:
-        """Calculate percentile from sorted values."""
-        if not sorted_values:
-            return 0.0
-
-        n = len(sorted_values)
-        if n == 1:
-            return sorted_values[0]
-
-        rank = (percentile / 100) * (n - 1)
-        lower_idx = int(rank)
-        upper_idx = min(lower_idx + 1, n - 1)
-        fraction = rank - lower_idx
-
-        return sorted_values[lower_idx] + fraction * (
-            sorted_values[upper_idx] - sorted_values[lower_idx]
-        )
-
-    def _generate_recommendations(
-        self,
-        segments: List[CriticalPathSegment],
-        bottleneck_service: Optional[str],
-        bottleneck_operation: Optional[str],
-        parallel_opportunity: float,
-    ) -> List[str]:
-        """Generate optimization recommendations."""
-        recommendations = []
-
-        if bottleneck_service and bottleneck_operation:
-            bottleneck_segment = max(segments, key=lambda s: s.contribution_ms)
-            recommendations.append(
-                f"Primary bottleneck: {bottleneck_service}/{bottleneck_operation} "
-                f"({bottleneck_segment.contribution_ms:.0f}ms, "
-                f"{bottleneck_segment.contribution_percent:.1f}% of critical path)"
-            )
-
-        if parallel_opportunity > 10:
-            recommendations.append(
-                f"Parallelization opportunity: {parallel_opportunity:.0f}ms could be "
-                f"saved by running sequential operations in parallel"
-            )
-
-        # Find segments with high contribution
-        high_impact = [
-            s for s in segments if s.contribution_percent > 20
-        ]
-        if len(high_impact) > 1:
-            services = list(set(s.span.service_name for s in high_impact))
-            recommendations.append(
-                f"Multiple high-impact services: {', '.join(services)}. "
-                f"Consider optimizing these first."
-            )
-
-        # Check for error spans on critical path
-        error_segments = [s for s in segments if s.span.has_error]
-        if error_segments:
-            recommendations.append(
-                f"{len(error_segments)} error(s) on critical path. "
-                f"Errors may be causing retries and increased latency."
-            )
-
-        return recommendations

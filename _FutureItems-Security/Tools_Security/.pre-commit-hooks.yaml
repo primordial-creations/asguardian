@@ -1,0 +1,59 @@
+# Pre-commit hooks for security scanning
+# Add to your .pre-commit-config.yaml:
+#
+# repos:
+#   - repo: local
+#     hooks:
+#       - id: security-secrets
+#         name: Scan for secrets
+#         entry: python security-tools/secrets_scanner.py
+#         language: python
+#         types: [python, javascript, typescript]
+
+- id: security-secrets
+  name: Scan for secrets
+  description: Detect exposed secrets and API keys
+  entry: python secrets_scanner.py
+  language: python
+  types: [python, javascript, typescript, json, yaml]
+  pass_filenames: false
+
+- id: security-sqli
+  name: Scan for SQL injection
+  description: Detect SQL injection vulnerabilities
+  entry: python sql_injection_scanner.py
+  language: python
+  types: [python, javascript, typescript, php, ruby]
+  pass_filenames: false
+
+- id: security-xss
+  name: Scan for XSS
+  description: Detect XSS vulnerabilities
+  entry: python xss_scanner.py
+  language: python
+  types: [python, javascript, typescript, php]
+  pass_filenames: false
+
+- id: security-sensitive
+  name: Scan for sensitive data
+  description: Detect exposed PII and sensitive data
+  entry: python sensitive_data_scanner.py
+  language: python
+  types_or: [python, javascript, typescript, json]
+  pass_filenames: false
+
+- id: security-misconfig
+  name: Scan for misconfigurations
+  description: Detect security misconfigurations
+  entry: python security_misconfig_scanner.py
+  language: python
+  types_or: [python, javascript, yaml, json, dockerfile]
+  pass_filenames: false
+
+- id: security-full
+  name: Full security scan
+  description: Run comprehensive security audit
+  entry: python security_toolkit.py --audit
+  language: python
+  pass_filenames: false
+  always_run: true

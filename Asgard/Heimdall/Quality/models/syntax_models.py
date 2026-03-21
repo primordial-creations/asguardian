@@ -177,7 +177,7 @@ class SyntaxResult:
 
     def get_issues_by_severity(self) -> Dict[str, List[SyntaxIssue]]:
         """Group all issues by severity."""
-        result = {
+        result: Dict[str, List[SyntaxIssue]] = {
             SyntaxSeverity.ERROR.value: [],
             SyntaxSeverity.WARNING.value: [],
             SyntaxSeverity.INFO.value: [],

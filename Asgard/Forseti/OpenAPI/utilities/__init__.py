@@ -11,6 +11,7 @@ from Asgard.Forseti.OpenAPI.utilities.openapi_utils import (
     resolve_references,
     validate_url,
     extract_ref_name,
+    compare_specs,
 )
 
 __all__ = [
@@ -22,4 +23,5 @@ __all__ = [
     "resolve_references",
     "validate_url",
     "extract_ref_name",
+    "compare_specs",
 ]

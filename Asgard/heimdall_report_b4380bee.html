@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Heimdall - architecture solid</title>
+  <style>
+    body {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      font-family: 'Cascadia Code', 'Fira Code', Consolas, monospace;
+      margin: 0;
+      padding: 24px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+    h1 {
+      color: #569cd6;
+      font-size: 1.1em;
+      margin: 0 0 16px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid #333;
+    }
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+      margin: 0;
+    }
+  </style>
+</head>
+<body>
+  <h1>Heimdall - architecture solid</h1>
+  <pre>
+======================================================================
+  HEIMDALL ARCHITECTURE ANALYSIS REPORT
+======================================================================
+
+  Scan Path:        /mnt/storage/home-data/Documents/GAIA/Asgard/Asgard
+  Scanned At:       2026-03-20 11:28:06
+  Duration:         3.72s
+
+  Total Violations: 250
+  Patterns Found:   0
+  Health Status:    NEEDS ATTENTION
+
+----------------------------------------------------------------------
+  SOLID PRINCIPLES
+----------------------------------------------------------------------
+
+  Checks five object-oriented design principles: Single Responsibility (one reason to change), Open/Closed (open for extension, closed for modification), Liskov Substitution (subtypes behave like their base), Interface Segregation (no fat interfaces), Dependency Inversion (depend on abstractions).
+
+  Classes Analyzed:  1335
+  Violations Found:  250
+
+  Single Responsibility Principle: 23 violations
+  Open/Closed Principle: 198 violations
+  Dependency Inversion Principle: 29 violations
+
+----------------------------------------------------------------------
+  PATTERN CANDIDATE SUGGESTIONS
+----------------------------------------------------------------------
+
+  Analyses code smells and structural signals to suggest GoF design patterns that could improve the design (Builder, Strategy, Observer, etc.). These are candidates — not violations.
+
+  Suggestions Found: 147
+
+  Strategy: 71 candidate(s)
+  Visitor: 42 candidate(s)
+  Factory: 13 candidate(s)
+  Facade: 7 candidate(s)
+  Mediator: 14 candidate(s)
+
+----------------------------------------------------------------------
+  RECOMMENDATIONS
+----------------------------------------------------------------------
+
+  - Address 23 Single Responsibility Principle violations
+  - Address 198 Open/Closed Principle violations
+  - Address 29 Dependency Inversion Principle violations
+  - Review 147 pattern candidate suggestion(s) -- applying these patterns could improve maintainability and extensibility
+
+======================================================================
+</pre>
+</body>
+</html>

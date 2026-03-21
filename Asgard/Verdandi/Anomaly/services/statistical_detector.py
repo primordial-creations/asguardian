@@ -4,7 +4,6 @@ Statistical Detector Service
 Provides statistical anomaly detection using z-score and IQR methods.
 """
 
-import math
 from datetime import datetime
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -13,6 +12,17 @@ from Asgard.Verdandi.Anomaly.models.anomaly_models import (
     AnomalySeverity,
     AnomalyType,
     BaselineMetrics,
+)
+from Asgard.Verdandi.Anomaly.services._stat_helpers import (
+    calculate_baseline_metrics,
+    calculate_mean_std,
+    calculate_quartiles,
+    confidence_from_zscore,
+    detect_anomalies_with_baseline,
+    find_change_points_in_values,
+    percentile,
+    severity_from_iqr_distance,
+    severity_from_zscore,
 )
 
 
@@ -85,11 +95,9 @@ class StatisticalDetector:
         elif method == "iqr":
             return self.detect_iqr(values, metric_name, timestamps)
         else:
-            # Combined: union of both methods
             zscore_anomalies = self.detect_zscore(values, metric_name, timestamps)
             iqr_anomalies = self.detect_iqr(values, metric_name, timestamps)
 
-            # Merge and deduplicate by timestamp
             seen_timestamps = set()
             combined = []
             for anomaly in zscore_anomalies + iqr_anomalies:
@@ -120,10 +128,10 @@ class StatisticalDetector:
             return []
 
         timestamps = timestamps or [datetime.now() for _ in range(len(values))]
-        mean, std_dev = self._calculate_mean_std(values)
+        mean, std_dev = calculate_mean_std(values)
 
         if std_dev == 0:
-            return []  # No variation in data
+            return []
 
         anomalies = []
         for i, (value, ts) in enumerate(zip(values, timestamps)):
@@ -131,21 +139,20 @@ class StatisticalDetector:
 
             if abs(z_score) >= self.z_threshold:
                 anomaly_type = AnomalyType.SPIKE if z_score > 0 else AnomalyType.DROP
-                severity = self._severity_from_zscore(z_score)
 
                 anomalies.append(
                     AnomalyDetection(
                         detected_at=datetime.now(),
                         data_timestamp=ts,
                         anomaly_type=anomaly_type,
-                        severity=severity,
+                        severity=severity_from_zscore(z_score),
                         metric_name=metric_name,
                         actual_value=value,
                         expected_value=mean,
                         deviation=abs(value - mean),
                         deviation_percent=abs(value - mean) / mean * 100 if mean != 0 else 0,
                         z_score=z_score,
-                        confidence=self._confidence_from_zscore(z_score),
+                        confidence=confidence_from_zscore(z_score),
                         description=f"Z-score anomaly: {z_score:.2f} standard deviations from mean",
                     )
                 )
@@ -174,11 +181,11 @@ class StatisticalDetector:
 
         timestamps = timestamps or [datetime.now() for _ in range(len(values))]
 
-        q1, q3 = self._calculate_quartiles(values)
+        q1, q3 = calculate_quartiles(values)
         iqr = q3 - q1
         lower_fence = q1 - self.iqr_multiplier * iqr
         upper_fence = q3 + self.iqr_multiplier * iqr
-        median = self._percentile(sorted(values), 50)
+        median = percentile(sorted(values), 50)
 
         anomalies = []
         for i, (value, ts) in enumerate(zip(values, timestamps)):
@@ -187,20 +194,17 @@ class StatisticalDetector:
                     AnomalyType.SPIKE if value > upper_fence else AnomalyType.DROP
                 )
 
-                # Calculate how far outside the fence
                 if value > upper_fence:
                     fence_distance = (value - upper_fence) / iqr if iqr > 0 else 0
                 else:
                     fence_distance = (lower_fence - value) / iqr if iqr > 0 else 0
-
-                severity = self._severity_from_iqr_distance(fence_distance)
 
                 anomalies.append(
                     AnomalyDetection(
                         detected_at=datetime.now(),
                         data_timestamp=ts,
                         anomaly_type=anomaly_type,
-                        severity=severity,
+                        severity=severity_from_iqr_distance(fence_distance),
                         metric_name=metric_name,
                         actual_value=value,
                         expected_value=median,
@@ -242,29 +246,8 @@ class StatisticalDetector:
                 metric_name=metric_name, baseline_period_days=period_days
             )
 
-        sorted_values = sorted(values)
-        mean, std_dev = self._calculate_mean_std(values)
-        q1, q3 = self._calculate_quartiles(values)
-        iqr = q3 - q1
-
-        return BaselineMetrics(
-            metric_name=metric_name,
-            calculated_at=datetime.now(),
-            sample_count=len(values),
-            baseline_period_days=period_days,
-            mean=mean,
-            median=self._percentile(sorted_values, 50),
-            std_dev=std_dev,
-            min_value=sorted_values[0],
-            max_value=sorted_values[-1],
-            p5=self._percentile(sorted_values, 5),
-            p25=q1,
-            p75=q3,
-            p95=self._percentile(sorted_values, 95),
-            p99=self._percentile(sorted_values, 99),
-            iqr=iqr,
-            lower_fence=q1 - self.iqr_multiplier * iqr,
-            upper_fence=q3 + self.iqr_multiplier * iqr,
+        return calculate_baseline_metrics(
+            values, metric_name, period_days, self.iqr_multiplier
         )
 
     def detect_with_baseline(
@@ -288,54 +271,7 @@ class StatisticalDetector:
             return []
 
         timestamps = timestamps or [datetime.now() for _ in range(len(values))]
-        anomalies = []
-
-        for value, ts in zip(values, timestamps):
-            # Z-score check
-            z_score = (
-                (value - baseline.mean) / baseline.std_dev
-                if baseline.std_dev > 0
-                else 0
-            )
-
-            # IQR check
-            is_iqr_outlier = (
-                value < baseline.lower_fence or value > baseline.upper_fence
-            )
-
-            if abs(z_score) >= self.z_threshold or is_iqr_outlier:
-                anomaly_type = (
-                    AnomalyType.SPIKE if value > baseline.mean else AnomalyType.DROP
-                )
-                severity = max(
-                    self._severity_from_zscore(z_score),
-                    self._severity_from_iqr_distance(
-                        abs(value - baseline.median) / baseline.iqr if baseline.iqr > 0 else 0
-                    ),
-                )
-
-                anomalies.append(
-                    AnomalyDetection(
-                        detected_at=datetime.now(),
-                        data_timestamp=ts,
-                        anomaly_type=anomaly_type,
-                        severity=severity,
-                        metric_name=baseline.metric_name,
-                        actual_value=value,
-                        expected_value=baseline.mean,
-                        deviation=abs(value - baseline.mean),
-                        deviation_percent=(
-                            abs(value - baseline.mean) / baseline.mean * 100
-                            if baseline.mean != 0
-                            else 0
-                        ),
-                        z_score=z_score,
-                        confidence=self._confidence_from_zscore(z_score),
-                        description=f"Anomaly detected against baseline (z={z_score:.2f})",
-                    )
-                )
-
-        return anomalies
+        return detect_anomalies_with_baseline(values, baseline, timestamps, self.z_threshold)
 
     def find_change_points(
         self,
@@ -354,101 +290,4 @@ class StatisticalDetector:
         Returns:
             List of (index, change_magnitude) tuples
         """
-        if len(values) < 2 * window_size:
-            return []
-
-        change_points = []
-
-        for i in range(window_size, len(values) - window_size):
-            before = values[i - window_size : i]
-            after = values[i : i + window_size]
-
-            before_mean = sum(before) / len(before)
-            after_mean = sum(after) / len(after)
-
-            # Calculate pooled standard deviation
-            before_var = sum((x - before_mean) ** 2 for x in before) / len(before)
-            after_var = sum((x - after_mean) ** 2 for x in after) / len(after)
-            pooled_std = math.sqrt((before_var + after_var) / 2)
-
-            if pooled_std > 0:
-                change_magnitude = abs(after_mean - before_mean) / pooled_std
-
-                if change_magnitude >= self.z_threshold:
-                    change_points.append((i, change_magnitude))
-
-        return change_points
-
-    def _calculate_mean_std(
-        self, values: Sequence[float]
-    ) -> Tuple[float, float]:
-        """Calculate mean and standard deviation."""
-        n = len(values)
-        if n == 0:
-            return 0.0, 0.0
-
-        mean = sum(values) / n
-        variance = sum((x - mean) ** 2 for x in values) / n
-        std_dev = math.sqrt(variance)
-
-        return mean, std_dev
-
-    def _calculate_quartiles(
-        self, values: Sequence[float]
-    ) -> Tuple[float, float]:
-        """Calculate Q1 and Q3."""
-        sorted_values = sorted(values)
-        q1 = self._percentile(sorted_values, 25)
-        q3 = self._percentile(sorted_values, 75)
-        return q1, q3
-
-    def _percentile(
-        self, sorted_values: List[float], percentile: float
-    ) -> float:
-        """Calculate percentile from sorted values."""
-        if not sorted_values:
-            return 0.0
-
-        n = len(sorted_values)
-        if n == 1:
-            return sorted_values[0]
-
-        rank = (percentile / 100) * (n - 1)
-        lower_idx = int(rank)
-        upper_idx = min(lower_idx + 1, n - 1)
-        fraction = rank - lower_idx
-
-        return sorted_values[lower_idx] + fraction * (
-            sorted_values[upper_idx] - sorted_values[lower_idx]
-        )
-
-    def _severity_from_zscore(self, z_score: float) -> AnomalySeverity:
-        """Determine severity from z-score."""
-        abs_z = abs(z_score)
-        if abs_z >= 5:
-            return AnomalySeverity.CRITICAL
-        elif abs_z >= 4:
-            return AnomalySeverity.HIGH
-        elif abs_z >= 3:
-            return AnomalySeverity.MEDIUM
-        elif abs_z >= 2:
-            return AnomalySeverity.LOW
-        return AnomalySeverity.INFO
-
-    def _severity_from_iqr_distance(self, distance: float) -> AnomalySeverity:
-        """Determine severity from IQR distance."""
-        if distance >= 3:
-            return AnomalySeverity.CRITICAL
-        elif distance >= 2:
-            return AnomalySeverity.HIGH
-        elif distance >= 1.5:
-            return AnomalySeverity.MEDIUM
-        elif distance >= 1:
-            return AnomalySeverity.LOW
-        return AnomalySeverity.INFO
-
-    def _confidence_from_zscore(self, z_score: float) -> float:
-        """Calculate confidence from z-score."""
-        # Approximate using sigmoid-like function
-        abs_z = abs(z_score)
-        return min(0.99, 1.0 - math.exp(-0.5 * abs_z))
+        return find_change_points_in_values(values, window_size, self.z_threshold)

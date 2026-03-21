@@ -54,8 +54,6 @@ def large_dataset():
 def normal_distribution_data():
     """Normally distributed data for statistical testing."""
     # Approximate normal distribution
-    import math
-
     mean = 150.0
     std_dev = 30.0
 

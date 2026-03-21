@@ -15,10 +15,20 @@ import yaml  # type: ignore[import-untyped]
 from Asgard.Heimdall.Security.Container.models.container_models import (
     ContainerConfig,
     ContainerFinding,
-    ContainerFindingType,
     ContainerReport,
 )
-from Asgard.Heimdall.Security.Container.utilities.dockerfile_parser import extract_code_snippet
+from Asgard.Heimdall.Security.Container.services._compose_checks import (
+    check_capabilities,
+    check_environment_secrets,
+    check_exposed_ports,
+    check_image_tag,
+    check_network_mode,
+    check_pid_mode,
+    check_privileged,
+    check_read_only,
+    check_security_opt,
+    check_volumes,
+)
 from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
 
 
@@ -174,35 +184,38 @@ class ComposeAnalyzer:
 
             service_line = self._find_service_line(lines, service_name)
 
-            findings.extend(self._check_privileged(
+            findings.extend(check_privileged(
                 service_name, service_config, lines, relative_path, service_line
             ))
-            findings.extend(self._check_network_mode(
+            findings.extend(check_network_mode(
                 service_name, service_config, lines, relative_path, service_line
             ))
-            findings.extend(self._check_pid_mode(
+            findings.extend(check_pid_mode(
                 service_name, service_config, lines, relative_path, service_line
             ))
-            findings.extend(self._check_capabilities(
+            findings.extend(check_capabilities(
                 service_name, service_config, lines, relative_path, service_line
             ))
-            findings.extend(self._check_environment_secrets(
+            findings.extend(check_environment_secrets(
+                service_name, service_config, lines, relative_path, service_line,
+                self.config.secret_env_patterns,
+            ))
+            findings.extend(check_volumes(
                 service_name, service_config, lines, relative_path, service_line
             ))
-            findings.extend(self._check_volumes(
+            findings.extend(check_security_opt(
                 service_name, service_config, lines, relative_path, service_line
             ))
-            findings.extend(self._check_security_opt(
+            findings.extend(check_image_tag(
                 service_name, service_config, lines, relative_path, service_line
             ))
-            findings.extend(self._check_image_tag(
+            findings.extend(check_read_only(
                 service_name, service_config, lines, relative_path, service_line
             ))
-            findings.extend(self._check_read_only(
-                service_name, service_config, lines, relative_path, service_line
-            ))
-            findings.extend(self._check_exposed_ports(
-                service_name, service_config, lines, relative_path, service_line
+            findings.extend(check_exposed_ports(
+                service_name, service_config, lines, relative_path, service_line,
+                self.config.check_ports,
+                self.config.sensitive_ports,
             ))
 
         return findings
@@ -223,406 +236,6 @@ class ComposeAnalyzer:
             if re.match(pattern, line):
                 return i
         return 1
-
-    def _check_privileged(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for privileged containers."""
-        findings: List[ContainerFinding] = []
-
-        if service_config.get("privileged", False):
-            findings.append(ContainerFinding(
-                file_path=file_path,
-                line_number=service_line,
-                finding_type=ContainerFindingType.PRIVILEGED_MODE,
-                severity=SecuritySeverity.CRITICAL,
-                title="Privileged Container",
-                description=f"Service '{service_name}' runs in privileged mode, giving it full access to the host.",
-                code_snippet=extract_code_snippet(lines, service_line),
-                service_name=service_name,
-                cwe_id="CWE-250",
-                confidence=0.95,
-                remediation="Remove privileged: true. Use specific capabilities instead if needed.",
-                references=[
-                    "https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities",
-                    "https://cwe.mitre.org/data/definitions/250.html",
-                ],
-            ))
-
-        return findings
-
-    def _check_network_mode(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for host network mode."""
-        findings: List[ContainerFinding] = []
-
-        network_mode = service_config.get("network_mode", "")
-        if network_mode == "host":
-            findings.append(ContainerFinding(
-                file_path=file_path,
-                line_number=service_line,
-                finding_type=ContainerFindingType.HOST_NETWORK,
-                severity=SecuritySeverity.HIGH,
-                title="Host Network Mode",
-                description=f"Service '{service_name}' uses host network mode, bypassing Docker network isolation.",
-                code_snippet=extract_code_snippet(lines, service_line),
-                service_name=service_name,
-                cwe_id="CWE-653",
-                confidence=0.95,
-                remediation="Use Docker networks instead of host network mode for better isolation.",
-                references=[
-                    "https://docs.docker.com/network/",
-                ],
-            ))
-
-        return findings
-
-    def _check_pid_mode(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for host PID namespace."""
-        findings: List[ContainerFinding] = []
-
-        pid_mode = service_config.get("pid", "")
-        if pid_mode == "host":
-            findings.append(ContainerFinding(
-                file_path=file_path,
-                line_number=service_line,
-                finding_type=ContainerFindingType.HOST_PID,
-                severity=SecuritySeverity.HIGH,
-                title="Host PID Namespace",
-                description=f"Service '{service_name}' shares the host PID namespace, allowing it to see and interact with all host processes.",
-                code_snippet=extract_code_snippet(lines, service_line),
-                service_name=service_name,
-                cwe_id="CWE-653",
-                confidence=0.95,
-                remediation="Remove pid: host unless absolutely necessary for debugging.",
-                references=[
-                    "https://docs.docker.com/engine/reference/run/#pid-settings---pid",
-                ],
-            ))
-
-        return findings
-
-    def _check_capabilities(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for dangerous capabilities."""
-        findings: List[ContainerFinding] = []
-
-        dangerous_caps = {
-            "SYS_ADMIN": "Allows mounting filesystems, loading kernel modules, and more",
-            "NET_ADMIN": "Allows full network administration",
-            "SYS_PTRACE": "Allows process tracing and debugging",
-            "DAC_READ_SEARCH": "Allows bypassing file read permission checks",
-            "ALL": "Grants all capabilities",
-        }
-
-        cap_add = service_config.get("cap_add", [])
-        if isinstance(cap_add, list):
-            for cap in cap_add:
-                cap_upper = str(cap).upper()
-                if cap_upper in dangerous_caps:
-                    findings.append(ContainerFinding(
-                        file_path=file_path,
-                        line_number=service_line,
-                        finding_type=ContainerFindingType.CAP_SYS_ADMIN,
-                        severity=SecuritySeverity.HIGH,
-                        title=f"Dangerous Capability: {cap_upper}",
-                        description=f"Service '{service_name}' has {cap_upper} capability. {dangerous_caps[cap_upper]}.",
-                        code_snippet=extract_code_snippet(lines, service_line),
-                        service_name=service_name,
-                        cwe_id="CWE-250",
-                        confidence=0.9,
-                        remediation="Remove this capability and use more specific, less privileged alternatives.",
-                        references=[
-                            "https://docs.docker.com/engine/reference/run/#runtime-privilege-and-linux-capabilities",
-                        ],
-                    ))
-
-        return findings
-
-    def _check_environment_secrets(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for secrets in environment variables."""
-        findings: List[ContainerFinding] = []
-
-        environment = service_config.get("environment", {})
-
-        env_list: List[str] = []
-        if isinstance(environment, dict):
-            env_list = [f"{k}={v}" for k, v in environment.items() if v is not None]
-        elif isinstance(environment, list):
-            env_list = [str(e) for e in environment]
-
-        for env_entry in env_list:
-            if "=" not in env_entry:
-                continue
-
-            key, value = env_entry.split("=", 1)
-
-            for pattern in self.config.secret_env_patterns:
-                if re.search(pattern, key, re.IGNORECASE):
-                    if value and not value.startswith("${") and not value.startswith("$"):
-                        findings.append(ContainerFinding(
-                            file_path=file_path,
-                            line_number=service_line,
-                            finding_type=ContainerFindingType.HARDCODED_SECRET,
-                            severity=SecuritySeverity.CRITICAL,
-                            title="Hardcoded Secret in Environment",
-                            description=f"Service '{service_name}' has a hardcoded secret in environment variable '{key}'.",
-                            code_snippet=extract_code_snippet(lines, service_line),
-                            service_name=service_name,
-                            cwe_id="CWE-798",
-                            confidence=0.85,
-                            remediation="Use Docker secrets, environment files, or external secret management.",
-                            references=[
-                                "https://docs.docker.com/compose/use-secrets/",
-                                "https://cwe.mitre.org/data/definitions/798.html",
-                            ],
-                        ))
-                    break
-
-        return findings
-
-    def _check_volumes(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for dangerous volume mounts."""
-        findings: List[ContainerFinding] = []
-
-        dangerous_mounts = {
-            "/": "Root filesystem",
-            "/etc": "System configuration",
-            "/var/run/docker.sock": "Docker socket",
-            "/proc": "Process information",
-            "/sys": "System information",
-        }
-
-        volumes = service_config.get("volumes", [])
-        if isinstance(volumes, list):
-            for volume in volumes:
-                volume_str = str(volume)
-
-                if ":" in volume_str:
-                    parts = volume_str.split(":")
-                    host_path = parts[0]
-                else:
-                    host_path = volume_str
-
-                for dangerous_path, description in dangerous_mounts.items():
-                    if host_path == dangerous_path or host_path.startswith(dangerous_path + "/"):
-                        findings.append(ContainerFinding(
-                            file_path=file_path,
-                            line_number=service_line,
-                            finding_type=ContainerFindingType.UNRESTRICTED_VOLUME,
-                            severity=SecuritySeverity.HIGH,
-                            title=f"Dangerous Volume Mount: {dangerous_path}",
-                            description=f"Service '{service_name}' mounts {dangerous_path} ({description}) from the host.",
-                            code_snippet=extract_code_snippet(lines, service_line),
-                            service_name=service_name,
-                            cwe_id="CWE-250",
-                            confidence=0.9,
-                            remediation="Avoid mounting sensitive host paths. Use named volumes or specific subdirectories.",
-                            references=[
-                                "https://docs.docker.com/storage/volumes/",
-                            ],
-                        ))
-                        break
-
-        return findings
-
-    def _check_security_opt(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for disabled security options."""
-        findings: List[ContainerFinding] = []
-
-        security_opt = service_config.get("security_opt", [])
-        if isinstance(security_opt, list):
-            for opt in security_opt:
-                opt_str = str(opt).lower()
-
-                if "apparmor:unconfined" in opt_str:
-                    findings.append(ContainerFinding(
-                        file_path=file_path,
-                        line_number=service_line,
-                        finding_type=ContainerFindingType.NO_SECURITY_OPT,
-                        severity=SecuritySeverity.HIGH,
-                        title="AppArmor Disabled",
-                        description=f"Service '{service_name}' runs with AppArmor disabled.",
-                        code_snippet=extract_code_snippet(lines, service_line),
-                        service_name=service_name,
-                        cwe_id="CWE-693",
-                        confidence=0.9,
-                        remediation="Use the default AppArmor profile or create a custom profile.",
-                        references=[
-                            "https://docs.docker.com/engine/security/apparmor/",
-                        ],
-                    ))
-
-                if "seccomp:unconfined" in opt_str:
-                    findings.append(ContainerFinding(
-                        file_path=file_path,
-                        line_number=service_line,
-                        finding_type=ContainerFindingType.NO_SECURITY_OPT,
-                        severity=SecuritySeverity.HIGH,
-                        title="Seccomp Disabled",
-                        description=f"Service '{service_name}' runs with seccomp disabled.",
-                        code_snippet=extract_code_snippet(lines, service_line),
-                        service_name=service_name,
-                        cwe_id="CWE-693",
-                        confidence=0.9,
-                        remediation="Use the default seccomp profile or create a custom profile.",
-                        references=[
-                            "https://docs.docker.com/engine/security/seccomp/",
-                        ],
-                    ))
-
-        return findings
-
-    def _check_image_tag(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for latest tag in images."""
-        findings: List[ContainerFinding] = []
-
-        image = service_config.get("image", "")
-        if isinstance(image, str):
-            if ":" not in image or image.endswith(":latest"):
-                findings.append(ContainerFinding(
-                    file_path=file_path,
-                    line_number=service_line,
-                    finding_type=ContainerFindingType.LATEST_TAG,
-                    severity=SecuritySeverity.MEDIUM,
-                    title="Using :latest Tag",
-                    description=f"Service '{service_name}' uses :latest tag or no tag for image '{image}'.",
-                    code_snippet=extract_code_snippet(lines, service_line),
-                    service_name=service_name,
-                    cwe_id="CWE-829",
-                    confidence=0.85,
-                    remediation="Pin images to specific version tags or digest hashes.",
-                    references=[
-                        "https://docs.docker.com/engine/reference/commandline/tag/",
-                    ],
-                ))
-
-        return findings
-
-    def _check_read_only(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for writable root filesystem."""
-        findings: List[ContainerFinding] = []
-
-        if not service_config.get("read_only", False):
-            findings.append(ContainerFinding(
-                file_path=file_path,
-                line_number=service_line,
-                finding_type=ContainerFindingType.WRITABLE_ROOT_FS,
-                severity=SecuritySeverity.LOW,
-                title="Writable Root Filesystem",
-                description=f"Service '{service_name}' has a writable root filesystem.",
-                code_snippet=extract_code_snippet(lines, service_line),
-                service_name=service_name,
-                cwe_id="CWE-732",
-                confidence=0.6,
-                remediation="Consider adding read_only: true and using volumes for writable paths.",
-                references=[
-                    "https://docs.docker.com/compose/compose-file/05-services/#read_only",
-                ],
-            ))
-
-        return findings
-
-    def _check_exposed_ports(
-        self,
-        service_name: str,
-        service_config: Dict[str, Any],
-        lines: List[str],
-        file_path: str,
-        service_line: int
-    ) -> List[ContainerFinding]:
-        """Check for exposed sensitive ports."""
-        findings: List[ContainerFinding] = []
-
-        if not self.config.check_ports:
-            return findings
-
-        ports = service_config.get("ports", [])
-        if isinstance(ports, list):
-            for port_mapping in ports:
-                port_str = str(port_mapping)
-
-                port_match = re.search(r":(\d+)(?:/|$)", port_str)
-                if port_match:
-                    container_port = int(port_match.group(1))
-                    if container_port in self.config.sensitive_ports:
-                        findings.append(ContainerFinding(
-                            file_path=file_path,
-                            line_number=service_line,
-                            finding_type=ContainerFindingType.EXPOSED_PORTS,
-                            severity=SecuritySeverity.MEDIUM,
-                            title=f"Sensitive Port {container_port} Exposed",
-                            description=f"Service '{service_name}' exposes port {container_port}.",
-                            code_snippet=extract_code_snippet(lines, service_line),
-                            service_name=service_name,
-                            cwe_id="CWE-200",
-                            confidence=0.7,
-                            remediation="Consider if this port needs to be exposed publicly.",
-                            references=[
-                                "https://docs.docker.com/compose/compose-file/05-services/#ports",
-                            ],
-                        ))
-
-        return findings
 
     def _severity_meets_threshold(self, severity: str) -> bool:
         """Check if a severity level meets the configured threshold."""

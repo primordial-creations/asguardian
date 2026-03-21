@@ -60,7 +60,7 @@ def _union_member_count(node: ast.AST) -> int:
     return 1  # Union[X] — degenerate single-type union
 
 
-def _all_args(func: ast.FunctionDef) -> list:
+def _all_args(func: ast.FunctionDef | ast.AsyncFunctionDef) -> list:
     """Collect all argument nodes (excluding self/cls) from a function definition."""
     args = (
         func.args.args
