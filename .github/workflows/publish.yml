@@ -7,7 +7,7 @@ on:
 
 jobs:
   publish:
-    runs-on: [self-hosted, UAT, x64]
+    runs-on: arc-x86
     permissions:
       id-token: write
     steps:
