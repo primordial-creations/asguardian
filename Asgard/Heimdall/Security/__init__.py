@@ -228,3 +228,23 @@ __all__ = [
     "OWASPCategory",
     "OWASPComplianceReport",
 ]
+
+# ── New submodule imports ──────────────────────────────────────────────────────
+from Asgard.Heimdall.Security.API import APIFinding, APIScanConfig, APIScanReport, APISecurityCategory, APISecurityScanner, APISeverity  # noqa: E501
+from Asgard.Heimdall.Security.Backdoor import BackdoorDetector, BackdoorFinding, BackdoorScanConfig, BackdoorScanReport, BackdoorSeverity, BackdoorType  # noqa: E501
+from Asgard.Heimdall.Security.DataExfil import DataExfiltrationDetector, ExfilFinding, ExfilScanConfig, ExfilScanReport, ExfilSeverity, ExfilType  # noqa: E501
+from Asgard.Heimdall.Security.Deserialization import DeserializationFinding, DeserializationScanConfig, DeserializationScanReport, DeserializationScanner, DeserializationSeverity  # noqa: E501
+from Asgard.Heimdall.Security.DNS import DNSCheck, DNSIssue, DNSScanReport, DNSSecurityChecker
+from Asgard.Heimdall.Security.FileIntegrity import FileIntegrityChecker, FileIntegrityReport, FileModification, FileRecord, PermissionChange  # noqa: E501
+from Asgard.Heimdall.Security.Frontend import FrontendFinding, FrontendScanConfig, FrontendScanReport, FrontendSecurityScanner, FrontendSeverity  # noqa: E501
+from Asgard.Heimdall.Security.Git import GitFinding, GitScanReport, GitSecurityScanner, GitSeverity
+from Asgard.Heimdall.Security.InfoDisclosure import InfoDisclosureFinding, InfoDisclosureScanConfig, InfoDisclosureScanReport, InfoDisclosureScanner, InfoDisclosureSeverity  # noqa: E501
+from Asgard.Heimdall.Security.InputValidation import InputValidationFinding, InputValidationScanConfig, InputValidationScanReport, InputValidationScanner, InputValidationSeverity  # noqa: E501
+from Asgard.Heimdall.Security.LogAnalysis import LogAnalysisReport, LogAnalyzer, LogEvent
+from Asgard.Heimdall.Security.Malware import MalwareFinding, MalwareScanConfig, MalwareScanReport, MalwareScanner, MalwareSeverity  # noqa: E501
+from Asgard.Heimdall.Security.Misconfig import MisconfigFinding, MisconfigScanConfig, MisconfigScanReport, MisconfigSeverity, SecurityMisconfigScanner  # noqa: E501
+from Asgard.Heimdall.Security.PathTraversal import PathTraversalFinding, PathTraversalScanConfig, PathTraversalScanReport, PathTraversalScanner, PathTraversalSeverity  # noqa: E501
+from Asgard.Heimdall.Security.RaceCondition import RaceConditionDetector, RaceConditionFinding, RaceConditionScanConfig, RaceConditionScanReport, RaceConditionSeverity  # noqa: E501
+from Asgard.Heimdall.Security.ReDoS import ReDoSFinding, ReDoSScanConfig, ReDoSScanReport, ReDoSScanner, ReDoSSeverity  # noqa: E501
+from Asgard.Heimdall.Security.SensitiveData import SensitiveDataFinding, SensitiveDataScanConfig, SensitiveDataScanReport, SensitiveDataScanner, SensitiveDataSeverity  # noqa: E501
+from Asgard.Heimdall.Security.SSRF import SSRFFinding, SSRFScanConfig, SSRFScanReport, SSRFSeverity, SSRFVulnerabilityType, SSRFXXEScanner  # noqa: E501
