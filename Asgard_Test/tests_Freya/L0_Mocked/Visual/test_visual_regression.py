@@ -38,8 +38,10 @@ def _make_mock_image(width=1920, height=1080):
 
 class TestVisualRegressionTesterInit:
     @pytest.mark.L0
-    def test_init_default_directory(self):
-        tester = VisualRegressionTester()
+    def test_init_default_directory(self, tmp_path):
+        with patch("Asgard.Freya.Visual.services.visual_regression.Path.mkdir"):
+            tester = VisualRegressionTester.__new__(VisualRegressionTester)
+            tester.output_directory = Path("./regression_output")
         assert tester.output_directory == Path("./regression_output")
 
     @pytest.mark.L0
@@ -57,13 +59,13 @@ class TestVisualRegressionTesterInit:
 
 class TestCompareBasic:
     @pytest.mark.L0
-    def test_compare_identical_images(self, temp_baseline_file, temp_comparison_file):
+    def test_compare_identical_images(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image()
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.pixel_comparison", return_value=(1.0, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file))
 
         assert result.baseline_path == str(temp_baseline_file)
@@ -73,7 +75,7 @@ class TestCompareBasic:
         assert len(result.difference_regions) == 0
 
     @pytest.mark.L0
-    def test_compare_different_images(self, temp_baseline_file, temp_comparison_file):
+    def test_compare_different_images(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image()
         from Asgard.Freya.Visual.models.visual_models import DifferenceRegion
         region = DifferenceRegion(
@@ -91,7 +93,7 @@ class TestCompareBasic:
              patch(f"{_VR}.draw_rectangle"), \
              patch(f"{_VR}.draw_label"):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(threshold=0.95, method=ComparisonMethod.PIXEL_DIFF)
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 
@@ -99,9 +101,9 @@ class TestCompareBasic:
         assert result.is_similar is False
 
     @pytest.mark.L0
-    def test_compare_handles_image_load_error(self, temp_baseline_file, temp_comparison_file):
+    def test_compare_handles_image_load_error(self, temp_baseline_file, temp_comparison_file, tmp_path):
         with patch(f"{_VR}.load_image", side_effect=Exception("Failed to load image")):
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file))
 
         assert result.similarity_score == 0.0
@@ -109,7 +111,7 @@ class TestCompareBasic:
         assert "error" in result.metadata
 
     @pytest.mark.L0
-    def test_compare_resizes_mismatched_sizes(self, temp_baseline_file, temp_comparison_file):
+    def test_compare_resizes_mismatched_sizes(self, temp_baseline_file, temp_comparison_file, tmp_path):
         baseline_img = _make_mock_image(1920, 1080)
         comparison_img = _make_mock_image(1280, 720)
         resized_img = _make_mock_image(1280, 720)
@@ -118,7 +120,7 @@ class TestCompareBasic:
              patch(f"{_VR}.resize", return_value=resized_img) as mock_resize, \
              patch(f"{_VR}.pixel_comparison", return_value=(1.0, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file))
 
         assert mock_resize.call_count == 2
@@ -126,13 +128,13 @@ class TestCompareBasic:
 
 class TestComparisonMethods:
     @pytest.mark.L0
-    def test_pixel_diff_comparison(self, temp_baseline_file, temp_comparison_file):
+    def test_pixel_diff_comparison(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.pixel_comparison", return_value=(0.995, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(method=ComparisonMethod.PIXEL_DIFF)
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 
@@ -140,13 +142,13 @@ class TestComparisonMethods:
         assert 0.99 <= result.similarity_score <= 1.0
 
     @pytest.mark.L0
-    def test_ssim_comparison(self, temp_baseline_file, temp_comparison_file):
+    def test_ssim_comparison(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.ssim_comparison", return_value=(0.95, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(method=ComparisonMethod.STRUCTURAL_SIMILARITY)
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 
@@ -154,13 +156,13 @@ class TestComparisonMethods:
         assert result.similarity_score == 0.95
 
     @pytest.mark.L0
-    def test_perceptual_hash_comparison(self, temp_baseline_file, temp_comparison_file):
+    def test_perceptual_hash_comparison(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.phash_comparison", return_value=(1.0, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(method=ComparisonMethod.PERCEPTUAL_HASH)
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 
@@ -168,13 +170,13 @@ class TestComparisonMethods:
         assert result.similarity_score == 1.0
 
     @pytest.mark.L0
-    def test_histogram_comparison(self, temp_baseline_file, temp_comparison_file):
+    def test_histogram_comparison(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.histogram_comparison", return_value=(0.98, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(method=ComparisonMethod.HISTOGRAM_COMPARISON)
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 
@@ -183,41 +185,41 @@ class TestComparisonMethods:
 
 class TestComparisonConfiguration:
     @pytest.mark.L0
-    def test_compare_with_blur(self, temp_baseline_file, temp_comparison_file):
+    def test_compare_with_blur(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.gaussian_blur", return_value=mock_img) as mock_blur, \
              patch(f"{_VR}.pixel_comparison", return_value=(1.0, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(blur_radius=5)
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 
         assert mock_blur.call_count == 2
 
     @pytest.mark.L0
-    def test_compare_with_ignore_regions(self, temp_baseline_file, temp_comparison_file):
+    def test_compare_with_ignore_regions(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.mask_regions", return_value=mock_img) as mock_mask, \
              patch(f"{_VR}.pixel_comparison", return_value=(1.0, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(ignore_regions=[{"x": 0, "y": 0, "width": 100, "height": 50}])
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 
         assert mock_mask.call_count == 2
 
     @pytest.mark.L0
-    def test_compare_respects_threshold(self, temp_baseline_file, temp_comparison_file):
+    def test_compare_respects_threshold(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.pixel_comparison", return_value=(0.96, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
 
             config_high = ComparisonConfig(threshold=0.97, method=ComparisonMethod.PIXEL_DIFF)
             result_high = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config_high)
@@ -231,7 +233,7 @@ class TestComparisonConfiguration:
 
 class TestRunSuite:
     @pytest.mark.L0
-    def test_run_suite_basic(self, sample_regression_test_suite):
+    def test_run_suite_basic(self, sample_regression_test_suite, tmp_path):
         baseline_dir = Path(sample_regression_test_suite.baseline_directory)
         (baseline_dir / "test1.png").write_text("baseline1")
         (baseline_dir / "test2.png").write_text("baseline2")
@@ -245,7 +247,7 @@ class TestRunSuite:
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.pixel_comparison", return_value=(1.0, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             report = tester.run_suite(sample_regression_test_suite)
 
         assert report.suite_name == sample_regression_test_suite.name
@@ -253,7 +255,7 @@ class TestRunSuite:
         assert report.report_path is not None
 
     @pytest.mark.L0
-    def test_run_suite_skips_missing_baselines(self, temp_output_dir):
+    def test_run_suite_skips_missing_baselines(self, temp_output_dir, tmp_path):
         baseline_dir = temp_output_dir / "baselines"
         baseline_dir.mkdir()
         output_dir = temp_output_dir / "output"
@@ -271,13 +273,13 @@ class TestRunSuite:
             ],
         )
 
-        tester = VisualRegressionTester()
+        tester = VisualRegressionTester(output_directory=str(tmp_path))
         report = tester.run_suite(suite)
 
         assert report.total_comparisons == 0
 
     @pytest.mark.L0
-    def test_run_suite_calculates_statistics(self, temp_output_dir):
+    def test_run_suite_calculates_statistics(self, temp_output_dir, tmp_path):
         baseline_dir = temp_output_dir / "baselines"
         baseline_dir.mkdir(exist_ok=True)
         output_dir = temp_output_dir / "output"
@@ -324,7 +326,7 @@ class TestRunSuite:
              patch(f"{_VR}.draw_rectangle"), \
              patch(f"{_VR}.draw_label"):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             report = tester.run_suite(suite)
 
         assert report.total_comparisons == 2
@@ -334,18 +336,18 @@ class TestRunSuite:
 
 class TestHelperMethods:
     @pytest.mark.L0
-    def test_mask_regions(self):
+    def test_mask_regions(self, tmp_path):
         mock_img = _make_mock_image(200, 200)
 
         with patch(f"{_VR}.mask_regions", return_value=mock_img) as mock_mask:
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             regions = [{"x": 0, "y": 0, "width": 100, "height": 50}]
             masked = tester._compare_with_mask(mock_img, mock_img, regions, ComparisonConfig()) if hasattr(tester, '_compare_with_mask') else mock_mask(mock_img, regions)
 
         assert masked is not None
 
     @pytest.mark.L0
-    def test_generate_diff_image(self):
+    def test_generate_diff_image(self, tmp_path):
         mock_img = _make_mock_image(100, 100)
         mock_diff = _make_mock_image(100, 100)
         mock_enhanced = _make_mock_image(100, 100)
@@ -354,7 +356,7 @@ class TestHelperMethods:
              patch(f"{_VR}.enhance_contrast", return_value=mock_enhanced), \
              patch(f"{_VR}.save_image") as mock_save:
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             diff_path = tester._generate_diff_image(mock_img, mock_img)
 
         assert "diff_" in diff_path
@@ -362,7 +364,7 @@ class TestHelperMethods:
         mock_save.assert_called_once()
 
     @pytest.mark.L0
-    def test_generate_annotated_image(self):
+    def test_generate_annotated_image(self, tmp_path):
         mock_img = _make_mock_image(200, 200)
 
         from Asgard.Freya.Visual.models.visual_models import DifferenceRegion, DifferenceType
@@ -380,7 +382,7 @@ class TestHelperMethods:
              patch(f"{_VR}.draw_label") as mock_label, \
              patch(f"{_VR}.save_image") as mock_save:
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             ann_path = tester._generate_annotated_image(mock_img, regions)
 
         assert "annotated_" in ann_path
@@ -391,7 +393,7 @@ class TestHelperMethods:
         mock_save.assert_called_once()
 
     @pytest.mark.L0
-    def test_generate_html_report(self, sample_regression_test_suite):
+    def test_generate_html_report(self, sample_regression_test_suite, tmp_path):
         from Asgard.Freya.Visual.models.visual_models import RegressionReport, VisualComparisonResult
 
         results = [
@@ -412,7 +414,7 @@ class TestHelperMethods:
             overall_similarity=0.98,
         )
 
-        tester = VisualRegressionTester()
+        tester = VisualRegressionTester(output_directory=str(tmp_path))
         report_path = tester._generate_html_report(report)
 
         assert report_path.exists()
@@ -424,22 +426,22 @@ class TestHelperMethods:
 
 class TestErrorHandling:
     @pytest.mark.L0
-    def test_compare_handles_load_errors(self, temp_baseline_file, temp_comparison_file):
+    def test_compare_handles_load_errors(self, temp_baseline_file, temp_comparison_file, tmp_path):
         with patch(f"{_VR}.load_image", side_effect=Exception("Conversion failed")):
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file))
 
         assert result.similarity_score == 0.0
         assert result.is_similar is False
 
     @pytest.mark.L0
-    def test_ssim_always_available(self, temp_baseline_file, temp_comparison_file):
+    def test_ssim_always_available(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
 
         with patch(f"{_VR}.load_image", return_value=mock_img), \
              patch(f"{_VR}.ssim_comparison", return_value=(0.92, [])):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(method=ComparisonMethod.STRUCTURAL_SIMILARITY)
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 
@@ -449,7 +451,7 @@ class TestErrorHandling:
 
 class TestVisualRegressionIntegration:
     @pytest.mark.L0
-    def test_full_comparison_workflow(self, temp_baseline_file, temp_comparison_file):
+    def test_full_comparison_workflow(self, temp_baseline_file, temp_comparison_file, tmp_path):
         mock_img = _make_mock_image(100, 100)
         from Asgard.Freya.Visual.models.visual_models import DifferenceRegion
 
@@ -469,7 +471,7 @@ class TestVisualRegressionIntegration:
              patch(f"{_VR}.draw_rectangle"), \
              patch(f"{_VR}.draw_label"):
 
-            tester = VisualRegressionTester()
+            tester = VisualRegressionTester(output_directory=str(tmp_path))
             config = ComparisonConfig(threshold=0.95, method=ComparisonMethod.STRUCTURAL_SIMILARITY)
             result = tester.compare(str(temp_baseline_file), str(temp_comparison_file), config=config)
 

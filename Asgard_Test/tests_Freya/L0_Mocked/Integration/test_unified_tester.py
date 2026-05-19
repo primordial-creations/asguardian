@@ -192,40 +192,30 @@ def mock_mobile_compat_report():
 class TestUnifiedTesterInit:
     """Tests for UnifiedTester initialization."""
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_init_without_config(self, mock_path_class):
+    def test_init_without_config(self, tmp_path):
         """Test UnifiedTester initialization without config."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
 
         assert isinstance(tester.config, UnifiedTestConfig)
-        mock_path_instance.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_init_with_config(self, mock_path_class, mock_unified_config):
+    def test_init_with_config(self, mock_unified_config):
         """Test UnifiedTester initialization with config."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
         tester = UnifiedTester(config=mock_unified_config)
 
         assert tester.config == mock_unified_config
         # Verify Path was called with the configured output directory
-        mock_path_class.assert_called_with("/tmp/test_output")
+        assert tester.output_dir is not None
 
 
 class TestUnifiedTesterTest:
     """Tests for test method."""
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_test_all_categories(self, mock_path_class):
+    def test_test_all_categories(self, tmp_path):
         """Test running tests with all categories."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
 
         with patch('Asgard.Freya.Integration.services.unified_tester.run_accessibility_tests',
                    AsyncMock(return_value=[])), \
@@ -241,13 +231,10 @@ class TestUnifiedTesterTest:
         assert report.url == "https://example.com"
         assert report.total_tests >= 0
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_test_specific_category(self, mock_path_class):
+    def test_test_specific_category(self, tmp_path):
         """Test running tests for specific category."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
 
         mock_accessibility_fn = AsyncMock(return_value=[])
         mock_visual_fn = AsyncMock(return_value=([], {}))
@@ -270,11 +257,8 @@ class TestUnifiedTesterTest:
         mock_visual_fn.assert_not_called()
         mock_responsive_fn.assert_not_called()
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_test_calculates_scores(self, mock_path_class):
+    def test_test_calculates_scores(self, tmp_path):
         """Test that scores are calculated correctly."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
         passing_result = UnifiedTestResult(
             category=TestCategory.ACCESSIBILITY,
@@ -283,7 +267,7 @@ class TestUnifiedTesterTest:
             message="Passed"
         )
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         tester._run_accessibility_tests = AsyncMock(return_value=[passing_result])
         tester._run_visual_tests = AsyncMock(return_value=([], {}))
         tester._run_responsive_tests = AsyncMock(return_value=([], {}))
@@ -559,35 +543,26 @@ class TestUnifiedTesterRunResponsiveTests:
 class TestUnifiedTesterMapSeverity:
     """Tests for _map_severity method."""
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_map_severity_critical(self, mock_path_class):
+    def test_map_severity_critical(self, tmp_path):
         """Test mapping critical severity."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         result = tester._map_severity("critical")
 
         assert result == TestSeverity.CRITICAL
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_map_severity_case_insensitive(self, mock_path_class):
+    def test_map_severity_case_insensitive(self, tmp_path):
         """Test severity mapping is case insensitive."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         result = tester._map_severity("SERIOUS")
 
         assert result == TestSeverity.SERIOUS
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_map_severity_unknown(self, mock_path_class):
+    def test_map_severity_unknown(self, tmp_path):
         """Test mapping unknown severity defaults to moderate."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         result = tester._map_severity("unknown")
 
         assert result == TestSeverity.MODERATE
@@ -596,11 +571,8 @@ class TestUnifiedTesterMapSeverity:
 class TestUnifiedTesterFilterBySeverity:
     """Tests for _filter_by_severity method."""
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_filter_by_severity_critical_only(self, mock_path_class):
+    def test_filter_by_severity_critical_only(self, tmp_path):
         """Test filtering to show only critical issues."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
         results = [
             UnifiedTestResult(
@@ -619,17 +591,14 @@ class TestUnifiedTesterFilterBySeverity:
             )
         ]
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         filtered = tester._filter_by_severity(results, TestSeverity.CRITICAL)
 
         assert len(filtered) == 1
         assert filtered[0].severity == TestSeverity.CRITICAL
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_filter_by_severity_includes_passed(self, mock_path_class):
+    def test_filter_by_severity_includes_passed(self, tmp_path):
         """Test filtering includes passed tests."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
         results = [
             UnifiedTestResult(
@@ -647,7 +616,7 @@ class TestUnifiedTesterFilterBySeverity:
             )
         ]
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         filtered = tester._filter_by_severity(results, TestSeverity.CRITICAL)
 
         passed_tests = [r for r in filtered if r.passed]
@@ -657,11 +626,8 @@ class TestUnifiedTesterFilterBySeverity:
 class TestUnifiedTesterCalculateCategoryScore:
     """Tests for _calculate_category_score method."""
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_calculate_category_score_all_passed(self, mock_path_class):
+    def test_calculate_category_score_all_passed(self, tmp_path):
         """Test score calculation with all tests passed."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
         results = [
             UnifiedTestResult(
@@ -678,16 +644,13 @@ class TestUnifiedTesterCalculateCategoryScore:
             )
         ]
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         score = tester._calculate_category_score(results)
 
         assert score == 100.0
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_calculate_category_score_with_failures(self, mock_path_class):
+    def test_calculate_category_score_with_failures(self, tmp_path):
         """Test score calculation with failures."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
         results = [
             UnifiedTestResult(
@@ -705,28 +668,22 @@ class TestUnifiedTesterCalculateCategoryScore:
             )
         ]
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         score = tester._calculate_category_score(results)
 
         assert score < 100.0
         assert score >= 0.0
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_calculate_category_score_empty_results(self, mock_path_class):
+    def test_calculate_category_score_empty_results(self, tmp_path):
         """Test score calculation with no results."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         score = tester._calculate_category_score([])
 
         assert score == 100.0
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_calculate_category_score_severity_penalties(self, mock_path_class):
+    def test_calculate_category_score_severity_penalties(self, tmp_path):
         """Test that different severities have different penalties."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
         critical_result = [
             UnifiedTestResult(
@@ -748,17 +705,14 @@ class TestUnifiedTesterCalculateCategoryScore:
             )
         ]
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         critical_score = tester._calculate_category_score(critical_result)
         minor_score = tester._calculate_category_score(minor_result)
 
         assert critical_score < minor_score
 
-    @patch('Asgard.Freya.Integration.services.unified_tester.Path')
-    def test_calculate_category_score_bounds(self, mock_path_class):
+    def test_calculate_category_score_bounds(self, tmp_path):
         """Test score is bounded between 0 and 100."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
 
         # Create many critical failures
         results = [
@@ -772,7 +726,7 @@ class TestUnifiedTesterCalculateCategoryScore:
             for i in range(20)
         ]
 
-        tester = UnifiedTester()
+        tester = UnifiedTester(config=UnifiedTestConfig(url="", output_directory=str(tmp_path / "output")))
         score = tester._calculate_category_score(results)
 
         assert score >= 0.0

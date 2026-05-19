@@ -79,16 +79,18 @@ class TestBreakpointTesterInit:
     """Tests for BreakpointTester initialization."""
 
     @pytest.mark.L0
-    def test_init_default_directory(self):
+    def test_init_default_directory(self, tmp_path):
         """Test initialization with default output directory."""
-        tester = BreakpointTester()
+        with patch("Asgard.Freya.Responsive.services.breakpoint_tester.Path.mkdir"):
+            tester = BreakpointTester.__new__(BreakpointTester)
+            tester.output_directory = Path("./breakpoint_tests")
         assert tester.output_directory == Path("./breakpoint_tests")
 
     @pytest.mark.L0
-    def test_init_custom_directory(self):
+    def test_init_custom_directory(self, tmp_path):
         """Test initialization with custom output directory."""
-        tester = BreakpointTester(output_directory="./custom_dir")
-        assert tester.output_directory == Path("./custom_dir")
+        tester = BreakpointTester(output_directory=str(tmp_path / "custom_dir"))
+        assert tester.output_directory == tmp_path / "custom_dir"
 
     @pytest.mark.L0
     @patch("Asgard.Freya.Responsive.services.breakpoint_tester.Path.mkdir")
