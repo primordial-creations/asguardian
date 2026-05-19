@@ -1,0 +1,13 @@
+A multi-module security scanner covers 25+ vulnerability categories spanning injection, secrets, cryptography, access control, authentication, headers, TLS, containers, infrastructure, and dependencies. Each module was developed independently with its own severity calibration. The result is that a "HIGH" severity finding from the secrets module is not necessarily comparable in risk to a "HIGH" severity finding from the container security module.
+
+Reason carefully through the problem of cross-module severity normalisation: how should a scanner ensure that findings of the same nominal severity represent comparable levels of actual risk?
+
+The severity definition problem: what is the correct basis for severity in a security scanner? CVSS uses a formula based on attack vector, complexity, required privileges, user interaction, confidentiality/integrity/availability impact, and scope. But CVSS was designed for known vulnerabilities in specific products, not for static analysis findings where exploitability is uncertain. Should a SAST tool use CVSS, a simplified version of it, or a different framework entirely? What are the practical problems with applying CVSS to SAST findings?
+
+The exploitability uncertainty problem: a CRITICAL finding from a taint analyzer might have a 30% probability of being a real vulnerability (the taint path might be sanitized elsewhere). A MEDIUM finding from a dependency scanner (known CVE in a transitive dependency) might have a 90% probability of being a real vulnerability (the CVE is definitively present, though exploitability depends on how the library is used). How should probability of being a true positive interact with severity to produce a risk prioritisation?
+
+The context dependency problem: a missing Content-Security-Policy header is MEDIUM severity for a static API that serves only JSON to a mobile app, and HIGH severity for a web application that renders user-controlled HTML. Can severity be context-sensitive in a static tool that has no knowledge of the application's deployment context, or should all severity assignments be conservative?
+
+The remediation cost problem: should severity account for remediation cost? A critical vulnerability that takes 5 minutes to fix (rotate a hardcoded API key) might warrant lower urgency than a high vulnerability that requires 2 weeks of refactoring (adding authentication to a large number of endpoints). Is this a legitimate dimension of severity, or a separate prioritisation concern?
+
+Produce a concrete cross-module severity normalisation framework with specific criteria for each severity level.

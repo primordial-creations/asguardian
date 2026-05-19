@@ -1,0 +1,11 @@
+Research Subresource Integrity (SRI) — the web security mechanism for verifying that externally hosted resources (scripts, stylesheets) have not been tampered with — covering its specification, browser support, deployment challenges, and interaction with CSP.
+
+I am building a security header analyzer and need to understand where SRI fits in the frontend security stack relative to CSP, and what the practical guidance is for when and how to apply it. The core use case is third-party CDN-hosted resources: a page that loads jQuery from cdnjs.cloudflare.com should use an integrity attribute so that if the CDN is compromised and the file is altered, the browser refuses to execute it.
+
+Cover: the SRI hash algorithm options (sha256, sha384, sha512) and the rationale for sha384 as the current recommendation, the process for generating integrity hashes (using openssl or the SRI Hash Generator), and the operational challenge of keeping integrity hashes current when CDN-hosted library versions are updated.
+
+Research the interaction between SRI and CSP: the require-sri-for directive (script and style) and its browser support, how SRI and nonce-based CSP interact (a script with both a nonce and an integrity attribute must pass both checks), and whether SRI provides meaningful additional protection in a site that already has a strict nonce-based CSP.
+
+Cover the limitations of SRI: it only protects against resource substitution at the CDN level, not against malicious code in the original library (the supply chain attack surface is upstream of what SRI can protect). Research the npm/CDN supply chain attacks where malicious code was injected into popular libraries — would SRI have caught these attacks, or does it only protect against CDN-side compromise?
+
+Include data on SRI adoption rates in the wild (HTTP Archive data), what percentage of pages that load third-party scripts use SRI, and why adoption remains low despite the security benefit.

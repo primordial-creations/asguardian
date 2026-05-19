@@ -1,6 +1,6 @@
 # Asgard Test Fixtures
 
-This directory contains intentionally vulnerable code used as ground-truth fixtures for L5 (Compliance) and L10 (Industry Benchmark) tests.
+This directory contains intentionally vulnerable code used as ground-truth fixtures for L5 (Compliance) and L14 (Industry Benchmark) tests.
 
 **⚠️ These files contain real security vulnerabilities by design. They must be excluded from all CI scanning, linting, and coverage runs.**
 

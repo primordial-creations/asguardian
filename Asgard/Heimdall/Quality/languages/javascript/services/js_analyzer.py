@@ -23,6 +23,9 @@ from Asgard.Heimdall.Quality.languages.javascript.services._js_rules import (
     check_no_eval,
     check_no_implied_eval,
 )
+from Asgard.Heimdall.Quality.languages.javascript.services._js_security_rules import (
+    _SECURITY_RULES,
+)
 from Asgard.Heimdall.Quality.languages.javascript.services._js_style_rules import (
     check_complexity,
     check_max_file_lines,
@@ -116,4 +119,7 @@ class JSAnalyzer:
         findings.extend(check_complexity(file_path, lines, self._is_rule_enabled("js.complexity"), self._config.max_complexity))
         findings.extend(check_no_trailing_spaces(file_path, lines, self._is_rule_enabled("js.no-trailing-spaces")))
         findings.extend(check_max_line_length(file_path, lines, self._is_rule_enabled("js.max-line-length")))
+        for rule_fn in _SECURITY_RULES:
+            rule_id = rule_fn.__doc__.split(":")[0].strip() if rule_fn.__doc__ else ""
+            findings.extend(rule_fn(file_path, lines, self._is_rule_enabled(rule_id)))
         return findings

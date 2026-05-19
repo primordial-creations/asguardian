@@ -1,0 +1,13 @@
+A static security scanner performs intra-function taint analysis using Python's AST module. It currently tracks taint through direct variable assignments and function return values within a single function. The next architectural step is to extend to cross-function taint tracking within a single file, then optionally to cross-file tracking.
+
+This extension requires building a call graph and computing or approximating function summaries. Reason carefully through the design decisions involved:
+
+For call graph construction from a Python AST without type resolution: what are the fundamental ambiguities (method calls where the receiver type is unknown, higher-order functions, decorated functions, __call__ methods), and what is the practical rate of unresolvable call targets in a typical Python web application codebase? Is there published data on this?
+
+For function summary computation: explain the difference between a flow-sensitive summary (the function propagates taint from parameter X to return value under condition Y) and a flow-insensitive summary (the function always propagates taint from parameter X to return value). In a tool that cannot afford full flow analysis, should summaries be over-approximated (assume taint propagates through all paths, increasing FPs) or under-approximated (assume taint propagates only through known paths, increasing FNs)? Justify the answer for a security tool specifically.
+
+For the incremental file change case: a developer changes 3 files in a 200-file project. Should the cross-function analysis re-analyse all 200 files, only the 3 changed files, or use cached summaries from unchanged files? What are the correctness implications of cached summaries when the cached file has not changed but a file it calls has?
+
+For the stopping condition: when cross-file taint is pursued, how many call graph hops is the right maximum depth before accepting that the precision cost exceeds the recall benefit? What does the research literature say about the distribution of taint path lengths in real injection vulnerabilities?
+
+Produce a concrete architecture recommendation with specific design choices and their accepted trade-offs.

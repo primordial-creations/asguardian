@@ -10,6 +10,7 @@ from Asgard.Heimdall.Quality.languages.go.models.go_models import (
 )
 from Asgard.Heimdall.Quality.languages.go.services._go_rules import (
     check_error_not_checked, check_no_panic, check_sql_injection, check_no_defer_in_loop, check_no_hardcoded_credentials, check_no_unbuffered_channel, check_no_global_mutex, check_context_not_propagated,
+    check_command_injection, check_xss, check_path_traversal, check_weak_crypto,
 )
 
 _RULES = [
@@ -21,6 +22,10 @@ _RULES = [
     check_no_unbuffered_channel,
     check_no_global_mutex,
     check_context_not_propagated,
+    check_command_injection,
+    check_xss,
+    check_path_traversal,
+    check_weak_crypto,
 ]
 
 

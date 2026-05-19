@@ -1,0 +1,9 @@
+Research the current empirical state of automated web accessibility testing coverage, focused on what axe-core, Lighthouse, Pa11y, and IBM Equal Access Checker can and cannot detect when run against real websites. Use the WebAIM Million annual reports (2019-2024) as a baseline for the prevalence of accessibility failures in the wild.
+
+The WebAIM Million consistently finds that the most common WCAG failures on the top one million homepages are: low-contrast text, missing alternative text on images, missing form input labels, empty links, missing document language, and empty buttons. For each of these six failure types, what percentage can be reliably detected by each automated tool? What are the documented false negative rates?
+
+I am building a WCAG 2.1 validator that checks forms, images, structure, ARIA usage, language, and links using Playwright for DOM access. I need to understand the theoretical maximum coverage achievable through automated DOM analysis. Research the ACT (Accessibility Conformance Testing) rules published by the W3C WAI and how many of those rules are automatable versus requiring human judgment.
+
+Cover the following gaps in automated testing: focus order assessment (can a tool reliably determine if the focus order is logical without understanding the visual layout?), meaningful link text in context (the link text "click here" is only a failure if the context doesn't provide meaning — how do tools handle this?), cognitive accessibility requirements in WCAG 2.2 (focus appearance, dragging movements, consistent help), and ARIA live region behavior that only manifests during dynamic updates.
+
+Include any academic studies that have measured automated WCAG testing tool accuracy on labeled datasets, and report what percentage of WCAG 2.1 Level AA success criteria can be automatically tested at all.

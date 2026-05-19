@@ -1,0 +1,9 @@
+Think carefully through the design of percentile budgets — the idea of setting SLO targets at multiple percentile levels simultaneously (P50 < 100ms, P95 < 500ms, P99 < 2000ms) — and whether this is actually a better approach than single-percentile SLOs. The Google SRE Workbook recommends latency SLOs at a single percentile (often P99), but practitioners frequently use multi-percentile targets. What are the real trade-offs?
+
+Multi-percentile SLOs can detect different failure modes: P50 degradation indicates broad traffic degradation, P99 degradation may indicate a resource contention issue affecting only a small fraction of requests. But they also create complexity: if P95 is in violation but P99 is fine, which governs the error budget? Do you compute separate error budgets per percentile, and if so, how do you allocate on-call attention across multiple simultaneously failing SLOs?
+
+Think through the latency distribution shapes that make single-percentile SLOs fail: in a service with a bimodal distribution (cache hits vs misses), a single P99 SLO may be permanently violated by the miss population even when the service is perfectly healthy. In a service with long-tail outliers from a small set of complex queries, P95 may look fine while P99.9 is catastrophic.
+
+Consider the alternative framing: instead of percentile budgets, what about defining SLOs in terms of the fraction of requests completing within a fixed threshold (this is the good-event/bad-event SLI model)? How does "99% of requests complete in under 500ms" differ operationally from "P99 < 500ms"? Are they mathematically equivalent, or are there edge cases where they diverge?
+
+Propose a principled framework for choosing between single-percentile SLOs, multi-percentile SLOs, and threshold-fraction SLOs for different service types, and identify the minimum data requirements for each approach to be statistically valid.

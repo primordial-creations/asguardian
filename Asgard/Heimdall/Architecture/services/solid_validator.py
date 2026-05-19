@@ -38,6 +38,20 @@ from Asgard.Heimdall.Architecture.services._solid_detectors import (
     is_visitor_class,
     is_utility_class,
 )
+from Asgard.Heimdall.Architecture.services._generic_solid_checks import (
+    check_srp_method_count,
+    check_isp_interface_size,
+    check_dip_concrete_instantiation,
+    check_ocp_type_checking,
+)
+from Asgard.Heimdall.Architecture.services._treesitter_solid_checks import (
+    check_srp_lcom4,
+    check_isp_fat_interface,
+    check_dip_concrete_dependency,
+    check_ocp_type_dispatch,
+)
+from Asgard.Heimdall.treesitter._language_loader import is_available as _ts_available
+from Asgard.Heimdall.common.language_registry import EXTENSION_TO_LANGUAGE
 
 
 class SOLIDValidator:
@@ -218,6 +232,100 @@ class SOLIDValidator:
 
         return report
 
+    # ------------------------------------------------------------------
+    # Multi-language generic analysis
+    # ------------------------------------------------------------------
+
+    def analyze_file_generic(
+        self,
+        file_path: Path,
+        language: str,
+    ) -> List[SOLIDViolation]:
+        """
+        Run generic regex-based SOLID checks on a single non-Python file.
+
+        Args:
+            file_path: Path to the source file.
+            language: Language identifier (e.g. "java", "go", "typescript").
+
+        Returns:
+            List of SOLIDViolation found in the file.
+        """
+        try:
+            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            return []
+
+        path_str = str(file_path)
+        source = "\n".join(lines)
+        all_rules = {
+            "solid.srp-lcom4": True,
+            "solid.isp-fat-interface": True,
+            "solid.dip-concrete-dependency": True,
+            "solid.ocp-type-dispatch": True,
+        }
+
+        if _ts_available(language):
+            raw = []
+            raw.extend(check_srp_lcom4(path_str, source, language, all_rules))
+            raw.extend(check_isp_fat_interface(path_str, source, language, all_rules))
+            raw.extend(check_dip_concrete_dependency(path_str, source, language, all_rules))
+            raw.extend(check_ocp_type_dispatch(path_str, source, language, all_rules))
+            return [_dict_to_violation(d, path_str) for d in raw]
+
+        violations: List[SOLIDViolation] = []
+        violations.extend(check_srp_method_count(path_str, lines, language, threshold=self.config.max_public_methods))
+        violations.extend(check_isp_interface_size(path_str, lines, language))
+        violations.extend(check_dip_concrete_instantiation(path_str, lines, language))
+        violations.extend(check_ocp_type_checking(path_str, lines, language))
+        return violations
+
+    def analyze_multilang(
+        self,
+        scan_path: Optional[Path] = None,
+        extensions: Optional[List[str]] = None,
+    ) -> SOLIDReport:
+        """
+        Scan non-Python source files for SOLID violations using regex heuristics.
+
+        Args:
+            scan_path: Root directory to scan (defaults to config.scan_path).
+            extensions: File extensions to scan (e.g. [".java", ".go"]).
+                        Defaults to a broad set of common compiled/scripted languages.
+
+        Returns:
+            SOLIDReport containing all found violations.
+        """
+        from Asgard.Heimdall.Quality.utilities.file_utils import scan_directory
+
+        path = scan_path or self.config.scan_path
+        path = Path(path).resolve()
+
+        if not path.exists():
+            raise FileNotFoundError(f"Scan path does not exist: {path}")
+
+        target_extensions = extensions or [
+            ".java", ".cs", ".go", ".rb", ".js", ".ts", ".jsx", ".tsx", ".php", ".kt",
+        ]
+
+        start_time = time.time()
+        report = SOLIDReport(scan_path=str(path))
+
+        for file_path in scan_directory(
+            path,
+            exclude_patterns=self.config.exclude_patterns,
+            include_extensions=target_extensions,
+        ):
+            language = EXTENSION_TO_LANGUAGE.get(file_path.suffix.lower())
+            if not language or language == "python":
+                continue
+
+            for v in self.analyze_file_generic(file_path, language):
+                report.add_violation(v)
+
+        report.scan_duration_seconds = time.time() - start_time
+        return report
+
     def generate_report(self, result: SOLIDReport, format: str = "text") -> str:
         """Generate a formatted report."""
         if format == "json":
@@ -226,3 +334,28 @@ class SOLIDValidator:
             return _gen_markdown(result)
         else:
             return _gen_text(result)
+
+
+_RULE_TO_PRINCIPLE = {
+    "solid.srp-lcom4": SOLIDPrinciple.SRP,
+    "solid.isp-fat-interface": SOLIDPrinciple.ISP,
+    "solid.dip-concrete-dependency": SOLIDPrinciple.DIP,
+    "solid.ocp-type-dispatch": SOLIDPrinciple.OCP,
+}
+
+_SEVERITY_MAP = {
+    "warning": ViolationSeverity.MODERATE,
+    "error": ViolationSeverity.HIGH,
+}
+
+
+def _dict_to_violation(d: dict, file_path: str) -> SOLIDViolation:
+    return SOLIDViolation(
+        principle=_RULE_TO_PRINCIPLE.get(d["rule_id"], SOLIDPrinciple.SRP),
+        class_name="<file>",
+        file_path=file_path,
+        line_number=d["line"],
+        message=d["message"],
+        severity=_SEVERITY_MAP.get(d["severity"], ViolationSeverity.MODERATE),
+        suggestion="",
+    )

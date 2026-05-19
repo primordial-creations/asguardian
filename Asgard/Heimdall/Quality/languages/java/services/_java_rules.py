@@ -19,14 +19,19 @@ def check_sql_injection(file_path: str, lines: List[str], enabled: bool = True) 
     """java.sql-injection: string concatenation in SQL queries."""
     if not enabled:
         return []
-    pattern = re.compile(r'(?:executeQuery|executeUpdate|execute|prepareStatement)\s*\(\s*"[^"]*"\s*\+')
-    return [
-        _finding(file_path, i + 1, "java.sql-injection", JavaRuleCategory.SECURITY, JavaSeverity.ERROR,
-                 "SQL Injection via String Concatenation",
-                 "Building SQL with string concatenation is vulnerable to injection.",
-                 line, "Use PreparedStatement with parameterised queries.")
-        for i, line in enumerate(lines) if pattern.search(line)
-    ]
+    # Direct concatenation in execute calls
+    inline = re.compile(r'(?:executeQuery|executeUpdate|execute|prepareStatement)\s*\(\s*"[^"]*"\s*\+')
+    # String query = "SELECT ... " + variable  (build-then-execute pattern)
+    build = re.compile(r'(?:String\s+\w*[Qq]uery\w*|String\s+\w*[Ss]ql\w*|String\s+\w*[Ss]tmt\w*)\s*=\s*"[^"]*"\s*\+')
+    findings = []
+    for i, line in enumerate(lines):
+        if inline.search(line) or build.search(line):
+            findings.append(_finding(
+                file_path, i + 1, "java.sql-injection", JavaRuleCategory.SECURITY, JavaSeverity.ERROR,
+                "SQL Injection via String Concatenation",
+                "Building SQL with string concatenation is vulnerable to injection.",
+                line, "Use PreparedStatement with parameterised queries."))
+    return findings
 
 
 def check_no_system_exit(file_path: str, lines: List[str], enabled: bool = True) -> List[JavaFinding]:
@@ -111,6 +116,85 @@ def check_no_raw_types(file_path: str, lines: List[str], enabled: bool = True) -
                  "Raw types bypass generic type safety.",
                  line, "Add type parameters, e.g. List<String>.")
         for i, line in enumerate(lines) if pattern.search(line)
+    ]
+
+
+def check_command_injection(file_path: str, lines: List[str], enabled: bool = True) -> List[JavaFinding]:
+    """java.command-injection: Runtime.getRuntime().exec( with variable concatenation."""
+    if not enabled:
+        return []
+    pattern = re.compile(r'Runtime\.getRuntime\s*\(\s*\)\.exec\s*\([^)]*\+')
+    return [
+        _finding(file_path, i + 1, "java.command-injection", JavaRuleCategory.SECURITY, JavaSeverity.ERROR,
+                 "Command Injection",
+                 "Passing user-controlled data to Runtime.exec() allows arbitrary command execution.",
+                 line, "Use ProcessBuilder with a String[] argument array; never concatenate user input.")
+        for i, line in enumerate(lines) if pattern.search(line)
+    ]
+
+
+def check_xss(file_path: str, lines: List[str], enabled: bool = True) -> List[JavaFinding]:
+    """java.xss: writing unescaped request data to the response."""
+    if not enabled:
+        return []
+    # Direct write of request param
+    direct = re.compile(r'(?:response\.getWriter|getWriter\s*\(\s*\))\s*.*print\w*\s*\([^)]*(?:request\.getParameter|req\.getParameter|getParameter)')
+    # ResponseBody/ModelAttribute returning user input (Spring MVC)
+    spring = re.compile(r'return\s+(?:request\.getParameter|req\.getParameter|params\.get)\s*\(')
+    # setAttribute with raw request param
+    attr = re.compile(r'setAttribute\s*\([^)]*(?:request\.getParameter|req\.getParameter)')
+    findings = []
+    for i, line in enumerate(lines):
+        if direct.search(line) or spring.search(line) or attr.search(line):
+            findings.append(_finding(
+                file_path, i + 1, "java.xss", JavaRuleCategory.SECURITY, JavaSeverity.ERROR,
+                "Cross-Site Scripting (XSS)",
+                "Writing unescaped request parameters to the response enables XSS.",
+                line, "Escape output with OWASP Java Encoder or use a template engine that auto-escapes."))
+    return findings
+
+
+def check_weak_crypto(file_path: str, lines: List[str], enabled: bool = True) -> List[JavaFinding]:
+    """java.weak-crypto: MessageDigest.getInstance with MD5 or SHA-1."""
+    if not enabled:
+        return []
+    pattern = re.compile(r'MessageDigest\.getInstance\s*\(\s*"(?:MD5|SHA-1)"', re.IGNORECASE)
+    return [
+        _finding(file_path, i + 1, "java.weak-crypto", JavaRuleCategory.SECURITY, JavaSeverity.ERROR,
+                 "Weak Cryptographic Hash Algorithm",
+                 "MD5 and SHA-1 are cryptographically broken.",
+                 line, "Use SHA-256 or stronger: MessageDigest.getInstance(\"SHA-256\").")
+        for i, line in enumerate(lines) if pattern.search(line)
+    ]
+
+
+def check_path_traversal(file_path: str, lines: List[str], enabled: bool = True) -> List[JavaFinding]:
+    """java.path-traversal: new File( with request parameter concatenation."""
+    if not enabled:
+        return []
+    pattern = re.compile(r'new\s+File\s*\([^)]*(?:request\.getParameter|req\.getParameter|getParam)')
+    return [
+        _finding(file_path, i + 1, "java.path-traversal", JavaRuleCategory.SECURITY, JavaSeverity.ERROR,
+                 "Path Traversal via User-Controlled File Path",
+                 "Using request parameters directly in new File() allows path traversal.",
+                 line, "Validate the path and use Path.normalize(); ensure it stays within the expected root.")
+        for i, line in enumerate(lines) if pattern.search(line)
+    ]
+
+
+def check_no_script_engine_eval(file_path: str, lines: List[str], enabled: bool = True) -> List[JavaFinding]:
+    """java.no-eval: ScriptEngine eval() executes arbitrary code."""
+    if not enabled:
+        return []
+    pattern = re.compile(r'\beval\s*\(')
+    # Only flag if ScriptEngine is referenced nearby — simple heuristic: flag eval( in any line
+    # that also contains script engine context, or flag broadly
+    return [
+        _finding(file_path, i + 1, "java.no-eval", JavaRuleCategory.SECURITY, JavaSeverity.ERROR,
+                 "ScriptEngine eval() Executes Arbitrary Code",
+                 "Calling eval() on a ScriptEngine with user-controlled input allows code injection.",
+                 line, "Avoid dynamic script evaluation; use a safe expression library instead.")
+        for i, line in enumerate(lines) if pattern.search(line) and "engine" in line.lower()
     ]
 
 

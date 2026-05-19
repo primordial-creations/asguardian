@@ -1,0 +1,11 @@
+Research Content Security Policy (CSP) as a defense-in-depth mechanism against XSS attacks: its effectiveness, the practical challenges of deployment, and the current state of best practices for CSP header construction.
+
+I am building a CSP analyzer that parses CSP headers, classifies directives, detects unsafe-inline and unsafe-eval usage, checks for nonce and hash-based allowlisting, and scores the policy for security. I need to understand what the research says about CSP effectiveness and the nuances of policy construction.
+
+Cover: the research on real-world CSP effectiveness — studies that analyzed the CSPs of major websites found that the majority of deployed CSPs were bypassable due to unsafe-inline usage or whitelisted JSONP endpoints. What percentage of Fortune 500 CSP headers provide meaningful XSS protection versus a false sense of security? What are the most common CSP bypass techniques (JSONP endpoints in trusted domains, Angular template injection, DOM-based XSS that doesn't require inline scripts)?
+
+Research strict-dynamic and its interaction with nonces: why is "'strict-dynamic'" the recommended approach for script allowlisting in 2024, how does it interact with older browsers that don't support it, and what does a correct nonce-based CSP implementation look like for a server-rendered versus a single-page application?
+
+Cover Trusted Types as a next-generation DOM XSS prevention mechanism: how does it complement CSP, what browser support exists, and what is the migration path for existing applications? Research the require-trusted-types-for 'script' directive and its operational implications.
+
+Include data on the operational cost of strict CSP: what percentage of legitimate page functionality breaks when unsafe-inline is removed? How do CDN-loaded third-party scripts (analytics, chat widgets, A/B testing tools) interact with strict CSP? What tooling exists for CSP violation reporting and iterative policy tightening?

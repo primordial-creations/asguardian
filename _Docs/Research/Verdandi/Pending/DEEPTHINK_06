@@ -1,0 +1,13 @@
+Think through the problem of critical path analysis in distributed traces and the edge cases that make a seemingly simple graph algorithm surprisingly difficult to get right in practice.
+
+The naive approach: build a DAG of spans using parent-span-id relationships, assign each span its duration, and find the longest path. But real traces violate the assumptions this approach requires. Think through each of the following problems:
+
+Asynchronous spans: a parent span fires off an async operation and immediately returns to the caller. The async span may take much longer than the parent. Is the async span on the critical path from the user's perspective? It depends on whether the parent waits for the async span to complete before delivering its response. How do you determine this from span data alone, without access to the application code?
+
+Parallel child spans: a parent fan-outs to three child spans simultaneously. The critical path goes through the slowest child. But the span start times may not be perfectly synchronized — there may be small gaps due to scheduling. How much gap is acceptable before you consider two spans to be sequential rather than parallel?
+
+Clock skew: in a distributed system, span timestamps from different hosts may be skewed by milliseconds or seconds. How does clock skew affect critical path calculation? Can you detect clock skew from span data, and if so, how do you correct for it?
+
+Missing spans: traces in production are often incomplete due to sampling, instrumentation gaps, or spans that failed to export. How should a critical path algorithm behave when a portion of the DAG is missing? Should it mark the path as incomplete, estimate the missing duration from similar traces, or skip the missing spans?
+
+Think through and propose a robust critical path algorithm that handles all four of these cases, specifying what assumptions must be documented and what cases should be flagged as low-confidence results.

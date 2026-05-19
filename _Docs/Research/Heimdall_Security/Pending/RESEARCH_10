@@ -1,0 +1,11 @@
+What are the current industry approaches, published benchmarks, and open problems for detecting access control vulnerabilities (CWE-284, CWE-285, CWE-639, CWE-862) using static analysis, specifically for Python web frameworks?
+
+Provide a detailed survey covering: how Broken Object Level Authorisation (BOLA/IDOR, OWASP API Security Top 10 #1) manifests in Django and FastAPI codebases at the code level, what AST patterns indicate a missing ownership check before a database query, and whether any commercial or open-source static analysis tool claims to detect BOLA vulnerabilities statically.
+
+For RBAC and permission enforcement: what are the AST-level patterns in Django's permission_required, DRF's IsAuthenticated/IsAdminUser/BasePermission, and FastAPI's Depends() dependency injection for auth? How can a scanner detect when a view function lacks any permission decorator or dependency, versus when it has one that is logically insufficient?
+
+For privilege escalation patterns specifically: what code patterns indicate that a non-privileged user can modify their own role or permissions, that a JWT claim is trusted without server-side validation, or that an admin action endpoint is missing elevated permission checks?
+
+Cover what the research literature says about the fundamental limitations of static access control analysis (the policy-specification problem: how does a scanner know what the intended access policy is?), what approaches exist for inferring access policy from code structure, and whether any tools use differential analysis (comparing similar endpoints to detect inconsistent permission enforcement).
+
+Include: OWASP API Security Top 10 2023 statistics on the prevalence of BOLA, any published CVE studies on access control bypass in Django/FastAPI applications from 2020-2025, and what automated testing approaches (dynamic analysis, fuzzing) complement static access control detection.

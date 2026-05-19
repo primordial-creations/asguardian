@@ -1,0 +1,11 @@
+What are the state-of-the-art techniques for detecting sensitive data exposure vulnerabilities (CWE-200, CWE-312, CWE-359) in application logs, API responses, and error messages using static analysis, and how do commercial tools approach this problem?
+
+Provide a comprehensive survey covering: how sensitive data leakage into logs is detected statically (identifying calls to logging.info/debug/error that include PII, credentials, session tokens, or full exception tracebacks with stack frames containing sensitive variable values), what the AST patterns are for detecting Django's DEBUG=True in production configurations and exception detail propagation to HTTP responses, and how FastAPI/Pydantic model serialisation can inadvertently expose fields that should be excluded.
+
+For API response data exposure: what static patterns indicate that an ORM model is serialised with all fields rather than an explicit field allowlist (Django's ModelSerializer with no explicit fields, SQLAlchemy model to_dict() methods), and how do tools detect the absence of field exclusion for sensitive attributes (password, secret_key, ssn, credit_card)?
+
+Cover information disclosure through error messages: what HTTP error response patterns leak internal stack traces, database query details, or server version information, and how are these detectable in framework configuration versus in exception handler code?
+
+Then address: what GDPR Article 32, PCI-DSS Requirement 3, and HIPAA Technical Safeguards specify about logging sensitive data, what the OWASP Logging Cheat Sheet recommends as the authoritative list of data types never to log, and how any existing tools (Bandit, Semgrep, SonarQube) cover sensitive data logging detection — including their documented gaps.
+
+Include any 2023-2025 research on using data flow analysis to track PII from input sources to log sinks.

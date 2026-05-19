@@ -89,27 +89,65 @@ def check_mass_assignment(file_path: str, lines: List[str], enabled: bool = True
     """ruby.mass-assignment: update_attributes(params) without filtering."""
     if not enabled:
         return []
-    pattern = re.compile(r'(?:update_attributes|update)\s*\(\s*params\s*\)')
-    return [
-        _finding(file_path, i + 1, "ruby.mass-assignment", RubyRuleCategory.SECURITY, RubySeverity.WARNING,
-                 "Mass Assignment from params",
-                 "Passing params directly allows attackers to set protected attributes.",
-                 line, "Use strong parameters: params.require(:model).permit(:field1, :field2).")
-        for i, line in enumerate(lines) if pattern.search(line)
-    ]
+    # Classic: update_attributes(params) or update(params)
+    classic = re.compile(r'(?:update_attributes|update)\s*\(\s*params\s*\)')
+    # Unsafe hash conversion: .to_unsafe_h bypasses strong parameters
+    unsafe_h = re.compile(r'\.to_unsafe_h\b')
+    findings = []
+    for i, line in enumerate(lines):
+        if classic.search(line) or unsafe_h.search(line):
+            findings.append(_finding(
+                file_path, i + 1, "ruby.mass-assignment", RubyRuleCategory.SECURITY, RubySeverity.WARNING,
+                "Mass Assignment from params",
+                "Passing params directly allows attackers to set protected attributes.",
+                line, "Use strong parameters: params.require(:model).permit(:field1, :field2)."))
+    return findings
 
 
 def check_no_hardcoded_credentials(file_path: str, lines: List[str], enabled: bool = True) -> List[RubyFinding]:
     """ruby.no-hardcoded-credentials: hardcoded passwords/tokens."""
     if not enabled:
         return []
-    pattern = re.compile(r'(?:password|secret|api_key|token)\s*=\s*["\'][^"\']{4,}["\']', re.IGNORECASE)
+    # String literal assigned to credential variable
+    literal = re.compile(r'(?:password|secret|api_key|token)\s*=\s*["\'][^"\']{4,}["\']', re.IGNORECASE)
+    # MD5 used for password hashing — detected here as credential misuse
+    md5_pass = re.compile(r'Digest::MD5\.hexdigest\s*\(\s*(?:self\.)?password\b', re.IGNORECASE)
+    findings = []
+    for i, line in enumerate(lines):
+        if literal.search(line) or md5_pass.search(line):
+            findings.append(_finding(
+                file_path, i + 1, "ruby.no-hardcoded-credentials",
+                RubyRuleCategory.SECURITY, RubySeverity.ERROR,
+                "Hardcoded Credential or Weak Password Hashing",
+                "Credentials in source code or MD5 password hashing are security risks.",
+                line, "Use ENV[] or Rails credentials; use bcrypt for passwords."))
+    return findings
+
+
+def check_xss(file_path: str, lines: List[str], enabled: bool = True) -> List[RubyFinding]:
+    """ruby.xss: render inline: with string interpolation."""
+    if not enabled:
+        return []
+    pattern = re.compile(r'render\s+inline\s*:.*#\{')
     return [
-        _finding(file_path, i + 1, "ruby.no-hardcoded-credentials",
-                 RubyRuleCategory.SECURITY, RubySeverity.ERROR,
-                 "Hardcoded Credential",
-                 "Credentials in source code are a security risk.",
-                 line, "Use ENV[] or Rails credentials.")
+        _finding(file_path, i + 1, "ruby.xss", RubyRuleCategory.SECURITY, RubySeverity.ERROR,
+                 "Cross-Site Scripting (XSS) via inline render with interpolation",
+                 "Using render inline: with user-controlled interpolation enables XSS.",
+                 line, "Use a proper template partial instead of inline rendering with user input.")
+        for i, line in enumerate(lines) if pattern.search(line)
+    ]
+
+
+def check_path_traversal(file_path: str, lines: List[str], enabled: bool = True) -> List[RubyFinding]:
+    """ruby.path-traversal: File.read or File.open with params[."""
+    if not enabled:
+        return []
+    pattern = re.compile(r'File\.(?:read|open)\s*\(\s*params\[')
+    return [
+        _finding(file_path, i + 1, "ruby.path-traversal", RubyRuleCategory.SECURITY, RubySeverity.ERROR,
+                 "Path Traversal via User-Controlled File Path",
+                 "Using params[] directly in File.read/open allows path traversal.",
+                 line, "Validate and sanitise the file path; use File.expand_path and check the result is within an allowed root.")
         for i, line in enumerate(lines) if pattern.search(line)
     ]
 

@@ -10,6 +10,7 @@ from Asgard.Heimdall.Quality.languages.java.models.java_models import (
 )
 from Asgard.Heimdall.Quality.languages.java.services._java_rules import (
     check_sql_injection, check_no_system_exit, check_no_print_stacktrace, check_empty_catch, check_string_equals, check_no_hardcoded_credentials, check_no_raw_types, check_no_object_finalize,
+    check_command_injection, check_xss, check_weak_crypto, check_path_traversal, check_no_script_engine_eval,
 )
 
 _RULES = [
@@ -21,6 +22,11 @@ _RULES = [
     check_no_hardcoded_credentials,
     check_no_raw_types,
     check_no_object_finalize,
+    check_command_injection,
+    check_xss,
+    check_weak_crypto,
+    check_path_traversal,
+    check_no_script_engine_eval,
 ]
 
 

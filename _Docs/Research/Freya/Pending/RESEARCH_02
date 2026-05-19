@@ -1,0 +1,9 @@
+Provide a comprehensive technical deep-dive into Core Web Vitals as of 2024-2025, covering the transition from FID to INP as a Core Web Vitals metric, the current measurement methodology for LCP, INP, and CLS, and the thresholds Google uses for the "good," "needs improvement," and "poor" classifications.
+
+I am building a page load analyzer using Playwright and the Navigation Timing API. I need to understand the exact measurement definitions for each metric at an implementation level: how is LCP calculated (what elements are considered LCP candidates, how does the LCP change as the page loads, when is it finalized?), how is INP measured (it requires observing all interaction latencies over the page lifetime and taking the 98th percentile — how is this approximated in a single synthetic lab test?), and how is CLS calculated (the windowed session approach to cumulative layout shift scoring, what counts as a layout shift versus an expected movement)?
+
+Research the gap between lab measurements (Lighthouse, WebPageTest, Playwright synthetic testing) and field measurements (Chrome User Experience Report, CrUX API). What systematic biases exist in lab measurement? Under what conditions does lab performance diverge most significantly from real-user experience?
+
+Cover the Resource Timing API and its relationship to Navigation Timing: how do you identify which resources are blocking the critical rendering path? What is the relationship between Time to First Byte, First Contentful Paint, and LCP? How does server-side rendering versus client-side rendering affect each metric differently?
+
+Include Google's PageSpeed Insights scoring formula and how the five Lighthouse performance metrics (FCP, LCP, TBT, CLS, SI) are weighted. Also research performance budgets — how do organizations set and enforce LCP and CLS budgets in CI pipelines?

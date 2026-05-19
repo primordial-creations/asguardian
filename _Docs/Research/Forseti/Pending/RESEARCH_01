@@ -1,0 +1,15 @@
+Conduct a comprehensive benchmark comparison of the leading OpenAPI linting tools available as of 2025: Spectral (Stoplight), IBM API Linter (ibm-openapi-validator), Redocly CLI, and Vacuum. For each tool, research and report on the following dimensions:
+
+Rule coverage: how many built-in rules does each tool ship with, how are rules categorized (structural correctness, security, documentation quality, design best practices), and what rule sets or profiles are available out of the box?
+
+Performance characteristics: what is the typical validation latency for small specs (under 50 paths), medium specs (50-200 paths), and large specs (500+ paths)? Are there published benchmarks or community-reported numbers? Does each tool support streaming or incremental validation?
+
+Extensibility model: how does each tool allow custom rules to be authored — JavaScript/TypeScript functions, Rego policies, YAML rule definitions, or other mechanisms? What is the learning curve and ecosystem maturity for custom rule development?
+
+Integration ecosystem: which CI/CD platforms, editors (VS Code, JetBrains), API gateways, and design platforms natively integrate each tool? Is there a programmatic API (Node.js library, REST service) beyond the CLI?
+
+False positive rates: are there any published studies, blog posts, or community forum discussions that compare false positive or false negative rates across these tools on real-world API specifications?
+
+Governance use cases: how do organizations use these tools to enforce API design standards across teams — centralized rule repositories, versioned rulesets, spectral profiles shared via npm packages?
+
+Conclude with a summary of which tool appears strongest in each dimension and what gaps exist in current open-source API linting tooling that represent opportunities for improvement.

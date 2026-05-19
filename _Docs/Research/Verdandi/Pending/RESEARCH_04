@@ -1,0 +1,9 @@
+Research state-of-the-art percentile estimation algorithms designed for high-throughput, memory-efficient operation at scale: t-digest, HDR Histogram, and DDSketch. For each algorithm, provide: the core data structure, the memory complexity relative to the number of data points, the accuracy guarantees (relative error vs absolute error), the merge-ability property (can you combine percentile sketches from multiple nodes?), and the computational complexity of insertion and quantile query.
+
+For t-digest specifically: explain the cluster-merging algorithm, why accuracy is highest at the tails (P1, P99) and lowest in the middle (P50), what the compression parameter controls, and how to choose it for different accuracy/memory trade-offs. Cover the parallel t-digest variant and its use in distributed systems.
+
+For HDR Histogram: explain the bucket structure, why it uses a power-of-two bucket strategy, what the lowest-discernible-value and highest-trackable-value parameters mean, and how to configure it for latency measurement (typically 1 microsecond to 3,600 seconds). Cover the coordinated omission problem that Gil Tene has written about and how HDR Histogram's recording approach addresses it.
+
+For DDSketch: explain the relative error guarantee, how the sketch adapts to the range of observed values, and how it compares to t-digest in terms of accuracy uniformity across quantiles.
+
+Research when you should use exact sorted-array percentile computation (as in a simple PercentileCalculator that sorts all values) versus sketch-based estimation. What is the crossover point in data volume or latency requirement where sketches become necessary? Cover the Greenwald-Khanna and KLL sketches as alternatives, and any recent academic work on optimal streaming quantile algorithms from 2020-2025.

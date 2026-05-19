@@ -1,0 +1,13 @@
+Research how Confluent Schema Registry implements Avro schema compatibility levels and how this design has influenced the broader ecosystem of schema registries as of 2025.
+
+Specifically investigate: What are the exact semantics of BACKWARD, FORWARD, FULL, BACKWARD_TRANSITIVE, FORWARD_TRANSITIVE, and FULL_TRANSITIVE compatibility levels in Confluent Schema Registry? How does the transitive vs non-transitive distinction change the set of allowed schema mutations? Provide concrete examples of schema changes that pass BACKWARD but fail BACKWARD_TRANSITIVE.
+
+What algorithm does Confluent Schema Registry use internally to evaluate Avro schema compatibility? Is it based on the Apache Avro ResolvingDecoder resolution algorithm, or does it implement its own compatibility logic? How does it handle union types, named types, default values, and aliases during compatibility checks?
+
+How does Confluent Schema Registry handle schema references — when an Avro schema references another named schema stored under a different subject, how does the compatibility check incorporate that referenced schema? What are the known edge cases or bugs in this area?
+
+How do competing schema registries — AWS Glue Schema Registry, Apicurio Registry, and the Buf Schema Registry for Protobuf — implement compatibility checking differently from Confluent? What compatibility levels do they support and where do their semantics diverge?
+
+What are the practical failure modes that teams encounter when migrating from BACKWARD to FULL compatibility on an existing schema subject with many versions? What migration strategies do practitioners recommend?
+
+Finally, what academic or industry research exists on the theoretical limits of schema compatibility — are there classes of schema changes that no compatibility level can safely accommodate without a coordinated cutover?

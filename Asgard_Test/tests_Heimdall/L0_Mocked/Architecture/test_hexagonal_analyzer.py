@@ -88,6 +88,55 @@ class TestHexagonalAnalyzerCrossAdapterViolation:
         assert report is not None
 
 
+class TestHexagonalAnalyzerPortClean:
+    def test_port_with_only_domain_imports_has_no_violations(self, tmp_path):
+        domain_dir = tmp_path / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "__init__.py").write_text("")
+        (domain_dir / "user.py").write_text("class User:\n    pass\n")
+
+        ports_dir = tmp_path / "ports"
+        ports_dir.mkdir()
+        (ports_dir / "__init__.py").write_text("")
+        (ports_dir / "user_port.py").write_text(
+            "from abc import ABC, abstractmethod\n\n"
+            "class IUserRepository(ABC):\n"
+            "    @abstractmethod\n"
+            "    def find(self, user_id: int): ...\n"
+        )
+        analyzer = HexagonalAnalyzer()
+        report: HexagonalReport = analyzer.analyze(scan_path=tmp_path)
+        port_violations = [v for v in report.violations if "port" in v.message.lower()]
+        assert len(port_violations) == 0
+
+    def test_infrastructure_importing_domain_is_clean(self, tmp_path):
+        domain_dir = tmp_path / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "__init__.py").write_text("")
+        (domain_dir / "user.py").write_text("class User:\n    pass\n")
+
+        infra_dir = tmp_path / "infrastructure"
+        infra_dir.mkdir()
+        (infra_dir / "__init__.py").write_text("")
+        (infra_dir / "user_repo.py").write_text(
+            "import sqlalchemy\n"
+            "from domain.user import User\n\n"
+            "class SQLUserRepository:\n"
+            "    def find(self, user_id: int) -> User:\n"
+            "        pass\n"
+        )
+        analyzer = HexagonalAnalyzer()
+        report: HexagonalReport = analyzer.analyze(scan_path=tmp_path)
+        infra_violations = [v for v in report.violations
+                            if "infrastructure" in (v.file_path or "").lower()]
+        assert len(infra_violations) == 0
+
+    def test_empty_directory_produces_empty_report(self, tmp_path):
+        analyzer = HexagonalAnalyzer()
+        report: HexagonalReport = analyzer.analyze(scan_path=tmp_path)
+        assert report.violations == []
+
+
 class TestHexagonalAnalyzerReportStructure:
     def test_report_has_expected_fields(self, tmp_path):
         (tmp_path / "module.py").write_text("x = 1\n")

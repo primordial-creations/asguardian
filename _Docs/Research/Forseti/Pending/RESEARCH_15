@@ -1,0 +1,13 @@
+Research the field of API fuzzing and property-based testing from API specifications — tools, techniques, and empirical results on defect discovery rates.
+
+Start with RESTler (Microsoft Research): how does RESTler's stateful REST API fuzzing work — how does it infer operation ordering from OpenAPI specs (using response data to populate subsequent request parameters), what categories of bugs has it been shown to find in published case studies, and what are its limitations (authentication handling, large state spaces, performance on large APIs)?
+
+Research Schemathesis in depth: how does it use Hypothesis under the hood to generate test cases from OpenAPI and GraphQL schemas, what strategies does it use for generating values for specific schema formats and constraints, how does its stateful testing mode work, and what are the published results on real-world bug discovery? How does Schemathesis compare to RESTler on common benchmarks?
+
+Investigate CATS (REST API Fuzzer) and other newer OpenAPI fuzzing tools: what unique approaches do they take compared to RESTler and Schemathesis? Are there specialized fuzzers for finding security vulnerabilities (injection, authentication bypass, mass assignment) in OpenAPI-described APIs?
+
+Research property-based testing frameworks that can be applied to API testing beyond Schemathesis: how do Hypothesis (Python), fast-check (TypeScript), and ScalaCheck integrate with API testing workflows? What API-specific property generators exist?
+
+What empirical data exists on the types of bugs most commonly discovered by spec-based API fuzzing vs traditional manual testing or unit testing? Are there published studies comparing defect density in APIs tested with fuzzing vs those tested only with example-based tests?
+
+What are the current research frontiers in API testing: LLM-guided fuzzing, differential testing between API versions, chaos testing for async APIs, and testing APIs with complex authentication flows?

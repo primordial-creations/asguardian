@@ -1,0 +1,11 @@
+Research the current state of the art in automated API breaking change detection for REST APIs, with a focus on what constitutes a "breaking change" and how different tools classify and detect them.
+
+Begin with a taxonomy: what categories of changes to an OpenAPI specification are universally agreed to be breaking changes for consumers? Cover: removal of endpoints, removal of required request fields, addition of required request parameters, narrowing of accepted types, removal of response fields that clients may depend on, changes to authentication schemes, changes to error response shapes, and removal of enum values. Are there changes that are breaking in some consumption patterns but not others?
+
+Research the leading automated detection tools: oasdiff (Go library and CLI), openapi-diff, Optic, and breaking-change detectors built into Bump.sh and ReadMe. For each, document what change categories they detect, how they report severity, whether they support ignore lists or allowlists for intentional breaking changes, and whether they integrate with GitHub Actions or GitLab CI.
+
+Investigate how Optic's "traffic-based" approach — comparing a spec against recorded real traffic rather than just spec-to-spec diffing — changes the quality of breaking change detection. What false positives does pure spec diffing produce that traffic-based diffing eliminates?
+
+How do organizations operationalize breaking change detection in their API lifecycle? What workflows do teams use to gate deployments on breaking change checks? Are there patterns for "soft" breaking changes where a deprecation period is enforced before a hard break is allowed?
+
+What is the current research on semantic versioning enforcement derived from detected breaking changes — specifically, tools that automatically suggest or enforce a major version bump when breaking changes are detected?

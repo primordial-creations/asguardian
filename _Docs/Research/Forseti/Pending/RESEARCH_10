@@ -1,0 +1,13 @@
+Research the landscape of mock server generation from API specifications — covering OpenAPI, AsyncAPI, Avro, and Protobuf — with a focus on the fidelity, configurability, and operational use of generated mocks.
+
+For OpenAPI mock servers: what are the leading tools — Prism (Stoplight), WireMock (with OpenAPI support), Microcks, Mockoon, and Imposter — and how do they differ in their approach? How does each handle: response selection when multiple examples are defined, dynamic data generation from schemas (vs static example replay), validation of incoming requests against the spec, and stateful mock behavior for CRUD-style APIs?
+
+Research Prism specifically: how does its "dynamic" mode generate synthetic response data from JSON Schemas, what algorithms or libraries does it use for fake data generation, and what are the known limitations (types it cannot generate, keywords it ignores)? How does Prism's request validation mode work in a proxy configuration?
+
+Investigate mock generation for event-driven systems: how does Microcks handle AsyncAPI specs and Avro/Protobuf message schemas to generate mock Kafka topics or AMQP exchanges? What Kafka consumer simulators exist that can replay realistic message streams conforming to a schema?
+
+Research the "record and replay" approach to mock generation — tools that record real API traffic and generate WireMock stubs or Pact contracts from it. How do tools like Hoverfly, Mockery, and Speedscale handle this, and what are the privacy and data-sensitivity challenges?
+
+What research exists on mock fidelity — the degree to which a mock server's behavior matches a real API for testing purposes? What categories of bugs are undetectable using mocks (race conditions, eventual consistency, auth edge cases) vs those that mocks reliably surface?
+
+What are the current open problems in mock generation: handling authentication flows, generating semantically valid fake data (valid credit card numbers, realistic addresses), and keeping mocks synchronized with evolving specs?

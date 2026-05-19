@@ -50,6 +50,14 @@ from Asgard.Heimdall.Quality.languages.csharp.models.csharp_models import (
     CsharpFinding, CsharpRuleCategory, CsharpSeverity, CsharpScanConfig, CsharpReport,
 )
 from Asgard.Heimdall.Quality.languages.csharp.services.csharp_analyzer import CsharpAnalyzer
+from Asgard.Heimdall.Quality.languages.cpp.models.cpp_models import (
+    CppFinding, CppRuleCategory, CppSeverity, CppScanConfig, CppReport,
+)
+from Asgard.Heimdall.Quality.languages.cpp.services.cpp_analyzer import CppAnalyzer
+from Asgard.Heimdall.Quality.languages.rust.models.rust_models import (
+    RustFinding, RustRuleCategory, RustSeverity, RustScanConfig, RustReport,
+)
+from Asgard.Heimdall.Quality.languages.rust.services.rust_analyzer import RustAnalyzer
 
 __all__ = [
     # JS models & analyzer
@@ -68,4 +76,8 @@ __all__ = [
     "PhpFinding", "PhpRuleCategory", "PhpSeverity", "PhpScanConfig", "PhpReport", "PhpAnalyzer",
     # C#
     "CsharpFinding", "CsharpRuleCategory", "CsharpSeverity", "CsharpScanConfig", "CsharpReport", "CsharpAnalyzer",
+    # C++
+    "CppFinding", "CppRuleCategory", "CppSeverity", "CppScanConfig", "CppReport", "CppAnalyzer",
+    # Rust
+    "RustFinding", "RustRuleCategory", "RustSeverity", "RustScanConfig", "RustReport", "RustAnalyzer",
 ]

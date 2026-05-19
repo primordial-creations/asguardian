@@ -160,6 +160,37 @@ class TestPhpHardcodedCredentials:
         assert any(f.rule_id == "php.no-hardcoded-credentials" for f in report.findings)
 
 
+class TestPhpPathTraversal:
+    def test_file_get_contents_with_get_param_flagged(self):
+        code = "<?php\n$data = file_get_contents($_GET['file']);\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "reader.php").write_text(code)
+            report = PhpAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "php.path-traversal" for f in report.findings)
+
+    def test_fopen_with_get_param_flagged(self):
+        code = "<?php\n$fh = fopen($_GET['path'], 'r');\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "reader.php").write_text(code)
+            report = PhpAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "php.path-traversal" for f in report.findings)
+
+    def test_static_path_not_flagged(self):
+        code = "<?php\n$data = file_get_contents('./data/config.json');\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "safe.php").write_text(code)
+            report = PhpAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "php.path-traversal" for f in report.findings)
+
+    def test_severity_is_error(self):
+        code = "<?php\nfile_get_contents($_POST['file']);\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bad.php").write_text(code)
+            report = PhpAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "php.path-traversal"]
+        assert findings[0].severity == PhpSeverity.ERROR
+
+
 class TestPhpAnalyzerReport:
     def test_multiple_findings_across_rules(self):
         code = (

@@ -10,6 +10,7 @@ from Asgard.Heimdall.Quality.languages.csharp.models.csharp_models import (
 )
 from Asgard.Heimdall.Quality.languages.csharp.services._csharp_rules import (
     check_sql_injection, check_no_hardcoded_credentials, check_no_empty_catch, check_xss, check_no_weak_crypto, check_path_traversal, check_command_injection, check_no_debug_code,
+    check_unsafe_deserialization, check_unsafe_reflection,
 )
 
 _RULES = [
@@ -21,6 +22,8 @@ _RULES = [
     check_path_traversal,
     check_command_injection,
     check_no_debug_code,
+    check_unsafe_deserialization,
+    check_unsafe_reflection,
 ]
 
 

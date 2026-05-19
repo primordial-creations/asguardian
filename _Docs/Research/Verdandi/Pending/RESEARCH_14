@@ -1,0 +1,9 @@
+Research SLI (Service Level Indicator) design patterns and the taxonomy of SLI types for different service categories. Cover the four SLI categories from the Google SRE Workbook: availability, latency, quality, and throughput. For each category, what are the canonical measurement methods, the recommended aggregation windows, and the standard good-event / bad-event framing?
+
+Research how SLIs differ across service types: request-driven services (HTTP APIs), pipeline services (batch jobs, streaming processors), storage systems (databases, object stores), and data plane services (load balancers, proxies). For each service type, what are the recommended SLIs, what events count as "good," and what are the common measurement pitfalls?
+
+Cover the error budget policy design: what happens when error budget is exhausted? What are the documented approaches organizations use — feature freeze, mandatory reliability work, escalation procedures? Research how organizations like Google, Netflix, and Spotify structure their error budget policies and what triggers a policy invocation.
+
+Research SLO review cadences and the mathematics of SLO refinement: how do you determine if your current SLO target is too tight (you're always burning budget) or too loose (you never burn any budget)? What is the concept of "error budget for the error budget," and how do you set initial SLO targets for new services with no historical data?
+
+Cover the relationship between SLOs and incident management: how do SLO-based systems integrate with PagerDuty, OpsGenie, and similar tools? What is the recommended approach for setting alert thresholds so that a burn rate alert fires before the error budget is exhausted but not so early that it's always noisy? Research organizations that have published post-mortems attributing incidents to SLO alert misconfiguration.

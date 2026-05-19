@@ -1,0 +1,13 @@
+Research the current state of API documentation generation from OpenAPI, AsyncAPI, GraphQL, and Protobuf specifications — focusing on quality, developer experience, and what documentation tooling fails to capture.
+
+For OpenAPI documentation: compare the leading rendering tools — Redoc, Swagger UI, Scalar, Mintlify, and Bump.sh — on dimensions including: rendering of complex nested schemas, handling of allOf/oneOf/anyOf in a human-readable way, support for multiple examples per operation, code sample generation across languages, try-it-out/interactive console quality, and customization options. What are the most common developer complaints about auto-generated API documentation?
+
+Research documentation quality metrics: are there tools or methodologies that score the quality of API documentation beyond structural completeness? How do organizations measure whether their API docs are actually useful to developers — time to first successful call, support ticket volume, community forum activity?
+
+Investigate Protobuf documentation generation: how do tools like protoc-gen-doc and buf's documentation features extract and render documentation from .proto comments? What are the limitations compared to OpenAPI documentation, particularly for complex nested message types and service definitions?
+
+Research GraphQL documentation: how does GraphQL's introspection-based documentation (GraphQL Playground, GraphiQL, Postman) compare to OpenAPI documentation in usability? What additional documentation do teams need to provide beyond what the schema expresses — query examples, pagination guidance, rate limit documentation?
+
+What research exists on the correlation between API documentation quality and API adoption, developer satisfaction, and integration success rates? Are there case studies from API providers (Stripe, Twilio, GitHub) that attribute adoption to documentation quality?
+
+What are the emerging approaches to AI-augmented API documentation: LLM-generated examples, conversational API documentation assistants, and automatic changelog generation from spec diffs?

@@ -172,3 +172,65 @@ class TestCsharpAnalyzerReport:
             (Path(d) / "X.cs").write_text(code)
             report = CsharpAnalyzer(config).analyze(scan_path=d)
         assert not any(f.rule_id == "csharp.no-debug-code" for f in report.findings)
+
+
+class TestCsharpUnsafeDeserialization:
+    def test_binary_formatter_flagged(self):
+        code = "var formatter = new BinaryFormatter();\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Serial.cs").write_text(code)
+            report = CsharpAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "csharp.unsafe-deserialization" for f in report.findings)
+
+    def test_net_data_contract_serializer_flagged(self):
+        code = "var s = new NetDataContractSerializer();\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Serial.cs").write_text(code)
+            report = CsharpAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "csharp.unsafe-deserialization" for f in report.findings)
+
+    def test_json_serializer_not_flagged(self):
+        code = "var s = new JsonSerializer();\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Safe.cs").write_text(code)
+            report = CsharpAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "csharp.unsafe-deserialization" for f in report.findings)
+
+    def test_finding_severity_is_error(self):
+        code = "var f = new LosFormatter();\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Serial.cs").write_text(code)
+            report = CsharpAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "csharp.unsafe-deserialization"]
+        assert findings[0].severity == CsharpSeverity.ERROR
+
+
+class TestCsharpUnsafeReflection:
+    def test_assembly_load_with_variable_flagged(self):
+        code = "var asm = Assembly.Load(userInput);\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Reflect.cs").write_text(code)
+            report = CsharpAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "csharp.unsafe-reflection" for f in report.findings)
+
+    def test_activator_create_instance_with_variable_flagged(self):
+        code = "var obj = Activator.CreateInstance(typeName);\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Reflect.cs").write_text(code)
+            report = CsharpAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "csharp.unsafe-reflection" for f in report.findings)
+
+    def test_assembly_load_with_string_literal_not_flagged(self):
+        code = 'var asm = Assembly.Load("MyLib");\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Safe.cs").write_text(code)
+            report = CsharpAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "csharp.unsafe-reflection" for f in report.findings)
+
+    def test_finding_severity_is_error(self):
+        code = "var obj = Activator.CreateInstance(dynamicType);\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Reflect.cs").write_text(code)
+            report = CsharpAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "csharp.unsafe-reflection"]
+        assert findings[0].severity == CsharpSeverity.ERROR

@@ -18,12 +18,21 @@ from Asgard.Heimdall.Architecture.models.architecture_models import (
     HexagonalZone,
     PortDefinition,
 )
+from Asgard.Heimdall.Architecture.services._architecture_config import (
+    ArchitectureConfig as LayerArchitectureConfig,
+    default_architecture_config,
+)
 from Asgard.Heimdall.Quality.utilities.file_utils import scan_directory
 from Asgard.Heimdall.Architecture.services._hexagonal_reporter import (
     generate_text_report as _gen_text,
     generate_json_report as _gen_json,
     generate_markdown_report as _gen_markdown,
 )
+from Asgard.Heimdall.Architecture.services._generic_hexagonal_checks import (
+    check_domain_imports_infrastructure,
+    check_missing_port_reference,
+)
+from Asgard.Heimdall.common.language_registry import EXTENSION_TO_LANGUAGE
 from Asgard.Heimdall.Architecture.services._hexagonal_validators import (
     validate_domain_isolation as _validate_domain,
     validate_dependency_direction as _validate_direction,
@@ -77,9 +86,14 @@ class HexagonalAnalyzer:
         ],
     }
 
-    def __init__(self, config: Optional[ArchitectureConfig] = None):
+    def __init__(
+        self,
+        config: Optional[ArchitectureConfig] = None,
+        layer_config: Optional[LayerArchitectureConfig] = None,
+    ):
         """Initialize the hexagonal analyzer."""
         self.config = config or ArchitectureConfig()
+        self.layer_config: LayerArchitectureConfig = layer_config or default_architecture_config()
         self.zone_patterns: Dict[HexagonalZone, List[str]] = dict(
             self.DEFAULT_ZONE_PATTERNS
         )
@@ -251,6 +265,49 @@ class HexagonalAnalyzer:
                 hits.add(module)
         return hits
 
+    def _get_layer_for_path(self, path_str: str) -> Optional[str]:
+        """Return the layer name for a given path string using layer_config patterns."""
+        import fnmatch
+        for layer in self.layer_config.layers:
+            for pattern in layer.path_patterns:
+                if fnmatch.fnmatch(path_str, pattern):
+                    return layer.name
+        return None
+
+    def _check_layer_violations(
+        self,
+        file_path: str,
+        imports: Set[str],
+    ) -> List[HexagonalViolation]:
+        """Check imports against layer_config forbidden_imports rules."""
+        violations: List[HexagonalViolation] = []
+        source_layer_name = self._get_layer_for_path(file_path)
+        if source_layer_name is None:
+            return violations
+
+        layer_map = {lc.name: lc for lc in self.layer_config.layers}
+        source_layer = layer_map.get(source_layer_name)
+        if source_layer is None:
+            return violations
+
+        for imp in imports:
+            import_layer_name = self._get_layer_for_path(imp)
+            if import_layer_name and import_layer_name in source_layer.forbidden_imports:
+                violations.append(
+                    HexagonalViolation(
+                        file_path=file_path,
+                        line_number=0,
+                        source_zone=HexagonalZone.UNASSIGNED,
+                        target_zone=HexagonalZone.UNASSIGNED,
+                        class_name="",
+                        message=(
+                            f"Layer '{source_layer_name}' must not import "
+                            f"from layer '{import_layer_name}' (imported: {imp})"
+                        ),
+                    )
+                )
+        return violations
+
     def _resolve_import_zone(
         self,
         import_name: str,
@@ -286,6 +343,82 @@ class HexagonalAnalyzer:
             return ".".join(parts)
         except ValueError:
             return None
+
+    # ------------------------------------------------------------------
+    # Multi-language generic analysis
+    # ------------------------------------------------------------------
+
+    def analyze_file_generic(
+        self,
+        file_path: Path,
+        language: str,
+    ) -> List[HexagonalViolation]:
+        """
+        Run generic regex-based hexagonal checks on a single non-Python file.
+
+        Args:
+            file_path: Path to the source file.
+            language: Language identifier (e.g. "java", "go", "typescript").
+
+        Returns:
+            List of HexagonalViolation found in the file.
+        """
+        try:
+            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+        except OSError:
+            return []
+
+        path_str = str(file_path)
+        violations: List[HexagonalViolation] = []
+        violations.extend(check_domain_imports_infrastructure(path_str, lines, language))
+        violations.extend(check_missing_port_reference(path_str, lines, language))
+        return violations
+
+    def analyze_multilang(
+        self,
+        scan_path: Optional[Path] = None,
+        extensions: Optional[List[str]] = None,
+    ) -> HexagonalReport:
+        """
+        Scan non-Python source files for hexagonal architecture violations.
+
+        Args:
+            scan_path: Root directory to scan (defaults to config.scan_path).
+            extensions: File extensions to include.
+
+        Returns:
+            HexagonalReport with all found violations.
+        """
+        import time as _time
+        from Asgard.Heimdall.Quality.utilities.file_utils import scan_directory
+
+        path = scan_path or self.config.scan_path
+        path = Path(path).resolve()
+
+        if not path.exists():
+            raise FileNotFoundError(f"Scan path does not exist: {path}")
+
+        target_extensions = extensions or [
+            ".java", ".cs", ".go", ".rb", ".js", ".ts", ".jsx", ".tsx", ".php", ".kt",
+        ]
+
+        start_time = _time.time()
+        report = HexagonalReport(scan_path=str(path))
+
+        for file_path in scan_directory(
+            path,
+            exclude_patterns=self.config.exclude_patterns,
+            include_extensions=target_extensions,
+        ):
+            language = EXTENSION_TO_LANGUAGE.get(file_path.suffix.lower())
+            if not language or language == "python":
+                continue
+
+            for v in self.analyze_file_generic(file_path, language):
+                report.add_violation(v)
+
+        report.scan_duration_seconds = _time.time() - start_time
+        return report
 
     def generate_report(
         self, result: HexagonalReport, format: str = "text"

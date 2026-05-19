@@ -1,0 +1,7 @@
+Research the state of infrastructure drift detection — the problem of detecting when actual cloud or cluster state has diverged from the desired state expressed in Terraform or Kubernetes manifests. Cover both the theoretical foundations and the practical tooling available as of 2024-2025.
+
+For Terraform drift: explain how "terraform plan" detects drift, the performance implications of running plan at scale across hundreds of modules, and alternative approaches like Driftctl, Terragrunt drift detection, and cloud provider native tools (AWS Config, Azure Policy, GCP Config Connector). What categories of drift are hardest to detect? Cover resource creation outside Terraform (clickops drift), attribute-level drift in mutable fields, and provider-side eventual consistency causing false drift reports.
+
+For Kubernetes drift: explain how GitOps controllers (ArgoCD, Flux) define and detect drift between the Git-committed desired state and the live cluster state. What is the computational model for diff calculation — do they use server-side apply dry-run, three-way merge patch, or structural diff of the live object? How do they handle fields injected by admission webhooks or defaulting controllers that are not in the committed manifest?
+
+Also cover the emerging concept of continuous drift detection versus on-demand drift detection, and research what SLOs organizations typically set for maximum acceptable drift duration before automated remediation triggers. Include any academic work or CNCF TAG papers on this topic.

@@ -1,0 +1,11 @@
+How should a unified compatibility score be designed to meaningfully compare API stability across REST (OpenAPI), gRPC (Protobuf), and event-driven (Avro/AsyncAPI) APIs, when the concept of "a breaking change" has different technical meanings, different severity distributions, and different consumer impact models in each paradigm?
+
+Start with the structural differences in what can break. A REST API breaking change typically affects one endpoint, one HTTP method, one request parameter, or one response field. The impact is proportional to how widely that specific operation or field is used across consumers. A Protobuf breaking change often affects a shared message type that may be used across many RPC methods, so a single field type change can break dozens of service calls simultaneously. An Avro schema change in a Kafka topic can affect thousands of consumers processing millions of events per hour — the blast radius is fundamentally different.
+
+Consider the time dimension: REST API breaking changes are detected at request time, giving immediate feedback. Protobuf breaking changes may be detected when a service restarts and fails to deserialize messages. Avro breaking changes in a Kafka topic may go undetected for hours if consumers are processing older messages from the queue and have not yet encountered the new schema version.
+
+Think about what a compatibility score should measure: is it the probability that a randomly selected consumer will be broken, the proportion of API surface area affected, the estimated engineering hours required to adapt consumers, or some combination? Should a score of 85 mean the same thing for a REST API as for a Kafka topic, or should the scoring scales be normalized differently for each paradigm?
+
+Consider the role of consumer knowledge in the score. A REST API field removal may be scored as high severity, but if the tool knows (from traffic logs or from consumer specs) that no current consumer reads that field, should the score reflect this? What are the architectural implications of building a compatibility scoring system that incorporates consumer usage data vs one that scores purely from spec-to-spec analysis?
+
+What would it take to make a unified score genuinely trustworthy — trustworthy enough that an organization could use it as a deployment gate across all their API types?

@@ -1,0 +1,9 @@
+Research statistical anomaly detection methods appropriate for small-to-medium time series (50-500 data points), focusing on z-score, IQR, and their extensions. Cover: why the standard z-score breaks down on small samples (Grubbs test vs z-score), how the modified z-score using median absolute deviation (MAD) provides more robust outlier detection, and the mathematical derivation of the 3.5 MAD threshold commonly cited in the literature.
+
+Research the Grubbs test, the generalized ESD (Extreme Studentized Deviate) test, and the GESD test for multiple outliers. How do these differ from simple z-score thresholding? What are the assumptions each test makes about the underlying distribution, and how do these assumptions break down for latency data (which is typically log-normal or heavy-tailed)?
+
+Cover ADTK (Anomaly Detection Toolkit for time series in Python): what detection methods does it provide, how does it handle seasonality, and what are its computational requirements? How does it compare to using raw statistical methods?
+
+Research the STUMPY library for matrix profile computation: what is a matrix profile, how does it detect anomalies in time series, and what is the computational complexity of the STOMP and STUMPY algorithms? For what time series lengths and anomaly types does matrix profile outperform z-score and IQR methods?
+
+Research change-point detection specifically: PELT (Pruned Exact Linear Time), BOCPD (Bayesian Online Change Point Detection), and the ruptures Python library. When a burn rate analyzer needs to detect that a new incident has started (not just that the current value is anomalous), which change-point algorithm is most appropriate, and what are the latency and computational trade-offs?

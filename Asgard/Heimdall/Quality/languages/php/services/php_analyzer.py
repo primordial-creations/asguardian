@@ -10,6 +10,7 @@ from Asgard.Heimdall.Quality.languages.php.models.php_models import (
 )
 from Asgard.Heimdall.Quality.languages.php.services._php_rules import (
     check_sql_injection, check_xss, check_no_eval, check_file_inclusion, check_command_injection, check_no_md5_password, check_no_extract, check_no_hardcoded_credentials,
+    check_path_traversal,
 )
 
 _RULES = [
@@ -21,6 +22,7 @@ _RULES = [
     check_no_md5_password,
     check_no_extract,
     check_no_hardcoded_credentials,
+    check_path_traversal,
 ]
 
 

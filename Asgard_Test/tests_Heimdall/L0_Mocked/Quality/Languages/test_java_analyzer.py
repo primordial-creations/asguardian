@@ -123,6 +123,92 @@ class TestJavaRawTypes:
         assert any(f.rule_id == "java.no-raw-types" for f in report.findings)
 
 
+class TestJavaCommandInjection:
+    def test_runtime_exec_with_concat_flagged(self):
+        code = 'Runtime.getRuntime().exec("ls " + userInput);\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Cmd.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "java.command-injection" for f in report.findings)
+
+    def test_runtime_exec_literal_not_flagged(self):
+        code = 'Runtime.getRuntime().exec("ls -la");\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Safe.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "java.command-injection" for f in report.findings)
+
+    def test_severity_is_error(self):
+        code = 'Runtime.getRuntime().exec(cmd + arg);\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Bad.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "java.command-injection"]
+        assert findings[0].severity == JavaSeverity.ERROR
+
+
+class TestJavaXss:
+    def test_response_writer_with_request_param_flagged(self):
+        code = 'response.getWriter().println(request.getParameter("name"));\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Servlet.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "java.xss" for f in report.findings)
+
+    def test_out_println_with_request_param_flagged(self):
+        code = 'out.println(request.getParameter("q"));\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Jsp.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "java.xss" for f in report.findings)
+
+    def test_static_string_not_flagged(self):
+        code = 'out.println("Hello World");\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Safe.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "java.xss" for f in report.findings)
+
+    def test_category_is_security(self):
+        code = 'response.getWriter().print(request.getParameter("x"));\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Bad.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "java.xss"]
+        assert findings[0].category == JavaRuleCategory.SECURITY
+
+
+class TestJavaWeakCrypto:
+    def test_md5_digest_flagged(self):
+        code = 'MessageDigest md = MessageDigest.getInstance("MD5");\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Hash.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "java.weak-crypto" for f in report.findings)
+
+    def test_sha1_digest_flagged(self):
+        code = 'MessageDigest sha = MessageDigest.getInstance("SHA-1");\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Hash.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "java.weak-crypto" for f in report.findings)
+
+    def test_sha256_not_flagged(self):
+        code = 'MessageDigest sha = MessageDigest.getInstance("SHA-256");\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Safe.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "java.weak-crypto" for f in report.findings)
+
+    def test_severity_is_error(self):
+        code = 'MessageDigest.getInstance("MD5");\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "Bad.java").write_text(code)
+            report = JavaAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "java.weak-crypto"]
+        assert findings[0].severity == JavaSeverity.ERROR
+
+
 class TestJavaAnalyzerReport:
     def test_report_summary_counts_match(self):
         code = (

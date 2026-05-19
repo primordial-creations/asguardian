@@ -1,0 +1,9 @@
+Research technical SEO audit methodology with a focus on which technical signals have the strongest empirical correlation with search rankings and organic traffic, and how automated SEO analysis tools perform against these signals.
+
+I am building an SEO analyzer that covers meta tags (title, description, Open Graph, Twitter Card), robots.txt parsing, structured data validation (JSON-LD, Schema.org vocabulary), and canonical URL handling. I need to understand the current state of technical SEO best practices, ranked by impact.
+
+Cover the following areas with evidence: title tag optimization (what is the current optimal length after Google's display-width-based truncation? how does keyword placement in the title tag affect rankings?), meta description impact (Google has stated meta descriptions are not a ranking signal — but what is their empirically measured effect on click-through rate, which is a ranking signal?), structured data (does JSON-LD markup for FAQ, HowTo, Article, and Product schemas demonstrably improve search appearance and click-through rates? what does the research show?).
+
+Research the technical SEO signals that most commonly block indexing: robots.txt disallow rules, noindex meta tags, canonical tag misconfigurations (self-referential canonicals, canonicals pointing to redirected URLs, canonicalization across HTTP/HTTPS/www variants), and Core Web Vitals as a ranking signal (Google's Page Experience update — what is the measured ranking impact of CWV scores?).
+
+Cover Google's current indexing pipeline: how does Googlebot handle JavaScript rendering (Chromium-based evergreen rendering versus legacy fetch-and-parse), and what is the practical SEO impact of rendering-dependent content that is not visible in the initial HTML response? Include data from Google Search Console documentation and third-party SEO studies (Ahrefs, Semrush, Moz) on technical audit priorities.

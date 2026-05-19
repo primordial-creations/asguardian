@@ -1,0 +1,9 @@
+Research the state of visual regression testing tools — Percy (BrowserStack), Chromatic (Storybook), Applitools Eyes, and open-source alternatives (reg-suit, BackstopJS, Playwright's built-in screenshot comparison) — with a focus on their false positive rates, algorithmic approaches to image comparison, and practical integration into CI pipelines.
+
+The core challenge in visual regression testing is distinguishing meaningful visual regressions from noise: subpixel antialiasing differences between runs, font rendering differences across OS/browser versions, dynamic content (timestamps, avatars, ads) that legitimately changes, animation frames captured at different points, and color profile differences. How does each tool address these sources of false positives?
+
+Research the computer vision approaches used: pixel-by-pixel comparison with threshold tolerances, perceptual hashing (pHash, dHash), structural similarity index (SSIM), and AI-based visual comparison (Applitools Visual AI). What are the theoretical properties of each approach — what kinds of regressions does each detect well, and what does each miss?
+
+I am building a visual regression system using Playwright for screenshot capture with pixel-by-pixel comparison. What are the known limitations of this approach compared to perceptual diff algorithms? At what resolution and tolerance threshold does pixel comparison produce acceptable false positive rates in practice?
+
+Cover the organizational challenges: visual regression tests require a "baseline" that must be intentionally updated when intentional visual changes are made. What workflows have teams adopted for baseline management? How do teams handle baseline updates across multiple browsers and viewport sizes? Are there studies on the ROI of visual regression testing in terms of bugs caught versus engineering overhead?

@@ -1,0 +1,9 @@
+What are the industry benchmarks and state-of-the-art detection methods for container security misconfigurations in Dockerfiles and docker-compose files, and how do commercial and open-source tools compare on detection coverage?
+
+Cover the primary static analysis tools for container security: Hadolint, Checkov, Trivy (config scanning mode), Snyk Container, Grype, Dockle, and Docker Scout. For each, provide: the rule set and CIS Docker Benchmark coverage, the detection methodology (AST parsing of Dockerfiles vs line-by-line pattern matching), false positive rates from published evaluations, and performance on large infrastructure repositories.
+
+For Dockerfile-specific issues, provide the current industry consensus on what constitutes a security misconfiguration for each of the following: running as root (USER instruction absence or USER 0), privileged mode (--privileged flag), exposed sensitive ports, ADD vs COPY for remote URLs, COPY of secrets into image layers, use of latest tags, multi-stage build secrets leakage, and health check absence.
+
+For docker-compose security: what are the critical misconfiguration patterns (privileged: true, host network mode, volume mounts of sensitive host paths like /etc/passwd or /var/run/docker.sock, environment variable secrets), and how do static scanners detect these across YAML parsing?
+
+Then address: what the CIS Docker Benchmark v1.6 and v1.7 scoring methodology is (how individual checks are weighted), what the NIST SP 800-190 (Application Container Security Guide) recommends as mandatory controls, and whether any benchmark dataset exists for testing container security scanner accuracy with known-vulnerable and known-safe Dockerfiles.

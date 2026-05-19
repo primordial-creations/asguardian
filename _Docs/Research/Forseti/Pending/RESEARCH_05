@@ -1,0 +1,11 @@
+Research the performance characteristics and optimization strategies for JSON Schema validation at high throughput — specifically targeting use cases where schemas must be validated or data must be validated against schemas at millions of events per second in streaming pipelines.
+
+Begin with a survey of the fastest JSON Schema validation libraries available across major languages: ajv (JavaScript/TypeScript), jsonschema and fastjsonschema (Python), jsonschema-rs (Rust with Python bindings), and everit-json-schema (Java). What are the published or community-benchmarked throughput numbers for each? How does schema complexity (depth of nesting, use of $ref, use of allOf/oneOf/anyOf) affect validation throughput?
+
+Investigate the internal compilation model used by high-performance validators like ajv: how does schema pre-compilation into bytecode or optimized JavaScript functions work, and what is the warmup cost vs steady-state throughput? How does ajv's "strict mode" affect both correctness and performance?
+
+Research how streaming data platforms handle JSON Schema validation at scale: does Apache Kafka's ecosystem have mature solutions for JSON Schema validation at the broker or consumer level beyond what Confluent Schema Registry provides? How do tools like Apache Flink or Apache Spark integrate schema validation into stream processing pipelines without becoming a bottleneck?
+
+What are the known correctness edge cases and interoperability issues in JSON Schema across draft versions (Draft 4, Draft 7, Draft 2019-09, Draft 2020-12)? Which draft versions have the best library support across languages? What are the most commonly misimplemented keywords?
+
+Research the emerging use of JSON Schema in AI/LLM tool calling and structured output: how are major LLM providers (OpenAI, Anthropic, Google) using JSON Schema to constrain model outputs, and what subset of JSON Schema do they support? What validation libraries are recommended for validating LLM-generated JSON against schemas?

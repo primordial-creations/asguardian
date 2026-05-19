@@ -1,0 +1,11 @@
+Research browser console error analysis as a signal for web application health and quality — the types of errors that appear in the browser console, their severity as indicators of real problems, and how to programmatically capture and classify them using tools like Playwright.
+
+I am building a console error analyzer that captures JavaScript errors, network errors, CSP violations, deprecation warnings, and mixed content warnings during automated page crawls. I need to understand the taxonomy of console messages, their relative importance, and what filtering and classification heuristics produce actionable signal.
+
+Cover the major categories of browser console output: JavaScript exceptions (TypeError, ReferenceError, SyntaxError — what percentage are fatal versus caught and handled?), network errors (failed resource loads — 404s, CORS errors, DNS failures, SSL certificate errors), CSP violations (script-src blocks, inline style violations, report-only versus enforcing mode), deprecation warnings (Web Platform deprecations, browser-vendor warnings about removed APIs), and mixed content warnings (HTTPS pages loading HTTP resources).
+
+Research the signal-to-noise problem in console analysis: modern single-page applications and third-party scripts generate substantial console output, much of which is informational or expected. How do you distinguish errors that represent real bugs from expected error conditions that are handled gracefully in application code? What heuristics do existing tools use?
+
+Cover CORS errors in depth: what information is available in the browser console for a CORS failure versus what is suppressed for security reasons? How do you determine from console output alone whether a CORS error is a misconfiguration on the server or an intentional cross-origin restriction?
+
+Include research on console error rates in the wild — HTTP Archive or similar studies on the frequency and types of console errors on popular websites. What are the most common error types, and what do they indicate about web development practice?

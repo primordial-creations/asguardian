@@ -1,0 +1,11 @@
+Research the current state of OpenAPI specification completeness and accuracy in the wild — how complete and correct are real-world OpenAPI specs, and what tools or methods are used to measure and improve spec quality.
+
+Begin with empirical research: are there published studies or datasets analyzing large corpora of public OpenAPI specs (from APIs.guru, GitHub, or similar sources) that measure the prevalence of validation errors, missing fields, incomplete schema definitions, and incorrect examples? What are the most common quality issues found in real-world specs?
+
+Research the concept of "OpenAPI completeness scoring" — what dimensions do tools like Optic, Stoplight, and IBM API Linter use to score spec completeness? Typical dimensions might include: response schema coverage (percentage of status codes with defined schemas), example coverage (percentage of schemas with examples), description coverage, security scheme definitions, and tag organization. Are there published scoring rubrics or industry standards for what constitutes a "complete" spec?
+
+Investigate spec drift: how often do OpenAPI specs become inaccurate relative to the actual API behavior over time? What mechanisms do organizations use to detect and prevent spec drift — traffic-based spec generation, contract testing, and spec linting in CI? What tools (Optic, APIFuzzer, RESTler) test whether a deployed API actually conforms to its spec?
+
+Research "design-first" vs "code-first" API development approaches and their impact on spec quality: do APIs developed design-first tend to have higher quality specs than those generated from code annotations? What are the best practices and toolchains for each approach?
+
+What research or tooling exists around automatically enriching incomplete OpenAPI specs: inferring missing schemas from code, generating examples, or using LLMs to fill in documentation gaps? What are the accuracy limitations of these automated enrichment approaches?

@@ -1,0 +1,9 @@
+Think deeply about the architectural problem of building a multi-format IaC validation system that must remain correct as the underlying formats evolve. Kubernetes API versions deprecate fields and promote resources between alpha, beta, and stable (e.g., the batch/v1beta1 CronJob to batch/v1 migration, the networking.k8s.io/v1beta1 Ingress deprecation). Terraform provider schemas change with each provider version. Helm API version v2 replaced v1. Docker Compose spec v3 replaced v2.x with breaking changes.
+
+The core architectural question is: how do you design a validation system whose rule set is versioned in lockstep with the format specifications it validates, such that rules are applied at the correct version and false positives from applying newer rules to older valid configurations are prevented?
+
+Reason through the following: should validation rules be associated with a schema version range (applicable from version X to version Y)? How do you handle forward compatibility — validating a config that targets a future API version the validator hasn't been updated for yet? What is the right abstraction boundary between format parsing, schema validation, and semantic policy evaluation?
+
+Consider the operational problem: a CI pipeline runs manifest validation. The Kubernetes version of the target cluster is 1.28. The validator was written against 1.27 schemas. A new field introduced in 1.28 is present in the manifest. Should the validator fail, warn, or pass? What if a field was removed in 1.28 and the manifest uses it?
+
+Draw on how OpenAPI schema evolution, Protocol Buffers compatibility rules, and SQL migration frameworks handle versioned schema validation to propose a principled architecture for IaC validation version management. What are the irreducible complexities that no design can eliminate?

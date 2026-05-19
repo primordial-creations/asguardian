@@ -1,0 +1,39 @@
+# Architecture layer configuration for hexagonal (ports and adapters) analysis.
+#
+# Schema:
+#   language: source language (default: python)
+#   layers: list of layer definitions
+#     - name: unique layer identifier
+#       path_patterns: glob patterns matched against source file paths
+#       allowed_imports: layers this layer may import from
+#       forbidden_imports: layers this layer must NOT import from
+
+language: python
+layers:
+  - name: domain
+    path_patterns:
+      - "*/domain/*"
+      - "*/models/*"
+    allowed_imports: []
+    forbidden_imports: [infrastructure, adapters]
+
+  - name: ports
+    path_patterns:
+      - "*/ports/*"
+    allowed_imports: [domain]
+    forbidden_imports: [infrastructure]
+
+  - name: application
+    path_patterns:
+      - "*/services/*"
+      - "*/use_cases/*"
+    allowed_imports: [domain, ports]
+    forbidden_imports: [infrastructure]
+
+  - name: infrastructure
+    path_patterns:
+      - "*/infrastructure/*"
+      - "*/adapters/*"
+      - "*/repositories/*"
+    allowed_imports: [domain, ports, application]
+    forbidden_imports: []

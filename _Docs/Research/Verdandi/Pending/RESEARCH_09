@@ -1,0 +1,9 @@
+Research cache performance analysis methodologies and the key metrics used by industry practitioners to evaluate cache health. Cover: hit rate (the fundamental metric), miss rate, eviction rate, memory fragmentation ratio, keyspace size growth rate, and latency distribution differences between cache hits and misses. What thresholds do Redis, Memcached, and CDN operators typically use to flag cache health problems?
+
+For cache hit rate specifically: what is considered a healthy hit rate for different cache use cases — session caches, query result caches, computed value caches, CDN edge caches, and CPU L1/L2/L3 caches? Is a 95% hit rate always good? Are there scenarios where a very high hit rate indicates the cache is too large and wasting memory?
+
+Research cache eviction policies in depth: LRU (Least Recently Used), LFU (Least Frequently Used), FIFO, TTL-based expiration, and Redis's approximated LRU and LFU implementations. What are the theoretical and empirical performance differences between these policies for web application workloads? Research the ARC (Adaptive Replacement Cache) algorithm and why Redis doesn't use it.
+
+Cover the cache stampede / thundering herd problem: what triggers it, how does probabilistic early expiration (XFetch algorithm) prevent it, and what other mitigation strategies exist (locking, probabilistic TTL jitter, background refresh)? Research the XFetch algorithm specifically — what are its parameters and how do you tune them?
+
+Research how to detect cache warming state versus steady state in metrics: what does a cache hit rate time series look like after a deployment restarts the cache? How long does warm-up typically take for different cache sizes and access patterns? What metrics signatures distinguish a cold cache from a cache with a poor eviction policy?

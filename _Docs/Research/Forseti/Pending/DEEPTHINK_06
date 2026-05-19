@@ -1,0 +1,11 @@
+How should a schema validation tool handle the inherent tension between validating a schema's structural correctness and validating a schema's semantic intent — and is it even possible to validate semantic intent from a schema alone?
+
+Consider an OpenAPI specification that is structurally valid: all required fields are present, all $ref references resolve, all types are valid JSON Schema types. The spec passes every structural validator. Yet the spec may be semantically wrong in ways that no tool can catch without domain knowledge: a field named userId that is typed as string but should logically be an integer, a currency field defined as float rather than string (introducing floating-point rounding errors), a timestamp field with no format specification, or an endpoint that accepts a POST body but returns a 200 instead of a 201 for resource creation.
+
+Think through what categories of semantic validation are possible without external knowledge. Some semantic rules can be derived from naming conventions: a field ending in At is probably a timestamp and should have format: date-time. A field ending in Id is probably a foreign key reference. A field named email should probably have format: email. These are probabilistic heuristics, not guarantees. How should a validator treat heuristic violations — as errors, warnings, or suggestions?
+
+Consider semantic validation across linked schemas: if an OpenAPI path parameter is named userId and the response body contains a field also named userId, should a validator check that they have compatible types? This kind of cross-schema semantic consistency check is beyond pure structural validation but is clearly valuable.
+
+Think about the role of naming conventions and style guides in semantic validation. How do organizations encode semantic expectations in a machine-readable style guide, and how do tools like Spectral implement custom rules that check semantic conventions? What is the limit of this approach — what semantic properties can never be expressed as a Spectral rule?
+
+Finally, consider the philosophical question: should a schema validation tool try to infer developer intent, or should it restrict itself to checking what can be verified objectively? What is the risk of a tool that guesses intent incorrectly and reports a false violation of a non-existent convention?

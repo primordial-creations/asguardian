@@ -1,0 +1,9 @@
+Research the coordinated omission problem in latency measurement as described by Gil Tene. What is coordinated omission, when does it occur in benchmarking and production monitoring, and how does it cause systematic underestimation of high-percentile latency? Cover the specific scenario where a slow response causes the load generator to pause, thereby preventing subsequent requests from starting and masking the downstream queuing effect.
+
+Research how HDR Histogram's interval histogram recording addresses coordinated omission: what is the "expected interval" parameter, and how does HDR Histogram correct for missed recordings when the actual interval exceeds the expected interval? How significant is the corrected versus uncorrected P99 latency discrepancy in real benchmark measurements?
+
+Cover the wrk2 benchmarking tool and its coordinated omission correction: how does it differ from wrk and Apache Bench in its measurement approach? What are the recommended configurations for wrk2 when measuring latency at specific percentiles?
+
+Research how production APM tools handle this problem: does Datadog APM, New Relic, or Dynatrace apply any coordinated omission correction? Do OpenTelemetry instrumentation libraries have any mechanism to detect when a request was queued before being handled and record the queuing time separately?
+
+Cover Little's Law applications to latency measurement: given throughput (requests per second) and concurrency (average in-flight requests), what does Little's Law tell you about the expected average latency? How can you use Little's Law to sanity-check reported latency values and identify measurement problems? Research tools and techniques for detecting when reported latency metrics are likely inaccurate due to instrumentation issues.

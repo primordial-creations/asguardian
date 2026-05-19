@@ -1,0 +1,11 @@
+What is the right mental model for "API completeness" — and how should a tool score it in a way that is both objectively measurable and meaningfully correlated with developer experience and API reliability?
+
+Start with the problem of definition. An API spec can be structurally complete (all required OpenAPI fields are present) while being experientially incomplete (every description field says "TODO", no examples are provided, error response schemas are missing). A spec can have rich documentation but be operationally incomplete (no rate limit documentation, no pagination guidance, no authentication flow examples). These dimensions of completeness are genuinely different but all matter to developers consuming the API.
+
+Think through a completeness scoring model along multiple dimensions. Documentation completeness: what percentage of operations have summaries and descriptions, what percentage of parameters have descriptions, what percentage of schemas have descriptions for each property? Example completeness: what percentage of request bodies have examples, what percentage of response schemas have examples, are the examples syntactically valid against the schema? Error response completeness: what percentage of operations document 4xx and 5xx responses, do error responses have consistent schemas? Schema precision: what percentage of string fields have format constraints, what percentage of integer fields have minimum/maximum bounds, what percentage of array fields have minItems/maxItems?
+
+Consider the weighting problem: is a missing operation description as serious as a missing error response schema? Is a missing example as serious as an undocumented required parameter? Different use cases weight these differently. A developer portal cares most about documentation completeness. A contract testing system cares most about schema precision. A security team cares most about authentication documentation.
+
+Should the tool output a single completeness score, a vector of dimension scores, or a qualitative completeness tier (Basic, Standard, Comprehensive)? What evidence exists that any particular completeness metric correlates with developer experience outcomes — time to first successful call, number of support tickets, API adoption rate?
+
+How should the scoring handle the inherent subjectivity of "good enough" documentation?

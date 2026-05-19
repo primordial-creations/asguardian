@@ -1,0 +1,9 @@
+What are the industry benchmarks and published detection rates for hardcoded secrets and credential detection in source code, and how do commercial and open-source secret scanning tools compare on precision and recall?
+
+Investigate the following tools: GitHub Advanced Security secret scanning (GA patterns, partner patterns, push protection), GitLeaks, TruffleHog v3, Detect-Secrets (Yelp), SpectralOps, and the secrets detection capabilities built into Semgrep and SonarQube.
+
+For each tool, provide: the detection methodology (regex patterns, entropy analysis, ML-based classification, or hybrid), the number of supported secret types, published or measured false positive rates on public repositories, whether the tool performs validity checking (live API probing) and what the security and legal implications of that are, and how entropy thresholds are calibrated.
+
+Then specifically address: what the research literature says about optimal Shannon entropy thresholds for detecting high-entropy secrets without flooding with false positives from minified JS or base64 image data, how context-aware filtering (e.g., detecting that a string is inside a test file or a placeholder assignment) reduces FP rates in practice, what CWE mappings apply to hardcoded secrets (CWE-798, CWE-259, CWE-321), and whether any standardised benchmark dataset exists for evaluating secret scanners (similar to OWASP Benchmark for injection).
+
+Include any 2023-2025 research on using LLMs or ML classifiers to improve secret detection precision beyond regex+entropy approaches, and what training datasets were used.

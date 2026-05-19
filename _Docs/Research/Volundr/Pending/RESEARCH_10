@@ -1,0 +1,9 @@
+Research Kustomize as a Kubernetes configuration management tool — its design philosophy, feature set as of v5.x, and how it compares to Helm for different use cases. I am building a Kustomize overlay generator and need to understand the complete feature surface and where practitioners encounter limitations.
+
+Cover the full Kustomize transformer and generator catalog: commonLabels, commonAnnotations, namePrefix, nameSuffix, images (image tag replacement), configMapGenerator and secretGenerator with their hash suffixing behavior, patches (strategic merge patch versus JSON 6902 patch), replacements (cross-resource field substitution), components, and OpenAPI schema-based merge key resolution.
+
+Research Kustomize's handling of CRDs: how does the strategic merge patch machinery work when the resource kind is a custom resource without a registered OpenAPI schema? What are the known failure modes when patching CRD instances versus built-in Kubernetes types?
+
+Cover best practices for structuring a large Kustomize repository: base versus overlay versus component patterns, how to manage environment-specific configuration without duplication, and the relationship between Kustomize overlays and GitOps with Flux or ArgoCD. What are the performance characteristics of kustomize build on large repositories with many overlays?
+
+Research the validation tooling available for Kustomize: can kubeconform validate kustomize build output with CRD schemas? How does conftest integrate with kustomize output? What are the most common Kustomize misconfiguration patterns found in public repositories, and is there any large-scale analysis of public GitOps repositories that documents common mistakes?

@@ -1,0 +1,13 @@
+Research database schema validation, migration tooling, and the concept of "schema as code" for relational and NoSQL databases, with a focus on how database schema governance compares to API schema governance.
+
+For relational databases: what are the leading migration tools — Flyway, Liquibase, Alembic, golang-migrate, Atlas — and how do they differ in their approach to schema versioning, migration authoring (SQL vs DSL), and rollback support? What validation checks do tools like Atlas perform on proposed migrations: destructive operation detection, index missing for foreign keys, column type widening vs narrowing safety?
+
+Research Atlas specifically as a "schema-as-code" tool: how does its declarative schema definition and "schema diff" approach compare to imperative migration scripts? What breaking change detection does Atlas provide, and how does it compare to the breaking change detection available for OpenAPI or Protobuf specs?
+
+Investigate schema validation for NoSQL databases: how do MongoDB's JSON Schema validator, DynamoDB's attribute definitions, and Cassandra's keyspace schemas approach schema enforcement? What tools exist for validating proposed schema changes in these systems before deployment?
+
+Research the concept of database contract testing: how do tools like dbt (data build tool) tests, Great Expectations, and Soda Core validate that data in a database conforms to expected schemas and quality rules? How do these data quality checks relate to API schema validation?
+
+What are the industry best practices for schema migration in zero-downtime deployments: the expand-contract pattern (adding columns before removing old ones), blue-green schema deployments, and feature flag-gated migrations? What tooling supports these patterns?
+
+How do organizations enforce cross-system schema consistency — ensuring that a Kafka topic schema, the database table schema, and the OpenAPI response schema for the same entity remain aligned? What governance tools or platform engineering solutions address this cross-schema consistency problem?

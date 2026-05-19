@@ -1,0 +1,13 @@
+A security scanner for a Python codebase must make a fundamental architectural decision: should it prefer to minimise false positives (high precision, accept higher false negatives) or minimise false negatives (high recall, accept higher false positives)? This trade-off is not uniform — the correct answer likely differs by vulnerability category, deployment context, and the stage in the development lifecycle where the scan runs.
+
+Reason carefully and systematically through this optimisation problem:
+
+First, establish the asymmetric cost structure. What is the actual cost of a false positive in a pre-commit scanner versus a CI/CD gate versus a periodic batch scan? What is the cost of a false negative for a CRITICAL injection vulnerability versus a LOW informational finding? How does the cost ratio change when the scanner runs in a regulated industry (healthcare, finance) versus a startup?
+
+Second, for each of the following vulnerability categories, reason through whether a false negative or false positive is more costly and why: SQL injection, hardcoded AWS credentials, missing HTTPS enforcement in TLS configuration, use of MD5 for password hashing, race conditions in file access, and ReDoS in user-supplied regex patterns.
+
+Third, address the temporal dimension: a false negative in pre-commit becomes a finding in CI, which becomes a production vulnerability. At which stage does the FP vs FN trade-off flip? Is there a principled argument that pre-commit tools should maximise recall at the cost of precision because the cost of disruption is lower before code is committed?
+
+Fourth, address the developer trust problem: empirical research on SAST tools shows that developers disable or ignore tools with high false positive rates. At what FP rate does a tool become counterproductive? Does the answer depend on whether the FP rate is uniform across severity levels?
+
+Produce a concrete decision framework: a table of vulnerability categories with recommended FP/FN trade-off targets and justification for each.

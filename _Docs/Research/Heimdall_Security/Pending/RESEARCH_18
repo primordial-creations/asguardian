@@ -1,0 +1,11 @@
+What are the current published detection techniques, benchmarks, and academic research for identifying input validation and sanitisation failures (CWE-20, CWE-116, CWE-179) in Python web applications, and specifically how do tools distinguish between validation that is present-but-insufficient versus completely absent?
+
+Provide a comprehensive survey covering: how static analysis tools model validation at the AST level (detecting the absence of validation before a sensitive operation vs detecting that a validation function is called but its return value is ignored), what the difference is between validation (rejecting invalid input) and sanitisation (transforming input to be safe), and why this distinction matters for taint analysis.
+
+For Python-specific patterns: what AST signatures indicate that form data, query parameters, or JSON body fields are used directly without passing through a validation function, how Pydantic v2 validators are modelled statically (field validators, model validators, annotated types with constraints), how Django Forms validation works at the AST level, and how FastAPI's automatic Pydantic validation interacts with raw request body access via Request.body().
+
+For encoding and output sanitisation: what are the AST patterns for detecting missing HTML escaping before template rendering (Jinja2 autoescaping disabled, use of Markup() without escaping, Django's mark_safe() on user-controlled data), how tools detect missing URL encoding before constructing redirect URLs, and what patterns indicate missing JSON serialisation escaping.
+
+Cover published research and tool capabilities: any 2020-2025 papers on input validation vulnerability detection recall rates, Semgrep community rules for Python validation bypasses, CodeQL's approach to validation modelling, and what OWASP Input Validation Cheat Sheet specifies as the canonical list of validation requirements.
+
+Include: how OWASP ASVS (Application Security Verification Standard) v4.0 Level 1-3 defines input validation requirements and whether those requirements are statically verifiable.

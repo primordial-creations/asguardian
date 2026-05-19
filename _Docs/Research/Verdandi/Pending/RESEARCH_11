@@ -1,0 +1,9 @@
+Research network performance analysis for application-layer observability tools. Cover the key network metrics that APM tools track: TCP connection establishment time, DNS resolution time, TLS handshake time, time to first byte, download throughput, and packet loss rate. What are the typical baseline values for each of these metrics in well-functioning cloud applications deployed in major AWS, GCP, and Azure regions?
+
+Research network latency characterization: what is the expected round-trip time between EC2 instances in the same availability zone, same region but different AZs, and cross-region? How much does TLS 1.2 handshake add to initial connection latency versus TLS 1.3? What is the latency impact of HTTP/1.1 vs HTTP/2 vs HTTP/3 for different request patterns (many small requests, few large requests)?
+
+Cover connection pooling and keep-alive behavior: how do HTTP keep-alive and TCP connection reuse affect observed latency distributions? What does the latency distribution look like for a service that has connection pool exhaustion? How do you distinguish network latency from connection pool wait time in span data?
+
+Research network anomaly detection: what statistical signatures in network metrics indicate packet loss, network congestion, DNS poisoning, or BGP route changes? How do APM tools like Datadog Network Performance Monitoring and Dynatrace detect network-layer problems from application-layer telemetry?
+
+Cover the USE (Utilization, Saturation, Errors) method by Brendan Gregg applied to network analysis: what are the utilization, saturation, and error indicators for network interfaces, TCP stacks, and DNS resolvers? How do these map to observable metrics in a cloud environment where you don't have direct access to network hardware? Research how eBPF-based network monitoring tools (Cilium, Pixie) collect network metrics without requiring application code changes.

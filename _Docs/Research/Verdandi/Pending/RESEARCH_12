@@ -1,0 +1,9 @@
+Research system resource analysis methodologies for application performance monitoring, specifically covering CPU, memory, disk I/O, and their relationship to application latency. Cover Brendan Gregg's USE method in depth: for each resource type, what are the specific utilization, saturation, and error metrics, what tools expose them on Linux, and what thresholds indicate a resource is a performance bottleneck?
+
+For CPU analysis: what is the relationship between CPU utilization percentage and application latency? At what CPU utilization level does queueing theory predict significant latency increase (Little's Law applied to CPU scheduling)? What is CPU steal time in virtualized environments, what causes it, and how does it affect latency percentiles differently from CPU user time? Research CPU throttling in containerized environments (Kubernetes CPU limits): how does CFS (Completely Fair Scheduler) throttling manifest in application latency, and why does P99 latency often spike even when average CPU utilization looks acceptable?
+
+For memory analysis: research the Linux memory pressure indicators: free memory vs available memory vs cached memory. What is the practical threshold at which a system starts swapping in cloud environments? How does Java garbage collection interact with system memory pressure metrics, and what GC metrics best predict application latency degradation?
+
+For disk I/O: research iowait as a latency indicator — what are its limitations, and when is it misleading? How do SSD versus HDD I/O patterns affect application latency differently? What are the disk saturation indicators in iostat output (util%, await, svctm)?
+
+Cover the relationship between these system metrics and the RED method (Rate, Errors, Duration) for service-level analysis: when system resources are saturated, how does that manifest in service-level Duration (latency) metrics, and in what order do symptoms appear?

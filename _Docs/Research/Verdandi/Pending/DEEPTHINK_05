@@ -1,0 +1,9 @@
+Think deeply about the design of burn rate alerting thresholds and the mathematical justification for the specific values (14.4x critical, 6.0x warning) from the Google SRE Workbook. These values assume a 30-day SLO window. Work through what happens when these same thresholds are applied to organizations using 7-day, 14-day, or 28-day SLO windows — are the thresholds still meaningful, or do they need to be recalculated?
+
+The 14.4x threshold is chosen because: at 14.4x burn rate sustained over 1 hour, the service will exhaust its entire 30-day error budget in approximately 2.08 days. The 6.0x threshold over 6 hours means budget exhaustion in approximately 5 days. Think through whether these exhaustion timelines are the actual design criterion, or whether the thresholds were chosen based on alert responsiveness (you want to catch this within 1 hour of it starting).
+
+Consider the false positive / false negative trade-off at different burn rate thresholds. At 14.4x, a brief spike of 15 minutes at very high error rate could trigger the alert even if the error budget is barely touched. The multi-window requirement (both short and long windows must exceed threshold simultaneously) is the mitigation. But think through: what is the minimum outage duration that a 14.4x burn rate alert with a 1h/5min window pair will reliably detect? What outage patterns will it systematically miss?
+
+Think about the interaction between burn rate alerting and deployment cadence: if a team deploys 10 times per day, and each deployment causes a brief 2-minute elevated error rate, how does this affect the burn rate alert system? Does the 1h window smooth out these deployment spikes, or does it accumulate them into a false positive? Design a test case to work through this numerically.
+
+Finally, argue whether burn rate alerting is inherently backward-looking (it reports on budget already consumed) and whether there is a meaningful way to make it predictive.

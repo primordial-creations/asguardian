@@ -1,0 +1,11 @@
+Research Protobuf schema compatibility checking — specifically how the buf CLI and Buf Schema Registry implement compatibility enforcement, and how this compares to hand-rolled compatibility logic based on the Protobuf language specification.
+
+Start with the Protobuf wire format compatibility rules: what changes to a .proto file are wire-compatible (safe to deploy without breaking existing serialized data), and what changes break wire compatibility? Cover field number reuse, type changes, label changes (optional vs repeated vs required in proto2), oneof additions, message nesting changes, and enum value additions vs removals. How does proto3's removal of required fields simplify compatibility compared to proto2?
+
+Research how the buf CLI implements its breaking change detection: what categories does buf define (FILE, PACKAGE, WIRE_JSON, WIRE), how do the categories relate to each other, and what is the practical difference between checking at the FILE level vs the WIRE level? What types of changes does buf classify as breaking in WIRE mode that are not breaking at the FILE level?
+
+Investigate the Buf Schema Registry: how does it manage schema versioning across commits and modules, what compatibility policies can be enforced per module, and how does its approach compare to Confluent Schema Registry for Avro? What are the integration patterns for using Buf Schema Registry in a polyglot microservices environment where some services use Protobuf and others use Avro or JSON Schema?
+
+Research Protobuf's JSON encoding and its compatibility implications: when a Protobuf message is used with JSON serialization (via proto3's canonical JSON mapping), what additional compatibility constraints apply beyond wire format compatibility?
+
+What are the known failure modes and sharp edges in Protobuf schema evolution that teams commonly encounter: field number conflicts after deletion, JSON name collisions, and compatibility issues introduced by proto2/proto3 mixing?

@@ -1,0 +1,9 @@
+What are the state-of-the-art techniques and published benchmarks for detecting ReDoS (Regular Expression Denial of Service, CWE-1333) vulnerabilities statically in Python, JavaScript, and Java codebases?
+
+Provide a comprehensive survey of: the theoretical basis for ReDoS (ambiguous NFA states, super-linear worst-case complexity, exponential backtracking), the classification of vulnerable regex patterns (catastrophic backtracking types: nested quantifiers, alternation with overlap, polynomial vs exponential complexity classes), and how static analysis tools determine whether a regex is reachable by user-controlled input.
+
+Cover the following tools and their detection approaches: vuln-regex-detector, safe-regex, rxxr2, RXXR, ReScue, Regexploit, and any CodeQL or Semgrep rules for ReDoS. For each, provide: the algorithm used (static automata analysis, graph-based NFA analysis, or fuzzing), false positive and false negative rates from published evaluations, performance on large regex corpora, and which regex features are unsupported.
+
+Then specifically address: how detection tools handle regex flags (re.DOTALL, re.MULTILINE) that affect backtracking behaviour, whether any tool can verify that a regex is only applied to bounded-length strings (making it non-exploitable), and what the typical remediation patterns are (atomic groups, possessive quantifiers, regex rewriting strategies).
+
+Include: published CVEs for ReDoS in Python libraries from 2020-2025, any GitHub Advisory Database statistics on ReDoS severity distribution, and whether OWASP, NIST, or CWE have published guidance on acceptable regex complexity thresholds for security-sensitive applications.

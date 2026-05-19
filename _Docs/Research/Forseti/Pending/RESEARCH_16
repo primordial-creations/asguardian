@@ -1,0 +1,13 @@
+Research the security validation landscape for API specifications — specifically what security checks can be performed statically against an OpenAPI, AsyncAPI, or GraphQL spec before the API is deployed.
+
+Begin with the OWASP API Security Top 10 (2023 edition): for each of the ten risk categories, research whether the risk can be detected via static analysis of an OpenAPI spec alone, requires runtime testing, or requires both. Which categories — Broken Object Level Authorization, Broken Authentication, Excessive Data Exposure, Lack of Rate Limiting, etc. — are most amenable to spec-level detection?
+
+Research the security rules available in Spectral, IBM API Linter, and Redocly for OpenAPI security checking: what specific checks do they perform — presence of security schemes, absence of HTTP on production servers, overly permissive CORS definitions, missing authentication on sensitive endpoints? How comprehensive is the coverage relative to OWASP API Security Top 10?
+
+Investigate API security scanning tools that go beyond spec linting: 42Crunch API Security Audit, StackHawk, and Traceable AI. What additional security checks do they perform, how do they integrate with CI/CD, and what is their false positive rate on real-world specs?
+
+Research GraphQL-specific security analysis: what tools perform static analysis of GraphQL schemas for security issues — introspection enabled in production, missing field-level authorization directives, overly deep query nesting limits, and dangerous scalar types? How do tools like GraphQL Armor address GraphQL-specific security concerns?
+
+What research exists on the correlation between API spec quality and API security posture: do APIs with well-documented security schemes have fewer security vulnerabilities in practice?
+
+What are the emerging research areas in API security: AI-generated API attack surface analysis, automated security requirement extraction from natural language API descriptions, and spec-driven threat modeling?

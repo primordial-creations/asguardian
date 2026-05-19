@@ -1,0 +1,11 @@
+A security scanner is being evaluated against a mixed corpus of Python codebases drawn from real open-source projects. The evaluation must produce precision and recall figures that are meaningful, reproducible, and not gamed by the composition of the evaluation corpus. Reason through the methodology for constructing this evaluation fairly.
+
+The ground truth problem: how do you establish ground truth for a SAST evaluation? Reason through the trade-offs of the following approaches: manual expert review of every finding and every missed vulnerability, using a synthetic benchmark with injected vulnerabilities (Juliet-style), using historical CVE fixes as ground truth (assuming pre-fix code is vulnerable and post-fix code is not), and crowdsourced bug bounty reports as ground truth. What are the validity threats of each approach for a Python-focused scanner?
+
+The corpus composition problem: if the evaluation corpus consists of 80% hobby projects with obvious SQL injection and 20% mature projects with subtle second-order injection, the precision and recall figures will reflect the corpus composition rather than the tool's capability. What sampling strategy produces a corpus that is representative of the actual deployment environment (mixed-maturity, mixed-framework Python web applications), and how do you verify that the corpus is not systematically biased toward patterns the scanner was trained or tuned on?
+
+The finding deduplication problem: when a vulnerability spans multiple lines and the scanner reports 3 findings for what is semantically one vulnerability, does that count as 3 true positives or 1? How should recall be computed when the scanner reports a finding at line 47 but the ground truth marks the vulnerability at lines 44-52?
+
+The false positive inflation problem: if a codebase has 10,000 lines and 5 vulnerabilities, a scanner that flags 500 lines achieves 100% recall with 1% precision. Is precision a meaningful metric in this regime, or should the evaluation use the F-beta score with a specific beta, and how should beta be chosen for a security tool?
+
+Produce a concrete evaluation methodology specification, including corpus construction, ground truth establishment, metric definitions, and the specific numeric thresholds that distinguish an acceptable scanner from an unacceptable one.

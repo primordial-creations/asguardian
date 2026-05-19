@@ -1,0 +1,9 @@
+Research web image optimization analysis — the current state of image format selection, compression techniques, responsive image delivery, and how automated tools evaluate image optimization quality. I am building an image analysis module and need to understand what signals to measure and what thresholds matter for real user impact.
+
+Cover next-generation image formats: WebP, AVIF, and JPEG XL — their compression efficiency relative to JPEG and PNG at equivalent perceptual quality (SSIM, DSSIM, Butteraugli scores), browser support matrices as of 2025, and how format selection interacts with CDN delivery (content negotiation via Accept header, format-specific CDN caching). What is the practical file size reduction achievable by migrating from JPEG to WebP versus WebP to AVIF for typical photography, illustrations, and screenshots?
+
+Research responsive images: the srcset and sizes attributes — what is the optimal breakpoint strategy for image variants? What is the cost (in bytes and HTTP requests) of serving appropriately-sized images versus a single large image? How does the browser's image download decision algorithm work (device pixel ratio, viewport width, network quality)?
+
+Cover lazy loading: the loading="lazy" attribute — browser native support, the threshold distance from the viewport that triggers loading, and the interaction between lazy loading and Largest Contentful Paint (hero images that are lazy-loaded will hurt LCP). What heuristics should be used to distinguish above-the-fold images (should not be lazy loaded) from below-the-fold images?
+
+Research image accessibility in depth beyond basic alt text: longdesc usage, complex image descriptions for charts and graphs, decorative images and the empty alt convention, animated images and WCAG 2.2 pause/stop/hide requirements, and SVG accessibility (title, desc elements, role="img"). What does research show about how screen reader users experience images on the current web?

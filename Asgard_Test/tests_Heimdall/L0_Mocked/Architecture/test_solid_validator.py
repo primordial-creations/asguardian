@@ -89,6 +89,55 @@ class TestSOLIDValidatorISPViolation:
         assert len(isp_violations) > 0
 
 
+class TestSOLIDValidatorOCPClean:
+    def test_polymorphic_dispatch_not_flagged(self, tmp_path):
+        (tmp_path / "ocp_clean.py").write_text(
+            "class ShapeRenderer:\n"
+            "    def render(self, shape):\n"
+            "        shape.draw()\n"
+        )
+        validator = SOLIDValidator()
+        report: SOLIDReport = validator.validate(scan_path=tmp_path)
+        ocp_violations = [v for v in report.violations if "OCP" in str(v.principle)
+                          and v.file_path.endswith("ocp_clean.py")]
+        assert len(ocp_violations) == 0
+
+
+class TestSOLIDValidatorISPClean:
+    def test_small_interface_not_flagged(self, tmp_path):
+        (tmp_path / "isp_clean.py").write_text(
+            "from abc import ABC, abstractmethod\n"
+            "class Readable(ABC):\n"
+            "    @abstractmethod\n"
+            "    def read(self): ...\n"
+            "    @abstractmethod\n"
+            "    def close(self): ...\n"
+        )
+        validator = SOLIDValidator()
+        report: SOLIDReport = validator.validate(scan_path=tmp_path)
+        isp_violations = [v for v in report.violations if "ISP" in str(v.principle)
+                          and v.file_path.endswith("isp_clean.py")]
+        assert len(isp_violations) == 0
+
+
+class TestSOLIDValidatorDIPClean:
+    def test_injected_dependencies_not_flagged(self, tmp_path):
+        (tmp_path / "dip_clean.py").write_text(
+            "class UserService:\n"
+            "    def __init__(self, repo, mailer, cache):\n"
+            "        self.repo = repo\n"
+            "        self.mailer = mailer\n"
+            "        self.cache = cache\n"
+            "    def get_user(self, user_id):\n"
+            "        return self.repo.find(user_id)\n"
+        )
+        validator = SOLIDValidator()
+        report: SOLIDReport = validator.validate(scan_path=tmp_path)
+        dip_violations = [v for v in report.violations if "DIP" in str(v.principle)
+                          and v.file_path.endswith("dip_clean.py")]
+        assert len(dip_violations) == 0
+
+
 class TestSOLIDValidatorDIPViolation:
     def test_concrete_dependency_instantiation_flagged(self, tmp_path):
         # DIP triggers when __init__ instantiates > 3 concrete (non-benign) classes

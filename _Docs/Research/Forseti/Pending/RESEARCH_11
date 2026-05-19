@@ -1,0 +1,13 @@
+Research the state of the art in code generation from API and schema specifications — covering OpenAPI, Protobuf, Avro, GraphQL, and AsyncAPI — with a focus on generated code quality, maintainability, and customization.
+
+For OpenAPI code generation: what are the leading generators — OpenAPI Generator, Kiota (Microsoft), oapi-codegen (Go), and Speakeasy — and how do they differ in generated code quality, type safety, and support for modern language features? What are the most commonly reported issues with OpenAPI Generator's output: incorrect nullability handling, poor streaming support, missing authentication helpers? How does Kiota's approach of generating a fluent client from any OpenAPI spec differ architecturally from template-based generators?
+
+Research Protobuf code generation via the buf CLI and the protoc plugin ecosystem: how does buf generate manage plugin versions and reproducible builds across polyglot teams? What are the best-practice patterns for generated code organization in a monorepo — per-language output directories, generated code committed vs gitignored, and buf.gen.yaml configuration?
+
+Investigate Avro code generation: what tools (avro-tools, avro4s for Scala, avrohugger) generate idiomatic typed classes from Avro schemas, and what are the limitations when schemas use complex union types or recursive references?
+
+Research GraphQL code generation: how does GraphQL Code Generator (The Guild) work, what plugins are most commonly used for TypeScript, React Query, and Apollo Client, and what are the challenges of keeping generated code synchronized with a frequently-changing schema?
+
+What research or industry data exists on the impact of using generated clients vs handwritten clients: do teams using generated clients experience fewer integration bugs, faster onboarding, and better API coverage? What are the cases where generated clients are worse than handwritten ones?
+
+What are the emerging trends: LLM-assisted code generation from specs, incremental regeneration (only regenerating changed operations), and spec-first contract enforcement in generated clients?

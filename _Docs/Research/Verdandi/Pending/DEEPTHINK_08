@@ -1,0 +1,13 @@
+Think deeply about the tension between sensitivity and specificity in anomaly detection for performance monitoring, and whether the right trade-off is the same across different use cases within a single analysis tool.
+
+In anomaly detection terminology: sensitivity (recall) measures how often the detector flags true anomalies; specificity measures how often it correctly ignores normal variation. Increasing sensitivity reduces missed detections but increases false positives. For a performance analysis tool used by engineers, the cost of a false positive is alert fatigue and wasted investigation time. The cost of a false negative is a missed performance problem that goes undetected until it causes a user-impacting incident.
+
+Now think through how this cost structure differs across different analysis types:
+
+For latency anomaly detection: a false positive causes an engineer to spend 30 minutes investigating a non-issue. A false negative means a latency regression ships to production. In a high-deployment-frequency environment (multiple deploys per day), what false positive rate is acceptable if it means catching 95% of latency regressions?
+
+For error rate anomaly detection: error spikes are often more operationally urgent than latency spikes. Should the error rate detector use a lower detection threshold (higher sensitivity) than the latency detector, even knowing this produces more false positives?
+
+For cache hit rate anomaly detection: a dropping cache hit rate might indicate a cache eviction misconfiguration, but it also commonly drops temporarily after a deployment due to cache warming. Should the detector have a post-deployment suppression window? How long?
+
+Think through the broader design question: should a performance analysis tool expose sensitivity/specificity as a configurable parameter per analysis type, and if so, what should the default be and who should be able to change it? What are the organizational dynamics that make teams under-alert (to avoid noise) versus over-alert (to avoid blame for missed issues)?

@@ -1,0 +1,9 @@
+Research the design and implementation of infrastructure validation frameworks — the layer of tooling that sits above individual linters and integrates multiple IaC analysis tools into a cohesive quality gate. I am building a validation framework for Kubernetes manifests, Terraform modules, Helm charts, CICD pipelines, Compose files, and GitOps configurations and need to understand how industry-leading frameworks structure their scoring, reporting, and extensibility models.
+
+Cover: how does Polaris (Fairwinds) aggregate multiple Kubernetes checks into a single audit report? What is its scoring model — weighted sum, pass/fail threshold, or something else? How does it handle partial compliance (e.g., a Deployment has resource limits but no security context)?
+
+Research Terraform compliance frameworks: Terraform Sentinel (HashiCorp), OPA/Conftest for Terraform plan JSON, and Terrat/Atlantis policy-as-code integrations. What is the schema of a Terraform plan JSON file and how do tools traverse it to evaluate policies?
+
+Investigate composite scoring approaches for infrastructure security posture. Are there published methodologies for combining scores from multiple tools (e.g., Trivy image scan + Polaris manifest check + Checkov IaC scan) into a single infrastructure health score? How do cloud security posture management (CSPM) tools like Wiz, Orca, and Prisma Cloud approach unified scoring?
+
+Cover the reporting formats used by these tools — SARIF for CI integration, JUnit XML for test runners, custom JSON schemas for dashboards — and research what format is most useful for a developer-facing CLI tool that needs to surface actionable remediation guidance alongside findings.

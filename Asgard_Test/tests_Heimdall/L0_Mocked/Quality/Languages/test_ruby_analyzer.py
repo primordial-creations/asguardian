@@ -151,6 +151,61 @@ class TestRubyWeakHash:
         assert any(f.rule_id == "ruby.no-md5-sha1" for f in report.findings)
 
 
+class TestRubyXss:
+    def test_render_inline_with_interpolation_flagged(self):
+        code = 'render inline: "<p>#{params[:name]}</p>"\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "ctrl.rb").write_text(code)
+            report = RubyAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "ruby.xss" for f in report.findings)
+
+    def test_render_partial_not_flagged(self):
+        code = "render partial: 'users/form'\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "safe.rb").write_text(code)
+            report = RubyAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "ruby.xss" for f in report.findings)
+
+    def test_severity_is_error(self):
+        code = 'render inline: "#{@user.input}"\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bad.rb").write_text(code)
+            report = RubyAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "ruby.xss"]
+        assert findings[0].severity == RubySeverity.ERROR
+
+
+class TestRubyPathTraversal:
+    def test_file_read_with_params_flagged(self):
+        code = "content = File.read(params[:filename])\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "ctrl.rb").write_text(code)
+            report = RubyAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "ruby.path-traversal" for f in report.findings)
+
+    def test_file_open_with_params_flagged(self):
+        code = "File.open(params[:path]) do |f|\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "ctrl.rb").write_text(code)
+            report = RubyAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "ruby.path-traversal" for f in report.findings)
+
+    def test_static_path_not_flagged(self):
+        code = "content = File.read('./data/config.json')\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "safe.rb").write_text(code)
+            report = RubyAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "ruby.path-traversal" for f in report.findings)
+
+    def test_category_is_security(self):
+        code = "File.read(params[:file])\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bad.rb").write_text(code)
+            report = RubyAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "ruby.path-traversal"]
+        assert findings[0].category == RubyRuleCategory.SECURITY
+
+
 class TestRubyAnalyzerReport:
     def test_multiple_findings_counted(self):
         code = (

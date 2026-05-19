@@ -1,0 +1,11 @@
+Research automated link checking at scale — the tools, algorithms, and operational challenges of validating that every hyperlink on a website or in a codebase resolves to a live, correct resource. I am building a link validator using Playwright and need to understand the state of the art.
+
+Cover the technical challenges: HTTP redirect chains and how to handle them (follow all redirects to final destination? report each hop? what is the maximum acceptable redirect chain length?), rate limiting (how to avoid triggering 429 responses or IP bans when crawling a large site's external links?), authentication-gated URLs (links that require login to resolve — how do link checkers handle session state?), and soft 404s (pages that return HTTP 200 but display "page not found" content — how do you detect these?).
+
+Research the difference between checking links in static HTML versus links in dynamically rendered JavaScript applications. For a Playwright-based checker that can execute JavaScript, what additional link sources must be checked beyond href attributes: onclick handlers that call window.location, fetch/XHR-sourced navigation, CSS url() references, srcset attributes, and data- attribute-encoded URLs?
+
+Cover the operational question of crawl politeness: robots.txt compliance for link checkers (should a link validator respect Crawl-delay directives for external sites?), user agent identification, and the ethical/legal considerations of automated link checking against third-party sites.
+
+Research link rot statistics: what percentage of links on the average website are broken? What is the half-life of a URL? Are there studies on link rot in specific content categories (academic papers, news articles, government documents)? How do CDN-hosted resources (images, scripts, fonts) fail differently from HTML page links?
+
+Include benchmark comparisons of link checking tools: lychee, linkchecker, broken-link-checker (npm), and Screaming Frog — covering throughput, accuracy, and false positive rates.

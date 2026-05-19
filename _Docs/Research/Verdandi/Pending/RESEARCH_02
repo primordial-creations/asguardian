@@ -1,0 +1,9 @@
+Research multi-window multi-burn-rate alerting as described in the Google SRE Workbook, chapter 5. I need a comprehensive technical breakdown of the algorithm, including every window pair (1h/5min, 6h/30min, 3-day/6h, 3-day/1day), the corresponding burn rate thresholds, and the alert severity levels assigned to each window pair.
+
+Specifically: what is the mathematical derivation for choosing the 1-hour and 5-minute window pairing with a 14.4x burn rate threshold for critical alerts? What percentage of the 30-day error budget does a 14.4x burn rate consume in 1 hour? How does the workbook justify the 6x burn rate with 6-hour/30-minute windows for warning alerts?
+
+Research the false positive and false negative characteristics of single-window burn rate alerting versus multi-window. What are the documented failure modes: what types of outages does single-window alerting miss, and what kinds of transient spikes cause false positives? Include any published empirical data on alert fatigue reduction when switching from threshold-based to burn-rate-based alerting.
+
+Cover how alert reset conditions work: once a burn rate alert fires, what conditions must hold before it auto-resolves? What is the "pending" state pattern in burn rate alerting, and how long should the alert stay in pending before firing to balance detection speed against noise?
+
+Research how major observability vendors (Datadog SLO monitors, Nobl9, Prometheus recording rules, Grafana SLO) have implemented multi-window burn rate alerting. What are the differences in their implementations compared to the Google SRE Workbook specification?

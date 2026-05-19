@@ -1,0 +1,9 @@
+Research GitOps validation tooling and best practices for the two dominant GitOps controllers — ArgoCD and Flux v2 — with a focus on what can be validated in the Git repository before a commit is merged, rather than after deployment to a cluster.
+
+I am building an ArgoCD Application/AppProject generator and a Flux Kustomization/HelmRelease generator. I need to understand: what does a complete pre-merge validation pipeline look like for a GitOps repository? Cover conftest with OPA policies, Kyverno CLI in offline mode, kubeval and kubeconform for schema validation, and pluto for deprecated API detection. What is the recommended combination of these tools and in what order should they run?
+
+Research the ArgoCD App-of-Apps pattern and its validation challenges — specifically, how do you validate that the parent Application's targetRevision, repoURL, and destination cluster values are consistent with your organization's permitted values? What Rego policies or Kyverno ClusterPolicy rules exist for this?
+
+For Flux specifically: research validation of Kustomization postBuild variable substitution, HelmRelease valuesFrom references to ConfigMaps and Secrets, and notification controller alerting configuration. What are the failure modes in Flux that are hardest to catch pre-merge?
+
+Cover the emerging practice of using ephemeral preview environments (spawned per pull request) as a higher-fidelity validation layer compared to pure static analysis. What tooling exists for this (vCluster, namespace-scoped previews, Argo CD ApplicationSets with PR generators)? What are the cost and latency tradeoffs versus static validation?

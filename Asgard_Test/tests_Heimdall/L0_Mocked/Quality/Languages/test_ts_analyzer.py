@@ -409,3 +409,152 @@ class TestTSAnalyzerCleanFile:
             assert report.files_analyzed == 1
             rule_ids = [f.rule_id for f in report.findings]
             assert "js.no-var" in rule_ids
+
+
+class TestTSSecurityRules:
+    """Tests confirming that JS security rules fire on .ts files via delegation."""
+
+    def test_js_no_eval_fires_on_ts_file(self):
+        """js.no-eval should fire on a .ts file containing eval()."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "evil.ts"
+            ts_file.write_text("const result = eval(userInput);\n")
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "js.no-eval" in rule_ids
+
+    def test_js_sql_injection_fires_on_ts_file(self):
+        """js.sql-injection should fire on a .ts file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "db.ts"
+            ts_file.write_text('db.query("SELECT * FROM users WHERE id=" + userId);\n')
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "js.sql-injection" in rule_ids
+
+    def test_js_no_prototype_pollution_fires_on_ts_file(self):
+        """js.no-prototype-pollution should fire on a .ts file."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "proto.ts"
+            ts_file.write_text("obj.__proto__ = malicious;\n")
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "js.no-prototype-pollution" in rule_ids
+
+
+class TestTSSpecificSecurityRules:
+    """Tests for the TS-specific security rules."""
+
+    def test_unsafe_any_fires_near_fetch(self):
+        """ts.unsafe-any should fire when 'as any' appears near 'fetch'."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "api.ts"
+            ts_file.write_text("const data = (await fetch(url) as any).json();\n")
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "ts.unsafe-any" in rule_ids
+
+    def test_unsafe_any_fires_near_query(self):
+        """ts.unsafe-any should fire when 'as any' appears near 'query'."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "db.ts"
+            ts_file.write_text("const result = (db.query(sql) as any).rows;\n")
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "ts.unsafe-any" in rule_ids
+
+    def test_unsafe_any_does_not_fire_without_sensitive_context(self):
+        """ts.unsafe-any should not fire when 'as any' is not near a sensitive function."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "safe.ts"
+            ts_file.write_text("const x = (legacyValue as any).prop;\n")
+
+            config = JSAnalysisConfig(
+                language="typescript",
+                enabled_rules=["ts.unsafe-any"],
+            )
+            analyzer = TSAnalyzer(config)
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "ts.unsafe-any" not in rule_ids
+
+    def test_no_unsafe_assertion_fires_on_req(self):
+        """ts.no-unsafe-assertion should fire on 'req.body!' non-null assertion."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "handler.ts"
+            ts_file.write_text("const name = req.body!.name;\n")
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "ts.no-unsafe-assertion" in rule_ids
+
+    def test_no_unsafe_assertion_fires_on_query(self):
+        """ts.no-unsafe-assertion should fire on 'query.id!' non-null assertion."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "ctrl.ts"
+            ts_file.write_text("const id = query.id!.toString();\n")
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "ts.no-unsafe-assertion" in rule_ids
+
+    def test_no_unsafe_assertion_does_not_fire_on_safe_code(self):
+        """ts.no-unsafe-assertion should not fire when '!' is used on local variables."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "safe.ts"
+            ts_file.write_text("const val = localVar!.prop;\n")
+
+            config = JSAnalysisConfig(
+                language="typescript",
+                enabled_rules=["ts.no-unsafe-assertion"],
+            )
+            analyzer = TSAnalyzer(config)
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "ts.no-unsafe-assertion" not in rule_ids
+
+    def test_ts_prototype_pollution_fires(self):
+        """ts.prototype-pollution should fire on __proto__ assignment in .ts files."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "pollute.ts"
+            ts_file.write_text("target.__proto__ = source;\n")
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            rule_ids = [f.rule_id for f in report.findings]
+            assert "ts.prototype-pollution" in rule_ids
+
+    def test_ts_prototype_pollution_severity_is_error(self):
+        """ts.prototype-pollution findings should have ERROR severity."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            ts_file = Path(tmpdir) / "pollute.ts"
+            ts_file.write_text("obj.__proto__ = evil;\n")
+
+            analyzer = TSAnalyzer()
+            report = analyzer.analyze(scan_path=tmpdir)
+
+            findings = [f for f in report.findings if f.rule_id == "ts.prototype-pollution"]
+            assert len(findings) >= 1
+            assert findings[0].severity == JSSeverity.ERROR.value

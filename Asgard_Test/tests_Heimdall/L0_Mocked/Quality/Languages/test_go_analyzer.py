@@ -129,6 +129,116 @@ class TestGoContextNotPropagated:
         assert any(f.rule_id == "go.context-not-propagated" for f in report.findings)
 
 
+class TestGoCommandInjection:
+    def test_exec_command_with_variable_flagged(self):
+        code = "cmd := exec.Command(userInput)\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "run.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "go.command-injection" for f in report.findings)
+
+    def test_exec_command_with_literal_not_flagged(self):
+        code = 'cmd := exec.Command("ls", "-la")\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "safe.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "go.command-injection" for f in report.findings)
+
+    def test_severity_is_error(self):
+        code = "exec.Command(input)\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bad.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "go.command-injection"]
+        assert findings[0].severity == GoSeverity.ERROR
+
+
+class TestGoXss:
+    def test_fprintf_with_request_data_flagged(self):
+        code = 'fmt.Fprintf(w, r.URL.Query().Get("name"))\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "handler.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "go.xss" for f in report.findings)
+
+    def test_fprintf_with_static_string_not_flagged(self):
+        code = 'fmt.Fprintf(w, "Hello World")\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "safe.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "go.xss" for f in report.findings)
+
+    def test_category_is_security(self):
+        code = 'fmt.Fprintf(w, req.FormValue("q"))\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bad.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "go.xss"]
+        assert findings[0].category == GoRuleCategory.SECURITY
+
+
+class TestGoPathTraversal:
+    def test_os_open_with_url_query_flagged(self):
+        code = 'f, err := os.Open(r.URL.Query().Get("file"))\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "handler.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "go.path-traversal" for f in report.findings)
+
+    def test_ioutil_read_with_form_value_flagged(self):
+        code = 'data, err := ioutil.ReadFile(r.FormValue("path"))\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "handler.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "go.path-traversal" for f in report.findings)
+
+    def test_static_path_not_flagged(self):
+        code = 'f, err := os.Open("./static/index.html")\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "safe.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "go.path-traversal" for f in report.findings)
+
+    def test_severity_is_error(self):
+        code = 'os.Open(r.URL.Query().Get("f"))\n'
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bad.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "go.path-traversal"]
+        assert findings[0].severity == GoSeverity.ERROR
+
+
+class TestGoWeakCrypto:
+    def test_md5_new_flagged(self):
+        code = "h := md5.New()\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "hash.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "go.weak-crypto" for f in report.findings)
+
+    def test_sha1_new_flagged(self):
+        code = "h := sha1.New()\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "hash.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert any(f.rule_id == "go.weak-crypto" for f in report.findings)
+
+    def test_sha256_not_flagged(self):
+        code = "h := sha256.New()\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "safe.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        assert not any(f.rule_id == "go.weak-crypto" for f in report.findings)
+
+    def test_severity_is_error(self):
+        code = "md5.New()\n"
+        with tempfile.TemporaryDirectory() as d:
+            (Path(d) / "bad.go").write_text(code)
+            report = GoAnalyzer().analyze(scan_path=d)
+        findings = [f for f in report.findings if f.rule_id == "go.weak-crypto"]
+        assert findings[0].severity == GoSeverity.ERROR
+
+
 class TestGoAnalyzerReport:
     def test_multiple_findings_counted(self):
         code = (

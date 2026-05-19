@@ -20,6 +20,7 @@ from Asgard.Heimdall.Quality.languages.javascript.models.js_models import (
 )
 from Asgard.Heimdall.Quality.languages.javascript.services.js_analyzer import JSAnalyzer
 from Asgard.Heimdall.Quality.languages.javascript.services._js_rules import _make_finding
+from Asgard.Heimdall.Quality.languages.typescript.services._ts_security_rules import _TS_SECURITY_RULES
 
 
 class TSAnalyzer:
@@ -103,6 +104,9 @@ class TSAnalyzer:
         findings.extend(self._check_no_non_null_assertion(file_path, lines))
         findings.extend(self._check_prefer_interface(file_path, lines))
         findings.extend(self._check_no_implicit_any(file_path, lines))
+        for rule_fn in _TS_SECURITY_RULES:
+            rule_id = rule_fn.__doc__.split(":")[0].strip() if rule_fn.__doc__ else ""
+            findings.extend(rule_fn(file_path, lines, self._is_rule_enabled(rule_id)))
         return findings
 
     def _check_no_explicit_any(self, file_path: str, lines: List[str]) -> List[JSFinding]:

@@ -10,6 +10,7 @@ from Asgard.Heimdall.Quality.languages.ruby.models.ruby_models import (
 )
 from Asgard.Heimdall.Quality.languages.ruby.services._ruby_rules import (
     check_sql_injection, check_no_eval, check_command_injection, check_no_yaml_load, check_no_send, check_mass_assignment, check_no_hardcoded_credentials, check_no_md5_sha1,
+    check_xss, check_path_traversal,
 )
 
 _RULES = [
@@ -21,6 +22,8 @@ _RULES = [
     check_mass_assignment,
     check_no_hardcoded_credentials,
     check_no_md5_sha1,
+    check_xss,
+    check_path_traversal,
 ]
 
 

@@ -18,7 +18,7 @@ L4 (UI/E2E) and L9 (Chaos/Live) are not applicable to Asgard — it is a static-
 | **L3** | Contract | Public API schemas & model shapes | Pydantic validation | Fast |
 | **L5** | Compliance | Security scanner detection quality | Known-bad code fixtures | Medium |
 | **L8** | Performance | Scanner throughput & latency | Real files, `pytest-benchmark` | Slow |
-| **L10** | Industry | TPR/FPR vs OWASP Benchmark; throughput vs Semgrep/Bandit; SonarQube quality thresholds | OWASP/Juliet fixtures, corpus files | Medium–Slow |
+| **L14** | Industry | TPR/FPR vs OWASP Benchmark; throughput vs Semgrep/Bandit; SonarQube quality thresholds | OWASP/Juliet fixtures, corpus files | Medium–Slow |
 
 ---
 
@@ -33,30 +33,30 @@ Asgard_Test/
         L3_Contract/               # Contract — Pydantic model shape assertions
         L5_Compliance/             # Compliance — known-bad code must be detected
         L8_Performance/            # Performance — benchmark scanner throughput
-        L10_Industry/              # Industry — OWASP TPR/FPR, Semgrep/Bandit throughput baselines
+        L14_Industry/              # Industry — OWASP TPR/FPR, Semgrep/Bandit throughput baselines
     tests_Forseti/
         L0_Mocked/
         L1_Integration/
         L3_Contract/
         L5_Compliance/
-        L10_Industry/
+        L14_Industry/
         L8_Performance/
     tests_Freya/
         L0_Mocked/
         L1_Integration/
         L3_Contract/
-        L10_Industry/
+        L14_Industry/
         L8_Performance/
     tests_Verdandi/
         L0_Mocked/
         L1_Integration/
         L3_Contract/
-        L10_Industry/
+        L14_Industry/
         L8_Performance/
     tests_Volundr/
         L0_Mocked/
         L3_Contract/
-        L10_Industry/
+        L14_Industry/
         L8_Performance/
     tests_Dashboard/               # Dashboard package tests
     tests_MCP/                     # MCP server package tests
@@ -163,7 +163,7 @@ Verify that security scanners actually catch real vulnerability patterns. These 
 
 ---
 
-## L10: Industry Benchmark Tests
+## L14: Industry Benchmark Tests
 
 ### Purpose
 Validate that Asgard meets or exceeds industry-standard detection quality and throughput benchmarks set by OWASP, NIST, and widely-used tools (Semgrep, Bandit, SonarQube).
@@ -202,7 +202,7 @@ Validate that Asgard meets or exceeds industry-standard detection quality and th
 - Throughput measured with `time.perf_counter` over a 10,000-line synthetic file
 
 ### Location
-`Asgard_Test/tests_Heimdall/L10_Industry/`
+`Asgard_Test/tests_Heimdall/L14_Industry/`
 
 ### Example
 ```python
@@ -275,7 +275,7 @@ class TestReDoSScannerPerformance:
 | L0 per scanner/service | 3 tests minimum (instantiation, clean, bad) |
 | L3 per public model | 2 tests minimum (valid, invalid) |
 | L5 per security category | 1 known-bad detection test |
-| L10 per security scanner | TPR ≥ 70%, FPR ≤ 30% + 1 throughput test |
+| L14 per security scanner | TPR ≥ 70%, FPR ≤ 30% + 1 throughput test |
 | L8 per scanner | 1 benchmark test |
 
 ---
