@@ -19,7 +19,7 @@ def check_sql_injection(file_path: str, lines: List[str], enabled: bool = True) 
     """php.sql-injection: unparameterised queries with user input."""
     if not enabled:
         return []
-    pattern = re.compile(r'(?:mysql_query|mysqli_query|query)\s*\(["\'][^"\']*\.\s*\$_(?:GET|POST|REQUEST|COOKIE)')
+    pattern = re.compile(r'(?:mysql_query|mysqli_query|query)\s*\([^)]*\$_(?:GET|POST|REQUEST|COOKIE)')
     return [
         _finding(file_path, i + 1, "php.sql-injection", PhpRuleCategory.SECURITY, PhpSeverity.ERROR,
                  "SQL Injection",

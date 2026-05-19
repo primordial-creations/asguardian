@@ -3,7 +3,7 @@
 from enum import Enum
 from pydantic import BaseModel, Field
 from pathlib import Path
-from typing import List
+from typing import Dict, List
 
 
 class GoRuleCategory(str, Enum):
@@ -41,3 +41,14 @@ class GoScanConfig(BaseModel):
         "*/.git/*", "*/build/*", "*/dist/*",
     ])
     max_findings: int = Field(default=1000)
+    max_file_lines: int = Field(default=10000)
+    rules: Dict[str, bool] = Field(default_factory=dict)
+
+
+class GoReport(BaseModel):
+    findings: List[GoFinding] = Field(default_factory=list)
+    scan_path: str = ""
+
+    @property
+    def total_findings(self) -> int:
+        return len(self.findings)

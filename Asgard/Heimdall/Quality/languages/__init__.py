@@ -31,23 +31,23 @@ from Asgard.Heimdall.Quality.languages.shell.models.shell_models import (
 )
 from Asgard.Heimdall.Quality.languages.shell.services.shell_analyzer import ShellAnalyzer
 from Asgard.Heimdall.Quality.languages.java.models.java_models import (
-    JavaFinding, JavaRuleCategory, JavaSeverity, JavaScanConfig,
+    JavaFinding, JavaRuleCategory, JavaSeverity, JavaScanConfig, JavaReport,
 )
 from Asgard.Heimdall.Quality.languages.java.services.java_analyzer import JavaAnalyzer
 from Asgard.Heimdall.Quality.languages.go.models.go_models import (
-    GoFinding, GoRuleCategory, GoSeverity, GoScanConfig,
+    GoFinding, GoRuleCategory, GoSeverity, GoScanConfig, GoReport,
 )
 from Asgard.Heimdall.Quality.languages.go.services.go_analyzer import GoAnalyzer
 from Asgard.Heimdall.Quality.languages.ruby.models.ruby_models import (
-    RubyFinding, RubyRuleCategory, RubySeverity, RubyScanConfig,
+    RubyFinding, RubyRuleCategory, RubySeverity, RubyScanConfig, RubyReport,
 )
 from Asgard.Heimdall.Quality.languages.ruby.services.ruby_analyzer import RubyAnalyzer
 from Asgard.Heimdall.Quality.languages.php.models.php_models import (
-    PhpFinding, PhpRuleCategory, PhpSeverity, PhpScanConfig,
+    PhpFinding, PhpRuleCategory, PhpSeverity, PhpScanConfig, PhpReport,
 )
 from Asgard.Heimdall.Quality.languages.php.services.php_analyzer import PhpAnalyzer
 from Asgard.Heimdall.Quality.languages.csharp.models.csharp_models import (
-    CsharpFinding, CsharpRuleCategory, CsharpSeverity, CsharpScanConfig,
+    CsharpFinding, CsharpRuleCategory, CsharpSeverity, CsharpScanConfig, CsharpReport,
 )
 from Asgard.Heimdall.Quality.languages.csharp.services.csharp_analyzer import CsharpAnalyzer
 
@@ -59,13 +59,13 @@ __all__ = [
     "ShellAnalysisConfig", "ShellFinding", "ShellReport", "ShellRuleCategory", "ShellSeverity",
     "ShellAnalyzer",
     # Java
-    "JavaFinding", "JavaRuleCategory", "JavaSeverity", "JavaScanConfig", "JavaAnalyzer",
+    "JavaFinding", "JavaRuleCategory", "JavaSeverity", "JavaScanConfig", "JavaReport", "JavaAnalyzer",
     # Go
-    "GoFinding", "GoRuleCategory", "GoSeverity", "GoScanConfig", "GoAnalyzer",
+    "GoFinding", "GoRuleCategory", "GoSeverity", "GoScanConfig", "GoReport", "GoAnalyzer",
     # Ruby
-    "RubyFinding", "RubyRuleCategory", "RubySeverity", "RubyScanConfig", "RubyAnalyzer",
+    "RubyFinding", "RubyRuleCategory", "RubySeverity", "RubyScanConfig", "RubyReport", "RubyAnalyzer",
     # PHP
-    "PhpFinding", "PhpRuleCategory", "PhpSeverity", "PhpScanConfig", "PhpAnalyzer",
+    "PhpFinding", "PhpRuleCategory", "PhpSeverity", "PhpScanConfig", "PhpReport", "PhpAnalyzer",
     # C#
-    "CsharpFinding", "CsharpRuleCategory", "CsharpSeverity", "CsharpScanConfig", "CsharpAnalyzer",
+    "CsharpFinding", "CsharpRuleCategory", "CsharpSeverity", "CsharpScanConfig", "CsharpReport", "CsharpAnalyzer",
 ]
