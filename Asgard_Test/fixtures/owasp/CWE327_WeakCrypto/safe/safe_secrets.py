@@ -1,0 +1,6 @@
+import secrets
+def generate_token():
+    return secrets.token_hex(32)
+
+def session_id():
+    return secrets.token_urlsafe(16)

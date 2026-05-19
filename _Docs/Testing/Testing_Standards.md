@@ -18,6 +18,7 @@ L4 (UI/E2E) and L9 (Chaos/Live) are not applicable to Asgard — it is a static-
 | **L3** | Contract | Public API schemas & model shapes | Pydantic validation | Fast |
 | **L5** | Compliance | Security scanner detection quality | Known-bad code fixtures | Medium |
 | **L8** | Performance | Scanner throughput & latency | Real files, `pytest-benchmark` | Slow |
+| **L10** | Industry | TPR/FPR vs OWASP Benchmark; throughput vs Semgrep/Bandit; SonarQube quality thresholds | OWASP/Juliet fixtures, corpus files | Medium–Slow |
 
 ---
 
@@ -32,26 +33,34 @@ Asgard_Test/
         L3_Contract/               # Contract — Pydantic model shape assertions
         L5_Compliance/             # Compliance — known-bad code must be detected
         L8_Performance/            # Performance — benchmark scanner throughput
+        L10_Industry/              # Industry — OWASP TPR/FPR, Semgrep/Bandit throughput baselines
     tests_Forseti/
         L0_Mocked/
         L1_Integration/
         L3_Contract/
         L5_Compliance/
+        L10_Industry/
         L8_Performance/
     tests_Freya/
         L0_Mocked/
         L1_Integration/
         L3_Contract/
+        L10_Industry/
         L8_Performance/
     tests_Verdandi/
         L0_Mocked/
         L1_Integration/
         L3_Contract/
+        L10_Industry/
         L8_Performance/
     tests_Volundr/
         L0_Mocked/
         L3_Contract/
+        L10_Industry/
         L8_Performance/
+    tests_Dashboard/               # Dashboard package tests
+    tests_MCP/                     # MCP server package tests
+    tests_Reporting/               # Reporting package tests
     L2_CrossPackage/               # Cross-package integration tests
 ```
 
@@ -154,6 +163,82 @@ Verify that security scanners actually catch real vulnerability patterns. These 
 
 ---
 
+## L10: Industry Benchmark Tests
+
+### Purpose
+Validate that Asgard meets or exceeds industry-standard detection quality and throughput benchmarks set by OWASP, NIST, and widely-used tools (Semgrep, Bandit, SonarQube).
+
+### Two pillars
+
+**1. Detection quality (OWASP Benchmark / Juliet Test Suite)**
+- True Positive Rate (TPR): scanner detects known-bad code
+- False Positive Rate (FPR): scanner does NOT flag known-safe code
+- Measured per CWE category across a fixed fixture library in `Asgard_Test/fixtures/owasp/`
+
+**2. Throughput vs. industry tools**
+- Bandit baseline: ≥ 2,000 lines/second
+- SonarQube baseline: ≤ 60ms per file
+- Measured on a synthetic 10,000-line corpus
+
+### Thresholds
+
+| Metric | Minimum (pass) | Target (good) | Excellent |
+|--------|---------------|---------------|-----------|
+| TPR per scanner | ≥ 50% | ≥ 70% | ≥ 85% |
+| FPR per scanner | ≤ 50% | ≤ 30% | ≤ 15% |
+| Throughput | ≥ 2,000 lines/s | ≥ 5,000 lines/s | ≥ 10,000 lines/s |
+| Latency per file | ≤ 60ms | ≤ 30ms | ≤ 10ms |
+
+### Quality thresholds (SonarQube / CodeClimate parity)
+- Technical debt ratio < 5%
+- Cognitive complexity threshold: 15 per function
+- Duplication detection: < 3% of codebase
+- Coverage gate: 80% minimum
+
+### Rules
+- Fixtures live in `Asgard_Test/fixtures/owasp/<CWE>/` — `bad/` (must detect) and `safe/` (must not flag)
+- Each test class covers one CWE category
+- TPR = detected / total_bad; FPR = false_flagged / total_safe
+- Throughput measured with `time.perf_counter` over a 10,000-line synthetic file
+
+### Location
+`Asgard_Test/tests_Heimdall/L10_Industry/`
+
+### Example
+```python
+class TestSQLInjectionOWASP:
+    def test_tpr_exceeds_70pct(self, tmp_path):
+        bad_dir = Path("Asgard_Test/fixtures/owasp/CWE89_SQLi/bad")
+        for f in bad_dir.glob("*.py"):
+            shutil.copy(f, tmp_path)
+        config = InputValidationScanConfig(scan_path=tmp_path)
+        report = InputValidationScanner().scan(config)
+        tpr = report.total_findings / len(list(bad_dir.glob("*.py")))
+        assert tpr >= 0.70, f"TPR {tpr:.0%} below 70% threshold"
+
+    def test_fpr_below_30pct(self, tmp_path):
+        safe_dir = Path("Asgard_Test/fixtures/owasp/CWE89_SQLi/safe")
+        for f in safe_dir.glob("*.py"):
+            shutil.copy(f, tmp_path)
+        config = InputValidationScanConfig(scan_path=tmp_path)
+        report = InputValidationScanner().scan(config)
+        fpr = report.total_findings / len(list(safe_dir.glob("*.py")))
+        assert fpr <= 0.30, f"FPR {fpr:.0%} above 30% threshold"
+
+class TestScannerThroughputVsBandit:
+    def test_exceeds_bandit_throughput(self, tmp_path):
+        code = "x = 1\n" * 10000
+        (tmp_path / "corpus.py").write_text(code)
+        config = ReDoSScanConfig(scan_path=tmp_path)
+        start = time.perf_counter()
+        ReDoSScanner().scan(config)
+        elapsed = time.perf_counter() - start
+        lines_per_sec = 10000 / elapsed
+        assert lines_per_sec >= 2000, f"Throughput {lines_per_sec:.0f} lines/s below Bandit baseline"
+```
+
+---
+
 ## L8: Performance Tests
 
 ### Purpose
@@ -190,6 +275,7 @@ class TestReDoSScannerPerformance:
 | L0 per scanner/service | 3 tests minimum (instantiation, clean, bad) |
 | L3 per public model | 2 tests minimum (valid, invalid) |
 | L5 per security category | 1 known-bad detection test |
+| L10 per security scanner | TPR ≥ 70%, FPR ≤ 30% + 1 throughput test |
 | L8 per scanner | 1 benchmark test |
 
 ---

@@ -127,15 +127,19 @@ class ComplexityAnalyzer:
             relative_path=str(file_path.relative_to(root_path)),
         )
 
+        if file_path.suffix.lower() == ".py":
+            return self._analyze_python_file(file_path, analysis)
+        return self._analyze_generic_file(file_path, analysis)
+
+    def _analyze_python_file(self, file_path: Path, analysis: FileComplexityAnalysis) -> FileComplexityAnalysis:
+        """Analyse a Python file using the AST."""
         source = file_path.read_text(encoding="utf-8", errors="ignore")
         tree = ast.parse(source, filename=str(file_path))
 
-        # Find all functions and methods
         for node in ast.walk(tree):
             if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 func_analysis = self._analyze_function(node, source)
 
-                # Determine if it's a method (inside a class)
                 class_name = self._get_parent_class(tree, node)
                 if class_name:
                     func_analysis.is_method = True
@@ -143,11 +147,31 @@ class ComplexityAnalyzer:
 
                 analysis.add_function(func_analysis)
 
-                # Check if it violates thresholds
                 if (func_analysis.cyclomatic_complexity > self.config.cyclomatic_threshold or
-                    func_analysis.cognitive_complexity > self.config.cognitive_threshold):
+                        func_analysis.cognitive_complexity > self.config.cognitive_threshold):
                     analysis.add_violation(func_analysis)
 
+        return analysis
+
+    def _analyze_generic_file(self, file_path: Path, analysis: FileComplexityAnalysis) -> FileComplexityAnalysis:
+        """Analyse any non-Python file via Pygments tokenization."""
+        from Asgard.Heimdall.Quality.services._generic_complexity import analyse_file as generic_analyse
+        for gf in generic_analyse(file_path):
+            severity = FunctionComplexity.calculate_severity(
+                max(gf.cyclomatic_complexity, gf.cognitive_complexity)
+            )
+            func_analysis = FunctionComplexity(
+                name=gf.name,
+                line_number=gf.start_line,
+                end_line=gf.end_line,
+                cyclomatic_complexity=gf.cyclomatic_complexity,
+                cognitive_complexity=gf.cognitive_complexity,
+                severity=severity,
+            )
+            analysis.add_function(func_analysis)
+            if (gf.cyclomatic_complexity > self.config.cyclomatic_threshold or
+                    gf.cognitive_complexity > self.config.cognitive_threshold):
+                analysis.add_violation(func_analysis)
         return analysis
 
     def _analyze_function(

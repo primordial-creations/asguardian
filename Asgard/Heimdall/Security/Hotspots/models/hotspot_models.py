@@ -86,7 +86,7 @@ class HotspotConfig(BaseModel):
         description="Glob patterns to exclude from scanning"
     )
     include_extensions: List[str] = Field(
-        default_factory=lambda: [".py"],
+        default_factory=lambda: [".py", ".pyw", ".js", ".jsx", ".mjs", ".ts", ".tsx", ".java", ".go", ".rb", ".php", ".cs", ".rs"],
         description="File extensions to include"
     )
     include_tests: bool = Field(True, description="Include test files in analysis")

@@ -74,11 +74,11 @@ jobs:
           pip install -e ".[test]"
 
       - name: Run tests
-        run: pytest Asgard_Test/ -v --tb=short
+        run: pytest Asgard_Test/ -v --tb=short --ignore=Asgard_Test/fixtures
 
       - name: Run tests with coverage
         if: matrix.python-version == '3.12'
-        run: pytest Asgard_Test/ --cov=Asgard --cov-report=term-missing --cov-report=xml
+        run: pytest Asgard_Test/ --cov=Asgard --cov-report=term-missing --cov-report=xml --ignore=Asgard_Test/fixtures
 
       - name: Upload coverage
         if: matrix.python-version == '3.12'

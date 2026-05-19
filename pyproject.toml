@@ -74,7 +74,7 @@ python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
 asyncio_mode = "auto"
-addopts = "-v --tb=short"
+addopts = "-v --tb=short --ignore=Asgard_Test/fixtures"
 markers = [
     "slow: marks tests as slow",
     "unit: unit tests",
@@ -93,6 +93,9 @@ markers = [
 [tool.ruff]
 target-version = "py311"
 line-length = 120
+exclude = [
+    "Asgard_Test/fixtures",
+]
 
 [tool.ruff.lint]
 select = [
@@ -128,6 +131,7 @@ warn_unused_configs = true
 disallow_untyped_defs = false
 check_untyped_defs = true
 ignore_missing_imports = true
+exclude = ["Asgard_Test/fixtures"]
 
 [tool.coverage.run]
 source = ["Asgard"]

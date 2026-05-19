@@ -147,7 +147,7 @@ class EnvFallbackConfig(BaseModel):
     )
     output_format: str = Field("text", description="Output format: text, json, markdown")
     include_extensions: Optional[List[str]] = Field(
-        default_factory=lambda: [".py"],
+        default_factory=lambda: [".py", ".pyw", ".js", ".jsx", ".mjs", ".ts", ".tsx", ".java", ".go", ".rb", ".php", ".cs", ".rs", ".kt", ".swift", ".scala"],
         description="File extensions to include"
     )
     exclude_patterns: List[str] = Field(
