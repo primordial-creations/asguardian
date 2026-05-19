@@ -77,18 +77,18 @@ def sample_openapi_v3_spec():
                 }
             },
             "/users/{userId}": {
-                "parameters": [
-                    {
-                        "name": "userId",
-                        "in": "path",
-                        "required": True,
-                        "schema": {"type": "integer"}
-                    }
-                ],
                 "get": {
                     "summary": "Get user",
                     "operationId": "getUser",
                     "tags": ["users"],
+                    "parameters": [
+                        {
+                            "name": "userId",
+                            "in": "path",
+                            "required": True,
+                            "schema": {"type": "integer"}
+                        }
+                    ],
                     "responses": {
                         "200": {
                             "description": "Successful response",

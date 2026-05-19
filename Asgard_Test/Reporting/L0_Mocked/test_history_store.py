@@ -18,6 +18,18 @@ from Asgard.Reporting.History.models.history_models import (
     TrendDirection,
 )
 from Asgard.Reporting.History.services.history_store import HistoryStore
+from Asgard.Reporting.History.services.reporting_analyzer import (
+    ReportingAnalyzerService,
+)
+
+
+def _make_analyzer(store: HistoryStore) -> ReportingAnalyzerService:
+    """Build a ReportingAnalyzerService backed by the store's repository.
+
+    get_trend_report() moved from HistoryStore to ReportingAnalyzerService
+    as part of an SRP refactor — HistoryStore now only handles persistence.
+    """
+    return ReportingAnalyzerService(repository=store._repository)
 
 
 def _make_snapshot(project_path: str, **metric_kwargs) -> AnalysisSnapshot:
@@ -175,7 +187,7 @@ class TestHistoryStoreTrendReport:
             store = HistoryStore(db_path=db_path)
             project_path = str(Path(tmpdir) / "empty_project")
 
-            report = store.get_trend_report(project_path)
+            report = _make_analyzer(store).get_trend_report(project_path)
             assert report.analysis_count == 0
             assert report.metric_trends == []
             assert report.first_analysis is None
@@ -198,7 +210,7 @@ class TestHistoryStoreTrendReport:
                 )
                 store.save_snapshot(snap)
 
-            report = store.get_trend_report(project_path)
+            report = _make_analyzer(store).get_trend_report(project_path)
             assert report.analysis_count == 2
             trend = next(
                 (t for t in report.metric_trends if t.metric_name == "security_score"),
@@ -224,7 +236,7 @@ class TestHistoryStoreTrendReport:
                 )
                 store.save_snapshot(snap)
 
-            report = store.get_trend_report(project_path)
+            report = _make_analyzer(store).get_trend_report(project_path)
             trend = next(
                 (t for t in report.metric_trends if t.metric_name == "security_score"),
                 None,
@@ -249,7 +261,7 @@ class TestHistoryStoreTrendReport:
                 )
                 store.save_snapshot(snap)
 
-            report = store.get_trend_report(project_path)
+            report = _make_analyzer(store).get_trend_report(project_path)
             trend = next(
                 (t for t in report.metric_trends if t.metric_name == "security_score"),
                 None,
@@ -276,7 +288,7 @@ class TestHistoryStoreTrendReport:
                 )
                 store.save_snapshot(snap)
 
-            report = store.get_trend_report(project_path)
+            report = _make_analyzer(store).get_trend_report(project_path)
             trend = next(
                 (t for t in report.metric_trends if t.metric_name == "duplication_percentage"),
                 None,
@@ -303,7 +315,7 @@ class TestHistoryStoreTrendReport:
                 )
                 store.save_snapshot(snap)
 
-            report = store.get_trend_report(project_path)
+            report = _make_analyzer(store).get_trend_report(project_path)
             trend = next(
                 (t for t in report.metric_trends if t.metric_name == "duplication_percentage"),
                 None,
@@ -330,7 +342,7 @@ class TestHistoryStoreTrendReport:
                 )
                 store.save_snapshot(snap)
 
-            report = store.get_trend_report(project_path)
+            report = _make_analyzer(store).get_trend_report(project_path)
             assert report.first_analysis is not None
             assert report.last_analysis is not None
 
@@ -343,6 +355,6 @@ class TestHistoryStoreTrendReport:
 
             store.save_snapshot(_make_snapshot(project_path, security_score=80.0))
 
-            report = store.get_trend_report(project_path)
+            report = _make_analyzer(store).get_trend_report(project_path)
             assert report.analysis_count == 1
             assert report.metric_trends == []

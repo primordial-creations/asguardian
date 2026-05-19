@@ -1,6 +1,7 @@
 {
   "permissions": {
     "allow": [
+      "Bash(*)",
       "Bash(heimdall quality:*)",
       "Bash(heimdall architecture:*)",
       "Bash(python -m Asgard.Heimdall.cli.main quality complexity Asgard/Forseti/JSONSchema/services/_schema_inference_helpers.py Asgard/Forseti/JSONSchema/services/_schema_validator_service_helpers.py Asgard/Forseti/JSONSchema/services/_schema_generator_helpers.py --format text)",

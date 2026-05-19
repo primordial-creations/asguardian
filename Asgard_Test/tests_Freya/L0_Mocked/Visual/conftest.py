@@ -168,6 +168,58 @@ def temp_comparison_file(temp_output_dir):
 
 
 @pytest.fixture
+def mock_page(mock_page):
+    """Override mock_page.evaluate to return appropriate values for Visual tests."""
+    from unittest.mock import AsyncMock, DEFAULT
+
+    _SENTINEL = object()
+    evaluate_mock = AsyncMock()
+    evaluate_mock._test_return_value = _SENTINEL  # track explicit test overrides
+
+    _orig_setattr = evaluate_mock.__class__.__setattr__
+
+    async def evaluate_side_effect(expr, *args, **kwargs):
+        expr_str = str(expr)
+        # Always return an int for the total elements query used in validate()
+        if "querySelectorAll('*').length" in expr_str:
+            return 42
+        # If the test explicitly set return_value (stored in _test_return_value), use it
+        if evaluate_mock._test_return_value is not _SENTINEL:
+            return evaluate_mock._test_return_value
+        # Return dimensions dict when the script is specifically fetching page scroll dimensions
+        if "document.documentElement.scrollWidth" in expr_str and "document.documentElement.scrollHeight" in expr_str:
+            return {"width": 1920, "height": 1080}
+        # Default: return empty list
+        return []
+
+    evaluate_mock.side_effect = evaluate_side_effect
+
+    # Intercept return_value assignments so tests can set mock_page.evaluate.return_value
+    class _EvaluateMockProxy:
+        """Proxy that forwards return_value sets to _test_return_value."""
+        def __init__(self, mock):
+            object.__setattr__(self, '_mock', mock)
+
+        def __getattr__(self, name):
+            return getattr(object.__getattribute__(self, '_mock'), name)
+
+        def __setattr__(self, name, value):
+            if name == 'return_value':
+                object.__getattribute__(self, '_mock')._test_return_value = value
+            elif name == 'side_effect':
+                object.__getattribute__(self, '_mock').side_effect = value
+            else:
+                setattr(object.__getattribute__(self, '_mock'), name, value)
+
+        def __call__(self, *args, **kwargs):
+            return object.__getattribute__(self, '_mock')(*args, **kwargs)
+
+    proxy = _EvaluateMockProxy(evaluate_mock)
+    mock_page.evaluate = proxy
+    return mock_page
+
+
+@pytest.fixture
 def mock_image_draw():
     """Mock PIL ImageDraw module for drawing annotations."""
     draw = MagicMock()

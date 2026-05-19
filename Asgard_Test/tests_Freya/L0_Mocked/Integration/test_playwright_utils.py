@@ -7,8 +7,8 @@ Comprehensive L0 unit tests for PlaywrightUtils service.
 import pytest
 from unittest.mock import AsyncMock, MagicMock, Mock, patch
 
-from Freya.Integration.models.integration_models import BrowserConfig, DeviceConfig
-from Freya.Integration.services.playwright_utils import (
+from Asgard.Freya.Integration.models.integration_models import BrowserConfig, DeviceConfig
+from Asgard.Freya.Integration.services.playwright_utils import (
     PlaywrightUtils,
     DEVICE_PRESETS,
     NETWORK_PRESETS,
@@ -95,7 +95,7 @@ class TestPlaywrightUtilsInit:
 class TestPlaywrightUtilsLaunchBrowser:
     """Tests for launch_browser method."""
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_launch_browser_chromium(self, mock_async_pw, mock_playwright, mock_browser):
         """Test launching Chromium browser."""
         mock_async_pw.return_value.start = AsyncMock(return_value=mock_playwright)
@@ -114,7 +114,7 @@ class TestPlaywrightUtilsLaunchBrowser:
             slow_mo=0
         )
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_launch_browser_firefox(self, mock_async_pw, mock_playwright, mock_browser):
         """Test launching Firefox browser."""
         mock_async_pw.return_value.start = AsyncMock(return_value=mock_playwright)
@@ -128,7 +128,7 @@ class TestPlaywrightUtilsLaunchBrowser:
 
         mock_playwright.firefox.launch.assert_called_once()
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_launch_browser_webkit(self, mock_async_pw, mock_playwright, mock_browser):
         """Test launching WebKit browser."""
         mock_async_pw.return_value.start = AsyncMock(return_value=mock_playwright)
@@ -142,7 +142,7 @@ class TestPlaywrightUtilsLaunchBrowser:
 
         mock_playwright.webkit.launch.assert_called_once()
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_launch_browser_headless_false(self, mock_async_pw, mock_playwright, mock_browser):
         """Test launching browser with headless=False."""
         mock_async_pw.return_value.start = AsyncMock(return_value=mock_playwright)
@@ -163,7 +163,7 @@ class TestPlaywrightUtilsLaunchBrowser:
 class TestPlaywrightUtilsCloseBrowser:
     """Tests for close_browser method."""
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_close_browser(self, mock_async_pw, mock_playwright, mock_browser):
         """Test closing browser."""
         mock_async_pw.return_value.start = AsyncMock(return_value=mock_playwright)
@@ -194,7 +194,7 @@ class TestPlaywrightUtilsCloseBrowser:
 class TestPlaywrightUtilsCreateContext:
     """Tests for create_context method."""
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_create_context_default(
         self, mock_async_pw, mock_playwright, mock_browser, mock_context
     ):
@@ -214,7 +214,7 @@ class TestPlaywrightUtilsCreateContext:
         assert call_kwargs["viewport"]["width"] == 1920
         assert call_kwargs["viewport"]["height"] == 1080
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_create_context_with_device(
         self, mock_async_pw, mock_playwright, mock_browser, mock_context
     ):
@@ -234,7 +234,7 @@ class TestPlaywrightUtilsCreateContext:
         assert call_kwargs["is_mobile"] is True
         assert call_kwargs["has_touch"] is True
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_create_context_with_video_recording(
         self, mock_async_pw, mock_playwright, mock_browser, mock_context
     ):
@@ -254,7 +254,7 @@ class TestPlaywrightUtilsCreateContext:
         call_kwargs = mock_browser.new_context.call_args[1]
         assert call_kwargs["record_video_dir"] == "/tmp/videos"
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_create_context_launches_browser_if_needed(
         self, mock_async_pw, mock_playwright, mock_browser, mock_context
     ):
@@ -271,7 +271,7 @@ class TestPlaywrightUtilsCreateContext:
 
         assert utils._browser is not None
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_create_context_with_network_conditions(
         self, mock_async_pw, mock_playwright, mock_browser, mock_context
     ):
@@ -297,7 +297,7 @@ class TestPlaywrightUtilsCreateContext:
 class TestPlaywrightUtilsCreatePage:
     """Tests for create_page method."""
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_create_page_with_context(
         self, mock_async_pw, mock_playwright, mock_browser, mock_context, mock_page
     ):
@@ -313,7 +313,7 @@ class TestPlaywrightUtilsCreatePage:
         mock_context.new_page.assert_called_once()
         mock_page.set_default_timeout.assert_called_once_with(30000)
 
-    @patch('Freya.Integration.services.playwright_utils.async_playwright')
+    @patch('Asgard.Freya.Integration.services.playwright_utils.async_playwright')
     def test_create_page_without_context(
         self, mock_async_pw, mock_playwright, mock_browser, mock_context, mock_page
     ):

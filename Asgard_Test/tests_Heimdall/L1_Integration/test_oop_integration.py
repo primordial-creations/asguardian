@@ -28,9 +28,9 @@ class TestOOPIntegration:
         report = analyzer.analyze()
 
         assert report is not None
-        assert hasattr(report, 'total_classes')
-        assert isinstance(report.total_classes, int)
-        assert report.total_classes >= 1
+        assert hasattr(report, 'total_classes_analyzed')
+        assert isinstance(report.total_classes_analyzed, int)
+        assert report.total_classes_analyzed >= 1
 
     def test_oop_analyze_complex_project_full(self, complex_project):
         """Test full OOP analysis on complex project."""
@@ -39,22 +39,21 @@ class TestOOPIntegration:
         report = analyzer.analyze()
 
         assert report is not None
-        assert report.total_classes >= 2
+        assert report.total_classes_analyzed >= 2
         assert hasattr(report, 'class_metrics')
         assert isinstance(report.class_metrics, list)
 
     def test_oop_coupling_analysis_simple_project(self, simple_project):
         """Test coupling analysis on simple project."""
         analyzer = CouplingAnalyzer()
-        report = analyzer.analyze(simple_project)
+        classes = analyzer.analyze(simple_project)
 
-        assert report is not None
-        assert hasattr(report, 'classes')
-        assert isinstance(report.classes, list)
+        assert classes is not None
+        assert isinstance(classes, list)
 
         # Check coupling metrics for each class
-        for cls in report.classes:
-            assert hasattr(cls, 'name')
+        for cls in classes:
+            assert hasattr(cls, 'class_name')
             assert hasattr(cls, 'cbo')
             assert isinstance(cls.cbo, int)
             assert cls.cbo >= 0
@@ -62,26 +61,26 @@ class TestOOPIntegration:
     def test_oop_coupling_analysis_complex_project(self, complex_project):
         """Test coupling analysis on complex project."""
         analyzer = CouplingAnalyzer()
-        report = analyzer.analyze(complex_project)
+        classes = analyzer.analyze(complex_project)
 
-        assert report is not None
-        assert len(report.classes) >= 2
+        assert classes is not None
+        assert len(classes) >= 2
 
         # Complex project should have some coupling
-        cbo_values = [cls.cbo for cls in report.classes]
+        cbo_values = [cls.cbo for cls in classes]
         assert any(cbo > 0 for cbo in cbo_values)
 
     def test_oop_coupling_high_coupling_detection(self, inheritance_hierarchy_project):
         """Test detection of high coupling."""
         analyzer = CouplingAnalyzer()
-        report = analyzer.analyze(inheritance_hierarchy_project)
+        classes = analyzer.analyze(inheritance_hierarchy_project)
 
-        assert report is not None
+        assert classes is not None
 
         # Find the HighlyCoupled class
         highly_coupled_found = False
-        for cls in report.classes:
-            if cls.name == 'HighlyCoupled':
+        for cls in classes:
+            if cls.class_name == 'HighlyCoupled':
                 highly_coupled_found = True
                 # Should have high CBO (many dependencies)
                 assert cls.cbo > 3
@@ -92,28 +91,27 @@ class TestOOPIntegration:
     def test_oop_coupling_afferent_efferent(self, complex_project):
         """Test afferent and efferent coupling metrics."""
         analyzer = CouplingAnalyzer()
-        report = analyzer.analyze(complex_project)
+        classes = analyzer.analyze(complex_project)
 
-        assert report is not None
+        assert classes is not None
 
-        # Check Ca (afferent) and Ce (efferent) metrics
-        for cls in report.classes:
-            if hasattr(cls, 'ca'):
-                assert isinstance(cls.ca, int)
-                assert cls.ca >= 0
-            if hasattr(cls, 'ce'):
-                assert isinstance(cls.ce, int)
-                assert cls.ce >= 0
+        for cls in classes:
+            assert hasattr(cls, 'afferent_coupling')
+            assert isinstance(cls.afferent_coupling, int)
+            assert cls.afferent_coupling >= 0
+            assert hasattr(cls, 'efferent_coupling')
+            assert isinstance(cls.efferent_coupling, int)
+            assert cls.efferent_coupling >= 0
 
     def test_oop_coupling_instability_metric(self, complex_project):
         """Test instability metric calculation."""
         analyzer = CouplingAnalyzer()
-        report = analyzer.analyze(complex_project)
+        classes = analyzer.analyze(complex_project)
 
-        assert report is not None
+        assert classes is not None
 
         # Check instability metric (I = Ce / (Ca + Ce))
-        for cls in report.classes:
+        for cls in classes:
             if hasattr(cls, 'instability'):
                 assert isinstance(cls.instability, (int, float))
                 assert 0 <= cls.instability <= 1
@@ -121,23 +119,22 @@ class TestOOPIntegration:
     def test_oop_inheritance_analysis_simple_project(self, simple_project):
         """Test inheritance analysis on simple project."""
         analyzer = InheritanceAnalyzer()
-        report = analyzer.analyze(simple_project)
+        classes = analyzer.analyze(simple_project)
 
-        assert report is not None
-        assert hasattr(report, 'classes')
-        assert isinstance(report.classes, list)
+        assert classes is not None
+        assert isinstance(classes, list)
 
     def test_oop_inheritance_analysis_hierarchy_project(self, inheritance_hierarchy_project):
         """Test inheritance analysis on hierarchy project."""
         analyzer = InheritanceAnalyzer()
-        report = analyzer.analyze(inheritance_hierarchy_project)
+        classes = analyzer.analyze(inheritance_hierarchy_project)
 
-        assert report is not None
-        assert len(report.classes) >= 6
+        assert classes is not None
+        assert len(classes) >= 6
 
         # Check DIT (Depth of Inheritance Tree) for deep hierarchy
         dit_values = []
-        for cls in report.classes:
+        for cls in classes:
             if hasattr(cls, 'dit'):
                 dit_values.append(cls.dit)
 
@@ -148,14 +145,14 @@ class TestOOPIntegration:
     def test_oop_inheritance_dit_metric(self, inheritance_hierarchy_project):
         """Test DIT metric calculation."""
         analyzer = InheritanceAnalyzer()
-        report = analyzer.analyze(inheritance_hierarchy_project)
+        classes = analyzer.analyze(inheritance_hierarchy_project)
 
-        assert report is not None
+        assert classes is not None
 
         # Find Level6 class with highest DIT
         level6_found = False
-        for cls in report.classes:
-            if cls.name == 'Level6':
+        for cls in classes:
+            if cls.class_name == 'Level6':
                 level6_found = True
                 assert hasattr(cls, 'dit')
                 assert cls.dit >= 5
@@ -166,20 +163,20 @@ class TestOOPIntegration:
     def test_oop_inheritance_noc_metric(self, inheritance_hierarchy_project):
         """Test NOC (Number of Children) metric."""
         analyzer = InheritanceAnalyzer()
-        report = analyzer.analyze(inheritance_hierarchy_project)
+        classes = analyzer.analyze(inheritance_hierarchy_project)
 
-        assert report is not None
+        assert classes is not None
 
         # Check NOC for each class
-        for cls in report.classes:
+        for cls in classes:
             if hasattr(cls, 'noc'):
                 assert isinstance(cls.noc, int)
                 assert cls.noc >= 0
 
         # Level1 should have children
         level1_found = False
-        for cls in report.classes:
-            if cls.name == 'Level1':
+        for cls in classes:
+            if cls.class_name == 'Level1':
                 level1_found = True
                 if hasattr(cls, 'noc'):
                     assert cls.noc >= 1
@@ -190,22 +187,21 @@ class TestOOPIntegration:
     def test_oop_cohesion_analysis_simple_project(self, simple_project):
         """Test cohesion analysis on simple project."""
         analyzer = CohesionAnalyzer()
-        report = analyzer.analyze(simple_project)
+        classes = analyzer.analyze(simple_project)
 
-        assert report is not None
-        assert hasattr(report, 'classes')
-        assert isinstance(report.classes, list)
+        assert classes is not None
+        assert isinstance(classes, list)
 
     def test_oop_cohesion_analysis_complex_project(self, complex_project):
         """Test cohesion analysis on complex project."""
         analyzer = CohesionAnalyzer()
-        report = analyzer.analyze(complex_project)
+        classes = analyzer.analyze(complex_project)
 
-        assert report is not None
-        assert len(report.classes) >= 1
+        assert classes is not None
+        assert len(classes) >= 1
 
         # Check LCOM metrics
-        for cls in report.classes:
+        for cls in classes:
             if hasattr(cls, 'lcom'):
                 assert isinstance(cls.lcom, (int, float))
                 assert cls.lcom >= 0
@@ -236,14 +232,14 @@ class CohesiveClass:
 ''')
 
         analyzer = CohesionAnalyzer()
-        report = analyzer.analyze(tmp_path)
+        classes = analyzer.analyze(tmp_path)
 
-        assert report is not None
-        assert len(report.classes) >= 1
+        assert classes is not None
+        assert len(classes) >= 1
 
         # Cohesive class should have low LCOM
-        for cls in report.classes:
-            if cls.name == 'CohesiveClass':
+        for cls in classes:
+            if cls.class_name == 'CohesiveClass':
                 if hasattr(cls, 'lcom'):
                     # Low LCOM indicates high cohesion
                     assert isinstance(cls.lcom, (int, float))
@@ -276,27 +272,26 @@ class DataProcessor:
 ''')
 
         analyzer = CohesionAnalyzer()
-        report = analyzer.analyze(tmp_path)
+        classes = analyzer.analyze(tmp_path)
 
-        assert report is not None
-        assert len(report.classes) >= 1
+        assert classes is not None
+        assert len(classes) >= 1
 
         # Check LCOM4 if available
-        for cls in report.classes:
+        for cls in classes:
             if hasattr(cls, 'lcom4'):
                 assert isinstance(cls.lcom4, (int, float))
 
     def test_oop_rfc_analysis_simple_project(self, simple_project):
         """Test RFC (Response for a Class) analysis."""
         analyzer = RFCAnalyzer()
-        report = analyzer.analyze(simple_project)
+        classes = analyzer.analyze(simple_project)
 
-        assert report is not None
-        assert hasattr(report, 'classes')
-        assert isinstance(report.classes, list)
+        assert classes is not None
+        assert isinstance(classes, list)
 
         # Check RFC metric
-        for cls in report.classes:
+        for cls in classes:
             if hasattr(cls, 'rfc'):
                 assert isinstance(cls.rfc, int)
                 assert cls.rfc >= 0
@@ -304,15 +299,15 @@ class DataProcessor:
     def test_oop_rfc_analysis_complex_project(self, complex_project):
         """Test RFC analysis on complex project."""
         analyzer = RFCAnalyzer()
-        report = analyzer.analyze(complex_project)
+        classes = analyzer.analyze(complex_project)
 
-        assert report is not None
-        assert len(report.classes) >= 1
+        assert classes is not None
+        assert len(classes) >= 1
 
         # UserService should have multiple methods
         user_service_found = False
-        for cls in report.classes:
-            if cls.name == 'UserService':
+        for cls in classes:
+            if cls.class_name == 'UserService':
                 user_service_found = True
                 if hasattr(cls, 'rfc'):
                     assert cls.rfc > 0
@@ -329,7 +324,7 @@ class DataProcessor:
         # ApplicationManager should have high WMC
         god_class_found = False
         for cls in report.class_metrics:
-            if cls.name == 'ApplicationManager':
+            if cls.class_name == 'ApplicationManager':
                 god_class_found = True
                 if hasattr(cls, 'wmc'):
                     assert isinstance(cls.wmc, int)
@@ -376,7 +371,7 @@ class DataProcessor:
         report = analyzer.analyze()
 
         assert report is not None
-        assert report.total_classes == 0
+        assert report.total_classes_analyzed == 0
 
     def test_oop_nonexistent_path_handling(self):
         """Test OOP analysis on nonexistent path."""
@@ -408,11 +403,11 @@ class SimpleClass:
         report = analyzer.analyze()
 
         assert report is not None
-        assert report.total_classes == 1
+        assert report.total_classes_analyzed == 1
 
         # Check metrics for the simple class
         cls = report.class_metrics[0]
-        assert cls.name == 'SimpleClass'
+        assert cls.class_name == 'SimpleClass'
 
     def test_oop_multiple_classes_single_file(self, tmp_path):
         """Test OOP analysis on file with multiple classes."""
@@ -442,7 +437,7 @@ class ClassC(ClassA):
         report = analyzer.analyze()
 
         assert report is not None
-        assert report.total_classes == 3
+        assert report.total_classes_analyzed == 3
 
     def test_oop_abstract_class_analysis(self, complex_project):
         """Test OOP analysis on abstract classes."""
@@ -455,7 +450,7 @@ class ClassC(ClassA):
         # BaseService is an abstract class
         base_service_found = False
         for cls in report.class_metrics:
-            if cls.name == 'BaseService':
+            if cls.class_name == 'BaseService':
                 base_service_found = True
                 # Abstract class should still have metrics
                 assert cls is not None
@@ -486,7 +481,7 @@ class OuterClass:
 
         assert report is not None
         # Should detect both outer and inner classes
-        assert report.total_classes >= 1
+        assert report.total_classes_analyzed >= 1
 
     def test_oop_metrics_consistency(self, complex_project):
         """Test that OOP metrics are consistent across analyzers."""
@@ -495,10 +490,10 @@ class OuterClass:
         oop_report = oop_analyzer.analyze()
 
         coupling_analyzer = CouplingAnalyzer()
-        coupling_report = coupling_analyzer.analyze(complex_project)
+        coupling_classes = coupling_analyzer.analyze(complex_project)
 
         # Both should find the same number of classes
-        assert oop_report.total_classes == len(coupling_report.classes)
+        assert oop_report.total_classes_analyzed == len(coupling_classes)
 
     def test_oop_all_metrics_present(self, complex_project):
         """Test that all major OOP metrics are calculated."""
@@ -511,7 +506,7 @@ class OuterClass:
 
         # Check that metrics are present
         cls = report.class_metrics[0]
-        assert hasattr(cls, 'name')
+        assert hasattr(cls, 'class_name')
 
         # Check for major metrics (may vary by implementation)
         metric_count = 0

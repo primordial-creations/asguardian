@@ -7,7 +7,7 @@ OpenAPI specs, GraphQL schemas, and performance metrics.
 
 import pytest
 
-from test_utils.generators import (
+from Asgard_Test.test_utils.generators import (
     generate_graphql_schema,
     generate_metrics_data,
     generate_openapi_spec,

@@ -8,14 +8,14 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from Heimdall.Performance.models.performance_models import (
+from Asgard.Heimdall.Performance.models.performance_models import (
     DatabaseFinding,
     DatabaseIssueType,
     DatabaseReport,
     PerformanceScanConfig,
     PerformanceSeverity,
 )
-from Heimdall.Performance.services.database_analyzer_service import (
+from Asgard.Heimdall.Performance.services.database_analyzer_service import (
     DatabaseAnalyzerService,
     DatabasePattern,
     DATABASE_PATTERNS,
@@ -465,16 +465,13 @@ def queries():
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
 
-            (tmpdir_path / "comments.py").write_text('''
-# User.objects.all()
-# cursor.execute("SELECT * FROM users")
-
-def actual_function():
-    """
-    Do NOT use: User.objects.all()
-    """
-    pass
-''')
+            (tmpdir_path / "comments.py").write_text(
+                "# User.objects.all()\n"
+                "# cursor.execute('SELECT * FROM users')\n"
+                "\n"
+                "def actual_function():\n"
+                "    pass\n"
+            )
 
             service = DatabaseAnalyzerService()
             result = service.scan(tmpdir_path)

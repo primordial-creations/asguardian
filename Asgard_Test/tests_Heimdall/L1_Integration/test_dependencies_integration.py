@@ -34,7 +34,7 @@ class TestDependenciesIntegration:
 
         assert report is not None
         assert report.total_modules >= 2
-        assert hasattr(report, 'dependencies')
+        assert hasattr(report, 'total_dependencies')
 
         # Complex project should have internal dependencies
         if hasattr(report, 'internal_dependencies'):

@@ -9,6 +9,10 @@ import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from Asgard.Freya.Accessibility.services.color_contrast import ColorContrastChecker
+from Asgard.Freya.Accessibility.services._color_contrast_math import (
+    parse_color, hex_to_rgb, calculate_contrast_ratio, calculate_relative_luminance,
+    parse_font_size, rgb_to_hex,
+)
 from Asgard.Freya.Accessibility.models.accessibility_models import (
     AccessibilityConfig,
     WCAGLevel,
@@ -34,7 +38,7 @@ class TestColorParsing:
         """Test parsing 6-digit hex color."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._parse_color("#ffffff")
+        rgb = parse_color("#ffffff")
 
         assert rgb == (255, 255, 255)
 
@@ -42,7 +46,7 @@ class TestColorParsing:
         """Test parsing 3-digit hex color."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._parse_color("#fff")
+        rgb = parse_color("#fff")
 
         assert rgb == (255, 255, 255)
 
@@ -50,7 +54,7 @@ class TestColorParsing:
         """Test parsing rgb() color."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._parse_color("rgb(128, 128, 128)")
+        rgb = parse_color("rgb(128, 128, 128)")
 
         assert rgb == (128, 128, 128)
 
@@ -58,7 +62,7 @@ class TestColorParsing:
         """Test parsing rgba() color."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._parse_color("rgba(255, 0, 0, 0.5)")
+        rgb = parse_color("rgba(255, 0, 0, 0.5)")
 
         assert rgb == (255, 0, 0)
 
@@ -66,7 +70,7 @@ class TestColorParsing:
         """Test parsing named color."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._parse_color("black")
+        rgb = parse_color("black")
 
         assert rgb == (0, 0, 0)
 
@@ -74,7 +78,7 @@ class TestColorParsing:
         """Test parsing white color."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._parse_color("white")
+        rgb = parse_color("white")
 
         assert rgb == (255, 255, 255)
 
@@ -82,7 +86,7 @@ class TestColorParsing:
         """Test parsing invalid color returns None."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._parse_color("invalid-color")
+        rgb = parse_color("invalid-color")
 
         assert rgb is None
 
@@ -90,7 +94,7 @@ class TestColorParsing:
         """Test parsing empty color returns None."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._parse_color("")
+        rgb = parse_color("")
 
         assert rgb is None
 
@@ -98,7 +102,7 @@ class TestColorParsing:
         """Test hex to RGB conversion."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._hex_to_rgb("ff8800")
+        rgb = hex_to_rgb("ff8800")
 
         assert rgb == (255, 136, 0)
 
@@ -106,7 +110,7 @@ class TestColorParsing:
         """Test hex to RGB conversion with hash."""
         checker = ColorContrastChecker(accessibility_config)
 
-        rgb = checker._hex_to_rgb("#00ff00")
+        rgb = hex_to_rgb("#00ff00")
 
         assert rgb == (0, 255, 0)
 
@@ -118,7 +122,7 @@ class TestLuminanceCalculation:
         """Test luminance calculation for white."""
         checker = ColorContrastChecker(accessibility_config)
 
-        luminance = checker._calculate_relative_luminance((255, 255, 255))
+        luminance = calculate_relative_luminance((255, 255, 255))
 
         assert luminance == pytest.approx(1.0, rel=0.01)
 
@@ -126,7 +130,7 @@ class TestLuminanceCalculation:
         """Test luminance calculation for black."""
         checker = ColorContrastChecker(accessibility_config)
 
-        luminance = checker._calculate_relative_luminance((0, 0, 0))
+        luminance = calculate_relative_luminance((0, 0, 0))
 
         assert luminance == pytest.approx(0.0, abs=0.01)
 
@@ -134,7 +138,7 @@ class TestLuminanceCalculation:
         """Test luminance calculation for gray."""
         checker = ColorContrastChecker(accessibility_config)
 
-        luminance = checker._calculate_relative_luminance((128, 128, 128))
+        luminance = calculate_relative_luminance((128, 128, 128))
 
         assert 0.0 < luminance < 1.0
 
@@ -142,7 +146,7 @@ class TestLuminanceCalculation:
         """Test luminance calculation for pure red."""
         checker = ColorContrastChecker(accessibility_config)
 
-        luminance = checker._calculate_relative_luminance((255, 0, 0))
+        luminance = calculate_relative_luminance((255, 0, 0))
 
         assert luminance > 0.0
 
@@ -154,7 +158,7 @@ class TestContrastRatioCalculation:
         """Test contrast ratio between black and white."""
         checker = ColorContrastChecker(accessibility_config)
 
-        ratio = checker._calculate_contrast_ratio((0, 0, 0), (255, 255, 255))
+        ratio = calculate_contrast_ratio((0, 0, 0), (255, 255, 255))
 
         assert ratio == pytest.approx(21.0, rel=0.1)
 
@@ -162,7 +166,7 @@ class TestContrastRatioCalculation:
         """Test contrast ratio is same regardless of order."""
         checker = ColorContrastChecker(accessibility_config)
 
-        ratio = checker._calculate_contrast_ratio((255, 255, 255), (0, 0, 0))
+        ratio = calculate_contrast_ratio((255, 255, 255), (0, 0, 0))
 
         assert ratio == pytest.approx(21.0, rel=0.1)
 
@@ -170,7 +174,7 @@ class TestContrastRatioCalculation:
         """Test contrast ratio of same color is 1.0."""
         checker = ColorContrastChecker(accessibility_config)
 
-        ratio = checker._calculate_contrast_ratio((128, 128, 128), (128, 128, 128))
+        ratio = calculate_contrast_ratio((128, 128, 128), (128, 128, 128))
 
         assert ratio == pytest.approx(1.0, rel=0.1)
 
@@ -178,7 +182,7 @@ class TestContrastRatioCalculation:
         """Test color pair meeting WCAG AA minimum."""
         checker = ColorContrastChecker(accessibility_config)
 
-        ratio = checker._calculate_contrast_ratio((0, 0, 0), (120, 120, 120))
+        ratio = calculate_contrast_ratio((0, 0, 0), (120, 120, 120))
 
         assert ratio >= 4.5 or ratio < 4.5
 
@@ -190,7 +194,7 @@ class TestFontSizeParsing:
         """Test parsing pixel font size."""
         checker = ColorContrastChecker(accessibility_config)
 
-        size = checker._parse_font_size("16px")
+        size = parse_font_size("16px")
 
         assert size == 16.0
 
@@ -198,7 +202,7 @@ class TestFontSizeParsing:
         """Test parsing point font size."""
         checker = ColorContrastChecker(accessibility_config)
 
-        size = checker._parse_font_size("12pt")
+        size = parse_font_size("12pt")
 
         assert size == pytest.approx(16.0, rel=0.1)
 
@@ -206,7 +210,7 @@ class TestFontSizeParsing:
         """Test parsing em font size."""
         checker = ColorContrastChecker(accessibility_config)
 
-        size = checker._parse_font_size("1.5em")
+        size = parse_font_size("1.5em")
 
         assert size == 24.0
 
@@ -214,7 +218,7 @@ class TestFontSizeParsing:
         """Test parsing rem font size."""
         checker = ColorContrastChecker(accessibility_config)
 
-        size = checker._parse_font_size("2rem")
+        size = parse_font_size("2rem")
 
         assert size == 32.0
 
@@ -222,7 +226,7 @@ class TestFontSizeParsing:
         """Test parsing percentage font size."""
         checker = ColorContrastChecker(accessibility_config)
 
-        size = checker._parse_font_size("150%")
+        size = parse_font_size("150%")
 
         assert size == 24.0
 
@@ -230,7 +234,7 @@ class TestFontSizeParsing:
         """Test parsing invalid font size returns default."""
         checker = ColorContrastChecker(accessibility_config)
 
-        size = checker._parse_font_size("invalid")
+        size = parse_font_size("invalid")
 
         assert size == 16.0
 
@@ -395,7 +399,7 @@ class TestRgbToHex:
         """Test converting white RGB to hex."""
         checker = ColorContrastChecker(accessibility_config)
 
-        hex_color = checker._rgb_to_hex((255, 255, 255))
+        hex_color = rgb_to_hex((255, 255, 255))
 
         assert hex_color == "#ffffff"
 
@@ -403,7 +407,7 @@ class TestRgbToHex:
         """Test converting black RGB to hex."""
         checker = ColorContrastChecker(accessibility_config)
 
-        hex_color = checker._rgb_to_hex((0, 0, 0))
+        hex_color = rgb_to_hex((0, 0, 0))
 
         assert hex_color == "#000000"
 
@@ -411,7 +415,7 @@ class TestRgbToHex:
         """Test converting custom RGB to hex."""
         checker = ColorContrastChecker(accessibility_config)
 
-        hex_color = checker._rgb_to_hex((255, 128, 64))
+        hex_color = rgb_to_hex((255, 128, 64))
 
         assert hex_color == "#ff8040"
 

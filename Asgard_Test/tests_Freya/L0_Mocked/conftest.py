@@ -119,6 +119,7 @@ def mock_playwright(mock_browser, mock_context, mock_page):
         playwright.chromium = AsyncMock()
         playwright.chromium.launch = AsyncMock(return_value=mock_browser)
         mock_browser.new_context = AsyncMock(return_value=mock_context)
+        mock_browser.new_page = AsyncMock(return_value=mock_page)
         return playwright
 
     return mock_playwright_context

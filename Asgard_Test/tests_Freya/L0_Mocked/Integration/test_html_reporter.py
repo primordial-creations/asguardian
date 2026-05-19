@@ -9,7 +9,7 @@ import pytest
 from pathlib import Path
 from unittest.mock import Mock, patch, mock_open, MagicMock
 
-from Freya.Integration.models.integration_models import (
+from Asgard.Freya.Integration.models.integration_models import (
     ReportConfig,
     ReportFormat,
     TestCategory,
@@ -18,7 +18,8 @@ from Freya.Integration.models.integration_models import (
     UnifiedTestResult,
     UnifiedTestReport,
 )
-from Freya.Integration.services.html_reporter import HTMLReporter
+from Asgard.Freya.Integration.services.html_reporter import HTMLReporter
+from Asgard.Freya.Integration.services._reporter_styles import get_css, get_javascript
 
 
 @pytest.fixture
@@ -120,7 +121,7 @@ class TestHTMLReporterInit:
 class TestHTMLReporterGenerate:
     """Tests for generate method."""
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_creates_output_directory(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -139,7 +140,7 @@ class TestHTMLReporterGenerate:
 
         mock_parent.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_writes_html_file(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -160,24 +161,17 @@ class TestHTMLReporterGenerate:
         written_content = handle.write.call_args[0][0]
         assert "<!DOCTYPE html>" in written_content
 
-    @patch('Freya.Integration.services.html_reporter.Path')
-    @patch('builtins.open', new_callable=mock_open)
-    def test_generate_returns_output_path(
-        self, mock_file, mock_path_class, mock_unified_test_report
-    ):
+    def test_generate_returns_output_path(self, mock_unified_test_report, tmp_path):
         """Test generate returns output path."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
-
         reporter = HTMLReporter()
+        out = tmp_path / "report.html"
         result = reporter.generate(
             report=mock_unified_test_report,
-            output_path="/tmp/report.html"
+            output_path=str(out),
         )
+        assert str(out) in result
 
-        assert "/tmp/report.html" in result
-
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_with_custom_title(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -197,7 +191,7 @@ class TestHTMLReporterGenerate:
         written_content = handle.write.call_args[0][0]
         assert "Custom Title" in written_content
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_includes_url(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -216,7 +210,7 @@ class TestHTMLReporterGenerate:
         written_content = handle.write.call_args[0][0]
         assert "https://example.com" in written_content
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_includes_scores(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -240,7 +234,7 @@ class TestHTMLReporterGenerate:
 class TestHTMLReporterGenerateJSON:
     """Tests for generate_json method."""
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     @patch('json.dump')
     def test_generate_json_creates_directory(
@@ -260,7 +254,7 @@ class TestHTMLReporterGenerateJSON:
 
         mock_parent.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     @patch('json.dump')
     def test_generate_json_writes_file(
@@ -281,29 +275,21 @@ class TestHTMLReporterGenerateJSON:
         dumped_data = call_args[0][0]
         assert "url" in dumped_data
 
-    @patch('Freya.Integration.services.html_reporter.Path')
-    @patch('builtins.open', new_callable=mock_open)
-    @patch('json.dump')
-    def test_generate_json_returns_path(
-        self, mock_json_dump, mock_file, mock_path_class, mock_unified_test_report
-    ):
+    def test_generate_json_returns_path(self, mock_unified_test_report, tmp_path):
         """Test generate_json returns output path."""
-        mock_path_instance = MagicMock()
-        mock_path_class.return_value = mock_path_instance
-
         reporter = HTMLReporter()
+        out = tmp_path / "report.json"
         result = reporter.generate_json(
             report=mock_unified_test_report,
-            output_path="/tmp/report.json"
+            output_path=str(out),
         )
-
-        assert "/tmp/report.json" in result
+        assert str(out) in result
 
 
 class TestHTMLReporterGenerateJUnit:
     """Tests for generate_junit method."""
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_junit_creates_directory(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -322,7 +308,7 @@ class TestHTMLReporterGenerateJUnit:
 
         mock_parent.mkdir.assert_called_once_with(parents=True, exist_ok=True)
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_junit_writes_xml(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -343,7 +329,7 @@ class TestHTMLReporterGenerateJUnit:
         assert "<?xml version=" in written_content
         assert "<testsuite" in written_content
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_junit_includes_testcases(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -363,7 +349,7 @@ class TestHTMLReporterGenerateJUnit:
         assert "<testcase" in written_content
         assert 'name="WCAG Test"' in written_content
 
-    @patch('Freya.Integration.services.html_reporter.Path')
+    @patch('Asgard.Freya.Integration.services.html_reporter.Path')
     @patch('builtins.open', new_callable=mock_open)
     def test_generate_junit_includes_failures(
         self, mock_file, mock_path_class, mock_unified_test_report
@@ -562,7 +548,7 @@ class TestHTMLReporterGetCSS:
     def test_get_css_returns_string(self):
         """Test _get_css returns CSS string."""
         reporter = HTMLReporter()
-        css = reporter._get_css()
+        css = get_css()
 
         assert isinstance(css, str)
         assert len(css) > 0
@@ -570,21 +556,21 @@ class TestHTMLReporterGetCSS:
     def test_get_css_includes_variables(self):
         """Test _get_css includes CSS variables."""
         reporter = HTMLReporter()
-        css = reporter._get_css()
+        css = get_css()
 
         assert ":root" in css or "--color" in css
 
     def test_get_css_includes_responsive(self):
         """Test _get_css includes responsive design."""
         reporter = HTMLReporter()
-        css = reporter._get_css()
+        css = get_css()
 
         assert "@media" in css
 
     def test_get_css_includes_styles(self):
         """Test _get_css includes main styles."""
         reporter = HTMLReporter()
-        css = reporter._get_css()
+        css = get_css()
 
         assert "body" in css or ".score-card" in css
 
@@ -595,7 +581,7 @@ class TestHTMLReporterGetJavaScript:
     def test_get_javascript_returns_string(self):
         """Test _get_javascript returns JavaScript string."""
         reporter = HTMLReporter()
-        js = reporter._get_javascript()
+        js = get_javascript()
 
         assert isinstance(js, str)
         assert len(js) > 0
@@ -603,7 +589,7 @@ class TestHTMLReporterGetJavaScript:
     def test_get_javascript_includes_event_listener(self):
         """Test _get_javascript includes event listeners."""
         reporter = HTMLReporter()
-        js = reporter._get_javascript()
+        js = get_javascript()
 
         assert "addEventListener" in js
         assert "DOMContentLoaded" in js

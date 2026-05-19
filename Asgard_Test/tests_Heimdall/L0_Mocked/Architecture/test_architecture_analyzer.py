@@ -19,14 +19,14 @@ class TestArchitectureAnalyzer:
         """Test initializing with default configuration."""
         analyzer = ArchitectureAnalyzer()
         assert analyzer.config is not None
-        assert analyzer.config.validate_solid is True
+        assert analyzer.config.max_class_responsibilities == 3
 
     def test_init_with_custom_config(self):
         """Test initializing with custom configuration."""
-        config = ArchitectureConfig(validate_solid=False, detect_patterns=True)
+        config = ArchitectureConfig(max_class_responsibilities=5, max_method_count=30)
         analyzer = ArchitectureAnalyzer(config)
-        assert analyzer.config.validate_solid is False
-        assert analyzer.config.detect_patterns is True
+        assert analyzer.config.max_class_responsibilities == 5
+        assert analyzer.config.max_method_count == 30
 
     def test_analyze_nonexistent_path(self):
         """Test analyzing a path that doesn't exist."""
@@ -260,4 +260,4 @@ class TestClass:
 
             assert "solid_violations" in check
             assert "layer_violations" in check
-            assert "patterns_detected" in check
+            assert "patterns_found" in check

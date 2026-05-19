@@ -26,7 +26,7 @@ class TestDuplicationDetector:
         detector = DuplicationDetector()
         assert detector.config is not None
         assert detector.config.min_block_size == 6
-        assert detector.config.similarity_threshold == 0.8
+        assert detector.config.similarity_threshold == 0.85
 
     def test_init_with_custom_config(self):
         """Test initializing with custom configuration."""

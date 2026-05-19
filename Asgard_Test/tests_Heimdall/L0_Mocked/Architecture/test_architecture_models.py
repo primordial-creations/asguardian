@@ -29,20 +29,21 @@ class TestArchitectureConfig:
     def test_default_values(self):
         """Test default configuration values."""
         config = ArchitectureConfig()
-        assert config.validate_solid is True
-        assert config.analyze_layers is True
-        assert config.detect_patterns is True
+        assert config.max_class_responsibilities == 3
+        assert config.max_method_count == 20
+        assert config.detect_patterns == []
+        assert config.layers == {}
 
     def test_custom_values(self):
         """Test custom configuration values."""
         config = ArchitectureConfig(
-            validate_solid=False,
-            analyze_layers=True,
-            detect_patterns=False,
+            max_class_responsibilities=5,
+            max_method_count=15,
+            detect_patterns=[PatternType.SINGLETON],
         )
-        assert config.validate_solid is False
-        assert config.analyze_layers is True
-        assert config.detect_patterns is False
+        assert config.max_class_responsibilities == 5
+        assert config.max_method_count == 15
+        assert config.detect_patterns == [PatternType.SINGLETON]
 
 
 class TestSOLIDPrinciple:
@@ -171,12 +172,14 @@ class TestLayerViolation:
     def test_create_layer_violation(self):
         """Test creating a layer violation."""
         violation = LayerViolation(
+            source_module="app.views",
             source_layer="presentation",
+            target_module="app.database",
             target_layer="infrastructure",
-            source_file="/test/view.py",
-            target_file="/test/database.py",
-            severity=ViolationSeverity.HIGH,
+            file_path="/test/view.py",
+            line_number=10,
             message="Presentation layer should not depend on infrastructure",
+            severity=ViolationSeverity.HIGH,
         )
         assert violation.source_layer == "presentation"
         assert violation.target_layer == "infrastructure"
@@ -201,8 +204,9 @@ class TestPatternMatch:
             pattern_type=PatternType.SINGLETON,
             class_name="DatabaseConnection",
             file_path="/test/db.py",
+            line_number=1,
             confidence=0.9,
-            evidence=["__new__ method", "_instance attribute"],
+            participants=["__new__ method", "_instance attribute"],
         )
         assert match.pattern_type == PatternType.SINGLETON
         assert match.confidence == 0.9

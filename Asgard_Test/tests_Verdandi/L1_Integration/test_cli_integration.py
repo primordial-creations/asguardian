@@ -12,8 +12,8 @@ from io import StringIO
 
 import pytest
 
-from Asgard.Verdandi.cli import (
-    create_parser,
+from Asgard.Verdandi.cli._parser import create_parser
+from Asgard.Verdandi.cli.handlers_analysis import (
     parse_data_list,
     run_web_vitals,
     run_percentiles,

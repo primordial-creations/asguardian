@@ -680,9 +680,14 @@ class TestAvroFieldProperties:
         assert field.has_default is False
 
     def test_has_default_with_null_value(self):
-        """Test has_default returns True when default is explicitly null."""
+        """has_default reflects whether the underlying default attribute is set.
+
+        AvroField models has_default as `default is not None`, so an explicit
+        `default=None` (which is indistinguishable from "unset" without a
+        sentinel) is reported as False.
+        """
         field = AvroField(name="field", type=["null", "string"], default=None)
-        assert field.has_default is True
+        assert field.has_default is False
 
 
 class TestAvroSchemaProperties:

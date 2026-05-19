@@ -22,7 +22,7 @@ from Asgard.Freya.Accessibility.models.accessibility_models import (
     AccessibilityCategory,
 )
 
-from conftest import file_url
+from Asgard_Test.tests_Freya.L1_Integration.conftest import file_url
 
 
 class TestAccessibilityIntegrationWCAGValidator:

@@ -8,7 +8,7 @@ import pytest
 from datetime import datetime
 from pathlib import Path
 
-from Heimdall.Performance.models.performance_models import (
+from Asgard.Heimdall.Performance.models.performance_models import (
     CacheFinding,
     CacheIssueType,
     CacheReport,

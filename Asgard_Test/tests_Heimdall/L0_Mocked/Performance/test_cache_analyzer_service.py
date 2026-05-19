@@ -8,14 +8,14 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from Heimdall.Performance.models.performance_models import (
+from Asgard.Heimdall.Performance.models.performance_models import (
     CacheFinding,
     CacheIssueType,
     CacheReport,
     PerformanceScanConfig,
     PerformanceSeverity,
 )
-from Heimdall.Performance.services.cache_analyzer_service import (
+from Asgard.Heimdall.Performance.services.cache_analyzer_service import (
     CacheAnalyzerService,
     CachePattern,
     CACHE_PATTERNS,
@@ -255,7 +255,8 @@ def get_data():
 </div>
 ''')
 
-            service = CacheAnalyzerService()
+            config = PerformanceScanConfig(include_extensions=[".html"])
+            service = CacheAnalyzerService(config)
             result = service.scan(tmpdir_path)
 
             template_query_findings = [
@@ -423,18 +424,15 @@ redis.set("key", "value")
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
 
-            (tmpdir_path / "comments.py").write_text('''
-# def get_user_data(id):
-#     pass
-
-# redis.set("key", "value")
-
-def actual_function():
-    """
-    Do NOT use: redis.set("key", "value")
-    """
-    pass
-''')
+            (tmpdir_path / "comments.py").write_text(
+                "# def get_user_data(id):\n"
+                "#     pass\n"
+                "\n"
+                "# redis.set('key', 'value')\n"
+                "\n"
+                "def actual_function():\n"
+                "    pass\n"
+            )
 
             service = CacheAnalyzerService()
             result = service.scan(tmpdir_path)

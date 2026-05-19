@@ -1,18 +1,17 @@
 """
 Tests for Asgard Dashboard Data Collector
 
-Unit tests for DataCollector.collect(), using unittest.mock.patch to avoid
-real SQLite database access. Tests verify DashboardState construction,
-correct propagation of issue counts, snapshot data, and ratings extraction.
+Unit tests for DataCollector.collect(). The collector takes injected
+IIssueRepository and IHistoryRepository dependencies (DIP), so tests
+just pass MagicMock repositories — no patching of storage internals.
 """
 
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
 from Asgard.Dashboard.models.dashboard_models import (
-    DashboardConfig,
     DashboardState,
     IssueSummaryData,
     RatingData,
@@ -28,6 +27,9 @@ from Asgard.Heimdall.Issues.models.issue_models import (
 from Asgard.Reporting.History.models.history_models import AnalysisSnapshot
 
 
+PROJECT_PATH = "/project"
+
+
 def _make_issues_summary(
     total_open: int = 0,
     total_confirmed: int = 0,
@@ -35,9 +37,8 @@ def _make_issues_summary(
     total_wont_fix: int = 0,
     total_resolved: int = 0,
     open_by_severity: dict = None,
-    project_path: str = "/project",
+    project_path: str = PROJECT_PATH,
 ) -> IssuesSummary:
-    """Return an IssuesSummary with controllable counts."""
     return IssuesSummary(
         total_open=total_open,
         total_confirmed=total_confirmed,
@@ -50,14 +51,13 @@ def _make_issues_summary(
 
 
 def _make_tracked_issue(
-    project_path: str = "/project",
+    project_path: str = PROJECT_PATH,
     rule_id: str = "quality.lazy_imports",
     file_path: str = "/project/main.py",
     line_number: int = 10,
     severity: IssueSeverity = IssueSeverity.HIGH,
     status: IssueStatus = IssueStatus.OPEN,
 ) -> TrackedIssue:
-    """Return a minimal TrackedIssue for mocking."""
     now = datetime.now()
     return TrackedIssue(
         issue_id="test-uuid-1234",
@@ -75,11 +75,10 @@ def _make_tracked_issue(
 
 
 def _make_snapshot(
-    project_path: str = "/project",
+    project_path: str = PROJECT_PATH,
     quality_gate_status: str = "passed",
     ratings: dict = None,
 ) -> AnalysisSnapshot:
-    """Return a minimal AnalysisSnapshot for mocking."""
     return AnalysisSnapshot(
         snapshot_id="snap-uuid-1234",
         project_path=project_path,
@@ -87,126 +86,65 @@ def _make_snapshot(
         git_commit="abc1234",
         git_branch="main",
         quality_gate_status=quality_gate_status,
-        ratings=ratings if ratings is not None else {"maintainability": "A", "reliability": "B", "security": "A", "overall": "A"},
+        ratings=(
+            ratings
+            if ratings is not None
+            else {"maintainability": "A", "reliability": "B", "security": "A", "overall": "A"}
+        ),
         metrics=[],
     )
 
 
-def _make_config(project_path: str = "/project") -> DashboardConfig:
-    """Return a DashboardConfig for the given project path."""
-    return DashboardConfig(
-        project_path=project_path,
-        open_browser=False,
-    )
+def _make_collector(
+    summary: IssuesSummary = None,
+    issues: list = None,
+    snapshots: list = None,
+) -> DataCollector:
+    """Build a DataCollector with mock repositories."""
+    issue_repo = MagicMock()
+    issue_repo.get_summary.return_value = summary or _make_issues_summary()
+    issue_repo.get_issues.return_value = issues or []
+
+    history_repo = MagicMock()
+    history_repo.get_snapshots.return_value = snapshots or []
+
+    return DataCollector(issue_repository=issue_repo, history_repository=history_repo)
 
 
 class TestDataCollectorCollect:
     """Tests for DataCollector.collect()."""
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_returns_dashboard_state(self, mock_tracker_cls, mock_store_cls):
-        """Test that collect() returns a DashboardState instance."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+    def test_collect_returns_dashboard_state(self):
+        collector = _make_collector()
+        state = collector.collect(PROJECT_PATH)
         assert isinstance(state, DashboardState)
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_empty_stores_zero_counts(self, mock_tracker_cls, mock_store_cls):
-        """Test that empty stores produce a DashboardState with zero counts."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+    def test_collect_empty_stores_zero_counts(self):
+        collector = _make_collector()
+        state = collector.collect(PROJECT_PATH)
         assert state.issue_summary.total == 0
         assert state.issue_summary.open == 0
         assert state.issue_summary.confirmed == 0
         assert state.issue_summary.critical == 0
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_returns_correct_project_path(self, mock_tracker_cls, mock_store_cls):
-        """Test that the returned DashboardState has the correct project_path."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary(project_path="/my/project")
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config(project_path="/my/project"))
-        state = collector.collect()
-
+    def test_collect_returns_correct_project_path(self):
+        collector = _make_collector(
+            summary=_make_issues_summary(project_path="/my/project")
+        )
+        state = collector.collect("/my/project")
         assert state.project_path == "/my/project"
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_no_history_returns_none_ratings(self, mock_tracker_cls, mock_store_cls):
-        """Test that when no snapshots exist, ratings is None."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+    def test_collect_no_history_returns_none_ratings(self):
+        collector = _make_collector()
+        state = collector.collect(PROJECT_PATH)
         assert state.ratings is None
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_no_history_returns_none_last_analyzed(self, mock_tracker_cls, mock_store_cls):
-        """Test that when no snapshots exist, last_analyzed is None."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+    def test_collect_no_history_returns_none_last_analyzed(self):
+        collector = _make_collector()
+        state = collector.collect(PROJECT_PATH)
         assert state.last_analyzed is None
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_extracts_ratings_from_most_recent_snapshot(
-        self, mock_tracker_cls, mock_store_cls
-    ):
-        """Test that ratings are populated from the most recent snapshot."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
+    def test_collect_extracts_ratings_from_most_recent_snapshot(self):
         snapshot = _make_snapshot(
             ratings={
                 "maintainability": "A",
@@ -215,213 +153,89 @@ class TestDataCollectorCollect:
                 "overall": "B",
             }
         )
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = [snapshot]
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+        collector = _make_collector(snapshots=[snapshot])
+        state = collector.collect(PROJECT_PATH)
         assert state.ratings is not None
         assert state.ratings.maintainability == "A"
         assert state.ratings.reliability == "B"
         assert state.ratings.security == "C"
         assert state.ratings.overall == "B"
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_uses_first_snapshot_as_latest(self, mock_tracker_cls, mock_store_cls):
-        """Test that the first element of snapshots_raw is treated as the most recent."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        newest = _make_snapshot(quality_gate_status="passed", ratings={"maintainability": "A", "reliability": "A", "security": "A", "overall": "A"})
-        older = _make_snapshot(quality_gate_status="failed", ratings={"maintainability": "E", "reliability": "E", "security": "E", "overall": "E"})
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = [newest, older]
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+    def test_collect_uses_first_snapshot_as_latest(self):
+        newest = _make_snapshot(
+            quality_gate_status="passed",
+            ratings={"maintainability": "A", "reliability": "A", "security": "A", "overall": "A"},
+        )
+        older = _make_snapshot(
+            quality_gate_status="failed",
+            ratings={"maintainability": "E", "reliability": "E", "security": "E", "overall": "E"},
+        )
+        collector = _make_collector(snapshots=[newest, older])
+        state = collector.collect(PROJECT_PATH)
         assert state.quality_gate_status == "passed"
         assert state.ratings.overall == "A"
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_issue_summary_open_count(self, mock_tracker_cls, mock_store_cls):
-        """Test that open issue count is correctly transferred to DashboardState."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary(total_open=5)
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+    def test_collect_issue_summary_open_count(self):
+        collector = _make_collector(summary=_make_issues_summary(total_open=5))
+        state = collector.collect(PROJECT_PATH)
         assert state.issue_summary.open == 5
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_issue_summary_total_counts_all_statuses(
-        self, mock_tracker_cls, mock_store_cls
-    ):
-        """Test that the total count is the sum of all status counts."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary(
-            total_open=2,
-            total_confirmed=1,
-            total_false_positives=1,
-            total_wont_fix=1,
-            total_resolved=3,
+    def test_collect_issue_summary_total_counts_all_statuses(self):
+        collector = _make_collector(
+            summary=_make_issues_summary(
+                total_open=2,
+                total_confirmed=1,
+                total_false_positives=1,
+                total_wont_fix=1,
+                total_resolved=3,
+            )
         )
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+        state = collector.collect(PROJECT_PATH)
         assert state.issue_summary.total == 8
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_critical_count_from_open_by_severity(
-        self, mock_tracker_cls, mock_store_cls
-    ):
-        """Test that critical count comes from open_by_severity dict."""
+    def test_collect_critical_count_from_open_by_severity(self):
         summary = _make_issues_summary(
             total_open=3,
-            open_by_severity={IssueSeverity.CRITICAL.value: 2, IssueSeverity.HIGH.value: 1},
+            open_by_severity={
+                IssueSeverity.CRITICAL.value: 2,
+                IssueSeverity.HIGH.value: 1,
+            },
         )
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = summary
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+        collector = _make_collector(summary=summary)
+        state = collector.collect(PROJECT_PATH)
         assert state.issue_summary.critical == 2
         assert state.issue_summary.high == 1
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_recent_issues_populated_from_get_issues(
-        self, mock_tracker_cls, mock_store_cls
-    ):
-        """Test that recent_issues is populated from get_issues() results."""
+    def test_collect_recent_issues_populated_from_get_issues(self):
         tracked_issue = _make_tracked_issue()
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = [tracked_issue]
-        mock_tracker_cls.return_value = mock_tracker
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = []
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+        collector = _make_collector(issues=[tracked_issue])
+        state = collector.collect(PROJECT_PATH)
         assert len(state.recent_issues) == 1
         assert state.recent_issues[0]["rule_id"] == "quality.lazy_imports"
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_snapshots_populated(self, mock_tracker_cls, mock_store_cls):
-        """Test that snapshots are populated from history store."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
+    def test_collect_snapshots_populated(self):
         snapshot = _make_snapshot()
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = [snapshot]
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+        collector = _make_collector(snapshots=[snapshot])
+        state = collector.collect(PROJECT_PATH)
         assert len(state.snapshots) == 1
         assert state.snapshots[0]["snapshot_id"] == "snap-uuid-1234"
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_snapshot_with_no_ratings_uses_unknown(
-        self, mock_tracker_cls, mock_store_cls
-    ):
-        """Test that a snapshot with empty ratings dict leaves state.ratings as None."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
+    def test_collect_snapshot_with_no_ratings_uses_unknown(self):
         snapshot = _make_snapshot(ratings={})
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = [snapshot]
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+        collector = _make_collector(snapshots=[snapshot])
+        state = collector.collect(PROJECT_PATH)
         assert state.ratings is None
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_last_analyzed_from_most_recent_snapshot(
-        self, mock_tracker_cls, mock_store_cls
-    ):
-        """Test that last_analyzed is set from the first snapshot's scan_timestamp."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
+    def test_collect_last_analyzed_from_most_recent_snapshot(self):
         ts = datetime(2025, 6, 1, 9, 0, 0)
         snapshot = _make_snapshot()
         snapshot.scan_timestamp = ts
-
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = [snapshot]
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+        collector = _make_collector(snapshots=[snapshot])
+        state = collector.collect(PROJECT_PATH)
         assert state.last_analyzed == ts
 
-    @patch("Asgard.Dashboard.services.data_collector.HistoryStore")
-    @patch("Asgard.Dashboard.services.data_collector.IssueTracker")
-    def test_collect_quality_gate_status_from_snapshot(
-        self, mock_tracker_cls, mock_store_cls
-    ):
-        """Test that quality_gate_status is taken from the most recent snapshot."""
-        mock_tracker = MagicMock()
-        mock_tracker.get_summary.return_value = _make_issues_summary()
-        mock_tracker.get_issues.return_value = []
-        mock_tracker_cls.return_value = mock_tracker
-
+    def test_collect_quality_gate_status_from_snapshot(self):
         snapshot = _make_snapshot(quality_gate_status="failed")
-        mock_store = MagicMock()
-        mock_store.get_snapshots.return_value = [snapshot]
-        mock_store_cls.return_value = mock_store
-
-        collector = DataCollector(_make_config())
-        state = collector.collect()
-
+        collector = _make_collector(snapshots=[snapshot])
+        state = collector.collect(PROJECT_PATH)
         assert state.quality_gate_status == "failed"

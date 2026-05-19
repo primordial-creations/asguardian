@@ -70,8 +70,11 @@ class TestAvroCompatibilityServiceBackwardCompatibility:
 
         result = service.check_schemas(old_schema, new_schema, CompatibilityMode.BACKWARD)
 
+        # check_schemas() (in-memory) does not populate added_fields/removed_fields
+        # summary lists — those are only built by the file-based check() entry
+        # point. A new field with a default surfaces as a non-blocking warning.
         assert result.is_compatible is True
-        assert "email" in result.added_fields
+        assert any("email" in (w.message or "") for w in result.warnings)
 
     def test_backward_incompatible_field_addition_no_default(self):
         """Test that adding required field without default breaks backward compatibility."""
@@ -122,7 +125,12 @@ class TestAvroCompatibilityServiceBackwardCompatibility:
 
         result = service.check_schemas(old_schema, new_schema, CompatibilityMode.BACKWARD)
 
-        assert "email" in result.removed_fields
+        # Removed fields surface in breaking_changes from check_schemas(); the
+        # removed_fields summary list is only populated by file-based check().
+        assert any(
+            "email" in (c.message or "") or c.old_value == "email"
+            for c in result.breaking_changes + result.warnings
+        )
 
 
 class TestAvroCompatibilityServiceForwardCompatibility:

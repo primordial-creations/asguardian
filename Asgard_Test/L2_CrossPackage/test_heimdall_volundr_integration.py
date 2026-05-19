@@ -220,8 +220,8 @@ class TestSecurityScanToNetworkPolicy:
         security_service = StaticSecurityService()
         security_report = security_service.scan(str(sample_python_project))
 
-        # Count vulnerabilities
-        vuln_count = len(security_report.vulnerabilities)
+        # Count vulnerabilities (SecurityReport aggregates per-severity totals).
+        vuln_count = security_report.total_issues
 
         # More vulnerabilities = stricter security
         if vuln_count > 10:
@@ -320,6 +320,7 @@ class TestDependencyAnalysisToDocker:
                     ]
                 ),
                 BuildStage(
+                    name="runtime",
                     base_image="python:3.11-slim",
                     workdir="/app",
                     copy_from="builder",
@@ -383,6 +384,7 @@ class TestDependencyAnalysisToDocker:
             healthcheck_retries=3,
             stages=[
                 BuildStage(
+                    name="runtime",
                     base_image="python:3.11-slim",
                     workdir="/app",
                     cmd=["python", "-m", "src.app.service"]
@@ -414,14 +416,16 @@ class TestDependencyAnalysisToDocker:
         dep_analyzer = DependencyAnalyzer(dep_config)
         dep_report = dep_analyzer.analyze(sample_python_project / "src")
 
-        # Get modularity score (0-100)
-        modularity_score = dep_report.modularity_metrics.average_instability * 100
+        # Get modularity score (0-100). DependencyReport.modularity holds the
+        # aggregated ModularityMetrics; modularity_score is 0-1 (higher better).
+        modularity_score = dep_report.modularity.modularity_score * 100
 
         # Determine build stages based on modularity
         if modularity_score > 70:
             # High modularity: simple single-stage build
             stages = [
                 BuildStage(
+                    name="runtime",
                     base_image="python:3.11-slim",
                     workdir="/app",
                     copy_commands=[{"src": ".", "dst": "/app"}],
@@ -440,6 +444,7 @@ class TestDependencyAnalysisToDocker:
                     run_commands=["pip install --user -r requirements.txt"]
                 ),
                 BuildStage(
+                    name="runtime",
                     base_image="python:3.11-slim",
                     workdir="/app",
                     copy_from="deps",

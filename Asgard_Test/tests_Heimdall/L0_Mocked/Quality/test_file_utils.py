@@ -80,7 +80,7 @@ class TestDefaultExcludeFiles:
         """Test that lock files are excluded."""
         assert "package-lock.json" in DEFAULT_EXCLUDE_FILES
         assert "yarn.lock" in DEFAULT_EXCLUDE_FILES
-        assert "poetry.lock" in DEFAULT_EXCLUDE_FILES
+        assert "pnpm-lock.yaml" in DEFAULT_EXCLUDE_FILES
 
 
 class TestGetFileExtension:
@@ -184,20 +184,20 @@ class TestCountLines:
 class TestIsExcludedPath:
     """Tests for is_excluded_path function."""
 
-    def test_hidden_file_excluded(self):
-        """Test that hidden files (starting with .) are excluded."""
-        path = Path("/some/path/.hidden")
-        assert is_excluded_path(path, []) is True
+    def test_git_dir_excluded(self):
+        """Test that .git is excluded with default patterns."""
+        path = Path("/some/path/.git")
+        assert is_excluded_path(path, None) is True
 
     def test_pycache_excluded(self):
-        """Test that __pycache__ is excluded."""
+        """Test that __pycache__ is excluded with default patterns."""
         path = Path("/some/path/__pycache__")
-        assert is_excluded_path(path, []) is True
+        assert is_excluded_path(path, None) is True
 
     def test_node_modules_excluded(self):
-        """Test that node_modules is excluded."""
+        """Test that node_modules is excluded with default patterns."""
         path = Path("/some/path/node_modules")
-        assert is_excluded_path(path, []) is True
+        assert is_excluded_path(path, None) is True
 
     def test_custom_exclude_pattern(self):
         """Test custom exclude patterns."""

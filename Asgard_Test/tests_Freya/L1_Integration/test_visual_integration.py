@@ -24,7 +24,7 @@ from Asgard.Freya.Visual.models.visual_models import (
     RegressionTestCase,
 )
 
-from conftest import file_url
+from Asgard_Test.tests_Freya.L1_Integration.conftest import file_url
 
 
 class TestVisualIntegrationScreenshotCapture:

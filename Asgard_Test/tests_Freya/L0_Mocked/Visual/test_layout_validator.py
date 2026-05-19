@@ -121,6 +121,8 @@ class TestValidate:
 
         async def track_evaluate(script):
             evaluate_calls.append(script)
+            if isinstance(script, str) and "querySelectorAll('*').length" in script:
+                return 42
             return [] if isinstance(script, str) else 0
 
         mock_page.evaluate.side_effect = track_evaluate

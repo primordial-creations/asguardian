@@ -24,7 +24,7 @@ from Asgard.Freya.Integration.models.integration_models import (
 from Asgard.Freya.Visual.services.screenshot_capture import ScreenshotCapture
 from Asgard.Freya.Visual.models.visual_models import ScreenshotConfig
 
-from conftest import file_url
+from Asgard_Test.tests_Freya.L1_Integration.conftest import file_url
 
 
 class TestUnifiedIntegrationUnifiedTester:

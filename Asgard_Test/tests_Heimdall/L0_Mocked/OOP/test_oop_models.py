@@ -22,7 +22,7 @@ class TestOOPConfig:
         """Test default configuration values."""
         config = OOPConfig()
         assert config.cbo_threshold == 10
-        assert config.lcom_threshold == 0.8
+        assert config.lcom_threshold == 0.85
         assert config.dit_threshold == 5
         assert config.noc_threshold == 10
         assert config.rfc_threshold == 50

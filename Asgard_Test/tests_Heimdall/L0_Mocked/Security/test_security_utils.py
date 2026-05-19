@@ -187,7 +187,7 @@ class TestScanDirectoryForSecurity:
 
             (tmpdir_path / "app.py").write_text("print('hello')")
             (tmpdir_path / "utils.js").write_text("const x = 1;")
-            (tmpdir_path / "config.yaml").write_text("key: value")
+            (tmpdir_path / "service.ts").write_text("const y = 2;")
 
             files = list(scan_directory_for_security(tmpdir_path))
             assert len(files) == 3

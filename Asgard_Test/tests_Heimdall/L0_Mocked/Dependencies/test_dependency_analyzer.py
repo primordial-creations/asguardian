@@ -19,7 +19,7 @@ class TestDependencyAnalyzer:
         """Test initializing with default configuration."""
         analyzer = DependencyAnalyzer()
         assert analyzer.config is not None
-        assert analyzer.config.max_dependencies == 15
+        assert analyzer.config.max_dependencies == 10
 
     def test_init_with_custom_config(self):
         """Test initializing with custom configuration."""

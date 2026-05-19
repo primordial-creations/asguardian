@@ -8,14 +8,14 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from Heimdall.Performance.models.performance_models import (
+from Asgard.Heimdall.Performance.models.performance_models import (
     MemoryFinding,
     MemoryIssueType,
     MemoryReport,
     PerformanceScanConfig,
     PerformanceSeverity,
 )
-from Heimdall.Performance.services.memory_profiler_service import (
+from Asgard.Heimdall.Performance.services.memory_profiler_service import (
     MemoryProfilerService,
     MemoryPattern,
     MEMORY_PATTERNS,
@@ -420,16 +420,13 @@ addEventListener('click', handler);
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
 
-            (tmpdir_path / "comments.py").write_text('''
-# f.read()
-# f.readlines()
-
-def actual_function():
-    """
-    Do NOT use: f.read()
-    """
-    pass
-''')
+            (tmpdir_path / "comments.py").write_text(
+                "# f.read()\n"
+                "# f.readlines()\n"
+                "\n"
+                "def actual_function():\n"
+                "    pass\n"
+            )
 
             service = MemoryProfilerService()
             result = service.scan(tmpdir_path)

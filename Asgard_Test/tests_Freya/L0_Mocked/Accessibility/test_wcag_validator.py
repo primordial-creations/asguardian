@@ -8,7 +8,20 @@ Tests all WCAG criteria checking, filtering, and scoring.
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from Asgard.Freya.Accessibility.services.wcag_validator import WCAGValidator, WCAG_CRITERIA
+from Asgard.Freya.Accessibility.services.wcag_validator import WCAGValidator
+from Asgard.Freya.Accessibility.services._wcag_criteria import WCAG_CRITERIA
+from Asgard.Freya.Accessibility.services._wcag_checks import (
+    check_images,
+    check_structure,
+    check_forms,
+    generate_id,
+    get_element_html,
+)
+from Asgard.Freya.Accessibility.services._wcag_checks_part2 import (
+    check_links,
+    check_language,
+    check_aria_basic,
+)
 from Asgard.Freya.Accessibility.models.accessibility_models import (
     AccessibilityConfig,
     WCAGLevel,
@@ -63,7 +76,7 @@ class TestCheckImages:
         mock_img.get_attribute = AsyncMock(side_effect=["Image description", None, None])
         mock_page.query_selector_all = AsyncMock(return_value=[mock_img])
 
-        violations, passed = await validator._check_images(mock_page)
+        violations, passed = await check_images(mock_page, validator.config.include_element_html)
 
         assert len(violations) == 0
         assert passed == 1
@@ -78,7 +91,7 @@ class TestCheckImages:
         mock_img.evaluate = AsyncMock(return_value="<img src='image.jpg'>")
         mock_page.query_selector_all = AsyncMock(return_value=[mock_img])
 
-        violations, passed = await validator._check_images(mock_page)
+        violations, passed = await check_images(mock_page, validator.config.include_element_html)
 
         assert len(violations) == 1
         assert violations[0].wcag_reference == "1.1.1"
@@ -94,7 +107,7 @@ class TestCheckImages:
         mock_img.get_attribute = AsyncMock(side_effect=["", None, "presentation"])
         mock_page.query_selector_all = AsyncMock(return_value=[mock_img])
 
-        violations, passed = await validator._check_images(mock_page)
+        violations, passed = await check_images(mock_page, validator.config.include_element_html)
 
         assert len(violations) == 0
         assert passed == 1
@@ -108,7 +121,7 @@ class TestCheckImages:
         mock_img.get_attribute = AsyncMock(side_effect=["", None, None])
         mock_page.query_selector_all = AsyncMock(return_value=[mock_img])
 
-        violations, passed = await validator._check_images(mock_page)
+        violations, passed = await check_images(mock_page, validator.config.include_element_html)
 
         assert passed == 1
 
@@ -127,7 +140,7 @@ class TestCheckStructure:
             [AsyncMock()],
         ])
 
-        violations, passed = await validator._check_structure(mock_page)
+        violations, passed = await check_structure(mock_page)
 
         assert any(v.wcag_reference == "2.4.2" for v in violations) is False
         assert passed >= 1
@@ -143,7 +156,7 @@ class TestCheckStructure:
             [AsyncMock()],
         ])
 
-        violations, passed = await validator._check_structure(mock_page)
+        violations, passed = await check_structure(mock_page)
 
         assert any(v.wcag_reference == "2.4.2" for v in violations)
         assert any(v.severity == ViolationSeverity.SERIOUS for v in violations)
@@ -165,7 +178,7 @@ class TestCheckStructure:
             [AsyncMock()],
         ])
 
-        violations, passed = await validator._check_structure(mock_page)
+        violations, passed = await check_structure(mock_page)
 
         heading_violations = [v for v in violations if "heading" in v.description.lower()]
         assert len(heading_violations) == 0
@@ -187,7 +200,7 @@ class TestCheckStructure:
             [AsyncMock()],
         ])
 
-        violations, passed = await validator._check_structure(mock_page)
+        violations, passed = await check_structure(mock_page)
 
         assert any("skipped" in v.description.lower() for v in violations)
 
@@ -205,7 +218,7 @@ class TestCheckStructure:
             [AsyncMock()],
         ])
 
-        violations, passed = await validator._check_structure(mock_page)
+        violations, passed = await check_structure(mock_page)
 
         assert any("first heading" in v.description.lower() for v in violations)
 
@@ -220,7 +233,7 @@ class TestCheckStructure:
             [],
         ])
 
-        violations, passed = await validator._check_structure(mock_page)
+        violations, passed = await check_structure(mock_page)
 
         assert any("main landmark" in v.description.lower() for v in violations)
 
@@ -243,7 +256,7 @@ class TestCheckForms:
         ])
         mock_page.query_selector = AsyncMock(return_value=mock_label)
 
-        violations, passed = await validator._check_forms(mock_page)
+        violations, passed = await check_forms(mock_page, validator.config.include_element_html)
 
         assert len([v for v in violations if "input" in v.description.lower()]) == 0
         assert passed >= 1
@@ -263,7 +276,7 @@ class TestCheckForms:
         ])
         mock_page.query_selector = AsyncMock(return_value=None)
 
-        violations, passed = await validator._check_forms(mock_page)
+        violations, passed = await check_forms(mock_page, validator.config.include_element_html)
 
         assert any(v.wcag_reference == "3.3.2" for v in violations)
         assert any("missing a label" in v.description.lower() for v in violations)
@@ -283,7 +296,7 @@ class TestCheckForms:
             [mock_button],
         ])
 
-        violations, passed = await validator._check_forms(mock_page)
+        violations, passed = await check_forms(mock_page, validator.config.include_element_html)
 
         button_violations = [v for v in violations if "button" in v.description.lower()]
         assert len(button_violations) == 0
@@ -303,7 +316,7 @@ class TestCheckForms:
             [mock_button],
         ])
 
-        violations, passed = await validator._check_forms(mock_page)
+        violations, passed = await check_forms(mock_page, validator.config.include_element_html)
 
         assert any(v.wcag_reference == "4.1.2" for v in violations)
         assert any("no accessible name" in v.description.lower() for v in violations)
@@ -324,7 +337,7 @@ class TestCheckLinks:
 
         mock_page.query_selector_all = AsyncMock(return_value=[mock_link])
 
-        violations, passed = await validator._check_links(mock_page)
+        violations, passed = await check_links(mock_page, validator.config.include_element_html)
 
         assert len(violations) == 0
         assert passed >= 1
@@ -342,7 +355,7 @@ class TestCheckLinks:
 
         mock_page.query_selector_all = AsyncMock(return_value=[mock_link])
 
-        violations, passed = await validator._check_links(mock_page)
+        violations, passed = await check_links(mock_page, validator.config.include_element_html)
 
         # Empty inner_text is checked but since there are no images with alt, it may pass
         # Verify the method executes without error
@@ -362,7 +375,7 @@ class TestCheckLinks:
 
         mock_page.query_selector_all = AsyncMock(return_value=[mock_link])
 
-        violations, passed = await validator._check_links(mock_page)
+        violations, passed = await check_links(mock_page, validator.config.include_element_html)
 
         assert any("not descriptive" in v.description.lower() for v in violations)
         assert any(v.severity == ViolationSeverity.MODERATE for v in violations)
@@ -378,7 +391,7 @@ class TestCheckLanguage:
 
         mock_page.evaluate = AsyncMock(return_value="en")
 
-        violations, passed = await validator._check_language(mock_page)
+        violations, passed = await check_language(mock_page)
 
         assert len(violations) == 0
         assert passed == 1
@@ -390,7 +403,7 @@ class TestCheckLanguage:
 
         mock_page.evaluate = AsyncMock(return_value="")
 
-        violations, passed = await validator._check_language(mock_page)
+        violations, passed = await check_language(mock_page)
 
         assert len(violations) == 1
         assert violations[0].wcag_reference == "3.1.1"
@@ -411,7 +424,7 @@ class TestCheckAriaBasic:
 
         mock_page.query_selector_all = AsyncMock(return_value=[mock_element])
 
-        violations, passed = await validator._check_aria_basic(mock_page)
+        violations, passed = await check_aria_basic(mock_page, validator.config.include_element_html)
 
         assert len(violations) == 0
         assert passed == 1
@@ -427,7 +440,7 @@ class TestCheckAriaBasic:
 
         mock_page.query_selector_all = AsyncMock(return_value=[mock_element])
 
-        violations, passed = await validator._check_aria_basic(mock_page)
+        violations, passed = await check_aria_basic(mock_page, validator.config.include_element_html)
 
         assert len(violations) == 1
         assert violations[0].wcag_reference == "4.1.2"
@@ -684,7 +697,7 @@ class TestGetElementHtml:
         mock_element = AsyncMock()
         mock_element.evaluate = AsyncMock(return_value="<div>Test</div>")
 
-        html = await validator._get_element_html(mock_element)
+        html = await get_element_html(mock_element, True)
 
         assert html == "<div>Test</div>"
 
@@ -697,7 +710,7 @@ class TestGetElementHtml:
         long_html = "<div>" + "a" * 600 + "</div>"
         mock_element.evaluate = AsyncMock(return_value=long_html)
 
-        html = await validator._get_element_html(mock_element)
+        html = await get_element_html(mock_element, True)
 
         assert len(html) == 503
         assert html.endswith("...")
@@ -710,7 +723,7 @@ class TestGetElementHtml:
         mock_element = AsyncMock()
         mock_element.evaluate = AsyncMock(side_effect=Exception("Test error"))
 
-        html = await validator._get_element_html(mock_element)
+        html = await get_element_html(mock_element, True)
 
         assert html == ""
 
@@ -722,8 +735,8 @@ class TestGenerateId:
         """Test ID generation is consistent for same inputs."""
         validator = WCAGValidator(accessibility_config)
 
-        id1 = validator._generate_id("test", "value")
-        id2 = validator._generate_id("test", "value")
+        id1 = generate_id("test", "value")
+        id2 = generate_id("test", "value")
 
         assert id1 == id2
 
@@ -731,8 +744,8 @@ class TestGenerateId:
         """Test ID generation differs for different inputs."""
         validator = WCAGValidator(accessibility_config)
 
-        id1 = validator._generate_id("test", "value1")
-        id2 = validator._generate_id("test", "value2")
+        id1 = generate_id("test", "value1")
+        id2 = generate_id("test", "value2")
 
         assert id1 != id2
 
@@ -740,6 +753,6 @@ class TestGenerateId:
         """Test ID is 12 characters long."""
         validator = WCAGValidator(accessibility_config)
 
-        id_value = validator._generate_id("prefix", "identifier")
+        id_value = generate_id("prefix", "identifier")
 
         assert len(id_value) == 12

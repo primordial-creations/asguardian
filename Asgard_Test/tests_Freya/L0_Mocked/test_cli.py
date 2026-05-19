@@ -13,8 +13,8 @@ from pathlib import Path
 from unittest.mock import AsyncMock, MagicMock, Mock, patch, call
 from datetime import datetime
 
-from Asgard.Freya.cli import (
-    create_parser,
+from Asgard.Freya.cli._parser import create_parser
+from Asgard.Freya.cli._formatters import (
     format_accessibility_text,
     format_accessibility_markdown,
     format_accessibility_html,
@@ -29,11 +29,15 @@ from Asgard.Freya.cli import (
     format_viewport_text,
     format_mobile_text,
     format_unified_text,
+)
+from Asgard.Freya.cli._handlers_accessibility import (
     run_accessibility_audit,
     run_contrast_check,
     run_keyboard_test,
     run_aria_validation,
     run_screen_reader_test,
+)
+from Asgard.Freya.cli._handlers_visual_responsive import (
     run_visual_capture,
     run_visual_compare,
     run_layout_validation,
@@ -42,6 +46,8 @@ from Asgard.Freya.cli import (
     run_touch_validation,
     run_viewport_test,
     run_mobile_test,
+)
+from Asgard.Freya.cli._handlers_images_integration import (
     run_unified_test,
     run_baseline_update,
     run_baseline_compare,
@@ -517,7 +523,7 @@ class TestAccessibilityAuditCommand:
         mock_result.violations = []
         mock_result.model_dump_json = Mock(return_value='{"score": 100}')
 
-        with patch('Asgard.Freya.cli.WCAGValidator') as mock_validator:
+        with patch('Asgard.Freya.cli._handlers_accessibility.WCAGValidator') as mock_validator:
             mock_instance = AsyncMock()
             mock_instance.validate = AsyncMock(return_value=mock_result)
             mock_validator.return_value = mock_instance
@@ -549,7 +555,7 @@ class TestAccessibilityAuditCommand:
         mock_result.minor_count = 0
         mock_result.violations = []
 
-        with patch('Asgard.Freya.cli.WCAGValidator') as mock_validator:
+        with patch('Asgard.Freya.cli._handlers_accessibility.WCAGValidator') as mock_validator:
             mock_instance = AsyncMock()
             mock_instance.validate = AsyncMock(return_value=mock_result)
             mock_validator.return_value = mock_instance
@@ -572,7 +578,7 @@ class TestAccessibilityAuditCommand:
         mock_result.has_violations = False
         mock_result.model_dump_json = Mock(return_value='{"score": 100}')
 
-        with patch('Asgard.Freya.cli.WCAGValidator') as mock_validator:
+        with patch('Asgard.Freya.cli._handlers_accessibility.WCAGValidator') as mock_validator:
             mock_instance = AsyncMock()
             mock_instance.validate = AsyncMock(return_value=mock_result)
             mock_validator.return_value = mock_instance
@@ -604,7 +610,7 @@ class TestContrastCheckCommand:
         mock_result.issues = []
         mock_result.model_dump_json = Mock(return_value='{"passing": 50}')
 
-        with patch('Asgard.Freya.cli.ColorContrastChecker') as mock_checker:
+        with patch('Asgard.Freya.cli._handlers_accessibility.ColorContrastChecker') as mock_checker:
             mock_instance = AsyncMock()
             mock_instance.check = AsyncMock(return_value=mock_result)
             mock_checker.return_value = mock_instance
@@ -636,7 +642,7 @@ class TestKeyboardTestCommand:
         mock_result.issues = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.KeyboardNavigationTester') as mock_tester:
+        with patch('Asgard.Freya.cli._handlers_accessibility.KeyboardNavigationTester') as mock_tester:
             mock_instance = AsyncMock()
             mock_instance.test = AsyncMock(return_value=mock_result)
             mock_tester.return_value = mock_instance
@@ -668,7 +674,7 @@ class TestARIAValidationCommand:
         mock_result.violations = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.ARIAValidator') as mock_validator:
+        with patch('Asgard.Freya.cli._handlers_accessibility.ARIAValidator') as mock_validator:
             mock_instance = AsyncMock()
             mock_instance.validate = AsyncMock(return_value=mock_result)
             mock_validator.return_value = mock_instance
@@ -701,7 +707,7 @@ class TestScreenReaderTestCommand:
         mock_result.heading_structure = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.ScreenReaderValidator') as mock_validator:
+        with patch('Asgard.Freya.cli._handlers_accessibility.ScreenReaderValidator') as mock_validator:
             mock_instance = AsyncMock()
             mock_instance.validate = AsyncMock(return_value=mock_result)
             mock_validator.return_value = mock_instance
@@ -727,7 +733,7 @@ class TestVisualCaptureCommand:
         mock_result = Mock()
         mock_result.file_path = "/tmp/screenshot.png"
 
-        with patch('Asgard.Freya.cli.ScreenshotCapture') as mock_capture:
+        with patch('Asgard.Freya.cli._handlers_visual_responsive.ScreenshotCapture') as mock_capture:
             mock_instance = Mock()
             mock_instance.capture_viewport = AsyncMock(return_value=mock_result)
             mock_capture.return_value = mock_instance
@@ -756,7 +762,7 @@ class TestVisualCompareCommand:
         mock_result.diff_image_path = None
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.VisualRegressionTester') as mock_tester:
+        with patch('Asgard.Freya.cli._handlers_visual_responsive.VisualRegressionTester') as mock_tester:
             mock_instance = Mock()
             mock_instance.compare = Mock(return_value=mock_result)
             mock_tester.return_value = mock_instance
@@ -783,7 +789,7 @@ class TestLayoutValidationCommand:
         mock_result.issues = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.LayoutValidator') as mock_validator:
+        with patch('Asgard.Freya.cli._handlers_visual_responsive.LayoutValidator') as mock_validator:
             mock_instance = AsyncMock()
             mock_instance.validate = AsyncMock(return_value=mock_result)
             mock_validator.return_value = mock_instance
@@ -811,7 +817,7 @@ class TestStyleValidationCommand:
         mock_result.issues = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.StyleValidator') as mock_validator:
+        with patch('Asgard.Freya.cli._handlers_visual_responsive.StyleValidator') as mock_validator:
             mock_instance = AsyncMock()
             mock_instance.validate = AsyncMock(return_value=mock_result)
             mock_validator.return_value = mock_instance
@@ -841,7 +847,7 @@ class TestBreakpointTestCommand:
         mock_result.results = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.BreakpointTester') as mock_tester:
+        with patch('Asgard.Freya.cli._handlers_visual_responsive.BreakpointTester') as mock_tester:
             mock_instance = AsyncMock()
             mock_instance.test = AsyncMock(return_value=mock_result)
             mock_tester.return_value = mock_instance
@@ -873,7 +879,7 @@ class TestTouchValidationCommand:
         mock_result.issues = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.TouchTargetValidator') as mock_validator:
+        with patch('Asgard.Freya.cli._handlers_visual_responsive.TouchTargetValidator') as mock_validator:
             mock_instance = AsyncMock()
             mock_instance.validate = AsyncMock(return_value=mock_result)
             mock_validator.return_value = mock_instance
@@ -904,7 +910,7 @@ class TestViewportTestCommand:
         mock_result.issues = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.ViewportTester') as mock_tester:
+        with patch('Asgard.Freya.cli._handlers_visual_responsive.ViewportTester') as mock_tester:
             mock_instance = AsyncMock()
             mock_instance.test = AsyncMock(return_value=mock_result)
             mock_tester.return_value = mock_instance
@@ -937,7 +943,7 @@ class TestMobileTestCommand:
         mock_result.issues = []
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.MobileCompatibilityTester') as mock_tester:
+        with patch('Asgard.Freya.cli._handlers_visual_responsive.MobileCompatibilityTester') as mock_tester:
             mock_instance = AsyncMock()
             mock_instance.test = AsyncMock(return_value=mock_result)
             mock_tester.return_value = mock_instance
@@ -979,7 +985,7 @@ class TestUnifiedTestCommand:
         mock_result.minor_count = 0
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.UnifiedTester') as mock_tester:
+        with patch('Asgard.Freya.cli._handlers_integration.UnifiedTester') as mock_tester:
             mock_instance = AsyncMock()
             mock_instance.test = AsyncMock(return_value=mock_result)
             mock_tester.return_value = mock_instance
@@ -1005,8 +1011,8 @@ class TestUnifiedTestCommand:
         mock_result.failed = 0
         mock_result.model_dump_json = Mock(return_value='{}')
 
-        with patch('Asgard.Freya.cli.UnifiedTester') as mock_tester, \
-             patch('Asgard.Freya.cli.HTMLReporter') as mock_reporter:
+        with patch('Asgard.Freya.cli._handlers_integration.UnifiedTester') as mock_tester, \
+             patch('Asgard.Freya.cli._handlers_integration.HTMLReporter') as mock_reporter:
             mock_tester_instance = AsyncMock()
             mock_tester_instance.test = AsyncMock(return_value=mock_result)
             mock_tester.return_value = mock_tester_instance
@@ -1038,7 +1044,7 @@ class TestBaselineCommands:
         mock_result.screenshot_path = "/tmp/baseline.png"
         mock_result.hash = "abc123"
 
-        with patch('Asgard.Freya.cli.BaselineManager') as mock_manager:
+        with patch('Asgard.Freya.cli._handlers_integration.BaselineManager') as mock_manager:
             mock_instance = Mock()
             mock_instance.create_baseline = AsyncMock(return_value=mock_result)
             mock_manager.return_value = mock_instance
@@ -1064,7 +1070,7 @@ class TestBaselineCommands:
             "diff_image_path": None
         }
 
-        with patch('Asgard.Freya.cli.BaselineManager') as mock_manager:
+        with patch('Asgard.Freya.cli._handlers_integration.BaselineManager') as mock_manager:
             mock_instance = Mock()
             mock_instance.compare_to_baseline = AsyncMock(return_value=mock_result)
             mock_manager.return_value = mock_instance
@@ -1091,7 +1097,7 @@ class TestBaselineCommands:
         baseline2.created_at = "2024-01-02T00:00:00"
         baseline2.device = "iphone-14"
 
-        with patch('Asgard.Freya.cli.BaselineManager') as mock_manager:
+        with patch('Asgard.Freya.cli._handlers_integration.BaselineManager') as mock_manager:
             mock_instance = Mock()
             mock_instance.list_baselines = Mock(return_value=[baseline1, baseline2])
             mock_manager.return_value = mock_instance
@@ -1108,7 +1114,7 @@ class TestBaselineCommands:
         args.name = "homepage"
         args.device = None
 
-        with patch('Asgard.Freya.cli.BaselineManager') as mock_manager:
+        with patch('Asgard.Freya.cli._handlers_integration.BaselineManager') as mock_manager:
             mock_instance = Mock()
             mock_instance.delete_baseline = Mock(return_value=True)
             mock_manager.return_value = mock_instance
@@ -1125,7 +1131,7 @@ class TestBaselineCommands:
         args.name = "nonexistent"
         args.device = None
 
-        with patch('Asgard.Freya.cli.BaselineManager') as mock_manager:
+        with patch('Asgard.Freya.cli._handlers_integration.BaselineManager') as mock_manager:
             mock_instance = Mock()
             mock_instance.delete_baseline = Mock(return_value=False)
             mock_manager.return_value = mock_instance
@@ -1175,7 +1181,7 @@ class TestCrawlCommand:
         mock_report.common_issues = []
         mock_report.page_results = []
 
-        with patch('Asgard.Freya.cli.SiteCrawler') as mock_crawler:
+        with patch('Asgard.Freya.cli._handlers_integration.SiteCrawler') as mock_crawler:
             mock_instance = Mock()
             mock_instance.set_progress_callback = Mock()
             mock_instance.crawl_and_test = AsyncMock(return_value=mock_report)
@@ -1222,7 +1228,7 @@ class TestCrawlCommand:
         mock_report.common_issues = []
         mock_report.page_results = []
 
-        with patch('Asgard.Freya.cli.SiteCrawler') as mock_crawler:
+        with patch('Asgard.Freya.cli._handlers_integration.SiteCrawler') as mock_crawler:
             mock_instance = Mock()
             mock_instance.set_progress_callback = Mock()
             mock_instance.crawl_and_test = AsyncMock(return_value=mock_report)

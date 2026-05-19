@@ -63,7 +63,7 @@ class TestBaselineEntry:
         assert entry.location == "file.py:10"
         assert entry.message == ""
         assert entry.reason == ""
-        assert entry.created_by == "asgard"
+        assert entry.created_by == "asguardian"
         assert entry.expires_at is None
         assert entry.metadata == {}
 

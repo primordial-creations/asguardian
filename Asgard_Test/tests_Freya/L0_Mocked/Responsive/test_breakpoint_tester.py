@@ -112,7 +112,7 @@ class TestBreakpointTesterTest:
         """Test running test with default breakpoints."""
         mock_page = AsyncMock()
         mock_page.goto = AsyncMock()
-        mock_page.evaluate = AsyncMock(return_value=375)
+        mock_page.evaluate = AsyncMock(return_value=0)
         mock_page.screenshot = AsyncMock()
 
         mock_context = AsyncMock()
@@ -432,11 +432,12 @@ class TestBreakpointTesterIntegration:
         mock_page = AsyncMock()
         mock_page.goto = AsyncMock()
         mock_page.evaluate = AsyncMock(side_effect=[
-            450,
-            overflow_elements,
-            [],
-            [],
-            [],
+            450,  # check_horizontal_scroll: scroll_width
+            overflow_elements,  # check_horizontal_scroll: overflow_elements
+            [],   # check_content_overflow
+            [],   # check_overlapping_elements
+            [],   # check_text_truncation
+            450,  # page_width
         ])
 
         mock_context = AsyncMock()

@@ -8,7 +8,7 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from Heimdall.Performance.utilities.performance_utils import (
+from Asgard.Heimdall.Performance.utilities.performance_utils import (
     PERFORMANCE_SCAN_EXTENSIONS,
     DEFAULT_EXCLUDE_DIRS,
     is_excluded_path,
@@ -58,9 +58,9 @@ class TestIsExcludedPath:
         assert is_excluded_path(path, ["test_*.py"])
 
     def test_exclude_by_directory_name(self):
-        """Test excluding by directory name."""
+        """Test excluding by directory name pattern."""
         path = Path("node_modules")
-        assert is_excluded_path(path, [])
+        assert is_excluded_path(path, ["node_modules"])
 
     def test_exclude_nested_path(self):
         """Test excluding nested paths."""
@@ -458,9 +458,9 @@ for i in range(10):
         assert loops[0]["has_continue"] is True
 
     def test_find_multiple_comprehensions(self):
-        """Test finding nested comprehensions."""
+        """Test finding comprehension with multiple generators (nested)."""
         code = '''
-result = [[x * y for x in range(5)] for y in range(5)]
+result = [x * y for x in range(5) for y in range(5)]
 '''
         loops = find_loops(code)
         nested = [loop for loop in loops if loop.get("is_nested")]

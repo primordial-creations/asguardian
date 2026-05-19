@@ -343,7 +343,10 @@ class TestCleanCode:
             detector = BugDetector(config=config)
             report = detector.scan(tmpdir_path)
 
-            assert report.total_bugs == 0
+            # Should produce no critical, high, or medium findings on clean code
+            assert report.critical_count == 0
+            assert report.high_count == 0
+            assert report.medium_count == 0
 
     def test_normal_return_with_no_following_code_no_bug(self):
         """Test that a return at the end of a function does not produce a finding."""

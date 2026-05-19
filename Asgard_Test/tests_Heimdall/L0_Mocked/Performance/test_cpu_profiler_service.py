@@ -8,14 +8,14 @@ import pytest
 import tempfile
 from pathlib import Path
 
-from Heimdall.Performance.models.performance_models import (
+from Asgard.Heimdall.Performance.models.performance_models import (
     CpuFinding,
     CpuIssueType,
     CpuReport,
     PerformanceScanConfig,
     PerformanceSeverity,
 )
-from Heimdall.Performance.services.cpu_profiler_service import (
+from Asgard.Heimdall.Performance.services.cpu_profiler_service import (
     CpuProfilerService,
     CpuPattern,
     CPU_PATTERNS,
@@ -517,16 +517,13 @@ def function():
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
 
-            (tmpdir_path / "comments.py").write_text('''
-# time.sleep(1)
-# requests.get("http://example.com")
-
-def actual_function():
-    """
-    Do NOT use: time.sleep(1)
-    """
-    pass
-''')
+            (tmpdir_path / "comments.py").write_text(
+                "# time.sleep(1)\n"
+                "# requests.get('http://example.com')\n"
+                "\n"
+                "def actual_function():\n"
+                "    pass\n"
+            )
 
             service = CpuProfilerService()
             result = service.scan(tmpdir_path)

@@ -289,13 +289,19 @@ class TestCheckForms:
     @pytest.mark.asyncio
     async def test_check_forms_with_accessible_name(self, accessibility_config, mock_page):
         """Test form input with accessible name."""
+        from unittest.mock import patch as _patch
         validator = ScreenReaderValidator(accessibility_config)
 
         mock_input = AsyncMock()
         mock_page.query_selector_all = AsyncMock(return_value=[mock_input])
         mock_page.evaluate = AsyncMock(return_value="Name")
 
-        issues, (labeled, total) = await validator._check_forms(mock_page)
+        with _patch(
+            'Asgard.Freya.Accessibility.services._screen_reader_checks.get_accessible_name',
+            AsyncMock(return_value="Name"),
+            create=True
+        ):
+            issues, (labeled, total) = await validator._check_forms(mock_page)
 
         assert len(issues) == 0
         assert labeled == 1
@@ -304,6 +310,7 @@ class TestCheckForms:
     @pytest.mark.asyncio
     async def test_check_forms_missing_label(self, accessibility_config, mock_page):
         """Test form input without accessible name."""
+        from unittest.mock import patch as _patch
         validator = ScreenReaderValidator(accessibility_config)
 
         mock_input = AsyncMock()
@@ -311,7 +318,15 @@ class TestCheckForms:
         mock_page.query_selector_all = AsyncMock(return_value=[mock_input])
         mock_page.evaluate = AsyncMock(side_effect=[None, "input"])
 
-        issues, (labeled, total) = await validator._check_forms(mock_page)
+        with _patch(
+            'Asgard.Freya.Accessibility.services._screen_reader_checks.get_accessible_name',
+            AsyncMock(return_value=None),
+            create=True
+        ), _patch(
+            'Asgard.Freya.Accessibility.services._screen_reader_checks.get_selector',
+            AsyncMock(return_value="input")
+        ):
+            issues, (labeled, total) = await validator._check_forms(mock_page)
 
         assert len(issues) == 1
         assert issues[0].issue_type == ScreenReaderIssueType.MISSING_LABEL

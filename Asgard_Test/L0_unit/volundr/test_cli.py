@@ -46,19 +46,19 @@ class TestCLIParserCreation:
         assert args.format == 'json'
 
     def test_parser_dry_run_flag(self):
-        """Test parser has dry-run flag"""
+        """--dry-run is a global flag and must come before the subcommand."""
         parser = create_parser()
 
-        args = parser.parse_args(['kubernetes', 'generate', '--name', 'test', '--image', 'nginx', '--dry-run'])
+        args = parser.parse_args(['--dry-run', 'kubernetes', 'generate', '--name', 'test', '--image', 'nginx'])
 
         assert hasattr(args, 'dry_run')
         assert args.dry_run is True
 
     def test_parser_output_flag(self):
-        """Test parser has output flag"""
+        """-o is a global flag and must come before the subcommand."""
         parser = create_parser()
 
-        args = parser.parse_args(['kubernetes', 'generate', '--name', 'test', '--image', 'nginx', '-o', '/tmp/out'])
+        args = parser.parse_args(['-o', '/tmp/out', 'kubernetes', 'generate', '--name', 'test', '--image', 'nginx'])
 
         assert hasattr(args, 'output')
         assert args.output == '/tmp/out'
@@ -474,7 +474,8 @@ class TestCLIEdgeCases:
         with patch('sys.argv', ['volundr', 'invalid-command']):
             with pytest.raises(SystemExit) as exc_info:
                 main()
-            assert exc_info.value.code == 1
+            # argparse exits with code 2 when an unknown subcommand is given.
+            assert exc_info.value.code == 2
 
     def test_kubernetes_without_subcommand(self):
         """Test kubernetes command without subcommand prints error"""
@@ -493,10 +494,10 @@ class TestCLIEdgeCases:
         parser = create_parser()
 
         args = parser.parse_args([
+            '--output', '/custom/path',
             'kubernetes', 'generate',
             '--name', 'test',
             '--image', 'nginx',
-            '--output', '/custom/path',
             '--output-dir', '/default/path'
         ])
 

@@ -40,6 +40,9 @@ def pytest_configure(config):
     config.addinivalue_line(
         "markers", "full_pipeline: Complete multi-package workflow"
     )
+    config.addinivalue_line(
+        "markers", "heimdall_forseti: Heimdall to Forseti integration"
+    )
 
 
 @pytest.fixture(scope="session")

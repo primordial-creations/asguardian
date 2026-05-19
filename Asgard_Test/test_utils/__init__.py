@@ -17,7 +17,7 @@ Usage:
     assert_json_valid('{"key": "value"}')
 """
 
-from test_utils.assertion_utils import (
+from Asgard_Test.test_utils.assertion_utils import (
     assert_approximate,
     assert_directory_structure,
     assert_file_exists,
@@ -25,14 +25,14 @@ from test_utils.assertion_utils import (
     assert_json_valid,
     assert_yaml_valid,
 )
-from test_utils.file_utils import (
+from Asgard_Test.test_utils.file_utils import (
     create_temp_directory_structure,
     create_temp_json_file,
     create_temp_python_file,
     create_temp_yaml_file,
     load_fixture,
 )
-from test_utils.generators import (
+from Asgard_Test.test_utils.generators import (
     generate_graphql_schema,
     generate_metrics_data,
     generate_openapi_spec,
@@ -40,7 +40,7 @@ from test_utils.generators import (
     generate_python_module,
     generate_web_vitals_data,
 )
-from test_utils.mock_utils import (
+from Asgard_Test.test_utils.mock_utils import (
     mock_database_connection,
     mock_file_system,
     mock_http_response,

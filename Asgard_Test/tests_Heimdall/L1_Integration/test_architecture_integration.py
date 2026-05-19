@@ -138,8 +138,8 @@ class Penguin(Bird):
         pattern_report = analyzer.detect_patterns(simple_project)
 
         assert pattern_report is not None
-        assert hasattr(pattern_report, 'detected_patterns')
-        assert isinstance(pattern_report.detected_patterns, list)
+        assert hasattr(pattern_report, 'patterns')
+        assert isinstance(pattern_report.patterns, list)
 
     def test_architecture_detect_singleton_pattern(self, tmp_path):
         """Test Singleton pattern detection."""
@@ -285,7 +285,7 @@ class User:
         assert isinstance(quick_check, dict)
         assert "solid_violations" in quick_check
         assert "layer_violations" in quick_check
-        assert "patterns_detected" in quick_check
+        assert "patterns_found" in quick_check
 
     def test_architecture_generate_text_report(self, simple_project):
         """Test generating text report for architecture analysis."""
@@ -334,9 +334,8 @@ class User:
     def test_architecture_with_custom_config(self, simple_project):
         """Test architecture analysis with custom configuration."""
         config = ArchitectureConfig(
-            validate_solid=True,
-            detect_patterns=True,
-            analyze_layers=False
+            max_class_responsibilities=5,
+            max_method_count=25,
         )
         analyzer = ArchitectureAnalyzer(config)
         report = analyzer.analyze(simple_project)

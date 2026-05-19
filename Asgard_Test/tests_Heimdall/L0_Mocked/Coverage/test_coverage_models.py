@@ -103,6 +103,7 @@ class TestMethodInfo:
         """Test full name without class."""
         method = MethodInfo(
             name="test_function",
+            class_name=None,
             file_path="/test/path.py",
             line_number=10,
         )
@@ -112,26 +113,31 @@ class TestMethodInfo:
         """Test public method type detection."""
         method = MethodInfo(
             name="public_method",
+            class_name=None,
             file_path="/test/path.py",
             line_number=10,
         )
         assert method.method_type == MethodType.PUBLIC
 
     def test_method_type_private(self):
-        """Test private method type detection."""
+        """Test private method type can be set."""
         method = MethodInfo(
             name="_private_method",
+            class_name=None,
             file_path="/test/path.py",
             line_number=10,
+            method_type=MethodType.PRIVATE,
         )
         assert method.method_type == MethodType.PRIVATE
 
     def test_method_type_dunder(self):
-        """Test dunder method type detection."""
+        """Test dunder method type can be set."""
         method = MethodInfo(
             name="__init__",
+            class_name=None,
             file_path="/test/path.py",
             line_number=10,
+            method_type=MethodType.DUNDER,
         )
         assert method.method_type == MethodType.DUNDER
 
@@ -143,6 +149,7 @@ class TestCoverageGap:
         """Test creating a coverage gap."""
         method = MethodInfo(
             name="untested_method",
+            class_name=None,
             file_path="/test/path.py",
             line_number=10,
         )
@@ -159,6 +166,7 @@ class TestCoverageGap:
         """Test file_path property."""
         method = MethodInfo(
             name="method",
+            class_name=None,
             file_path="/test/path.py",
             line_number=10,
         )
@@ -174,6 +182,7 @@ class TestCoverageGap:
         """Test line_number property."""
         method = MethodInfo(
             name="method",
+            class_name=None,
             file_path="/test/path.py",
             line_number=42,
         )
@@ -261,6 +270,7 @@ class TestClassCoverage:
             total_methods=10,
             covered_methods=7,
             uncovered_methods=["a", "b", "c"],
+            coverage_percent=70.0,
         )
         assert coverage.coverage_percent == 70.0
 
@@ -279,6 +289,7 @@ class TestCoverageReport:
         """Test total gaps count."""
         method = MethodInfo(
             name="method",
+            class_name=None,
             file_path="/test/path.py",
             line_number=10,
         )
@@ -301,6 +312,7 @@ class TestCoverageReport:
 
         method = MethodInfo(
             name="method",
+            class_name=None,
             file_path="/test/path.py",
             line_number=10,
         )

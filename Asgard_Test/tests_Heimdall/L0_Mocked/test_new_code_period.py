@@ -5,7 +5,6 @@ Unit tests for detecting new and modified code files relative to a configured
 reference point. Tests use temp directories with real files.
 """
 
-import subprocess
 import tempfile
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -19,6 +18,11 @@ from Asgard.Heimdall.common.new_code_period import (
     NewCodePeriodResult,
     NewCodePeriodType,
 )
+from Asgard.Heimdall.common import _new_code_git
+from Asgard.Heimdall.common import new_code_period as _ncp_module
+
+# Resolve forward reference to Path in NewCodePeriodConfig.baseline_path
+NewCodePeriodConfig.model_rebuild(_types_namespace={"Path": Path})
 
 
 class TestNewCodePeriodDetectorNonGit:
@@ -32,7 +36,8 @@ class TestNewCodePeriodDetectorNonGit:
                 reference_date=datetime.now() - timedelta(days=30),
             )
             detector = NewCodePeriodDetector()
-            result = detector.detect(tmpdir, config)
+            with patch.object(_ncp_module, "git_available", return_value=False):
+                result = detector.detect(tmpdir, config)
 
             assert result.new_files == []
             assert result.modified_files == []
@@ -46,7 +51,8 @@ class TestNewCodePeriodDetectorNonGit:
                 reference_date=datetime.now() - timedelta(days=1),
             )
             detector = NewCodePeriodDetector()
-            result = detector.detect(tmpdir, config)
+            with patch.object(_ncp_module, "git_available", return_value=False):
+                result = detector.detect(tmpdir, config)
             assert isinstance(result, NewCodePeriodResult)
 
     def test_since_date_mtime_detects_recently_modified_files(self):
@@ -62,7 +68,8 @@ class TestNewCodePeriodDetectorNonGit:
                 reference_date=reference_date,
             )
             detector = NewCodePeriodDetector()
-            result = detector.detect(tmpdir, config)
+            with patch.object(_ncp_module, "git_available", return_value=False):
+                result = detector.detect(tmpdir, config)
 
             assert "recent.py" in result.modified_files
 
@@ -83,7 +90,8 @@ class TestNewCodePeriodDetectorNonGit:
                 reference_date=reference_date,
             )
             detector = NewCodePeriodDetector()
-            result = detector.detect(tmpdir, config)
+            with patch.object(_ncp_module, "git_available", return_value=False):
+                result = detector.detect(tmpdir, config)
 
             assert "old.py" not in result.modified_files
 
@@ -94,7 +102,8 @@ class TestNewCodePeriodDetectorNonGit:
                 period_type=NewCodePeriodType.SINCE_LAST_ANALYSIS,
             )
             detector = NewCodePeriodDetector()
-            result = detector.detect(tmpdir, config)
+            with patch.object(_ncp_module, "git_available", return_value=False):
+                result = detector.detect(tmpdir, config)
             assert isinstance(result, NewCodePeriodResult)
 
 
@@ -110,16 +119,13 @@ class TestNewCodePeriodDetectorWithGitMock:
             )
             detector = NewCodePeriodDetector()
 
-            def mock_git_available(scan_path):
-                return True
-
             def mock_run_git(args, cwd):
-                if args[0] == "log":
+                if args and args[0] == "log":
                     return "src/new_feature.py\nsrc/utils.py\n"
                 return None
 
-            with patch.object(detector, "_git_available", side_effect=mock_git_available), \
-                 patch.object(detector, "_run_git", side_effect=mock_run_git):
+            with patch.object(_ncp_module, "git_available", return_value=True), \
+                 patch.object(_new_code_git, "run_git", side_effect=mock_run_git):
                 result = detector.detect(tmpdir, config)
 
             assert "src/new_feature.py" in result.modified_files
@@ -134,16 +140,13 @@ class TestNewCodePeriodDetectorWithGitMock:
             )
             detector = NewCodePeriodDetector()
 
-            def mock_git_available(scan_path):
-                return True
-
             def mock_run_git(args, cwd):
-                if args[0] == "diff" and "--name-status" in args:
+                if args and args[0] == "diff" and "--name-status" in args:
                     return "A\tsrc/added_file.py\nM\tsrc/modified_file.py\nD\tsrc/deleted_file.py\n"
                 return None
 
-            with patch.object(detector, "_git_available", side_effect=mock_git_available), \
-                 patch.object(detector, "_run_git", side_effect=mock_run_git):
+            with patch.object(_ncp_module, "git_available", return_value=True), \
+                 patch.object(_new_code_git, "run_git", side_effect=mock_run_git):
                 result = detector.detect(tmpdir, config)
 
             assert "src/added_file.py" in result.new_files
@@ -162,20 +165,17 @@ class TestNewCodePeriodDetectorWithGitMock:
 
             captured_args = []
 
-            def mock_git_available(scan_path):
-                return True
-
             def mock_run_git(args, cwd):
                 captured_args.append(args)
-                if args[0] == "diff" and "--name-status" in args:
+                if args and args[0] == "diff" and "--name-status" in args:
                     return "M\tsrc/changed.py\n"
                 return "0"
 
-            with patch.object(detector, "_git_available", side_effect=mock_git_available), \
-                 patch.object(detector, "_run_git", side_effect=mock_run_git):
-                result = detector.detect(tmpdir, config)
+            with patch.object(_ncp_module, "git_available", return_value=True), \
+                 patch.object(_new_code_git, "run_git", side_effect=mock_run_git):
+                detector.detect(tmpdir, config)
 
-            diff_calls = [a for a in captured_args if a[0] == "diff"]
+            diff_calls = [a for a in captured_args if a and a[0] == "diff"]
             assert any("HEAD~1" in a for a in diff_calls)
 
     def test_since_version_returns_new_and_modified(self):
@@ -187,16 +187,13 @@ class TestNewCodePeriodDetectorWithGitMock:
             )
             detector = NewCodePeriodDetector()
 
-            def mock_git_available(scan_path):
-                return True
-
             def mock_run_git(args, cwd):
-                if args[0] == "diff" and "--name-status" in args:
+                if args and args[0] == "diff" and "--name-status" in args:
                     return "A\tsrc/brand_new.py\nM\tsrc/updated.py\n"
                 return "0"
 
-            with patch.object(detector, "_git_available", side_effect=mock_git_available), \
-                 patch.object(detector, "_run_git", side_effect=mock_run_git):
+            with patch.object(_ncp_module, "git_available", return_value=True), \
+                 patch.object(_new_code_git, "run_git", side_effect=mock_run_git):
                 result = detector.detect(tmpdir, config)
 
             assert "src/brand_new.py" in result.new_files
@@ -211,10 +208,7 @@ class TestNewCodePeriodDetectorWithGitMock:
             )
             detector = NewCodePeriodDetector()
 
-            def mock_git_available(scan_path):
-                return True
-
-            with patch.object(detector, "_git_available", side_effect=mock_git_available):
+            with patch.object(_ncp_module, "git_available", return_value=True):
                 result = detector.detect(tmpdir, config)
 
             assert result.new_files == []
@@ -229,16 +223,13 @@ class TestNewCodePeriodDetectorWithGitMock:
             )
             detector = NewCodePeriodDetector()
 
-            def mock_git_available(scan_path):
-                return True
-
             def mock_run_git(args, cwd):
-                if args[0] == "diff":
+                if args and args[0] == "diff":
                     return "A\tfile1.py\nA\tfile2.py\nM\tfile3.py\n"
                 return "0"
 
-            with patch.object(detector, "_git_available", side_effect=mock_git_available), \
-                 patch.object(detector, "_run_git", side_effect=mock_run_git):
+            with patch.object(_ncp_module, "git_available", return_value=True), \
+                 patch.object(_new_code_git, "run_git", side_effect=mock_run_git):
                 result = detector.detect(tmpdir, config)
 
             expected = len(result.new_files) + len(result.modified_files)
@@ -258,7 +249,7 @@ class TestNewCodePeriodDetectorWithGitMock:
             )
             detector = NewCodePeriodDetector()
 
-            with patch.object(detector, "_git_available", return_value=False):
+            with patch.object(_ncp_module, "git_available", return_value=False):
                 result = detector.detect(tmpdir, config)
 
             assert "myfile.py" in result.modified_files
@@ -275,8 +266,9 @@ class TestNewCodePeriodResult:
                 reference_date=datetime.now() - timedelta(days=1),
             )
             detector = NewCodePeriodDetector()
-            result = detector.detect(tmpdir, config)
-            assert result.period_type == NewCodePeriodType.SINCE_DATE.value
+            with patch.object(_ncp_module, "git_available", return_value=False):
+                result = detector.detect(tmpdir, config)
+            assert result.period_type == NewCodePeriodType.SINCE_DATE
 
     def test_result_reference_point_is_set(self):
         """NewCodePeriodResult has a non-empty reference_point description."""
@@ -286,7 +278,8 @@ class TestNewCodePeriodResult:
                 reference_date=datetime.now() - timedelta(days=1),
             )
             detector = NewCodePeriodDetector()
-            result = detector.detect(tmpdir, config)
+            with patch.object(_ncp_module, "git_available", return_value=False):
+                result = detector.detect(tmpdir, config)
             assert result.reference_point != ""
 
     def test_result_detected_at_is_set(self):
@@ -297,57 +290,52 @@ class TestNewCodePeriodResult:
                 reference_date=datetime.now() - timedelta(days=1),
             )
             detector = NewCodePeriodDetector()
-            result = detector.detect(tmpdir, config)
+            with patch.object(_ncp_module, "git_available", return_value=False):
+                result = detector.detect(tmpdir, config)
             assert result.detected_at is not None
             assert isinstance(result.detected_at, datetime)
 
 
 class TestNewCodePeriodParseNameStatus:
-    """Tests for the internal _parse_name_status helper."""
+    """Tests for the parse_name_status helper."""
 
     def test_parse_added_files(self):
         """Added files (A status) are placed in new_files."""
-        detector = NewCodePeriodDetector()
         output = "A\tsrc/new_file.py\nA\tsrc/another.py\n"
-        new_files, modified_files = detector._parse_name_status(output)
+        new_files, modified_files = _new_code_git.parse_name_status(output)
         assert "src/new_file.py" in new_files
         assert "src/another.py" in new_files
         assert modified_files == []
 
     def test_parse_modified_files(self):
         """Modified files (M status) are placed in modified_files."""
-        detector = NewCodePeriodDetector()
         output = "M\tsrc/existing.py\n"
-        new_files, modified_files = detector._parse_name_status(output)
+        new_files, modified_files = _new_code_git.parse_name_status(output)
         assert new_files == []
         assert "src/existing.py" in modified_files
 
     def test_parse_deleted_files_excluded(self):
         """Deleted files (D status) are excluded from both lists."""
-        detector = NewCodePeriodDetector()
         output = "D\tsrc/removed.py\n"
-        new_files, modified_files = detector._parse_name_status(output)
+        new_files, modified_files = _new_code_git.parse_name_status(output)
         assert new_files == []
         assert modified_files == []
 
     def test_parse_renamed_files_go_to_modified(self):
         """Renamed files (R status) are placed in modified_files."""
-        detector = NewCodePeriodDetector()
         output = "R100\tsrc/old_name.py\tsrc/new_name.py\n"
-        new_files, modified_files = detector._parse_name_status(output)
+        new_files, modified_files = _new_code_git.parse_name_status(output)
         assert new_files == []
         assert "src/new_name.py" in modified_files
 
     def test_parse_none_output_returns_empty(self):
         """None output returns two empty lists."""
-        detector = NewCodePeriodDetector()
-        new_files, modified_files = detector._parse_name_status(None)
+        new_files, modified_files = _new_code_git.parse_name_status(None)
         assert new_files == []
         assert modified_files == []
 
     def test_parse_empty_string_returns_empty(self):
         """Empty string output returns two empty lists."""
-        detector = NewCodePeriodDetector()
-        new_files, modified_files = detector._parse_name_status("")
+        new_files, modified_files = _new_code_git.parse_name_status("")
         assert new_files == []
         assert modified_files == []

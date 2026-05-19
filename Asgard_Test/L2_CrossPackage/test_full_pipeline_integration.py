@@ -88,7 +88,7 @@ class TestCompleteDevWorkflow:
 
         assert security_report is not None
         print(f"Security score: {security_report.security_score}/100")
-        print(f"Vulnerabilities found: {len(security_report.vulnerabilities)}")
+        print(f"Vulnerabilities found: {security_report.total_issues}")
 
         # 1c. Dependency Analysis
         dep_config = DependencyConfig(
@@ -110,14 +110,13 @@ class TestCompleteDevWorkflow:
             },
             "security": {
                 "score": security_report.security_score,
-                "vulnerability_count": len(security_report.vulnerabilities),
-                "critical_count": len([v for v in security_report.vulnerabilities
-                                      if v.severity.value == "critical"])
+                "vulnerability_count": security_report.total_issues,
+                "critical_count": security_report.critical_issues
             },
             "dependencies": {
                 "module_count": dep_report.total_modules,
                 "circular_dependencies": dep_report.total_cycles,
-                "instability": dep_report.modularity_metrics.average_instability
+                "modularity_score": dep_report.modularity.modularity_score
             }
         }
 
@@ -136,7 +135,7 @@ class TestCompleteDevWorkflow:
 
         assert openapi_result.is_valid
         print(f"OpenAPI spec valid: {openapi_result.is_valid}")
-        print(f"OpenAPI version: {openapi_result.spec_version}")
+        print(f"OpenAPI version: {openapi_result.openapi_version}")
 
         # 2b. Parse API details
         with open(sample_openapi_spec, 'r') as f:
@@ -153,7 +152,7 @@ class TestCompleteDevWorkflow:
         # Save Forseti report
         forseti_report = {
             "openapi_valid": openapi_result.is_valid,
-            "api_version": openapi_result.spec_version,
+            "api_version": openapi_result.openapi_version,
             "api_title": api_info.get('title'),
             "api_version_number": api_info.get('version'),
             "endpoint_count": endpoint_count
@@ -261,6 +260,7 @@ class TestCompleteDevWorkflow:
                     ]
                 ),
                 BuildStage(
+                    name="runtime",
                     base_image="python:3.11-slim",
                     workdir="/app",
                     copy_from="builder",
@@ -381,7 +381,7 @@ class TestCompleteDevWorkflow:
 
         assert pipeline_result is not None
         pipeline_file = output_dir / "ci-cd-pipeline.yaml"
-        pipeline_file.write_text(pipeline_result.yaml_content)
+        pipeline_file.write_text(pipeline_result.pipeline_content)
         assert pipeline_file.exists()
         print(f"Generated CI/CD pipeline: {pipeline_file}")
 
@@ -423,36 +423,27 @@ class TestCompleteDevWorkflow:
             max_response_time_ms = 500
 
         sla_config = SLAConfig(
-            target_success_rate=target_success_rate,
-            max_response_time_ms=max_response_time_ms,
+            threshold_ms=max_response_time_ms,
             target_percentile=99,
-            measurement_window_seconds=3600
         )
 
-        print(f"SLA target success rate: {sla_config.target_success_rate}")
-        print(f"SLA max response time: {sla_config.max_response_time_ms}ms")
+        print(f"SLA threshold: {sla_config.threshold_ms}ms")
 
         # 5b. Configure Apdex based on operation types
-        # For this test, assume read-heavy API
-        apdex_config = ApdexConfig(
-            satisfied_threshold_ms=100,
-            tolerating_threshold_ms=500
-        )
+        apdex_config = ApdexConfig(threshold_ms=100)
 
-        print(f"Apdex satisfied threshold: {apdex_config.satisfied_threshold_ms}ms")
-        print(f"Apdex tolerating threshold: {apdex_config.tolerating_threshold_ms}ms")
+        print(f"Apdex threshold: {apdex_config.threshold_ms}ms")
 
         # Save Verdandi configuration
         verdandi_report = {
             "sla_config": {
-                "target_success_rate": sla_config.target_success_rate,
-                "max_response_time_ms": sla_config.max_response_time_ms,
-                "target_percentile": sla_config.target_percentile
+                "threshold_ms": sla_config.threshold_ms,
+                "target_percentile": sla_config.target_percentile,
             },
             "apdex_config": {
-                "satisfied_threshold_ms": apdex_config.satisfied_threshold_ms,
-                "tolerating_threshold_ms": apdex_config.tolerating_threshold_ms
-            }
+                "threshold_ms": apdex_config.threshold_ms,
+                "frustration_threshold_ms": apdex_config.frustration_threshold_ms,
+            },
         }
 
         verdandi_report_file = reports_dir / "verdandi_monitoring.json"
@@ -557,12 +548,11 @@ class TestCompleteDevWorkflow:
             max_response_time = 500
 
         sla_config = SLAConfig(
-            target_success_rate=0.99,
-            max_response_time_ms=max_response_time,
-            target_percentile=95
+            threshold_ms=max_response_time,
+            target_percentile=95,
         )
 
-        assert sla_config.max_response_time_ms == max_response_time
+        assert sla_config.threshold_ms == max_response_time
 
 
 @pytest.mark.cross_package
@@ -619,11 +609,12 @@ class TestCrossCuttingConcerns:
         k8s_generator = ManifestGenerator(output_dir=str(output_dir))
         k8s_manifest = k8s_generator.generate(k8s_config)
 
-        # Verify YAML is parseable
-        yaml_data = yaml.safe_load(k8s_manifest.yaml_content)
-        assert yaml_data is not None
-        assert "apiVersion" in yaml_data
-        assert "kind" in yaml_data
+        # Verify YAML is parseable (manifest may contain multiple documents).
+        docs = [d for d in yaml.safe_load_all(k8s_manifest.yaml_content) if d]
+        assert docs, "Expected at least one YAML document"
+        first = docs[0]
+        assert "apiVersion" in first
+        assert "kind" in first
 
         # Generate pipeline
         pipeline_config = PipelineConfig(
@@ -641,5 +632,5 @@ class TestCrossCuttingConcerns:
         pipeline = pipeline_generator.generate(pipeline_config)
 
         # Verify pipeline YAML is parseable
-        pipeline_data = yaml.safe_load(pipeline.yaml_content)
+        pipeline_data = yaml.safe_load(pipeline.pipeline_content)
         assert pipeline_data is not None

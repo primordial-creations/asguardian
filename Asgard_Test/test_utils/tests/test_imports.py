@@ -12,32 +12,32 @@ class TestImports:
 
     def test_import_test_utils(self):
         """Test that test_utils package can be imported."""
-        import test_utils
+        import Asgard_Test.test_utils as test_utils
         assert test_utils is not None
 
     def test_import_file_utils(self):
         """Test that file_utils module can be imported."""
-        from test_utils import file_utils
+        from Asgard_Test.test_utils import file_utils
         assert file_utils is not None
 
     def test_import_mock_utils(self):
         """Test that mock_utils module can be imported."""
-        from test_utils import mock_utils
+        from Asgard_Test.test_utils import mock_utils
         assert mock_utils is not None
 
     def test_import_assertion_utils(self):
         """Test that assertion_utils module can be imported."""
-        from test_utils import assertion_utils
+        from Asgard_Test.test_utils import assertion_utils
         assert assertion_utils is not None
 
     def test_import_generators(self):
         """Test that generators module can be imported."""
-        from test_utils import generators
+        from Asgard_Test.test_utils import generators
         assert generators is not None
 
     def test_import_file_functions_from_root(self):
         """Test importing file utility functions from root."""
-        from test_utils import (
+        from Asgard_Test.test_utils import (
             create_temp_python_file,
             create_temp_yaml_file,
             create_temp_json_file,
@@ -52,7 +52,7 @@ class TestImports:
 
     def test_import_mock_functions_from_root(self):
         """Test importing mock utility functions from root."""
-        from test_utils import (
+        from Asgard_Test.test_utils import (
             mock_playwright_page,
             mock_playwright_browser,
             mock_database_connection,
@@ -67,7 +67,7 @@ class TestImports:
 
     def test_import_assertion_functions_from_root(self):
         """Test importing assertion utility functions from root."""
-        from test_utils import (
+        from Asgard_Test.test_utils import (
             assert_yaml_valid,
             assert_json_valid,
             assert_json_schema,
@@ -84,7 +84,7 @@ class TestImports:
 
     def test_import_generator_functions_from_root(self):
         """Test importing generator utility functions from root."""
-        from test_utils import (
+        from Asgard_Test.test_utils import (
             generate_python_class,
             generate_python_module,
             generate_openapi_spec,
@@ -101,13 +101,13 @@ class TestImports:
 
     def test_all_exports_available(self):
         """Test that all exports in __all__ are available."""
-        import test_utils
+        import Asgard_Test.test_utils as test_utils
         assert hasattr(test_utils, "__all__")
         for name in test_utils.__all__:
             assert hasattr(test_utils, name), f"Export '{name}' not found"
 
     def test_version_available(self):
         """Test that version is available."""
-        import test_utils
+        import Asgard_Test.test_utils as test_utils
         assert hasattr(test_utils, "__version__")
         assert isinstance(test_utils.__version__, str)

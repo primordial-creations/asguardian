@@ -21,7 +21,7 @@ from Asgard.Freya.Responsive.models.responsive_models import (
     MOBILE_DEVICES,
 )
 
-from conftest import file_url
+from Asgard_Test.tests_Freya.L1_Integration.conftest import file_url
 
 
 class TestResponsiveIntegrationBreakpointTester:
