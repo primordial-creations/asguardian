@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from Asgard.Heimdall.Quality import FileAnalyzer, AnalysisConfig
+from Asgard.Bragi.Quality import FileAnalyzer, AnalysisConfig
 from Asgard.Heimdall.Security import StaticSecurityService
-from Asgard.Heimdall.Dependencies import DependencyAnalyzer, DependencyConfig
+from Asgard.Bragi.Dependencies import DependencyAnalyzer, DependencyConfig
 from Asgard.Forseti.OpenAPI import SpecValidatorService
 from Asgard.Volundr.Kubernetes import ManifestConfig, ManifestGenerator, SecurityProfile
 from Asgard.Volundr.Docker import DockerfileConfig, DockerfileGenerator

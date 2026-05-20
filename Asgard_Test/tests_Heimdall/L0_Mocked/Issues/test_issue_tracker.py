@@ -11,7 +11,7 @@ from pathlib import Path
 
 import pytest
 
-from Asgard.Heimdall.Issues.models.issue_models import (
+from Asgard.Shared.Issues.models.issue_models import (
     IssueFilter,
     IssueSeverity,
     IssueStatus,
@@ -19,7 +19,7 @@ from Asgard.Heimdall.Issues.models.issue_models import (
     IssuesSummary,
     TrackedIssue,
 )
-from Asgard.Heimdall.Issues.services.issue_tracker import IssueTracker
+from Asgard.Shared.Issues.services.issue_tracker import IssueTracker
 
 
 def _make_tracker(tmp_path: Path) -> IssueTracker:

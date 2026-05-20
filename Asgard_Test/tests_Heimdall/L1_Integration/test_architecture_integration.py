@@ -8,7 +8,7 @@ import json
 import pytest
 from pathlib import Path
 
-from Asgard.Heimdall.Architecture import (
+from Asgard.Bragi.Architecture import (
     ArchitectureAnalyzer,
     ArchitectureConfig,
 )

@@ -1,22 +1,22 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.models.env_fallback_models import (
+from Asgard.Bragi.Quality.models.env_fallback_models import (
     EnvFallbackConfig,
     EnvFallbackSeverity,
 )
-from Asgard.Heimdall.Quality.services.env_fallback_scanner import EnvFallbackScanner
-from Asgard.Heimdall.Quality.models.lazy_import_models import (
+from Asgard.Bragi.Quality.services.env_fallback_scanner import EnvFallbackScanner
+from Asgard.Bragi.Quality.models.lazy_import_models import (
     LazyImportConfig,
     LazyImportSeverity,
 )
-from Asgard.Heimdall.Quality.services.lazy_import_scanner import LazyImportScanner
-from Asgard.Heimdall.Quality.models.library_usage_models import (
+from Asgard.Bragi.Quality.services.lazy_import_scanner import LazyImportScanner
+from Asgard.Bragi.Quality.models.library_usage_models import (
     ForbiddenImportConfig,
 )
-from Asgard.Heimdall.Quality.services.library_usage_scanner import LibraryUsageScanner
-from Asgard.Heimdall.Quality.models.datetime_models import DatetimeConfig
-from Asgard.Heimdall.Quality.services.datetime_scanner import DatetimeScanner
+from Asgard.Bragi.Quality.services.library_usage_scanner import LibraryUsageScanner
+from Asgard.Bragi.Quality.models.datetime_models import DatetimeConfig
+from Asgard.Bragi.Quality.services.datetime_scanner import DatetimeScanner
 
 
 def run_env_fallback_analysis(args: argparse.Namespace, verbose: bool = False) -> int:

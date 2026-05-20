@@ -1,0 +1,80 @@
+Designing an API schema analysis tool for these three fundamentally distinct audiences requires resolving a core tension: **the need for rich, empathetic context versus the need for high-signal, zero-noise automation.**
+
+If a tool natively outputs dense paragraphs of text, senior engineers will abandon it. If it outputs terse error codes, junior developers will blindly guess how to fix them. If it lacks historical aggregation, platform engineers get no value from it.
+
+To solve this, the architecture must abandon the traditional "linter" paradigm (where an engine evaluates a rule and directly prints a formatted string). Instead, it must adopt an architecture of **Extreme Decoupling**, separating the *mechanism* of analysis from the *presentation* of the findings and the *policy* of severity.
+
+Here is the architectural design and product strategy to serve these three audiences simultaneously.
+
+---
+
+### 1. The Core Architecture: The "Rich Finding" Payload
+
+A single validation engine can absolutely serve all three audiences, provided it is "headless." The core engine (ideally written in a fast systems language like Go or Rust) parses the schema into an Abstract Syntax Tree (AST), evaluates rules, and outputs a standardized, machine-readable object (such as **SARIF** — Static Analysis Results Interchange Format).
+
+Every violation becomes a "Rich Finding" JSON object containing:
+
+* **Coordinates:** Precise JSONPath, line, and column numbers.
+* **Terse Data:** A one-sentence summary and precise rule ID (e.g., `fmt-012`).
+* **Educational Payload:** The "Why this matters," Good/Bad examples, and internal docs links.
+* **Remediation Data:** A deterministic JSON-patch or AST diff for auto-fixing the issue.
+* **Metadata:** Git author, API ownership tier, and inline suppression status.
+
+This singular object acts as the source of truth. The varying needs and update frequencies of the audiences are handled entirely by **Audience-Specific Adapters**.
+
+---
+
+### 2. The Audience-Specific Adapters
+
+#### A. The Junior Developer View (The Educator)
+
+Junior developers need high-context, low-friction learning. They should not be forced to context-switch to a wiki to understand an error.
+
+* **Delivery Adapter:** IDE Extension (VS Code / IntelliJ) backed by a Language Server Protocol (LSP).
+* **The Experience:** The LSP parses the *Educational Payload*. When a junior writes `type: string` for an email field, a subtle underline appears. On hover, the tool renders a rich Markdown card explaining exactly why this matters (*"Without format: email, mock generators will produce random text..."*), ensuring they don't feel like they are just appeasing a pedantic robot.
+* **Actionability:** Using the *Remediation Data*, the IDE offers a 1-click "Quick Fix." The junior learns the correct syntax by watching the tool confidently write it for them.
+* **Update Frequency:** The IDE extension pulls the Educational Payloads from a centralized Content Registry, allowing Platform teams to update explanations and documentation links dynamically without requiring engineers to install new IDE plugin versions.
+
+#### B. The Senior Engineer View (The Unix Utility)
+
+Senior engineers suffer from alert fatigue. They demand speed, determinism, and agency.
+
+* **Delivery Adapter:** Local CLI binary and pre-commit hooks.
+* **The Experience:** By default, the CLI strictly ignores the educational payload. It outputs dense, greppable, UNIX-style text: `user-api.yaml:42:10 ERR [fmt-012] Missing email format`.
+* **Trust via Suppressions:** Static analysis is never perfect. Senior engineers will uninstall a tool if they cannot bypass a false positive or handle a legacy edge case. The engine must support AST-aware inline suppressions (e.g., an OpenAPI extension like `x-lint-ignore: [fmt-012, "Legacy downstream system crashes on format validation"]`). The CLI mandates a string justification to prevent lazy bypassing, but strictly respects the suppression, remaining entirely silent so the engineer is unblocked.
+
+#### C. Platform Engineering View (The Oracle)
+
+Platform teams do not care about line 42 of the User API. They care about systemic drift, organizational enablement, and measuring tech debt.
+
+* **Delivery Adapter:** CI/CD runners and Telemetry Sinks.
+* **The Experience:** When the CLI runs in CI, it asynchronously ships the raw SARIF objects to a data warehouse (e.g., Datadog, Snowflake) to power aggregate dashboards.
+* **The "Suppression Velocity" Metric:** This is the Platform team's secret weapon. When a senior engineer uses an inline suppression, it bypasses the CI gate, but the telemetry adapter *still logs it in the database as an `IGNORED` finding*. Platform teams can track "Total Suppressed Violations" to quantify API tech debt. Furthermore, if telemetry shows a specific rule is suppressed 80% of the time, Platform knows the rule is poorly designed, not the engineers.
+
+---
+
+### 3. The Severity Paradox & The Quality Gate
+
+*Should rule severity be audience-configurable, or should rules have fixed severities with audience-specific display filtering?*
+
+**Severity must never be audience-configurable.**
+
+If a missing constraint is a "gentle suggestion" in a junior's IDE but a "hard error" in a senior's CI pipeline, you create the **CI Paradox**. The junior developer will happily push code that their local environment told them was acceptable, only for the central CI gate to violently reject it. This breeds extreme frustration, creates an "it works on my machine" culture, and destroys trust in the tooling.
+
+To function as a reliable organizational quality gate, the architecture must rely on **Fixed Objective Severity, Contextual Display Filtering, and Baselining.**
+
+**1. Fixed Objective Severity:** A rule's severity (`ERROR`, `WARN`, `INFO`) is a singular, immutable truth defined by Platform Engineering in a central policy file.
+
+* `ERROR`: Invalidates the schema or breaks critical security standards. **Fails the CI build.**
+* `WARN` / `INFO`: Best practices and deprecation notices. **Passes the CI build**, but triggers telemetry.
+
+**2. Contextual Display Filtering:** Instead of changing the severity, we change *how the UI reacts to it*.
+
+* **For Juniors (IDE):** `WARN` and `INFO` rules are displayed prominently as yellow/blue squiggles. This acts as an ambient mentor, proactively nudging them toward best practices before they commit.
+* **For Seniors (CLI):** The CLI drops `WARN` and `INFO` rules entirely by default. It only prints `ERRORS`. This provides the zero-noise environment seniors require, while keeping them aligned with the same CI gate the juniors use.
+
+**3. Managing the Quality Gate (Progressive Rollouts & Baselines):**
+Because the architecture decouples policy from the engine, Platform teams gain organizational superpowers:
+
+* **Shadow Rollouts:** Platform introduces a new rule (e.g., strict pagination) as an `INFO` severity. Seniors don't see it (filtered out). Juniors see it as a gentle "lightbulb" hint. Telemetry gathers adoption data. Once 90% of APIs naturally comply, Platform promotes the rule to an `ERROR`, ratcheting up the quality gate without breaking 500 pipelines overnight.
+* **Baselining:** To ensure the tool doesn't block features on legacy APIs, the engine supports a `.lint-baseline.json` file. This records all existing violations on an old API and effectively "hides" them. The CI quality gate only fails on *net-new* violations introduced by a PR, ensuring tech debt is contained without halting product delivery.

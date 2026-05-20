@@ -1,26 +1,26 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.models.future_leak_models import (
+from Asgard.Bragi.Quality.models.future_leak_models import (
     FutureLeakConfig,
     FutureLeakSeverity,
 )
-from Asgard.Heimdall.Quality.services.future_leak_scanner import FutureLeakScanner
-from Asgard.Heimdall.Quality.models.blocking_async_models import (
+from Asgard.Bragi.Quality.services.future_leak_scanner import FutureLeakScanner
+from Asgard.Bragi.Quality.models.blocking_async_models import (
     BlockingAsyncConfig,
     BlockingAsyncSeverity,
 )
-from Asgard.Heimdall.Quality.services.blocking_async_scanner import BlockingAsyncScanner
-from Asgard.Heimdall.Quality.models.resource_cleanup_models import (
+from Asgard.Bragi.Quality.services.blocking_async_scanner import BlockingAsyncScanner
+from Asgard.Bragi.Quality.models.resource_cleanup_models import (
     ResourceCleanupConfig,
     ResourceCleanupSeverity,
 )
-from Asgard.Heimdall.Quality.services.resource_cleanup_scanner import ResourceCleanupScanner
-from Asgard.Heimdall.Quality.models.error_handling_models import (
+from Asgard.Bragi.Quality.services.resource_cleanup_scanner import ResourceCleanupScanner
+from Asgard.Bragi.Quality.models.error_handling_models import (
     ErrorHandlingConfig,
     ErrorHandlingSeverity,
 )
-from Asgard.Heimdall.Quality.services.error_handling_scanner import ErrorHandlingScanner
+from Asgard.Bragi.Quality.services.error_handling_scanner import ErrorHandlingScanner
 from Asgard.Heimdall.Security.models.config_secrets_models import (
     ConfigSecretsConfig,
     ConfigSecretSeverity,

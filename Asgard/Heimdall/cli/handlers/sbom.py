@@ -3,8 +3,8 @@ import json
 import traceback as _traceback
 from pathlib import Path
 
-from Asgard.Heimdall.Dependencies.models.sbom_models import SBOMConfig, SBOMFormat
-from Asgard.Heimdall.Dependencies.services.sbom_generator import SBOMGenerator
+from Asgard.Bragi.Dependencies.models.sbom_models import SBOMConfig, SBOMFormat
+from Asgard.Bragi.Dependencies.services.sbom_generator import SBOMGenerator
 
 
 def run_sbom_generation(args: argparse.Namespace, verbose: bool = False) -> int:

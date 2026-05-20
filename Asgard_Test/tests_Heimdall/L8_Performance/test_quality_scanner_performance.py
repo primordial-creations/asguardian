@@ -14,44 +14,44 @@ import pytest
 # ---------------------------------------------------------------------------
 # Complexity
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.services.complexity_analyzer import ComplexityAnalyzer
-from Asgard.Heimdall.Quality.models.complexity_models import ComplexityConfig
+from Asgard.Bragi.Quality.services.complexity_analyzer import ComplexityAnalyzer
+from Asgard.Bragi.Quality.models.complexity_models import ComplexityConfig
 
 # ---------------------------------------------------------------------------
 # Duplication
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.services.duplication_detector import DuplicationDetector
-from Asgard.Heimdall.Quality.models.duplication_models import DuplicationConfig
+from Asgard.Bragi.Quality.services.duplication_detector import DuplicationDetector
+from Asgard.Bragi.Quality.models.duplication_models import DuplicationConfig
 
 # ---------------------------------------------------------------------------
 # Naming
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.services.naming_convention_scanner import NamingConventionScanner
-from Asgard.Heimdall.Quality.models.naming_models import NamingConfig
+from Asgard.Bragi.Quality.services.naming_convention_scanner import NamingConventionScanner
+from Asgard.Bragi.Quality.models.naming_models import NamingConfig
 
 # ---------------------------------------------------------------------------
 # Maintainability
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.services.maintainability_analyzer import MaintainabilityAnalyzer
-from Asgard.Heimdall.Quality.models.maintainability_models import MaintainabilityConfig
+from Asgard.Bragi.Quality.services.maintainability_analyzer import MaintainabilityAnalyzer
+from Asgard.Bragi.Quality.models.maintainability_models import MaintainabilityConfig
 
 # ---------------------------------------------------------------------------
 # Typing coverage
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.services.typing_scanner import TypingScanner
-from Asgard.Heimdall.Quality.models.typing_models import TypingConfig
+from Asgard.Bragi.Quality.services.typing_scanner import TypingScanner
+from Asgard.Bragi.Quality.models.typing_models import TypingConfig
 
 # ---------------------------------------------------------------------------
 # Code smell
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.services.code_smell_detector import CodeSmellDetector
-from Asgard.Heimdall.Quality.models.smell_models import SmellConfig
+from Asgard.Bragi.Quality.services.code_smell_detector import CodeSmellDetector
+from Asgard.Bragi.Quality.models.smell_models import SmellConfig
 
 # ---------------------------------------------------------------------------
 # Technical debt
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
-from Asgard.Heimdall.Quality.models.debt_models import DebtConfig
+from Asgard.Bragi.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
+from Asgard.Bragi.Quality.models.debt_models import DebtConfig
 
 # ---------------------------------------------------------------------------
 # Shared synthetic payload

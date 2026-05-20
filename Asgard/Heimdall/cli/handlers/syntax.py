@@ -1,16 +1,16 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.models.syntax_models import (
+from Asgard.Bragi.Quality.models.syntax_models import (
     LinterType,
     SyntaxConfig,
     SyntaxSeverity,
 )
-from Asgard.Heimdall.Quality.services.syntax_checker import SyntaxChecker
-from Asgard.Heimdall.Dependencies.models.requirements_models import RequirementsConfig
-from Asgard.Heimdall.Dependencies.services.requirements_checker import RequirementsChecker
-from Asgard.Heimdall.Dependencies.models.license_models import LicenseConfig
-from Asgard.Heimdall.Dependencies.services.license_checker import LicenseChecker
+from Asgard.Bragi.Quality.services.syntax_checker import SyntaxChecker
+from Asgard.Bragi.Dependencies.models.requirements_models import RequirementsConfig
+from Asgard.Bragi.Dependencies.services.requirements_checker import RequirementsChecker
+from Asgard.Bragi.Dependencies.models.license_models import LicenseConfig
+from Asgard.Bragi.Dependencies.services.license_checker import LicenseChecker
 
 
 def run_syntax_analysis(args: argparse.Namespace, verbose: bool = False, fix_mode: bool = False) -> int:

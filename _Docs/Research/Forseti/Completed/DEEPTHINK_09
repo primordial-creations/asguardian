@@ -1,0 +1,90 @@
+The right mental model for API completeness requires abandoning the idea of a single "finish line" or a binary checklist. An API specification is a **boundary object**—a single artifact that must simultaneously serve three distinct audiences with competing definitions of "complete":
+
+1. **The Human (Developers, Product Managers):** Needs context, pedagogy, and fast onboarding.
+2. **The Machine (SDK Generators, API Gateways, Fuzzers):** Needs strict data boundaries and rigid types.
+3. **The System (Operators, Security, Support):** Needs rules of engagement for failure, resilience, and scale.
+
+Because these needs are orthogonal, **completeness is not a percentage; it is a multi-dimensional capability matrix.**
+
+To score completeness in a way that is objectively measurable and directly tied to Developer Experience (DX) and reliability, a tool should evaluate the API across four independent vectors, apply heuristic checks to defeat "malicious compliance" in documentation, and output results using context-aware profiles and gated tiers.
+
+Here is the blueprint for how that tool should work.
+
+---
+
+### 1. The Four Vectors of Completeness (Objective Metrics)
+
+A scoring tool must parse the specification and calculate objective percentages across four distinct layers:
+
+**A. Experiential Completeness (The Human Lens)**
+
+* **Metric:** `%` of operations, parameters, and schema properties (down to the leaf nodes) with descriptions.
+* **Metric:** `%` of request bodies and response schemas containing at least one example.
+* **The Crucial Check (Example Validity):** Do the provided examples syntactically validate against their own JSON Schema? *An invalid example actively harms the developer and must yield a negative score or instant failure.*
+
+**B. Schema Precision (The Machine Lens)**
+
+* **Metric:** `%` of `string` fields with `format`, `pattern`, `minLength`, or `maxLength`.
+* **Metric:** `%` of `integer`/`number` fields with `minimum` and `maximum`.
+* **Metric:** `%` of `array` fields with `minItems` and `maxItems`.
+* **Metric:** `%` of object schemas where `additionalProperties` is explicitly defined.
+
+**C. Operational Completeness (The System Lens)**
+
+* **Metric:** `%` of operations documenting at least one `4xx` (client error) and `5xx` (server error).
+* **Metric:** **Error Standardization.** Do all error responses point to a unified schema (e.g., RFC 7807 Problem Details), or are they bespoke per endpoint?
+* **Metric:** Presence of operational metadata: Authentication scopes defined, rate limit headers documented, pagination parameters/links specified.
+
+**D. Structural Completeness (The Baseline)**
+
+* **Metric:** 100% syntactically valid OpenAPI/AsyncAPI. Zero broken `$ref` pointers. All strictly required OpenAPI fields are present.
+
+---
+
+### 2. Defeating Subjectivity: Measuring "Good Enough"
+
+An API spec is structurally complete if a description says `"TODO"`, but experientially incomplete. To objectively score subjective text, the tool must employ **deterministic heuristics for semantic entropy**:
+
+1. **The Stop-Word Filter:** Any description exactly matching or containing only "TODO", "TBD", "test", "fixme", or "N/A" scores a 0.
+2. **The Tautology Penalty (String Distance):** The tool must calculate the Levenshtein distance between the property name and the description. If the property `billingAddress` is described as `"The billing address"`, the string similarity is near 100%. The tool flags this as providing *zero additive entropy* and scores it as missing.
+3. **Length & Token Minimums:** A valid description must cross a minimum threshold—e.g., $> 15$ characters, containing more than two words, and at least one verb.
+4. **LLM-Assisted Sampling (Optional but powerful):** Modern CI/CD pipelines can afford to randomly sample 5% of descriptions and pass them to a lightweight, local LLM with a strict prompt: *"Does this description explain the business purpose, format, or constraints of the field? True/False."* This generates a confidence multiplier for the overall score.
+
+---
+
+### 3. The Weighting Problem and the Ideal Output
+
+**The Trap of the Single Score**
+A tool should **never** output a single composite score (e.g., "Your API is 82% complete"). A single score allows catastrophic flaws to be masked by perfection elsewhere. An API with beautiful documentation (100% Experiential) but no documented authentication (0% Operational) is mathematically an "82%," but functionally unusable.
+
+**The Solution: Dimensional Vectors + Gated Tiers**
+The tool should output a **Radar Chart (Vector Score)** accompanied by a **Qualitative Maturity Tier** (Basic, Standard, Comprehensive).
+
+Tiers solve the weighting problem by acting as *lowest-common-denominator gates*. You only achieve a tier if you meet the minimum threshold for *all* relevant dimensions:
+
+* 🥉 **Basic (Integration is possible but painful):** 100% Structural, >60% Experiential, Auth documented.
+* 🥈 **Standard (Dev-Portal Ready):** Meets Basic, plus >85% Experiential, 100% of examples validate against schemas, >80% Error Coverage.
+* 🥇 **Comprehensive (CodeGen & Enterprise Ready):** Meets Standard, plus >90% Schema Precision (bounds/formats everywhere), unified error schemas, and documented rate limits.
+
+**Context-Aware Profiles**
+Because different teams care about different dimensions, the tool should accept a `--profile` flag.
+
+* A Developer Portal CI pipeline runs `--profile=dx` (failing the build if Experiential drops).
+* A Security pipeline runs `--profile=secops` (ignoring missing descriptions, but strictly enforcing Schema Precision to prevent buffer overflow attacks).
+
+---
+
+### 4. The Evidence: Correlating Metrics to Real-World Outcomes
+
+Engineering leadership will only adopt this tooling if the metrics map to business outcomes. You can correlate these specific vectors directly to established platform KPIs:
+
+* **Time to First Successful Call (TTFSC) $\leftrightarrow$ Example Completeness & Validity.**
+* *Evidence:* Developers rarely read schema descriptions top-to-bottom; they copy-paste the JSON payload or cURL snippet. If examples are missing or syntactically invalid, TTFSC spikes from minutes to hours. Validated examples are the strongest predictor of rapid onboarding.
+
+
+* **Support Ticket Volume $\leftrightarrow$ Error Completeness & Consistency.**
+* *Evidence:* When developers receive a generic `400 Bad Request` with an empty body, their only recourse is to open a support ticket. Standardized, documented error schemas allow developers to self-serve their fixes. High operational completeness correlates inversely with support load.
+
+
+* **SDK Bug Rates & Production Incidents $\leftrightarrow$ Schema Precision.**
+* *Evidence:* Auto-generated client libraries rely entirely on schema precision. If an API returns an unbounded array, or a string that is actually a UUID without declaring the `format: uuid`, generated clients will use incorrect native types, leading to runtime panics, out-of-memory errors, or integration breakages in strongly-typed languages. Precision acts as a client-side firewall.

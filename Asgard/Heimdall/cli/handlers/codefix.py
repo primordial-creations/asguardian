@@ -3,7 +3,7 @@ import json
 import traceback as _traceback
 from pathlib import Path
 
-from Asgard.Heimdall.CodeFix.services.codefix_service import CodeFixService
+from Asgard.Bragi.CodeFix.services.codefix_service import CodeFixService
 
 
 def run_codefix_suggestions(args: argparse.Namespace, verbose: bool = False) -> int:

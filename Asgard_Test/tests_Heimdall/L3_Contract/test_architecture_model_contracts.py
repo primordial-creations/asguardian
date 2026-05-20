@@ -9,7 +9,7 @@ from pathlib import Path
 from dataclasses import fields as dc_fields
 
 
-from Asgard.Heimdall.Architecture.models.architecture_models import (
+from Asgard.Bragi.Architecture.models.architecture_models import (
     ArchitectureConfig,
     ArchitectureReport,
     SOLIDReport,

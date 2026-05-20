@@ -12,7 +12,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from Asgard.Heimdall.Quality import FileAnalyzer, AnalysisConfig
+from Asgard.Bragi.Quality import FileAnalyzer, AnalysisConfig
 from Asgard.Heimdall.Security import StaticSecurityService, SecurityScanConfig
 from Asgard.Forseti.OpenAPI import SpecValidatorService, OpenAPIConfig
 from Asgard.Forseti.JSONSchema.services.schema_validator_service import SchemaValidatorService

@@ -1,10 +1,10 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.models.documentation_models import DocumentationConfig
-from Asgard.Heimdall.Quality.services.documentation_scanner import DocumentationScanner
-from Asgard.Heimdall.Quality.models.naming_models import NamingConfig
-from Asgard.Heimdall.Quality.services.naming_convention_scanner import NamingConventionScanner
+from Asgard.Bragi.Quality.models.documentation_models import DocumentationConfig
+from Asgard.Bragi.Quality.services.documentation_scanner import DocumentationScanner
+from Asgard.Bragi.Quality.models.naming_models import NamingConfig
+from Asgard.Bragi.Quality.services.naming_convention_scanner import NamingConventionScanner
 
 
 def run_documentation_analysis(args: argparse.Namespace, verbose: bool = False) -> int:

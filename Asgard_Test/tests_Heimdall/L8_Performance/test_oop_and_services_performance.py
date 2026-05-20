@@ -20,57 +20,57 @@ import pytest
 # ---------------------------------------------------------------------------
 # OOP
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.OOP.services.oop_analyzer import OOPAnalyzer
-from Asgard.Heimdall.OOP.services.coupling_analyzer import CouplingAnalyzer
-from Asgard.Heimdall.OOP.services.inheritance_analyzer import InheritanceAnalyzer
-from Asgard.Heimdall.OOP.services.cohesion_analyzer import CohesionAnalyzer
-from Asgard.Heimdall.OOP.models.oop_models import OOPConfig
+from Asgard.Bragi.OOP.services.oop_analyzer import OOPAnalyzer
+from Asgard.Bragi.OOP.services.coupling_analyzer import CouplingAnalyzer
+from Asgard.Bragi.OOP.services.inheritance_analyzer import InheritanceAnalyzer
+from Asgard.Bragi.OOP.services.cohesion_analyzer import CohesionAnalyzer
+from Asgard.Bragi.OOP.models.oop_models import OOPConfig
 
 # ---------------------------------------------------------------------------
 # Architecture extras
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Architecture.services.layer_analyzer import LayerAnalyzer
-from Asgard.Heimdall.Architecture.services.pattern_detector import PatternDetector
-from Asgard.Heimdall.Architecture.models.architecture_models import ArchitectureConfig
+from Asgard.Bragi.Architecture.services.layer_analyzer import LayerAnalyzer
+from Asgard.Bragi.Architecture.services.pattern_detector import PatternDetector
+from Asgard.Bragi.Architecture.models.architecture_models import ArchitectureConfig
 
 # ---------------------------------------------------------------------------
 # Dependencies
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Dependencies.services.dependency_analyzer import DependencyAnalyzer
-from Asgard.Heimdall.Dependencies.models.dependency_models import DependencyConfig
+from Asgard.Bragi.Dependencies.services.dependency_analyzer import DependencyAnalyzer
+from Asgard.Bragi.Dependencies.models.dependency_models import DependencyConfig
 
 # ---------------------------------------------------------------------------
 # Coverage
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Coverage.services.coverage_analyzer import CoverageAnalyzer
-from Asgard.Heimdall.Coverage.models.coverage_models import CoverageConfig
+from Asgard.Bragi.Coverage.services.coverage_analyzer import CoverageAnalyzer
+from Asgard.Bragi.Coverage.models.coverage_models import CoverageConfig
 
 # ---------------------------------------------------------------------------
 # Performance
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Performance.services.static_performance_service import StaticPerformanceService
-from Asgard.Heimdall.Performance.models._performance_reports import PerformanceScanConfig
+from Asgard.Bragi.Performance.services.static_performance_service import StaticPerformanceService
+from Asgard.Bragi.Performance.models._performance_reports import PerformanceScanConfig
 
 # ---------------------------------------------------------------------------
 # Profiles
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Profiles.services.profile_manager import ProfileManager
+from Asgard.Shared.Profiles.services.profile_manager import ProfileManager
 
 # ---------------------------------------------------------------------------
 # CodeFix
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.CodeFix.services.codefix_service import CodeFixService
+from Asgard.Bragi.CodeFix.services.codefix_service import CodeFixService
 
 # ---------------------------------------------------------------------------
 # QualityGate
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
-from Asgard.Heimdall.QualityGate.models.quality_gate_models import MetricType
+from Asgard.Bragi.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
+from Asgard.Bragi.QualityGate.models.quality_gate_models import MetricType
 
 # ---------------------------------------------------------------------------
 # Ratings
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Ratings.services.ratings_calculator import RatingsCalculator
+from Asgard.Bragi.Ratings.services.ratings_calculator import RatingsCalculator
 
 # ---------------------------------------------------------------------------
 # Shared synthetic payload and project builder

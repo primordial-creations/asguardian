@@ -1,15 +1,15 @@
 import json
 
-from Asgard.Heimdall.Performance.models.performance_models import PerformanceScanConfig
-from Asgard.Heimdall.Performance.services.static_performance_service import StaticPerformanceService
-from Asgard.Heimdall.OOP.models.oop_models import OOPConfig
-from Asgard.Heimdall.OOP.services.oop_analyzer import OOPAnalyzer
-from Asgard.Heimdall.Architecture.models.architecture_models import ArchitectureConfig
-from Asgard.Heimdall.Architecture.services.architecture_analyzer import ArchitectureAnalyzer
-from Asgard.Heimdall.Dependencies.models.dependency_models import DependencyConfig
-from Asgard.Heimdall.Dependencies.services.dependency_analyzer import DependencyAnalyzer
-from Asgard.Heimdall.Coverage.models.coverage_models import CoverageConfig
-from Asgard.Heimdall.Coverage.services.coverage_analyzer import CoverageAnalyzer
+from Asgard.Bragi.Performance.models.performance_models import PerformanceScanConfig
+from Asgard.Bragi.Performance.services.static_performance_service import StaticPerformanceService
+from Asgard.Bragi.OOP.models.oop_models import OOPConfig
+from Asgard.Bragi.OOP.services.oop_analyzer import OOPAnalyzer
+from Asgard.Bragi.Architecture.models.architecture_models import ArchitectureConfig
+from Asgard.Bragi.Architecture.services.architecture_analyzer import ArchitectureAnalyzer
+from Asgard.Bragi.Dependencies.models.dependency_models import DependencyConfig
+from Asgard.Bragi.Dependencies.services.dependency_analyzer import DependencyAnalyzer
+from Asgard.Bragi.Coverage.models.coverage_models import CoverageConfig
+from Asgard.Bragi.Coverage.services.coverage_analyzer import CoverageAnalyzer
 
 
 def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports):

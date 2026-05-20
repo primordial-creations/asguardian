@@ -1,23 +1,23 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.models.complexity_models import ComplexityConfig
-from Asgard.Heimdall.Quality.services.complexity_analyzer import ComplexityAnalyzer
-from Asgard.Heimdall.Quality.models.duplication_models import DuplicationConfig
-from Asgard.Heimdall.Quality.services.duplication_detector import DuplicationDetector
-from Asgard.Heimdall.Quality.models.smell_models import (
+from Asgard.Bragi.Quality.models.complexity_models import ComplexityConfig
+from Asgard.Bragi.Quality.services.complexity_analyzer import ComplexityAnalyzer
+from Asgard.Bragi.Quality.models.duplication_models import DuplicationConfig
+from Asgard.Bragi.Quality.services.duplication_detector import DuplicationDetector
+from Asgard.Bragi.Quality.models.smell_models import (
     SmellConfig,
     SmellSeverity,
     SmellThresholds,
 )
-from Asgard.Heimdall.Quality.models.debt_models import DebtConfig, TimeHorizon
-from Asgard.Heimdall.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
-from Asgard.Heimdall.Quality.models.maintainability_models import (
+from Asgard.Bragi.Quality.models.debt_models import DebtConfig, TimeHorizon
+from Asgard.Bragi.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
+from Asgard.Bragi.Quality.models.maintainability_models import (
     MaintainabilityConfig,
     LanguageProfile,
 )
-from Asgard.Heimdall.Quality.services.code_smell_detector import CodeSmellDetector
-from Asgard.Heimdall.Quality.services.maintainability_analyzer import MaintainabilityAnalyzer
+from Asgard.Bragi.Quality.services.code_smell_detector import CodeSmellDetector
+from Asgard.Bragi.Quality.services.maintainability_analyzer import MaintainabilityAnalyzer
 
 
 def run_complexity_analysis(args: argparse.Namespace, verbose: bool = False) -> int:

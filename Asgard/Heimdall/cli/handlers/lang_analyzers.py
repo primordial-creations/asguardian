@@ -3,11 +3,11 @@ import json
 import traceback as _traceback
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.languages.javascript.models.js_models import JSAnalysisConfig
-from Asgard.Heimdall.Quality.languages.javascript.services.js_analyzer import JSAnalyzer
-from Asgard.Heimdall.Quality.languages.typescript.services.ts_analyzer import TSAnalyzer
-from Asgard.Heimdall.Quality.languages.shell.models.shell_models import ShellAnalysisConfig
-from Asgard.Heimdall.Quality.languages.shell.services.shell_analyzer import ShellAnalyzer
+from Asgard.Bragi.Quality.languages.javascript.models.js_models import JSAnalysisConfig
+from Asgard.Bragi.Quality.languages.javascript.services.js_analyzer import JSAnalyzer
+from Asgard.Bragi.Quality.languages.typescript.services.ts_analyzer import TSAnalyzer
+from Asgard.Bragi.Quality.languages.shell.models.shell_models import ShellAnalysisConfig
+from Asgard.Bragi.Quality.languages.shell.services.shell_analyzer import ShellAnalyzer
 
 
 def run_js_analysis(args: argparse.Namespace, verbose: bool = False) -> int:

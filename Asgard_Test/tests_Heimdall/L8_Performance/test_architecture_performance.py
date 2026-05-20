@@ -10,9 +10,9 @@ from textwrap import dedent
 
 import pytest
 
-from Asgard.Heimdall.Architecture.services.solid_validator import SOLIDValidator
-from Asgard.Heimdall.Architecture.services.hexagonal_analyzer import HexagonalAnalyzer
-from Asgard.Heimdall.Architecture.models.architecture_models import ArchitectureConfig
+from Asgard.Bragi.Architecture.services.solid_validator import SOLIDValidator
+from Asgard.Bragi.Architecture.services.hexagonal_analyzer import HexagonalAnalyzer
+from Asgard.Bragi.Architecture.models.architecture_models import ArchitectureConfig
 
 # ---------------------------------------------------------------------------
 # Fixture factory

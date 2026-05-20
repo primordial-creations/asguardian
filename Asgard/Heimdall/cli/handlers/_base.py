@@ -9,7 +9,7 @@ import webbrowser
 from pathlib import Path
 from typing import Callable, cast
 
-from Asgard.Heimdall.Quality.models.analysis_models import SeverityLevel
+from Asgard.Bragi.Quality.models.analysis_models import SeverityLevel
 
 
 _handlers_loaded = False

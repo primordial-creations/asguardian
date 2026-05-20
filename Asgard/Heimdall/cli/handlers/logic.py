@@ -1,12 +1,12 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.models.duplication_models import DuplicationConfig
-from Asgard.Heimdall.Quality.services.duplication_detector import DuplicationDetector
-from Asgard.Heimdall.Quality.models.smell_models import SmellConfig, SmellSeverity
-from Asgard.Heimdall.Quality.services.code_smell_detector import CodeSmellDetector
-from Asgard.Heimdall.Quality.models.complexity_models import ComplexityConfig
-from Asgard.Heimdall.Quality.services.complexity_analyzer import ComplexityAnalyzer
+from Asgard.Bragi.Quality.models.duplication_models import DuplicationConfig
+from Asgard.Bragi.Quality.services.duplication_detector import DuplicationDetector
+from Asgard.Bragi.Quality.models.smell_models import SmellConfig, SmellSeverity
+from Asgard.Bragi.Quality.services.code_smell_detector import CodeSmellDetector
+from Asgard.Bragi.Quality.models.complexity_models import ComplexityConfig
+from Asgard.Bragi.Quality.services.complexity_analyzer import ComplexityAnalyzer
 
 
 def run_logic_analysis(args: argparse.Namespace, verbose: bool = False, analysis_type: str = "audit") -> int:

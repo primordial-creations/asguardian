@@ -9,10 +9,10 @@ from pathlib import Path
 
 import pytest
 
-from Asgard.Heimdall.Architecture.services.solid_validator import SOLIDValidator
-from Asgard.Heimdall.Architecture.services.hexagonal_analyzer import HexagonalAnalyzer
-from Asgard.Heimdall.Architecture.models.architecture_models import ArchitectureConfig
-from Asgard.Heimdall.Architecture.models._solid_models import SOLIDPrinciple
+from Asgard.Bragi.Architecture.services.solid_validator import SOLIDValidator
+from Asgard.Bragi.Architecture.services.hexagonal_analyzer import HexagonalAnalyzer
+from Asgard.Bragi.Architecture.models.architecture_models import ArchitectureConfig
+from Asgard.Bragi.Architecture.models._solid_models import SOLIDPrinciple
 
 
 # ---------------------------------------------------------------------------

@@ -17,7 +17,7 @@ from Asgard.Dashboard.models.dashboard_models import (
     RatingData,
 )
 from Asgard.Dashboard.services.data_collector import DataCollector
-from Asgard.Heimdall.Issues.models.issue_models import (
+from Asgard.Shared.Issues.models.issue_models import (
     IssueSeverity,
     IssuesSummary,
     IssueStatus,

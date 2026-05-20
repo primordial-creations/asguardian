@@ -12,12 +12,12 @@ from unittest.mock import patch
 
 import pytest
 
-import Asgard.Heimdall.Profiles.services.profile_manager as profile_manager_module
-from Asgard.Heimdall.Profiles.models.profile_models import (
+import Asgard.Shared.Profiles.services.profile_manager as profile_manager_module
+from Asgard.Shared.Profiles.models.profile_models import (
     QualityProfile,
     RuleConfig,
 )
-from Asgard.Heimdall.Profiles.services.profile_manager import ProfileManager
+from Asgard.Shared.Profiles.services.profile_manager import ProfileManager
 
 
 class TestProfileManagerListProfiles:

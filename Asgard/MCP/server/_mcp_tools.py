@@ -9,17 +9,17 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional, cast
 
-from Asgard.Heimdall.Dependencies.models.sbom_models import SBOMConfig, SBOMFormat
-from Asgard.Heimdall.Dependencies.services.sbom_generator import SBOMGenerator
-from Asgard.Heimdall.Issues.models.issue_models import IssueFilter, IssueStatus
-from Asgard.Heimdall.Issues.services.issue_tracker import IssueTracker
-from Asgard.Heimdall.Quality.models.analysis_models import AnalysisConfig
-from Asgard.Heimdall.Quality.models.debt_models import DebtConfig
-from Asgard.Heimdall.Quality.services.file_length_analyzer import FileAnalyzer
-from Asgard.Heimdall.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
-from Asgard.Heimdall.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
-from Asgard.Heimdall.Ratings.models.ratings_models import RatingsConfig
-from Asgard.Heimdall.Ratings.services.ratings_calculator import RatingsCalculator
+from Asgard.Bragi.Dependencies.models.sbom_models import SBOMConfig, SBOMFormat
+from Asgard.Bragi.Dependencies.services.sbom_generator import SBOMGenerator
+from Asgard.Shared.Issues.models.issue_models import IssueFilter, IssueStatus
+from Asgard.Shared.Issues.services.issue_tracker import IssueTracker
+from Asgard.Bragi.Quality.models.analysis_models import AnalysisConfig
+from Asgard.Bragi.Quality.models.debt_models import DebtConfig
+from Asgard.Bragi.Quality.services.file_length_analyzer import FileAnalyzer
+from Asgard.Bragi.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer
+from Asgard.Bragi.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
+from Asgard.Bragi.Ratings.models.ratings_models import RatingsConfig
+from Asgard.Bragi.Ratings.services.ratings_calculator import RatingsCalculator
 from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
 from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
 from Asgard.MCP.models.mcp_models import MCPServerConfig

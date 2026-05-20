@@ -1,10 +1,10 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.OOP.models.oop_models import OOPConfig
-from Asgard.Heimdall.OOP.services.oop_analyzer import OOPAnalyzer
-from Asgard.Heimdall.Architecture.models.architecture_models import ArchitectureConfig
-from Asgard.Heimdall.Architecture.services.architecture_analyzer import ArchitectureAnalyzer
+from Asgard.Bragi.OOP.models.oop_models import OOPConfig
+from Asgard.Bragi.OOP.services.oop_analyzer import OOPAnalyzer
+from Asgard.Bragi.Architecture.models.architecture_models import ArchitectureConfig
+from Asgard.Bragi.Architecture.services.architecture_analyzer import ArchitectureAnalyzer
 
 
 def run_oop_analysis(args: argparse.Namespace, verbose: bool = False) -> int:

@@ -1,7 +1,7 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Init.linter_initializer import LinterInitializer
+from Asgard.Shared.Init.linter_initializer import LinterInitializer
 
 
 def run_init_linter(args, verbose: bool = False) -> int:

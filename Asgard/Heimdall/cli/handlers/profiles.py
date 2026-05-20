@@ -2,8 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
-from Asgard.Heimdall.Profiles.services.profile_manager import ProfileManager
-from Asgard.Heimdall.Profiles.models.profile_models import QualityProfile, RuleConfig
+from Asgard.Shared.Profiles.services.profile_manager import ProfileManager
+from Asgard.Shared.Profiles.models.profile_models import QualityProfile, RuleConfig
 
 
 def run_profiles_command(args: argparse.Namespace, verbose: bool = False) -> int:

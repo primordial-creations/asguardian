@@ -1,0 +1,81 @@
+To satisfy the radically opposing constraints of multi-second heuristic static analysis and microsecond runtime execution, you cannot use a single monolithic execution engine. If you optimize an engine for the developer (retaining Abstract Syntax Trees and line numbers), the runtime will blow its latency budget. If you optimize for the runtime hot-path, the developer experience will lack context. Conversely, building completely separate implementations guarantees "validation drift"—the catastrophic scenario where an API spec passes CI but its payloads are rejected by the API gateway.
+
+The correct architectural pattern is a **Unified Rule Registry with Bifurcated Execution Engines**, bridged by an **Ahead-of-Time (AOT) Compiler**, and governed by a **Metadata-Driven Profile Abstraction**.
+
+Here is how this architecture models your specific contexts and resolves their conflicting constraints.
+
+---
+
+### 1. The Core Architecture: Bifurcated Execution
+
+The tool must separate *what* the rules are from *how* they are executed.
+
+* **The Static Analysis Engine (CLI, Pre-commit, CI):** This engine parses the schema into a rich Abstract Syntax Tree (AST). It prioritizes source-mapping, line numbers, cross-file reference resolution, and generating actionable, human-readable errors. It is designed to evaluate the design and structure of the schema itself.
+* **The Runtime Engine (API Gateway / Middleware):** This engine evaluates incoming HTTP *payloads*. It never parses YAML/JSON specs and has no concept of an AST. It prioritizes zero-allocation, microsecond latency.
+* **The Bridge (The AOT Compiler):** During the CI/CD phase, if the schema passes static analysis, the tool acts as a compiler. It translates the schema's payload constraints (types, regexes, bounds) into a highly optimized, flat binary artifact (e.g., WebAssembly, an eBPF filter, or a Regex State Machine). The Runtime Engine simply loads and executes this artifact.
+
+### 2. The Abstraction: "Validation Profiles"
+
+To avoid spaghetti code (`if context == "pre-commit" { skip }`), a "Validation Profile" must not be a hardcoded list of rules. Instead, it should be a **declarative query against rule metadata, combined with an execution contract**.
+
+Every rule in your registry must be intrinsically tagged with three metadata dimensions:
+
+* **Target:** `Schema` (validating the spec design) vs. `Payload` (validating live data).
+* **Cost:** `O(1)` (local regex/type), `O(N)` (AST traversal), `Network` (fetching remote dependencies/registries).
+* **Confidence:** `Deterministic` (mathematical certainty, 0% false positives) vs. `Heuristic` (linting, best-guesses, stylistic).
+
+A **Validation Profile** orchestrates four axes:
+
+1. **Rule Selector:** A predicate query filtering which rules run (e.g., `Cost <= O(N)`).
+2. **Severity Mapping:** How violations map to system behavior (Error, Warn, Ignore).
+3. **Execution Budget:** Hard timeouts and bailout semantics (`fail-open` vs `fail-closed`).
+4. **Reporter Sink:** Where the output goes (Rich text, SARIF, Metrics).
+
+---
+
+### 3. Modeling the Four Contexts
+
+By injecting different Validation Profiles into the architecture, the tool adapts its behavior automatically without duplicating logic.
+
+#### A. The Developer CLI (The Coach)
+
+* **Selector:** `Target == Schema`, **All Costs**, **All Confidences**.
+* **Budget & Semantics:** 5+ seconds. Non-blocking (`collect-all`). Exits with code `0` for warnings.
+* **Severity Mapping:** `Deterministic` -> Error; `Heuristic` -> Warning.
+* **Reporter Sink:** Uses the AST to print rich, color-coded terminal output with squiggly lines mapping exactly to the file, augmented with auto-fix suggestions and documentation links.
+
+#### B. The CI/CD Gate (The Source of Truth)
+
+* **Selector:** `Target == Schema`, `Cost <= Network` (caching required to ensure determinism).
+* **Budget & Semantics:** 30 seconds. Strict `fail-closed`. If a schema `$ref` URL is unreachable, the pipeline fails.
+* **Severity Mapping:** *Crucial distinction here.* To achieve zero false positives for blocking errors, `Heuristic` rules are forcibly downgraded to non-blocking `Warnings` (annotating the PR but returning exit code 0). Only `Deterministic` failures result in Exit Code 1.
+* **The Handoff:** If the spec passes, the pipeline triggers the AOT Compiler to generate the runtime artifact.
+
+#### C. The Pre-Commit Hook (The Speed Gate)
+
+* **Selector:** `Target == Schema`, **`Cost <= O(N)`**, **`Confidence == Deterministic`**.
+* **Budget & Semantics:** Strict 2-second timeout. `Fail-fast`.
+* **Graceful Degradation:** `Fail-open` semantics. If the hook times out, or if a required validation dependency (like a local Python environment) is missing, the engine catches the exception, prints a soft warning to `stderr` ("*Validation degraded: deferring to CI*"), and exits `0`. Developers are never blocked by broken tooling.
+
+#### D. The Runtime Validator (The Data Plane)
+
+* **Selector:** `Target == Payload` only.
+* **Execution:** Runs the pre-compiled AOT artifact in memory.
+* **Budget & Semantics:** < 1 millisecond execution constraint. Strict `fail-closed` (returns HTTP 400 for bad inbound requests to protect backend services).
+* **Reporter Sink:** Minimal observability. Heavy error strings are stripped to prevent log-volume explosions and PII leaks. Instead, failures increment high-performance counters (e.g., `validation_failed_total{endpoint="/users", reason="type_mismatch"}`).
+
+---
+
+### 4. Handling Cross-Context Friction
+
+*How do you handle a check that is appropriate in CI but too slow for pre-commit?*
+
+This is solved organically by the **Metadata Abstraction** and **Time-Sliced Preemption**.
+
+If an API rule is designed to check for backwards compatibility by downloading the previous schema version from a remote registry, the rule author simply tags it `Cost: Network`.
+
+Because the Pre-commit Profile's rule selector explicitly filters out network-bound rules (`Cost <= O(N)`), the engine **dynamically drops the slow rule** from the execution graph before validation even begins. You do not maintain separate rule lists; the metadata handles the routing.
+
+Furthermore, if a local check unexpectedly hangs and approaches the 2-second mark, the engine's Execution Budget interrupts the process. Because the pre-commit profile is configured to `fail-open`, it safely yields the results of the fast rules that *did* finish, warns the user that validation was truncated, and exits `0`.
+
+This layered defense maintains organizational validation policy without ever destroying developer velocity or incentivizing engineers to bypass the hook entirely.

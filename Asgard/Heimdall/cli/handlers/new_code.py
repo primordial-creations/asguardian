@@ -3,7 +3,7 @@ import json
 from datetime import datetime
 from pathlib import Path
 
-from Asgard.Heimdall.common.new_code_period import (
+from Asgard.Shared.common.new_code_period import (
     NewCodePeriodConfig,
     NewCodePeriodDetector,
     NewCodePeriodType,

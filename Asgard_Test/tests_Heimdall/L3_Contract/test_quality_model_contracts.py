@@ -8,7 +8,7 @@ from pydantic import ValidationError
 # ---------------------------------------------------------------------------
 # Complexity
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.complexity_models import (
+from Asgard.Bragi.Quality.models.complexity_models import (
     FunctionComplexity,
     FileComplexityAnalysis,
     ComplexityResult,
@@ -47,7 +47,7 @@ class TestComplexityConfigContract:
 # ---------------------------------------------------------------------------
 # Duplication
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.duplication_models import (
+from Asgard.Bragi.Quality.models.duplication_models import (
     CodeBlock,
     DuplicationMatch,
     CloneFamily,
@@ -103,7 +103,7 @@ class TestDuplicationConfigContract:
 # ---------------------------------------------------------------------------
 # Debt
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.debt_models import (
+from Asgard.Bragi.Quality.models.debt_models import (
     DebtItem,
     DebtReport,
     DebtConfig,
@@ -116,7 +116,7 @@ class TestDebtItemContract:
             DebtItem()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.debt_models import DebtType
+        from Asgard.Bragi.Quality.models.debt_models import DebtType
         di = DebtItem(debt_type=DebtType.CODE, file_path="/a.py", description="Too long")
         assert hasattr(di, "debt_type")
         assert hasattr(di, "file_path")
@@ -138,7 +138,7 @@ class TestDebtReportContract:
 # ---------------------------------------------------------------------------
 # Naming
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.naming_models import (
+from Asgard.Bragi.Quality.models.naming_models import (
     NamingViolation,
     NamingConfig,
     NamingReport,
@@ -171,7 +171,7 @@ class TestNamingConfigContract:
 # ---------------------------------------------------------------------------
 # Documentation
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.documentation_models import (
+from Asgard.Bragi.Quality.models.documentation_models import (
     DocumentationConfig,
     FunctionDocumentation,
     ClassDocumentation,
@@ -200,7 +200,7 @@ class TestDocumentationConfigContract:
 # ---------------------------------------------------------------------------
 # Analysis
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.analysis_models import (
+from Asgard.Bragi.Quality.models.analysis_models import (
     FileAnalysis,
     AnalysisResult,
     AnalysisConfig,
@@ -213,7 +213,7 @@ class TestFileAnalysisContract:
             FileAnalysis()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.analysis_models import SeverityLevel
+        from Asgard.Bragi.Quality.models.analysis_models import SeverityLevel
         fa = FileAnalysis(
             file_path="/a.py",
             line_count=200,
@@ -236,7 +236,7 @@ class TestAnalysisConfigContract:
 # ---------------------------------------------------------------------------
 # Thread Safety
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.thread_safety_models import (
+from Asgard.Bragi.Quality.models.thread_safety_models import (
     ThreadSafetyIssue,
     ThreadSafetyReport,
     ThreadSafetyConfig,
@@ -249,7 +249,7 @@ class TestThreadSafetyIssueContract:
             ThreadSafetyIssue()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.thread_safety_models import ThreadSafetyIssueType, ThreadSafetySeverity
+        from Asgard.Bragi.Quality.models.thread_safety_models import ThreadSafetyIssueType, ThreadSafetySeverity
         tsi = ThreadSafetyIssue(
             file_path="/a.py",
             line_number=10,
@@ -272,7 +272,7 @@ class TestThreadSafetyConfigContract:
 # ---------------------------------------------------------------------------
 # Race Condition
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.race_condition_models import (
+from Asgard.Bragi.Quality.models.race_condition_models import (
     RaceConditionIssue,
     RaceConditionReport,
     RaceConditionConfig,
@@ -304,7 +304,7 @@ class TestRaceConditionConfigContract:
 # ---------------------------------------------------------------------------
 # Blocking Async
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.blocking_async_models import (
+from Asgard.Bragi.Quality.models.blocking_async_models import (
     BlockingCall,
     BlockingAsyncReport,
     BlockingAsyncConfig,
@@ -317,7 +317,7 @@ class TestBlockingCallContract:
             BlockingCall()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.blocking_async_models import BlockingCallType
+        from Asgard.Bragi.Quality.models.blocking_async_models import BlockingCallType
         bc = BlockingCall(
             file_path="/a.py",
             line_number=20,
@@ -338,7 +338,7 @@ class TestBlockingAsyncConfigContract:
 # ---------------------------------------------------------------------------
 # Error Handling
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.error_handling_models import (
+from Asgard.Bragi.Quality.models.error_handling_models import (
     ErrorHandlingViolation,
     ErrorHandlingReport,
     ErrorHandlingConfig,
@@ -351,7 +351,7 @@ class TestErrorHandlingViolationContract:
             ErrorHandlingViolation()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.error_handling_models import ErrorHandlingType, ErrorHandlingSeverity
+        from Asgard.Bragi.Quality.models.error_handling_models import ErrorHandlingType, ErrorHandlingSeverity
         ehv = ErrorHandlingViolation(
             file_path="/a.py",
             line_number=10,
@@ -372,7 +372,7 @@ class TestErrorHandlingConfigContract:
 # ---------------------------------------------------------------------------
 # Code Smells
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.smell_models import (
+from Asgard.Bragi.Quality.models.smell_models import (
     CodeSmell,
     SmellReport,
     SmellConfig,
@@ -385,7 +385,7 @@ class TestCodeSmellContract:
             CodeSmell()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.smell_models import SmellCategory, SmellSeverity
+        from Asgard.Bragi.Quality.models.smell_models import SmellCategory, SmellSeverity
         cs = CodeSmell(
             name="LongMethod",
             category=SmellCategory.BLOATERS,
@@ -409,7 +409,7 @@ class TestSmellConfigContract:
 # ---------------------------------------------------------------------------
 # Typing
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.typing_models import (
+from Asgard.Bragi.Quality.models.typing_models import (
     FunctionAnnotation,
     FileTypingStats,
     TypingReport,
@@ -423,7 +423,7 @@ class TestFunctionAnnotationContract:
             FunctionAnnotation()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.typing_models import AnnotationStatus, AnnotationSeverity
+        from Asgard.Bragi.Quality.models.typing_models import AnnotationStatus, AnnotationSeverity
         fa = FunctionAnnotation(
             file_path="/a.py",
             line_number=10,
@@ -443,7 +443,7 @@ class TestTypingConfigContract:
 # ---------------------------------------------------------------------------
 # Type Check
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.type_check_models import (
+from Asgard.Bragi.Quality.models.type_check_models import (
     TypeCheckDiagnostic,
     FileTypeCheckStats,
     TypeCheckReport,
@@ -475,7 +475,7 @@ class TestTypeCheckConfigContract:
 # ---------------------------------------------------------------------------
 # Lazy Import
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.lazy_import_models import (
+from Asgard.Bragi.Quality.models.lazy_import_models import (
     LazyImport,
     LazyImportReport,
     LazyImportConfig,
@@ -508,7 +508,7 @@ class TestLazyImportConfigContract:
 # ---------------------------------------------------------------------------
 # Future Leak
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.future_leak_models import (
+from Asgard.Bragi.Quality.models.future_leak_models import (
     FutureLeak,
     FutureLeakReport,
     FutureLeakConfig,
@@ -521,7 +521,7 @@ class TestFutureLeakContract:
             FutureLeak()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.future_leak_models import FutureLeakType, FutureLeakSeverity
+        from Asgard.Bragi.Quality.models.future_leak_models import FutureLeakType, FutureLeakSeverity
         fl = FutureLeak(
             file_path="/a.py",
             line_number=10,
@@ -543,7 +543,7 @@ class TestFutureLeakConfigContract:
 # ---------------------------------------------------------------------------
 # Resource Cleanup
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.resource_cleanup_models import (
+from Asgard.Bragi.Quality.models.resource_cleanup_models import (
     ResourceCleanupViolation,
     ResourceCleanupReport,
     ResourceCleanupConfig,
@@ -556,7 +556,7 @@ class TestResourceCleanupViolationContract:
             ResourceCleanupViolation()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.resource_cleanup_models import ResourceCleanupType, ResourceCleanupSeverity
+        from Asgard.Bragi.Quality.models.resource_cleanup_models import ResourceCleanupType, ResourceCleanupSeverity
         rcv = ResourceCleanupViolation(
             file_path="/a.py",
             line_number=10,
@@ -577,7 +577,7 @@ class TestResourceCleanupConfigContract:
 # ---------------------------------------------------------------------------
 # Daemon Thread
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.daemon_thread_models import (
+from Asgard.Bragi.Quality.models.daemon_thread_models import (
     DaemonThreadIssue,
     DaemonThreadReport,
     DaemonThreadConfig,
@@ -590,7 +590,7 @@ class TestDaemonThreadIssueContract:
             DaemonThreadIssue()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.daemon_thread_models import DaemonThreadIssueType, DaemonThreadSeverity
+        from Asgard.Bragi.Quality.models.daemon_thread_models import DaemonThreadIssueType, DaemonThreadSeverity
         dti = DaemonThreadIssue(
             file_path="/a.py",
             line_number=15,
@@ -611,7 +611,7 @@ class TestDaemonThreadConfigContract:
 # ---------------------------------------------------------------------------
 # Datetime
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.datetime_models import (
+from Asgard.Bragi.Quality.models.datetime_models import (
     DatetimeViolation,
     DatetimeReport,
     DatetimeConfig,
@@ -624,7 +624,7 @@ class TestDatetimeViolationContract:
             DatetimeViolation()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.datetime_models import DatetimeIssueType, DatetimeSeverity
+        from Asgard.Bragi.Quality.models.datetime_models import DatetimeIssueType, DatetimeSeverity
         dv = DatetimeViolation(
             file_path="/a.py",
             line_number=10,
@@ -645,7 +645,7 @@ class TestDatetimeConfigContract:
 # ---------------------------------------------------------------------------
 # Env Fallback
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.env_fallback_models import (
+from Asgard.Bragi.Quality.models.env_fallback_models import (
     EnvFallbackViolation,
     EnvFallbackReport,
     EnvFallbackConfig,
@@ -658,7 +658,7 @@ class TestEnvFallbackViolationContract:
             EnvFallbackViolation()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.models.env_fallback_models import EnvFallbackType, EnvFallbackSeverity
+        from Asgard.Bragi.Quality.models.env_fallback_models import EnvFallbackType, EnvFallbackSeverity
         efv = EnvFallbackViolation(
             file_path="/a.py",
             line_number=5,
@@ -679,7 +679,7 @@ class TestEnvFallbackConfigContract:
 # ---------------------------------------------------------------------------
 # Library Usage (Forbidden Imports)
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.library_usage_models import (
+from Asgard.Bragi.Quality.models.library_usage_models import (
     ForbiddenImportViolation,
     ForbiddenImportReport,
     ForbiddenImportConfig,
@@ -712,7 +712,7 @@ class TestForbiddenImportConfigContract:
 # ---------------------------------------------------------------------------
 # Maintainability
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.models.maintainability_models import (
+from Asgard.Bragi.Quality.models.maintainability_models import (
     HalsteadMetrics,
     FunctionMaintainability,
     FileMaintainability,
@@ -748,7 +748,7 @@ class TestMaintainabilityConfigContract:
 # ---------------------------------------------------------------------------
 # Bug Detection
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.BugDetection.models.bug_models import (
+from Asgard.Bragi.Quality.BugDetection.models.bug_models import (
     BugFinding,
     BugReport,
     BugDetectionConfig,
@@ -781,7 +781,7 @@ class TestBugDetectionConfigContract:
 # ---------------------------------------------------------------------------
 # JavaScript Quality
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.languages.javascript.models.js_models import (
+from Asgard.Bragi.Quality.languages.javascript.models.js_models import (
     JSFinding,
     JSReport,
     JSAnalysisConfig,
@@ -794,7 +794,7 @@ class TestJSFindingContract:
             JSFinding()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.languages.javascript.models.js_models import JSRuleCategory, JSSeverity
+        from Asgard.Bragi.Quality.languages.javascript.models.js_models import JSRuleCategory, JSSeverity
         jf = JSFinding(
             file_path="/a.js",
             line_number=5,
@@ -816,7 +816,7 @@ class TestJSAnalysisConfigContract:
 # ---------------------------------------------------------------------------
 # Shell Quality
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Quality.languages.shell.models.shell_models import (
+from Asgard.Bragi.Quality.languages.shell.models.shell_models import (
     ShellFinding,
     ShellReport,
     ShellAnalysisConfig,
@@ -829,7 +829,7 @@ class TestShellFindingContract:
             ShellFinding()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Quality.languages.shell.models.shell_models import ShellRuleCategory, ShellSeverity
+        from Asgard.Bragi.Quality.languages.shell.models.shell_models import ShellRuleCategory, ShellSeverity
         sf = ShellFinding(
             file_path="/a.sh",
             line_number=5,

@@ -12,14 +12,14 @@ from unittest.mock import patch
 
 import pytest
 
-from Asgard.Heimdall.common.new_code_period import (
+from Asgard.Shared.common.new_code_period import (
     NewCodePeriodConfig,
     NewCodePeriodDetector,
     NewCodePeriodResult,
     NewCodePeriodType,
 )
-from Asgard.Heimdall.common import _new_code_git
-from Asgard.Heimdall.common import new_code_period as _ncp_module
+from Asgard.Shared.common import _new_code_git
+from Asgard.Shared.common import new_code_period as _ncp_module
 
 # Resolve forward reference to Path in NewCodePeriodConfig.baseline_path
 NewCodePeriodConfig.model_rebuild(_types_namespace={"Path": Path})

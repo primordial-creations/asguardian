@@ -5,15 +5,15 @@ from datetime import datetime
 from pathlib import Path
 from typing import List
 
-from Asgard.Heimdall.Quality.models.debt_models import DebtConfig
-from Asgard.Heimdall.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer as _TechDebtAnalyzer
+from Asgard.Bragi.Quality.models.debt_models import DebtConfig
+from Asgard.Bragi.Quality.services.technical_debt_analyzer import TechnicalDebtAnalyzer as _TechDebtAnalyzer
 from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
 from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService as _StaticSecuritySvc
-from Asgard.Heimdall.Ratings.models.ratings_models import RatingsConfig
-from Asgard.Heimdall.Ratings.services.ratings_calculator import RatingsCalculator
-from Asgard.Heimdall.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
-from Asgard.Heimdall.Quality.models.documentation_models import DocumentationConfig
-from Asgard.Heimdall.Quality.services.documentation_scanner import DocumentationScanner
+from Asgard.Bragi.Ratings.models.ratings_models import RatingsConfig
+from Asgard.Bragi.Ratings.services.ratings_calculator import RatingsCalculator
+from Asgard.Bragi.QualityGate.services.quality_gate_evaluator import QualityGateEvaluator
+from Asgard.Bragi.Quality.models.documentation_models import DocumentationConfig
+from Asgard.Bragi.Quality.services.documentation_scanner import DocumentationScanner
 from Asgard.Reporting.History.services.history_store import HistoryStore
 from Asgard.Reporting.History.models.history_models import AnalysisSnapshot, MetricSnapshot
 

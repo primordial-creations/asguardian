@@ -8,7 +8,7 @@ import json
 import pytest
 from pathlib import Path
 
-from Asgard.Heimdall.OOP import (
+from Asgard.Bragi.OOP import (
     OOPAnalyzer,
     OOPConfig,
     CouplingAnalyzer,

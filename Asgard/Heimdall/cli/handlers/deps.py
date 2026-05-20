@@ -2,9 +2,9 @@ import argparse
 import json
 from pathlib import Path
 
-from Asgard.Heimdall.Dependencies.models.dependency_models import DependencyConfig
-from Asgard.Heimdall.Dependencies.services.dependency_analyzer import DependencyAnalyzer
-from Asgard.Heimdall.Dependencies.services.graph_builder import GraphBuilder
+from Asgard.Bragi.Dependencies.models.dependency_models import DependencyConfig
+from Asgard.Bragi.Dependencies.services.dependency_analyzer import DependencyAnalyzer
+from Asgard.Bragi.Dependencies.services.graph_builder import GraphBuilder
 
 
 def run_deps_analysis(args: argparse.Namespace, verbose: bool = False, analysis_type: str = "all") -> int:

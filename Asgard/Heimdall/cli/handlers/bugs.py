@@ -3,8 +3,8 @@ import json
 import traceback as _traceback
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.BugDetection.models.bug_models import BugDetectionConfig
-from Asgard.Heimdall.Quality.BugDetection.services.bug_detector import BugDetector
+from Asgard.Bragi.Quality.BugDetection.models.bug_models import BugDetectionConfig
+from Asgard.Bragi.Quality.BugDetection.services.bug_detector import BugDetector
 
 
 def run_bugs_analysis(args: argparse.Namespace, verbose: bool = False) -> int:

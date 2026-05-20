@@ -1,22 +1,22 @@
 import argparse
 
-from Asgard.Heimdall.Quality.models.analysis_models import SeverityLevel
-from Asgard.Heimdall.Quality.models.complexity_models import ComplexitySeverity
-from Asgard.Heimdall.Quality.models.duplication_models import DuplicationSeverity
-from Asgard.Heimdall.Quality.models.smell_models import SmellSeverity
-from Asgard.Heimdall.Quality.models.debt_models import DebtSeverity
-from Asgard.Heimdall.Quality.models.maintainability_models import MaintainabilityLevel
-from Asgard.Heimdall.Quality.models.env_fallback_models import EnvFallbackSeverity
-from Asgard.Heimdall.Quality.models.lazy_import_models import LazyImportSeverity
-from Asgard.Heimdall.Quality.models.syntax_models import SyntaxSeverity
-from Asgard.Heimdall.Quality.models.library_usage_models import ForbiddenImportSeverity
-from Asgard.Heimdall.Quality.models.datetime_models import DatetimeSeverity
-from Asgard.Heimdall.Quality.models.typing_models import AnnotationSeverity
-from Asgard.Heimdall.Quality.models.thread_safety_models import ThreadSafetySeverity
-from Asgard.Heimdall.Quality.models.race_condition_models import RaceConditionSeverity
-from Asgard.Heimdall.Quality.models.daemon_thread_models import DaemonThreadSeverity
+from Asgard.Bragi.Quality.models.analysis_models import SeverityLevel
+from Asgard.Bragi.Quality.models.complexity_models import ComplexitySeverity
+from Asgard.Bragi.Quality.models.duplication_models import DuplicationSeverity
+from Asgard.Bragi.Quality.models.smell_models import SmellSeverity
+from Asgard.Bragi.Quality.models.debt_models import DebtSeverity
+from Asgard.Bragi.Quality.models.maintainability_models import MaintainabilityLevel
+from Asgard.Bragi.Quality.models.env_fallback_models import EnvFallbackSeverity
+from Asgard.Bragi.Quality.models.lazy_import_models import LazyImportSeverity
+from Asgard.Bragi.Quality.models.syntax_models import SyntaxSeverity
+from Asgard.Bragi.Quality.models.library_usage_models import ForbiddenImportSeverity
+from Asgard.Bragi.Quality.models.datetime_models import DatetimeSeverity
+from Asgard.Bragi.Quality.models.typing_models import AnnotationSeverity
+from Asgard.Bragi.Quality.models.thread_safety_models import ThreadSafetySeverity
+from Asgard.Bragi.Quality.models.race_condition_models import RaceConditionSeverity
+from Asgard.Bragi.Quality.models.daemon_thread_models import DaemonThreadSeverity
 from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
-from Asgard.Heimdall.Performance.models.performance_models import PerformanceSeverity
+from Asgard.Bragi.Performance.models.performance_models import PerformanceSeverity
 
 SEVERITY_MARKERS = {
     SeverityLevel.CRITICAL.value: "[CRITICAL]",

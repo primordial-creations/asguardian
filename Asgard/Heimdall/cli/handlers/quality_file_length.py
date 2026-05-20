@@ -4,13 +4,13 @@ from pathlib import Path
 
 from Asgard.Heimdall.cli.common import SEVERITY_MARKERS
 from Asgard.Heimdall.cli.handlers._base import _generate_quality_html_report
-from Asgard.Heimdall.Quality.models.analysis_models import (
+from Asgard.Bragi.Quality.models.analysis_models import (
     AnalysisConfig,
     DEFAULT_EXTENSION_THRESHOLDS,
     SeverityLevel,
 )
-from Asgard.Heimdall.Quality.services.file_length_analyzer import FileAnalyzer
-from Asgard.Heimdall.Quality.utilities.file_utils import discover_files
+from Asgard.Bragi.Quality.services.file_length_analyzer import FileAnalyzer
+from Asgard.Bragi.Quality.utilities.file_utils import discover_files
 
 
 def run_quality_analysis(args: argparse.Namespace, verbose: bool = False) -> int:

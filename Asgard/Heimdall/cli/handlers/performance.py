@@ -1,11 +1,11 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Performance.models.performance_models import (
+from Asgard.Bragi.Performance.models.performance_models import (
     PerformanceScanConfig,
     PerformanceSeverity,
 )
-from Asgard.Heimdall.Performance.services.static_performance_service import StaticPerformanceService
+from Asgard.Bragi.Performance.services.static_performance_service import StaticPerformanceService
 
 
 def run_performance_analysis(args: argparse.Namespace, verbose: bool = False, analysis_type: str = "all") -> int:

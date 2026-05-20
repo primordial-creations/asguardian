@@ -7,7 +7,7 @@ from pydantic import ValidationError
 # ---------------------------------------------------------------------------
 # CodeFix
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.CodeFix.models.codefix_models import (
+from Asgard.Bragi.CodeFix.models.codefix_models import (
     CodeFix,
     FixSuggestion,
     CodeFixReport,
@@ -31,7 +31,7 @@ class TestCodeFixContract:
         assert hasattr(cf, "fix_type")
 
     def test_accepts_valid_enum_types(self):
-        from Asgard.Heimdall.CodeFix.models.codefix_models import FixType
+        from Asgard.Bragi.CodeFix.models.codefix_models import FixType
         cf = CodeFix(
             rule_id="R001",
             title="t",
@@ -48,7 +48,7 @@ class TestFixSuggestionContract:
             FixSuggestion()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.CodeFix.models.codefix_models import CodeFix
+        from Asgard.Bragi.CodeFix.models.codefix_models import CodeFix
         fix = CodeFix(rule_id="R001", title="t", description="d", fix_type="automated", confidence="high")
         fs = FixSuggestion(
             file_path="/a.py",
@@ -74,7 +74,7 @@ class TestCodeFixReportContract:
 # ---------------------------------------------------------------------------
 # Dependencies / SBOM
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Dependencies.models.sbom_models import (
+from Asgard.Bragi.Dependencies.models.sbom_models import (
     SBOMComponent,
     SBOMDocument,
     SBOMConfig,
@@ -124,7 +124,7 @@ class TestSBOMConfigContract:
 # ---------------------------------------------------------------------------
 # QualityGate
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.QualityGate.models.quality_gate_models import (
+from Asgard.Bragi.QualityGate.models.quality_gate_models import (
     GateCondition,
     ConditionResult,
     QualityGate,
@@ -139,7 +139,7 @@ class TestGateConditionContract:
             GateCondition()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.QualityGate.models.quality_gate_models import MetricType, GateOperator
+        from Asgard.Bragi.QualityGate.models.quality_gate_models import MetricType, GateOperator
         gc = GateCondition(metric=MetricType.SECURITY_RATING, operator=GateOperator.LESS_THAN, threshold=1.0)
         assert hasattr(gc, "metric")
         assert hasattr(gc, "threshold")
@@ -170,7 +170,7 @@ class TestQualityGateConfigContract:
 # ---------------------------------------------------------------------------
 # Ratings
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Ratings.models.ratings_models import (
+from Asgard.Bragi.Ratings.models.ratings_models import (
     DimensionRating,
     ProjectRatings,
     RatingsConfig,
@@ -213,7 +213,7 @@ class TestRatingsConfigContract:
 # ---------------------------------------------------------------------------
 # Issues
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Issues.models.issue_models import (
+from Asgard.Shared.Issues.models.issue_models import (
     TrackedIssue,
     IssueFilter,
     IssuesSummary,
@@ -268,7 +268,7 @@ class TestIssuesSummaryContract:
 # ---------------------------------------------------------------------------
 # Performance
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Performance.models.performance_models import (
+from Asgard.Bragi.Performance.models.performance_models import (
     CacheFinding,
     CpuFinding,
     DatabaseFinding,
@@ -284,7 +284,7 @@ class TestCacheFindingContract:
             CacheFinding()
 
     def test_accepts_valid_data(self):
-        from Asgard.Heimdall.Performance.models.performance_models import CacheIssueType, PerformanceSeverity
+        from Asgard.Bragi.Performance.models.performance_models import CacheIssueType, PerformanceSeverity
         cf = CacheFinding(
             file_path="/a.py",
             line_number=10,
@@ -321,7 +321,7 @@ class TestPerformanceReportContract:
 # ---------------------------------------------------------------------------
 # Profiles
 # ---------------------------------------------------------------------------
-from Asgard.Heimdall.Profiles.models.profile_models import (
+from Asgard.Shared.Profiles.models.profile_models import (
     RuleConfig,
     QualityProfile,
     ProfileAssignment,

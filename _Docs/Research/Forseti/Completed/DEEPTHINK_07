@@ -1,0 +1,60 @@
+The transition from treating a breaking change as a **binary failure** (to be blocked) to a **lifecycle event** (to be orchestrated) represents a major leap in API governance maturity.
+
+Current tools (like `openapi-diff`, Spectral, or Optic) act as stateless gatekeepers. They evaluate `Spec A` vs. `Spec B` and fail the CI build if a backwards-incompatible change is found. While excellent for preventing *accidental* breakage, they treat all breaking changes as syntax errors.
+
+To manage *intentional* breaking changes, tooling must evolve into a **stateful workflow engine**. Here is a comprehensive design for an Intentional Breaking Change (IBC) Management System.
+
+---
+
+### 1. The Producer Workflow: Orchestrating the Migration
+
+An intentional breaking change cannot be a single Pull Request. Good tooling enforces a multi-phase state machine: **Declaration $\rightarrow$ Deprecation $\rightarrow$ Verification $\rightarrow$ Execution.**
+
+* **Declaration & The "Escape Hatch":** When the CI linter detects a breaking change, it halts the PR but provides an interactive override (e.g., a GitHub App button or a `/declare-intentional-break` comment command).
+* **Auto-Generating Migration Docs:** Because the tooling possesses the Abstract Syntax Tree (AST) diff of the OpenAPI spec, it understands the mechanical changes. It automatically scaffolds a Markdown migration guide (e.g., *"Field `userId` (integer) removed; mapped to `userUuid` (string). See structural diff below."*), leaving the developer to fill in only the human context (the "why").
+* **The Deferred Deletion (Two-Phase Commit):** The tooling automatically forces the developer to split their work:
+* **Phase 1 PR (The Deprecation):** Deploys the new endpoint/field alongside the old one, injecting deprecation metadata into the API specification. This is merged immediately.
+* **Phase 2 PR (The Removal):** Contains the actual deletion of the legacy code. **The system creates this PR but cryptographically locks it in CI.**
+
+
+* **Telemetry-Driven Verification:** Time-based deprecation (e.g., "waiting 90 days") is dangerous if users haven't actually migrated. The CI lock on the Phase 2 PR integrates with the API Gateway (e.g., Kong, Apigee, Datadog). The final unlock condition is a programmable rule: *Traffic to this specific deprecated route/field from known consumers must equal `0` for 7 consecutive days.*
+
+### 2. The Role of the Spec vs. The Control Plane
+
+To make this workflow machine-readable across an organization, we must divide responsibilities between the API Spec (the contract) and the surrounding ecosystem (the state). **The rule of thumb: The spec holds the contract; the Control Plane holds the logistics.**
+
+**What lives IN the spec (Metadata):**
+The spec must represent the technical mechanics and timeline so generic tooling can understand the lifecycle:
+
+* `deprecated: true` (Standard OpenAPI)
+* `x-sunset-date: "2026-12-01"` (Drives the IETF standard RFC 8594 `Sunset` HTTP header).
+* `x-replaced-by: "#/paths/~1v2~1users"` (A JSON pointer to the new implementation).
+* `x-migration-guide: "https://docs.api.com/migrations/v2"`
+
+**What lives OUTSIDE the spec (The Control Plane):**
+The spec knows *what* is breaking, but it doesn't know *who* it breaks. An Internal Developer Portal (IDP) or API Management platform must manage the state:
+
+* **Identity Mapping:** Linking an API Key or consumer IP to team ownership, Slack channels, and PagerDuty schedules.
+* **Workflow State:** Tracking which consumers have been notified, logging the `$NOTIFICATION_DATE` to enforce SLA deprecation periods, and tracking who has explicitly clicked "Acknowledged" on their migration tickets.
+
+### 3. Closing the Asymmetry: Consumer-Side Tooling
+
+Currently, API producers have excellent dashboards and linters, while consumers find out about breaking changes via an ignored mailing list or a 500 error in production. We must shift from "Producer Governance" to "Consumer Dependency Management" by pushing visibility directly into the consumer's SDLC.
+
+* **Shift-Left (Build Time):** Just as `npm audit` fails a build for security vulnerabilities, consumers should have an **API Dependency Audit** step in CI. The tool fetches the latest production specs of external APIs they depend on. If the consumer code calls an endpoint with an `x-sunset-date` < 30 days away, the consumer's CI throws a warning or fails, forcing them to prioritize the migration before the upstream producer deletes the code.
+* **Shift-Left (Dev Time):** If consumers use typed clients generated from the producer's spec, the `deprecated: true` flag translates into language-native deprecation annotations (e.g., `@Deprecated` in Java). Developers see a visual strikethrough (`~~fetchOldUser()~~`) and a tooltip linking to the migration guide directly in their IDE.
+* **Shift-Right (Run Time):** The producer's API Gateway automatically injects `Deprecation` and `Sunset` headers into legacy responses. Standardized consumer-side HTTP clients (or egress proxies like Envoy) are configured to intercept these headers and emit structured alerts to the *consumer's* APM (Datadog/New Relic): *"Warning: Upstream API dependency sunsetting in 45 days."*
+
+### 4. Internal vs. External APIs: Adapting the Strategy
+
+The strategy for orchestration differs vastly depending on your ecosystem's boundary and your visibility into the consumer.
+
+#### Internal APIs (Monorepos or closely-coupled Microservices)
+
+* **Visibility:** 100%. Distributed tracing and service mesh tell you exactly who is calling what.
+* **Tooling Strategy:** **Automated Refactoring.** Because you have access to the consumers' source code, the producer's breaking change tool can generate **Codemods** (via tools like Sourcegraph Batch Changes or gritQL). It automatically rewrites the consumers' code to use the new API and opens PRs across the organization. The breaking change is blocked only until those automated PRs are merged.
+
+#### External APIs (Public SaaS, unknown third-parties)
+
+* **Visibility:** Low. You only know API keys, IP addresses, and User-Agents. You cannot see their source code, and you cannot guarantee "zero traffic" because legacy users will ignore emails forever.
+* **Tooling Strategy:** **Graceful Degradation and "Brownouts."** Tooling here focuses on communication and simulated breakage. As the Sunset date approaches, the orchestration system configures the API Gateway to execute automated **Brownouts**: intentionally dropping 1% of requests to the old endpoint (returning `410 Gone` or `503 Service Unavailable`), then 5%, then 25%, for short scheduled windows. This triggers the external consumer's monitoring alarms, forcing them to notice the impending breaking change *before* the permanent, hard deletion occurs.

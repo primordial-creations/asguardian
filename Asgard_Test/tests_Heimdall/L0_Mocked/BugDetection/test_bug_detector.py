@@ -10,14 +10,14 @@ from pathlib import Path
 
 import pytest
 
-from Asgard.Heimdall.Quality.BugDetection.models.bug_models import (
+from Asgard.Bragi.Quality.BugDetection.models.bug_models import (
     BugCategory,
     BugDetectionConfig,
     BugFinding,
     BugReport,
     BugSeverity,
 )
-from Asgard.Heimdall.Quality.BugDetection.services.bug_detector import BugDetector
+from Asgard.Bragi.Quality.BugDetection.services.bug_detector import BugDetector
 
 
 class TestBugDetectorInitialization:

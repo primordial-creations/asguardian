@@ -2,8 +2,8 @@ import argparse
 import json
 from pathlib import Path
 
-from Asgard.Heimdall.Coverage.models.coverage_models import CoverageConfig
-from Asgard.Heimdall.Coverage.services.coverage_analyzer import CoverageAnalyzer
+from Asgard.Bragi.Coverage.models.coverage_models import CoverageConfig
+from Asgard.Bragi.Coverage.services.coverage_analyzer import CoverageAnalyzer
 
 
 def run_coverage_analysis(args: argparse.Namespace, verbose: bool = False, analysis_type: str = "all") -> int:

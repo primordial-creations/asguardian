@@ -3,7 +3,7 @@ import json
 import traceback as _traceback
 from pathlib import Path
 
-from Asgard.Heimdall.Issues.models.issue_models import (
+from Asgard.Shared.Issues.models.issue_models import (
     IssueFilter,
     IssueStatus,
     IssueSeverity,
@@ -11,7 +11,7 @@ from Asgard.Heimdall.Issues.models.issue_models import (
     IssuesSummary,
     TrackedIssue,
 )
-from Asgard.Heimdall.Issues.services.issue_tracker import IssueTracker
+from Asgard.Shared.Issues.services.issue_tracker import IssueTracker
 
 
 def run_issues_command(args: argparse.Namespace, verbose: bool = False) -> int:

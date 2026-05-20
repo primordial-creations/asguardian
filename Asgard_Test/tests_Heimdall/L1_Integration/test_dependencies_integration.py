@@ -8,7 +8,7 @@ import json
 import pytest
 from pathlib import Path
 
-from Asgard.Heimdall.Dependencies import (
+from Asgard.Bragi.Dependencies import (
     DependencyAnalyzer,
     DependencyConfig,
 )

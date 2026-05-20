@@ -1,15 +1,15 @@
 import json
 
-from Asgard.Heimdall.Quality.models.analysis_models import AnalysisConfig
-from Asgard.Heimdall.Quality.services.file_length_analyzer import FileAnalyzer
-from Asgard.Heimdall.Quality.models.complexity_models import ComplexityConfig
-from Asgard.Heimdall.Quality.services.complexity_analyzer import ComplexityAnalyzer
-from Asgard.Heimdall.Quality.models.lazy_import_models import LazyImportConfig
-from Asgard.Heimdall.Quality.services.lazy_import_scanner import LazyImportScanner
-from Asgard.Heimdall.Quality.models.env_fallback_models import EnvFallbackConfig
-from Asgard.Heimdall.Quality.services.env_fallback_scanner import EnvFallbackScanner
-from Asgard.Heimdall.Quality.models.type_check_models import TypeCheckConfig
-from Asgard.Heimdall.Quality.services.type_checker import TypeChecker
+from Asgard.Bragi.Quality.models.analysis_models import AnalysisConfig
+from Asgard.Bragi.Quality.services.file_length_analyzer import FileAnalyzer
+from Asgard.Bragi.Quality.models.complexity_models import ComplexityConfig
+from Asgard.Bragi.Quality.services.complexity_analyzer import ComplexityAnalyzer
+from Asgard.Bragi.Quality.models.lazy_import_models import LazyImportConfig
+from Asgard.Bragi.Quality.services.lazy_import_scanner import LazyImportScanner
+from Asgard.Bragi.Quality.models.env_fallback_models import EnvFallbackConfig
+from Asgard.Bragi.Quality.services.env_fallback_scanner import EnvFallbackScanner
+from Asgard.Bragi.Quality.models.type_check_models import TypeCheckConfig
+from Asgard.Bragi.Quality.services.type_checker import TypeChecker
 from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
 from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
 

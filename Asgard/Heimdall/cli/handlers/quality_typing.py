@@ -1,25 +1,25 @@
 import argparse
 from pathlib import Path
 
-from Asgard.Heimdall.Quality.models.typing_models import TypingConfig
-from Asgard.Heimdall.Quality.services.typing_scanner import TypingScanner
-from Asgard.Heimdall.Quality.models.type_check_models import TypeCheckConfig
-from Asgard.Heimdall.Quality.services.type_checker import TypeChecker
-from Asgard.Heimdall.Quality.models.thread_safety_models import (
+from Asgard.Bragi.Quality.models.typing_models import TypingConfig
+from Asgard.Bragi.Quality.services.typing_scanner import TypingScanner
+from Asgard.Bragi.Quality.models.type_check_models import TypeCheckConfig
+from Asgard.Bragi.Quality.services.type_checker import TypeChecker
+from Asgard.Bragi.Quality.models.thread_safety_models import (
     ThreadSafetyConfig,
     ThreadSafetySeverity,
 )
-from Asgard.Heimdall.Quality.services.thread_safety_scanner import ThreadSafetyScanner
-from Asgard.Heimdall.Quality.models.race_condition_models import (
+from Asgard.Bragi.Quality.services.thread_safety_scanner import ThreadSafetyScanner
+from Asgard.Bragi.Quality.models.race_condition_models import (
     RaceConditionConfig,
     RaceConditionSeverity,
 )
-from Asgard.Heimdall.Quality.services.race_condition_scanner import RaceConditionScanner
-from Asgard.Heimdall.Quality.models.daemon_thread_models import (
+from Asgard.Bragi.Quality.services.race_condition_scanner import RaceConditionScanner
+from Asgard.Bragi.Quality.models.daemon_thread_models import (
     DaemonThreadConfig,
     DaemonThreadSeverity,
 )
-from Asgard.Heimdall.Quality.services.daemon_thread_scanner import DaemonThreadScanner
+from Asgard.Bragi.Quality.services.daemon_thread_scanner import DaemonThreadScanner
 
 
 def run_typing_analysis(args: argparse.Namespace, verbose: bool = False) -> int:

@@ -8,7 +8,7 @@ import json
 import pytest
 from pathlib import Path
 
-from Asgard.Heimdall.Quality import (
+from Asgard.Bragi.Quality import (
     AnalysisConfig,
     FileAnalyzer,
     ComplexityAnalyzer,
