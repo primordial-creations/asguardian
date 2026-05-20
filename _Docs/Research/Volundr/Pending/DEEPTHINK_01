@@ -1,9 +1,0 @@
-Design a theoretically sound methodology for computing a single infrastructure security posture score for a software project whose infrastructure is defined using a combination of Terraform modules, Kubernetes manifests, Helm charts, CICD pipeline definitions, Docker Compose files, and Dockerfile configurations.
-
-The fundamental challenge is aggregation across heterogeneous domains: a Terraform misconfiguration (e.g., a public S3 bucket) has a different risk profile than a Kubernetes manifest issue (e.g., a container running as root) which differs again from a CICD pipeline issue (e.g., a GitHub Actions workflow using unpinned third-party actions). How should these be weighted against each other? Is a single number even meaningful, or does it obscure more than it reveals?
-
-Reason through the following design tensions: severity normalization (how do you map CVSS scores for CVEs, CIS benchmark levels, and SLSA compliance levels onto a common scale?), coverage versus depth (is it better to shallowly cover all categories or deeply analyze one?), actionability (a score that goes down when you add more resources even though you fixed all existing issues creates perverse incentives — how do you design against this?), and temporal dynamics (a score should reflect recent changes more heavily than old, stable configurations).
-
-Consider the game-theoretic problem: once engineers know how the score is computed, they will optimize for the score rather than for actual security. What architectural choices make the scoring system resistant to gaming? How do established frameworks like CVSS, DREAD, and OWASP Risk Rating handle this problem, and what can a composite infrastructure score learn from their design choices?
-
-Propose a concrete mathematical model, justify each design decision, and identify the assumptions that would invalidate your model.

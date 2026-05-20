@@ -1,0 +1,125 @@
+To design a Static Application Security Testing (SAST) policy that developers actually trust, we must recognize a fundamental shift in the threat model: **production code is exposed to untrusted external input at runtime, whereas test code is executed in trusted CI/CD environments.**
+
+However, unilaterally ignoring test directories creates massive security blind spots, while treating test code identically to production code creates crippling alert fatigue.
+
+Here is a careful reasoning through the edge cases and failure modes of test context detection, followed by a concrete, implementable policy specification.
+
+---
+
+### Part 1: Edge Cases & Failure Modes Analysis
+
+#### 1. The File Identification Problem
+
+No single heuristic reliably detects test files; each has severe failure modes.
+
+* **Heuristic 1: File Names (`test_*.py`, `*_test.py`)**
+* *Failure Mode (False Positives):* Production scripts for diagnostics (e.g., `test_db_connection.py`) or product features (e.g., `ab_test_router.py`, `test_flight_api.py`) will be incorrectly suppressed.
+* *Failure Mode (False Negatives):* Misses vital test utilities like `conftest.py`, `factories.py`, or `dummy_data.py`.
+
+
+* **Heuristic 2: Directories (`tests/`, `test/`, `spec/`)**
+* *Failure Mode (False Positives):* Naive substring matching (e.g., `/var/www/ab_testing/`) flags the whole app. Additionally, if the application domain itself is testing (e.g., student examination software), a core Django app might legitimately be named `test/`.
+
+
+* **Heuristic 3: Imports (`import pytest`, `import unittest`)**
+* *Failure Mode:* Production code frequently (and problematically) imports `unittest.mock` for runtime monkey-patching. Conversely, pure test-data files often don't import any test frameworks at all.
+
+
+* **The Correct Combination:** The scanner must use a **Composite File Heuristic** requiring exact-word path boundary matches combined with file-naming conventions, and fall back to AST (Abstract Syntax Tree) analysis if the path is ambiguous.
+
+#### 2. The Function-Level Test Context Problem
+
+Helper files like `utils.py` might live in production paths but contain test-specific code (e.g., `def create_mock_user():`). Conversely, test files might contain non-test helper functions.
+
+* *Failure Mode:* If a scanner only assigns context at the file level, it either scans the mock function (flagging weak test hashes like MD5) or suppresses the entire file (missing real vulnerabilities in production functions within the same file).
+* *The Solution:* The scanner must implement **AST-Level Context Tainting**. It must push and pop a "Test Scope" as it traverses the AST based on decorators (e.g., `@pytest.fixture`) and class inheritance (e.g., `unittest.TestCase`).
+
+#### 3. The Mock and Fixture Problem (The Secret Leak Paradox)
+
+Test fixtures require fake credentials to mock authentication.
+
+* *Failure Mode (If Suppressed):* Developers frequently copy-paste *real, active credentials* into test files to "get the test passing locally," intending to revert them but forgetting. If test files are excluded from security scans, these active keys leak into version control undetected. An attacker scraping GitHub does not respect directory boundaries; a key leaked in `conftest.py` is a critical breach.
+* *The Solution:* **Secrets must never be suppressed based on test context.** Instead, the secret scanner itself must apply a robust "Dummy Value Filter" (checking for low entropy or substrings like `EXAMPLE`, `TEST`, `MOCK`). Surviving high-entropy secrets retain their CRITICAL severity, regardless of where they live.
+
+#### 4. The Integration Test Problem
+
+Integration tests (`tests/integration/`, `tests/e2e/`) make real network calls, often against local containers or staging environments, frequently disabling TLS verification.
+
+* *Failure Mode:* Flagging Server-Side Request Forgery (SSRF) or SQLi in integration tests creates immense noise. These vulnerabilities require an external, attacker-controlled entry point. In a test run, the input is controlled by the test suite, making it structurally unexploitable.
+* *The Solution:* Differentiate between Unit and Integration context. Standard data-flow injections (SQLi, XSS) are suppressed. However, network misconfigurations (hardcoded internal IPs, `verify=False`) in integration tests should be downgraded to **INFO** severity—they aren't exploitable, but they are highly valuable for security teams mapping internal CI/CD attack surfaces.
+
+#### 5. The Security Regression Test Problem
+
+Applications often have `test_security.py` suites explicitly designed to contain vulnerable patterns (e.g., testing that an XSS sanitizer or downstream WAF works).
+
+* *Failure Mode:* The SAST tool's test suppression logic actively defeats the security test, resulting in a failed CI/CD pipeline and causing teams to falsely believe the scanner is broken.
+* *The Solution:* Implement deterministic, explicit overrides (inline pragmas and configuration paths) that bypass the scanner's context engine entirely.
+
+---
+
+### Part 2: Concrete Policy Specification
+
+#### Rule 1: The Context Determination Engine
+
+As the scanner parses the AST, it assigns a **Context Tag** to nodes (Files, Classes, or Functions) based on the following logic. Child nodes inherit the context of their parents.
+
+1. **`CONTEXT: TEST_UNIT` or `CONTEXT: TEST_INTEGRATION` (File-Level)**
+Assigned to the entire file if:
+* **Strict Path + Name:** The path matches regex boundaries `(?:^|/)(tests?|testing|specs?|__tests__)(?:/|$)` **AND** the filename matches `^test_.*\.py$` or `.*_test\.py$`.
+* **Known Fixtures:** The filename is exactly `conftest.py`, `noxfile.py`, `tox.ini`, `factories.py`, or `mocks.py`.
+* *(Integration Sub-type)*: If the path contains `integration`, `e2e`, or `system`, elevate the tag to `TEST_INTEGRATION`.
+
+
+2. **`CONTEXT: TEST_FUNCTION` (AST-Level)**
+If a file is *not* tagged by the rule above, individual AST nodes are tagged if:
+* **Inheritance:** The class inherits from `unittest.TestCase`, `unittest.IsolatedAsyncioTestCase`, or `django.test.TestCase`.
+* **Decorators:** The function is decorated with `@pytest.fixture`, `@patch`, `@mock.patch`, `@responses.activate`, or `@given`.
+* **Naming:** The function name matches `^test_[a-zA-Z0-9_]+` **AND** the function block contains an `assert` statement.
+
+
+
+#### Rule 2: The Secret Filtering Protocol
+
+Because `CONTEXT: TEST_*` tags **do not** automatically suppress secrets, the scanner must filter false positives by analyzing the *value* of the credential:
+
+* **Drop Finding if:**
+* Fails Shannon Entropy checks (e.g., `password123`, `admin`).
+* Contains known dummy substrings (case-insensitive): `EXAMPLE`, `DUMMY`, `MOCK`, `FAKE`, `XXXX`.
+* Matches exact vendor documentation strings (e.g., AWS's `AKIAIOSFODNN7EXAMPLE`).
+
+
+* **Retain Finding (CRITICAL) if:**
+* It is a valid, high-entropy token (e.g., a regex-validated Stripe Live Key, GitHub PAT, or RSA Private Key) that passes the filter above.
+
+
+
+#### Rule 3: The Contextual Severity Matrix
+
+When a vulnerability is identified, its final reported severity is dictated by this routing matrix:
+
+| Vulnerability Category | `TEST_UNIT` / `TEST_FUNCTION` | `TEST_INTEGRATION` | Policy Justification |
+| --- | --- | --- | --- |
+| **Data-Flow Injections**<br>
+
+<br>*(SQLi, XSS, Path Traversal)* | 🚫 **SUPPRESS** | 🚫 **SUPPRESS** | Tests do not ingest untrusted user input from external attackers. Flaws are structurally unexploitable. |
+| **Weak Cryptography**<br>
+
+<br>*(MD5, SHA1, `random` module)* | 🚫 **SUPPRESS** | 🚫 **SUPPRESS** | Weak hashes and PRNGs are standard practice for generating fast, deterministic mock IDs. |
+| **Command Injection / SSRF** | 🚫 **SUPPRESS** | 🟡 **DOWNGRADE (LOW)** | Can expose CI/CD runners if tests dynamically pull data from malicious PR titles/branches. Retained at LOW to map pipeline risk. |
+| **Network Config**<br>
+
+<br>*(`verify=False`, Hardcoded IPs)* | 🚫 **SUPPRESS** | 🟡 **DOWNGRADE (INFO)** | Intentional for hitting local staging servers. Downgraded rather than dropped to track technical debt. |
+| **Hardcoded Secrets**<br>
+
+<br>*(AWS, JWT, DB Passwords)* | 🔴 **CRITICAL**<br>
+
+<br>*(Apply Rule 2)* | 🔴 **CRITICAL**<br>
+
+<br>*(Apply Rule 2)* | A real credential committed to version control is a breach, regardless of the file's purpose. |
+
+#### Rule 4: Security Regression Overrides
+
+To ensure the scanner can evaluate intentionally vulnerable code (and validate its own functionality), the Context Engine is immediately bypassed if either of the following is true:
+
+1. **Inline Pragma:** If an AST node is preceded by the comment `# sast: enforce` or `# sast: ignore-context`, the `TEST_*` tag is stripped from that node, forcing standard production-level evaluation.
+2. **Configuration Bypass:** The scanner configuration file (`.sast.yml`) must support a `strict_scan_paths` array. Any file matching these regex paths (e.g., `tests/security/.*`) bypasses all heuristics and is evaluated strictly as production code.

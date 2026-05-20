@@ -1,0 +1,94 @@
+The challenge of automated regression detection in continuous deployment (CD) is fundamentally a **causal inference problem**. You are attempting to isolate the Average Treatment Effect (the code change) from a sea of confounding variables (traffic gradients, system state, caching, background noise). Because you cannot observe the counterfactual—how the old code would have performed at the exact same moment under the exact same conditions—you are forced to rely on proxies.
+
+Every proxy introduces structural blind spots. To build a reliable detection system, you must understand the mathematical failure modes of each strategy.
+
+---
+
+### 1. Pre/Post Comparison (Sequential Adjacent)
+
+**Mechanism:** Compare metric averages from the $N$ minutes immediately preceding the deployment to the $N$ minutes following it.
+
+**Failure Modes & Confounds:**
+
+* **Time-Correlated Gradients:** If you deploy at 8:50 AM, the post-deployment window captures the 9:00 AM user stampede. Natural increases in concurrency lead to longer queueing times and higher garbage collection overhead. A harmless deployment is falsely flagged as a latency regression.
+* **The Cold-Start Penalty:** New application instances have empty memory caches, unoptimized Just-In-Time (JIT) compilation, and fresh database connection pools. The first 3 to 5 minutes post-deploy will *always* mimic a performance regression.
+* **External Burstiness:** A deployment that finishes exactly at the top of the hour often collides with scheduled background cron jobs, skewing CPU and latency metrics.
+
+### 2. Same-Time-Last-Week (Historical Baseline)
+
+**Mechanism:** Compare the post-deployment window (e.g., Tuesday at 2:00 PM) to the exact same time window from the past. Controls for diurnal traffic curves.
+
+**Failure Modes & Confounds:**
+
+* **CD Code Drift:** In a high-velocity CD environment, "last Tuesday" might be 40 deployments ago. You are no longer measuring the marginal impact of *this* deployment; you are measuring cumulative codebase drift.
+* **Macro-State Drift:** Between last week and today, organic traffic may have grown, the database tables have millions of new rows (making sequential scans slower), or a heavy feature flag was toggled.
+* **Calendar Anomalies:** Marketing launches, public holidays, or upstream ISP outages in the historical baseline completely invalidate the comparison.
+
+### 3. Canary Comparison (Simultaneous RCT)
+
+**Mechanism:** Route a fraction of traffic to the new version (Canary) alongside the old version (Stable). Because both run simultaneously, this acts as a **Randomized Controlled Trial (RCT)**, mathematically eliminating time-of-day and organic growth confounds.
+
+**Failure Modes & Confounds:**
+
+* **SUTVA Violations (Shared Resource Contention):** If the canary introduces an $N+1$ query that locks a shared database table, the *stable* nodes will also slow down waiting for those locks. The relative difference between Canary and Stable remains near zero, masking a catastrophic global outage.
+* **Unequal Cache Hit Rates:** A Canary receiving 1% of traffic will experience a fundamentally worse local in-memory cache hit rate than a Stable fleet receiving 99% of traffic, making it look artificially slow.
+* **Cold vs. Warm Bias:** Comparing a 1-minute-old Canary to a 3-day-old Stable node yields false positives due to the cold-start penalty mentioned above.
+
+---
+
+### The Statistical Mathematics of Canary Sizing
+
+To rely on a canary without exposing too many users to a broken build, you must calculate the exact duration ($T$) and traffic percentage ($p$) required to achieve statistical power (typically 80% power with a 5% false-positive rate).
+
+Web latency is highly right-skewed, often exhibiting a Coefficient of Variation ($CV = \sigma / \mu$) of around 1.0. To detect a relative regression ($r$) between two unevenly sized groups, the required test duration in seconds can be approximated by the formula:
+
+$$T \approx \frac{8}{R \cdot p(1-p)} \left(\frac{CV}{r}\right)^2$$
+
+*(Where $R$ is total service Requests Per Second, $p$ is the canary traffic split, and $r$ is the target regression size).*
+
+If we want to detect a **5% latency regression** ($r = 0.05$), here is how total traffic volume dictates your CD pipeline velocity:
+
+| Total Service Volume | Traffic Split | Canary Load | Time to Statistical Validity ($T$) | Viability for Fast CD |
+| --- | --- | --- | --- | --- |
+| **High** (10,000 RPS) | **1% Canary** | 100 RPS | **~32 seconds** | Excellent. Minimum blast radius. |
+| **Medium** (1,000 RPS) | **5% Canary** | 50 RPS | **~1.1 minutes** | Excellent. Fast and reliable. |
+| **Low** (100 RPS) | **10% Canary** | 10 RPS | **~6 minutes** | Good, but requires a wider deployment window. |
+| **Very Low** (10 RPS) | **10% Canary** | 1 RPS | **~1 hour** | **Fails.** Stalls pipeline indefinitely. |
+| **Very Low** (10 RPS) | **50% (Blue/Green)** | 5 RPS | **~21 minutes** | Viable compromise for low-traffic services. |
+
+*Crucial Takeaway:* You cannot use a standard "5% for 5 minutes" canary on a low-traffic service. You will suffer from statistical starvation, meaning your system will fail to differentiate a true regression from normal metric variance. You must dynamically adjust your canary split inversely to your total traffic volume.
+
+---
+
+### The Decision Framework & MDES Targets
+
+Choose your strategy based on the intersection of **Traffic Volume**, **Deployment Frequency**, and **Infrastructure Capabilities**. The strategy determines your **Minimum Detectable Effect Size (MDES)**—the smallest regression you can automatically catch without triggering constant false-positive rollbacks.
+
+#### Tier 1: The "Hyperscaler" Profile
+
+* **Profile:** High Traffic (>1,000 RPS), High Frequency (Multiple/day), Service Mesh / Advanced Ingress.
+* **Strategy:** **New Canary vs. Baseline Canary.** To eliminate the "Cold vs. Warm" bias, route 5% of traffic to the New Canary, and 5% to a *Baseline Canary* (a freshly booted node running the OLD code). Ignore the first 2 minutes for JIT warmup, then compare them strictly against each other for 5 minutes.
+* **Global Guardrail:** Concurrently monitor global Pre/Post absolute latency to catch SUTVA database lockups.
+* **MDES:** **1% to 5%.** High statistical power allows you to auto-rollback on micro-regressions confidently.
+
+#### Tier 2: The "Pragmatic Middle"
+
+* **Profile:** Medium Traffic (100 - 1,000 RPS), Daily Deploys, Standard Load Balancing.
+* **Strategy:** **"Fat Canary" with a Blind Spot.** Run a 10% - 20% canary to generate statistical mass quickly. Implement a strict 3-minute post-deploy blind spot to ignore cold starts.
+* **MDES:** **5% to 10%.** You must widen your alerting bands slightly to account for caching imbalances between the 20% canary and 80% stable fleets.
+
+#### Tier 3: Low Volume / B2B SaaS
+
+* **Profile:** Low Traffic (<100 RPS) or highly cyclical traffic, Weekly Deploys.
+* **Strategy:** **Blue/Green (50/50) OR Pre/Post with Synthetic Load.**
+* Because low-percentage canaries take hours here, use a 50/50 Blue/Green split to maximize statistical power.
+* Alternatively, abandon organic metrics. Continuously inject deterministic, high-frequency *synthetic transactions* (e.g., via a load generator) and evaluate the Pre/Post performance of *only* the synthetic traffic, as its payload variance is zero.
+
+
+* **MDES:** **10% to 15%.**
+
+#### Tier 4: Basic Infrastructure (No split routing)
+
+* **Profile:** Any traffic volume, standard rolling updates.
+* **Strategy:** **Difference-in-Differences (DiD).** To strip out the time-of-day confound without a canary, compare the deltas. Calculate today's Pre/Post drift, and subtract last week's Pre/Post drift.
+* **MDES:** **15% to 25%+.** Because you cannot mathematically control for organic traffic ramps and short-term systematic bias, you must set your automated rollback thresholds high. Rely on this setup only to catch severe, step-function failures, leaving 5% micro-regressions to be caught by long-term observability.

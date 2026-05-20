@@ -1,9 +1,0 @@
-Think through the problem of aggregating performance metrics across a fleet of heterogeneous services to produce a meaningful portfolio-level performance view. An organization with 200 microservices needs some way to answer "is our overall system performance healthy?" without drowning in 200 independent SLO dashboards.
-
-The naive approach — averaging SLO compliance rates across services — has obvious problems. A 99.9% availability SLO for the authentication service that handles every user session has a fundamentally different weight from a 99.9% SLO for an internal admin reporting tool used by 5 people. Think through: what weighting schemes are meaningful? Traffic-weighted (services with more requests count more)? Business-impact-weighted (who sets impact weights, and what political problems does this create)? Dependency-graph-weighted (services that block critical paths count more)?
-
-Think through the composition problem: if Service A has 99.9% availability and calls Service B with 99.9% availability, the composite availability of the user-facing operation that requires both is approximately 99.8%. This means in a deep call chain of 10 services, each with 99.9% availability, the chain achieves only about 99.0% composite availability. How should a portfolio-level health view account for this composition effect, and does this mean that individual service SLO targets need to be set higher for services that participate in long call chains?
-
-Consider the organizational incentive problem: if team-level performance scores are derived from SLO compliance, teams will set loose SLO targets to ensure they always pass. Think through what governance mechanisms prevent this SLO gaming, and whether the analysis tool should flag SLOs that appear too loose based on historical performance.
-
-Propose a portfolio-level health scoring approach and identify its key assumptions and failure modes.

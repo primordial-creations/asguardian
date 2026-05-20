@@ -1,0 +1,79 @@
+Building a service map from distributed trace data exposes the harsh reality of observability: theoretical models rarely survive contact with production. In theory, extracting `parent_span_id` and `span_id` to build a Directed Acyclic Graph (DAG) is trivial. In practice, messy instrumentation, ephemeral compute, and asynchronous boundaries turn naive service maps into unreadable, disconnected "hairballs."
+
+To build a production-grade service map, the system must act as a **telemetry inference engine**, relying on dimensional aggregation, semantic conventions, and safe heuristics. Here is a design addressing the specific edge cases you identified.
+
+---
+
+### 1. Service Identity: Normalization vs. Over-Merging
+
+In a polyglot microservices environment, the `service.name` attribute is notoriously unreliable. It is configured locally by disparate teams, resulting in fragmented identities (e.g., `payment-service`, `PaymentService`, and `payments`).
+
+**Defensible Normalization Heuristics:**
+
+* **Infrastructure Anchoring (The Gold Standard):** String matching is weak; infrastructure context is strong. If you enrich traces with OpenTelemetry (OTel) resource attributes, grouping by `[k8s.cluster.name] + [k8s.namespace.name] + [k8s.deployment.name]` creates a highly accurate canonical identity that overrides arbitrary developer strings.
+* **Lexical Canonicalization:** If infrastructure metadata is missing, safely apply casing alignment (forcing lowercase) and uniform delimiters (converting whitespace, underscores, and camelCase boundaries to hyphens). `Payment_Service` and `paymentService` safely become `payment-service`.
+
+**Risky Normalization (Dangerous to Automate):**
+
+* **Suffix Stripping & Stemming:** Automatically stripping `-api`, `-worker`, or stemming `payments` to `payment` is dangerous. A team might legitimately have a `payment-api` (synchronous ingress) and a `payment-worker` (asynchronous processor). Merging them destroys differing scale profiles and failure domains.
+* **Version Stripping:** Blindly merging `payment-v1` and `payment-v2` hides "Strangler Fig" migrations or canary deployments, blinding operators to the differing behaviors of two versions running in parallel.
+
+**The Solution: Composite Keys and Aliasing**
+Treat service identity as a tiered resolution pipeline. The node's true identifier in the backend must be a composite key (`tenant:env:namespace:canonical_name`). For the remaining inconsistencies, implement an **Alias Registry**. The UI can suggest merges ("These two services share exact upstream/downstream dependencies"), but operators must explicitly approve the merge.
+
+---
+
+### 2. Dynamic Service Discovery: Pods vs. Services
+
+Kubernetes environments feature highly ephemeral execution contexts (Pods) backing stable logical endpoints (Deployments/Services).
+
+* If you plot pods, the map becomes an unreadable, rapidly churning star-graph.
+* If you only plot logical services, you lose the granular context needed for regression analysis (e.g., "Is the whole service failing, or is one specific canary pod stuck in a crash loop?").
+
+**The Solution: Dimensional Edges via Streaming Aggregation**
+The map builder must structurally separate the **Visual Viewport** from the **Data Model**. Do not query raw spans to render the graph. Instead, stream the spans through an aggregation pipeline (e.g., the OTel Collector `servicegraph` processor).
+
+Edges are persisted in a Time-Series/OLAP database not as scalar links, but as **multi-dimensional metric distributions**:
+`calls_total{src="Service A", dest="Service B", dest_pod="pod-123", dest_version="v2", status="error"}`
+
+**Operational Workflow (Semantic Zoom):**
+Visually, the UI renders a single, clean logical edge from Service A to Service B. If that edge shows a spiked error rate, the operator clicks it. The UI dynamically issues a `GROUP BY dest_pod` or `GROUP BY dest_version` query against the timeseries backend. This instantly reveals if the incident is tied to a specific ephemeral instance or bad canary release, preserving deployment-level resolution without ever cluttering the global map.
+
+---
+
+### 3. Async Messaging: Bridging Disconnected Traces
+
+In event-driven architectures (Kafka, SQS, RabbitMQ), synchronous `parent_span_id` relationships break down. Service A produces a message and its trace ends; Service B consumes it later on a new trace. Furthermore, even if context *is* propagated, drawing a direct edge (`Service A -> Service B`) is architecturally inaccurate; Service A depends on Kafka's availability, not Service B's.
+
+**The Solution: Synthesizing Virtual Nodes via Semantic Conventions**
+The map builder must abandon strict parent-child logic and synthesize **Virtual Infrastructure Nodes** using OTel messaging semantic conventions.
+
+1. **Producer Inference:** Identify spans with `span.kind = PRODUCER`. Extract `messaging.system` (e.g., `kafka`) and `messaging.destination.name` (e.g., `orders-topic`).
+* *Draw edge:* `Service A` $\rightarrow$ `[Kafka: orders-topic]`
+
+
+2. **Consumer Inference:** Identify distinct traces with `span.kind = CONSUMER` and extract the same attributes.
+* *Draw edge:* `[Kafka: orders-topic]` $\rightarrow$ `Service B`
+
+
+3. **OTel Span Links:** For modern, properly instrumented async flows, OTel uses the `span.links` array to maintain context across disconnected traces. The builder should parse these links to validate topological connections, rendering them visually as dashed lines to denote asynchronous boundaries.
+
+*(Edge Case Warning: Message queues often use dynamic reply-to queues, e.g., `amq.gen-12345`. Naively mapping destination names will cause a massive cardinality explosion of virtual nodes. The builder must apply parameterized rollups—collapsing to `amq.gen-*`—just as it would for HTTP URL paths).*
+
+---
+
+### 4. Edge Direction, Fanout, and Temporality
+
+Foundational services (Auth, Configuration, User Profiles) suffer from massive in-degree fanout. If 50 services call an Auth API, the visualization quickly becomes a useless "Death Star."
+
+**Temporality: Time-Windows vs. Snapshots**
+A service map must be a **sliding time-windowed view** (e.g., "Last 1 Hour"), never a point-in-time snapshot. Snapshots miss infrequent cron jobs, and infinite historical lookbacks show decommissioned services.
+
+* **Visual Decay ("Ghost Edges"):** If an edge had traffic yesterday but has 0 traffic in the currently selected 1-hour window, render it as a dashed, semi-transparent line. This preserves topological context while answering the critical incident question: *"Did traffic suddenly stop flowing here, or does this service rarely run?"*
+
+**Visualizing and Taming Fanout:**
+To keep the map operationally viable, implement the following UI/UX constraint layers:
+
+1. **Ego-Centric Views:** Do not load the global map by default. Force the user to start at a focal node (the "Ego") and only render N-hops (usually 1 upstream, 2 downstream). This turns a 500-node hairball into a digestible 15-node critical path, showing exactly *"Who is affecting me?"* and *"Who will I affect?"*
+2. **Semantic Clustering:** If 30 services from the `frontend-bff` namespace all call the Auth service, visually cluster the upstream callers into a single expandable bounding box. Draw one thick, aggregated edge from the box to Auth, rather than 30 crisscrossing lines.
+3. **Threshold Pruning:** Default to hiding edges representing less than `< 0.1%` of a service's overall traffic. This eliminates noise from localized health checks, rogue developer scripts, or one-off `curl` commands. *(Exception: If a low-volume edge has an error rate > 0%, it must instantly materialize on the map in red).*

@@ -1,9 +1,0 @@
-What is the current state of benchmark corpora for evaluating SAST tools against injection vulnerabilities, specifically SQL injection (CWE-89), command injection (CWE-78), and path traversal (CWE-22)?
-
-Specifically investigate: the OWASP Benchmark Project (Benchmark Score methodology, TP rate, FP rate, and Youden index used to rank tools), NIST SARD (Software Assurance Reference Dataset) coverage for these three CWE categories as of 2024-2025, and the Juliet Test Suite versions for Java and C/C++.
-
-For each benchmark, provide: the number of test cases per CWE, how ground truth is established, whether the benchmark uses synthetic or real-world code, known weaknesses of the benchmark (e.g., synthetic patterns that don't reflect real codebases), and any published tool scores from Checkmarx, Veracode, Semgrep, SonarQube, and CodeQL.
-
-Also cover: whether any benchmark exists specifically for Python (the language of Heimdall's injection detection), what false positive rates commercial tools report on real open-source Python codebases (Django, Flask, FastAPI projects), and whether regex-based detection vs AST-based detection shows measurable recall differences on these benchmarks.
-
-Include any 2023-2025 academic papers that propose new injection detection benchmarks or evaluate existing ones, particularly papers that criticise the OWASP Benchmark for over-representing easily detectable patterns.

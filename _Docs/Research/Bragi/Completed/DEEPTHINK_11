@@ -1,0 +1,54 @@
+Designing a system to handle the tension between static analysis rules and legitimate architectural complexity requires balancing two opposing forces: **Linter Tyranny** (where rigid rules force developers to write unnatural, obtuse code to appease a tool) and the **Normalization of Deviance** (where a team slowly accepts degraded quality, defeating the tool entirely).
+
+For a team of 10–50 developers—large enough to require standardization but small enough that heavy enterprise bureaucracy will destroy velocity—the overarching design philosophy should be **Asymmetric Friction**. Making compliant code should be the path of least resistance; making a legitimate exception should be highly visible and require documented thought; and silently gaming the system should be mechanically impossible.
+
+Here is a principled approach to designing this system across your four dimensions.
+
+---
+
+### 1. The Inline Suppression Mechanism: Tactical, Visible Exceptions
+
+Inline suppressions (e.g., `# noqa`, `// eslint-disable`) are a necessary micro-level escape hatch. They belong exactly where the complexity lives. However, a naked suppression is invisible technical debt.
+
+* **Mandate a Reason and Rule ID:** Bare suppressions must be categorically rejected by CI. Configure your linter or write a lightweight pre-commit hook to strictly enforce a format that requires the rule name and a justification (ideally a ticket link).
+* *Reject:* `// NOLINT`
+* *Accept:* `// NOLINT(cognitive-complexity): [ENG-402] Maps exactly to the 12-state payment protocol.`
+
+
+* **Reject Time-Based Expiration:** Hardcoding expiration dates into comments (e.g., `expires: 2026-06-01`) is a severe anti-pattern. It creates "CI Time Bombs" where a pristine `main` branch suddenly fails to build on a Tuesday morning for code no one is actively touching, blocking unrelated hotfixes.
+* **Use State-Based Expiration:** Instead of time bombs, use two state-based mechanisms:
+1. **Unused Directive Checking:** Enable linter flags like `--report-unused-disable-directives`. If a developer refactors the complex function and it no longer violates the rule, CI will fail until the suppression comment is removed.
+2. **Ticket Binding:** Because you mandated ticket IDs in the suppression, run a weekly asynchronous cron job that queries your issue tracker. If a ticket is marked "Closed" or "Resolved" but the suppression still exists in `main`, flag it to the team.
+
+
+* **Metrics as Social Friction:** Do not use total suppression counts as a hard CI blocker, as this encourages developers to write worse code just to avoid the linter. Instead, use a CI bot (like DangerJS) to post an automated PR comment: *"⚠️ **Quality Alert:** This PR introduces 2 new static analysis suppressions."* This leverages visibility to ensure peer reviewers actually check the justification.
+
+### 2. The Baseline Strategy: The One-Way Ratchet
+
+Generating a baseline (an ignore-list of current violations) is the only realistic way to introduce strict tooling to a legacy codebase without halting feature development.
+
+* **The Failure Mode ("Baseline Inflation"):** The fatal flaw of baselines is that developers facing a tight deadline will simply run `linter --update-baseline` locally. They sweep their newly introduced sloppy code under the rug to get CI to pass.
+* **The Solution: Strict Ratcheting:** The baseline must act as a mechanical one-way ratchet.
+* In the standard CI pipeline, the baseline file is strictly **read-only**. If new code introduces a violation not in the baseline, CI fails.
+* If a developer accidentally or intentionally refactors and *fixes* a legacy issue, a CI bot should detect the fix, shrink the baseline file, and automatically push the smaller file back to the branch. **The baseline can only shrink, never grow.**
+
+
+* **Line-Number Agnosticism:** Adding an import at the top of a file shifts all subsequent line numbers, which can confuse naïve baseline tools into reporting "new" violations. Ensure your tooling fingerprints violations based on AST (Abstract Syntax Tree) nodes or stable function signatures, not raw line numbers.
+
+### 3. Rule Configuration Hierarchy: Bounded Contexts
+
+Allowing configuration at every possible level (global, directory, file, and function) creates "config soup"—a fractured codebase where developers spend hours debugging why a rule didn't fire, and bad habits hide in loosely configured corners.
+
+For a team of 10–50 developers, restrict configuration to a **Two-Tier Hierarchy**:
+
+* **Tier 1: Global Defaults (Project Root):** A single configuration file that governs 95% of the codebase. This represents the engineering organization's unified standard.
+* **Tier 2: Directory Contexts (Domain Boundaries):** Overrides are permitted *only* at the directory level to represent fundamentally different execution contexts. For example, `/tests` legitimately requires looser cognitive complexity and magic-number rules. `/infrastructure/scripts` might permit synchronous file I/O.
+* **Ban File- and Function-Level Configurations:** You should strictly forbid redefining rule thresholds within central config files for specific files (e.g., configuring `max-complexity: 50` just for `utils.ts` in your `.eslintrc`). If a single file genuinely needs an exception, the developer must use an **Inline Suppression** (Dimension 1). This ensures the technical debt remains physically adjacent to the code, highly visible, and bound to a written justification.
+
+### 4. Governance: Automated Gatekeeping vs. Peer Review
+
+Governance fails when it relies entirely on human vigilance, but it stalls velocity when it relies on a "Lint Dictator" manually approving every exception. The solution is distributed governance based on the blast radius of the change.
+
+* **Macro-Governance (Systemic Changes):** The global configuration, directory-level overrides, and the baseline file must be locked down using branch protection (e.g., GitHub `CODEOWNERS`). Any PR modifying these files—including a legitimate need to manually expand the baseline after a massive framework upgrade—requires explicit approval from a designated group (e.g., Tech Leads, Staff Engineers, or a rotating "Quality Guild"). Individual developers cannot silently alter the rules of the game.
+* **Micro-Governance (Local Exceptions):** Individual developers *do* have the authority to add inline suppressions to unblock themselves under time pressure. Because Dimension 1 enforces a mandatory reason and triggers an automated PR bot comment, you successfully shift the governance of micro-exceptions from a rigid automated blocker to **human peer review**. The developer doesn't need to beg a global gatekeeper for permission, but they *must* socially defend their decision to their peers.
+* **The "Coach vs. Cop" Feedback Loop:** Rules must serve the reality of the team. Every quarter, the Quality Guild should review the suppression metrics. If a specific rule (e.g., `max-class-length`) accounts for 80% of all inline suppressions, **the rule is wrong, not the team.** The guild should use their macro-authority to relax the global threshold, maintaining the team's trust in the tooling.

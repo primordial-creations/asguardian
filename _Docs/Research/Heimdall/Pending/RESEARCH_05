@@ -1,9 +1,0 @@
-What are the industry standards and best-practice frameworks for evaluating HTTP security header configurations, and how do commercial and open-source tools measure the security posture of a web application's response headers?
-
-Cover the following: the Mozilla Observatory scoring methodology (how individual headers are weighted, what score thresholds map to grades A through F), the OWASP Secure Headers Project recommendations as of 2024-2025 (including the recommended values for CSP, HSTS, X-Frame-Options, X-Content-Type-Options, Referrer-Policy, Permissions-Policy), and the securityheaders.com grading algorithm.
-
-For each of the following headers, provide the current industry consensus on the minimum secure configuration, known bypass techniques that a static scanner cannot detect, and how each header maps to specific CWEs or OWASP Top 10 categories: Content-Security-Policy, Strict-Transport-Security, X-Frame-Options, Content-Type header with nosniff, Cross-Origin-Opener-Policy, Cross-Origin-Resource-Policy, and Permissions-Policy.
-
-Then address: how static analysis of framework configuration files (Django settings.py, Express middleware chains, Spring Security config) can detect missing or misconfigured headers without making live HTTP requests, what the false positive challenge is when headers are set dynamically in middleware versus at the route level, and whether any open benchmarks exist for testing header detection accuracy across different web frameworks.
-
-Include any 2023-2025 research or industry reports on the adoption rate of security headers across the top 1 million websites (Tranco/Alexa datasets) and which headers have the lowest adoption despite being easy to implement.

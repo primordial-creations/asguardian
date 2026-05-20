@@ -1,0 +1,68 @@
+Analyzing performance anomalies in small batches of time-series data (50–500 points) places you in a uniquely constrained domain. In this "few-shot" regime, the mathematical assumptions of statistical methods (unimodality, normal distribution) are routinely violated by latency data, yet the data is too sparse for deep learning to generalize or complex ML models to converge without extreme overfitting.
+
+Here is a detailed breakdown of how statistical and ML-based methods trade off across your specific scenarios, followed by an architectural analysis of the hybrid approach.
+
+---
+
+### Part 1: Scenario Analysis (Constrained to 50–500 Data Points)
+
+#### 1. A sudden step-change in P99 latency after a deployment (No seasonality)
+
+* **Winner: Statistical Methods** *(Specifically Split-Window MAD or CUSUM)*
+* **Why ML Fails:** A deployment introduces a temporal regime shift. An Isolation Forest is spatial, not temporal; if a 500-point batch has 250 points at 50ms and 250 points at 200ms, the Forest will see two dense clusters and likely classify *both* as normal, completely missing the anomaly. Prophet's changepoint detection will lag significantly, and LSTMs will simply output massive, uninterpretable reconstruction errors.
+* **Why Stats Win:** Comparing the Median Absolute Deviation (MAD) of the first half of the batch to the second half, or using a Cumulative Sum (CUSUM) control chart, instantly detects the exact boundary of the structural break. It requires zero training data, virtually zero compute, and accurately describes the shift.
+
+#### 2. A gradual drift in P50 latency over 48 hours (e.g., a memory leak)
+
+* **Winner: ML-Based Methods** *(Prophet’s trend component or basic Linear Regression)*
+* **Why Stats Fail:** This scenario exposes the fatal flaw of rolling statistics: the **"Boiling Frog"** problem. If you use a rolling Z-score or IQR, the baseline continuously creeps upward alongside the drift. Because the point-to-point delta between $t$ and $t+1$ is tiny, the moving baseline simply swallows the degradation, and no alert ever fires.
+* **Why ML Wins:** Prophet (or even a simple Ordinary Least Squares regression) evaluates the batch globally and isolates the trend from localized noise. Even with just 500 points, fitting a regression line will definitively prove a statistically significant positive trajectory, flagging the systemic drift.
+
+#### 3. A regular weekly latency spike every Monday morning
+
+* **Winner: ML-Based Methods (Prophet)** — *Conditional on sampling resolution*
+* **Why Stats Fail:** Statistical bounds have no memory and no concept of calendars. A rolling MAD or Z-score will blindly fire a false-positive alert every single Monday morning, generating severe alert fatigue.
+* **The ML Caveat:** Prophet explicitly uses Fourier series to model seasonality and will learn to expect the spike. **However, you are constrained by your 50–500 points.** If your 500 points represent 1-minute resolution, your batch only spans ~8 hours. You cannot detect weekly seasonality because the context doesn't exist in the batch. If your 500 points are hourly rollups (spanning ~3 weeks), Prophet is the clear winner for suppressing the expected variance.
+
+#### 4. A bimodal latency distribution (Cache hits @ 5ms, misses @ 200ms)
+
+* **Winner: ML-Based Methods (Isolation Forest)**
+* **Why Stats Fail Catastrophically:** Global Z-scores implicitly assume a unimodal Gaussian curve. If 80% of requests take 5ms and 20% take 200ms, your mean sits in a "dead zone" (e.g., 44ms) with a massive standard deviation. A truly anomalous 100ms request gets a perfectly normal Z-score and is ignored. Conversely, a tight MAD might anchor the median at 5ms, causing *every single normal cache miss* to trigger a critical anomaly alert.
+* **Why ML Wins:** Isolation Forests are non-parametric and partition the feature space recursively. Even with a small batch of 200 points, the algorithm will naturally isolate the two dense spatial clusters. It will correctly classify both 5ms and 200ms as "normal," while an anomalous 80ms request will fall into the sparse space between them, requiring very few tree splits to isolate, and getting correctly flagged.
+
+---
+
+### Part 2: Evaluating the Hybrid Approach
+
+The most pragmatic architecture for a mature observability tool is a **Hybrid Model**: Use lightweight statistical methods on the immediate batch for fast, local context, and query ML models trained asynchronously on deep historical data to provide baseline expectations.
+
+However, integrating these two systems introduces complex edge cases.
+
+#### Failure Modes of the Hybrid Approach
+
+1. **"Improvement as an Anomaly" (Conflicting Signals):** An engineer deploys a database index that drops P99 latency from 100ms to 20ms. The rolling statistical batch analyzer updates instantly and reports the system is perfectly stable. The historical ML baseline, however, expects 100ms. It flags the massive *drop* as a critical anomaly, triggering pager storms for a highly successful deployment.
+2. **Resolution Mismatch:** To save database storage, ML baselines are often trained on smoothed, aggregated data (e.g., 5-minute averages). The local batch tool often processes raw, spiky telemetry (e.g., 10-second intervals). Comparing high-variance raw batches against low-variance smoothed ML bounds generates endless false positives.
+3. **Data Poisoning:** If a system degrades slowly over a month and the ML model periodically retrains on that data, the model learns that the degraded state is the "new seasonal normal." It will suppress alerts, completely blinding the hybrid system to systemic failure.
+
+#### When is a stale ML baseline worse than a rolling statistical baseline?
+
+A stale ML baseline becomes an active liability **immediately following an intentional state mutation.**
+
+In software, infrastructure is engineered, not organic. When a team ships code, adds a database index, or auto-scales hardware, the underlying data-generating process fundamentally mutates. In these moments, rolling statistical baselines (like a trailing 50-point MAD) are beautifully *amnesic*—they quickly forget the old architecture and accurately bound the new reality.
+
+An ML model has deep memory. It will stubbornly insist that the intentional mutation is an anomaly, causing severe alert storms. **Rule of thumb:** Whenever a deployment or configuration change is registered, ML baselines should be temporarily suspended, allowing rolling stats to govern until the new ML baseline is established.
+
+#### What data volume threshold should trigger switching from Stats to ML?
+
+Do not transition from statistical to ML baselining based purely on raw point counts ($N$). Transition based on algorithmic prerequisites and temporal coverage:
+
+1. **For Distributional ML (Switching to Isolation Forest):**
+* **Threshold: ~150 to 250 points.** Below this, ensemble tree partitioning is too shallow and highly sensitive to single random outliers. Above this, the geometry of the batch is dense enough to map multimodality safely.
+
+
+2. **For Seasonal ML (Switching to Prophet):**
+* **Threshold: 3 to 4 complete seasonal cycles.** Do not switch just because you hit 500 points. If you want to model daily seasonality, wait until your history spans 3 to 4 days. For weekly Monday spikes, wait until you have accumulated 3 to 4 *weeks* of data.
+
+
+3. **For Deep Learning (Switching to LSTMs):**
+* **Threshold: > 10,000 continuous points.** Deep learning requires vast amounts of sequence data to map dependencies without simply memorizing the noise. LSTMs represent massive computational overhead for very little predictive gain in a batch-focused performance tool. Rely on statistics and tree-based models instead.

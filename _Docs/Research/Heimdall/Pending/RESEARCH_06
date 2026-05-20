@@ -1,9 +1,0 @@
-What is the current state of static analysis techniques for detecting race conditions and Time-of-Check to Time-of-Use (TOCTOU) vulnerabilities (CWE-367, CWE-362) in Python and multi-language codebases, and what are the fundamental limitations of purely static approaches?
-
-Provide a comprehensive survey covering: how race condition detection differs between compiled languages (where tools like ThreadSanitizer operate at runtime) and interpreted languages like Python, what static patterns reliably indicate TOCTOU vulnerabilities in Python filesystem operations (os.path.exists followed by open, os.access followed by file operation), and how the GIL affects race condition exploitability in CPython versus other Python implementations.
-
-For concurrent Python specifically: what static patterns indicate unsafe shared state in threading.Thread, asyncio coroutines, and multiprocessing scenarios? How do tools detect unsafe access to shared mutable objects (dicts, lists, class attributes) across threads without synchronisation primitives? What CWE subcategories apply to async race conditions (e.g., asyncio check-then-act)?
-
-Cover commercial and open-source tool capabilities: does Semgrep, CodeQL, Bandit, or any other tool have published rules or queries for Python race condition detection? What do they detect and what are their documented false negative rates? Are there any research tools from academia (2020-2025) specifically targeting Python concurrency bugs?
-
-Also address: what the research says about race conditions in web framework request handlers (Django, FastAPI, Flask) where multiple worker processes share state through a database, whether database-level TOCTOU (SELECT then UPDATE without transactions) is detectable statically, and what mitigation patterns a scanner should recognise as safe (threading.Lock, asyncio.Lock, database SELECT FOR UPDATE).

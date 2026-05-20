@@ -1,0 +1,53 @@
+Designing a multi-format Infrastructure as Code (IaC) validation system that survives the relentless evolution of upstream specifications is one of the most notoriously difficult problems in platform engineering.
+
+Validation systems inevitably collapse when they conflate **structural legality** (the schema shape) with **semantic safety** (the business policy). If your security rule for "do not run containers as root" is hardcoded to look for `apiVersion: apps/v1`, it will silently fail the moment a user submits a Helm chart using `apps/v1beta1`, or a Docker Compose file.
+
+To solve this, the architecture must completely decouple the validation engine, the evolving format schemas, and the semantic policies. Here is a principled architectural blueprint for managing IaC validation versioning, addressing your operational scenarios and the irreducible complexities of the domain.
+
+---
+
+### 1. The Core Architecture: The Four-Tiered Abstraction
+
+To insulate your rule sets from underlying format churn, the system must process raw IaC files through a pipeline of increasingly normalized representations:
+
+1. **Lexical Parsing (Syntax):** Converts text (`.yaml`, `.tf`) into an un-typed Abstract Syntax Tree (AST). It knows nothing about Kubernetes or Terraform; it only preserves structure and source-mapping (line/column numbers) for error tracing.
+2. **Dynamic Schema Binding (Structure):** Evaluates the AST against a highly specific, point-in-time schema (e.g., K8s 1.28 OpenAPI or AWS Terraform Provider v5.0). This validates types, bounds, and catches typos.
+3. **Canonical Normalization (Upcasting):** The translation layer. It transforms version-specific ASTs into an **Internal Canonical Model (ICM)**. For example, a legacy `batch/v1beta1` CronJob and a modern `batch/v1` CronJob are both mapped in-memory to a standardized, unversioned `Canonical_CronJob` object.
+4. **Semantic Policy Evaluation (Intent):** Executes security, compliance, and business logic (via OPA/Rego, CEL, etc.) strictly against the Internal Canonical Model.
+
+### 2. Rule Versioning: Ranges vs. Canonicalization
+
+**Should validation rules be associated with a schema version range (valid from version X to Y)?**
+
+* **For Structural Schema Rules: No.** Schemas should be treated purely as external data dependencies, not executable code. The validator engine should contain zero hardcoded schemas. It must dynamically match the target environment to a specific point-in-time schema.
+* **For Semantic Policies: Absolutely not.** Binding business rules to version ranges (e.g., `valid_from: k8s_1.19, valid_to: k8s_1.21`) creates a combinatorial explosion. Every time an API promotes from beta to stable, you would have to duplicate or rewrite policies.
+
+Instead, the burden of version evolution is absorbed entirely by the **Normalization Layer**. Your security engineers write the semantic policy exactly *once* against the Canonical Model. When a new Kubernetes version deprecates an API, you write one new adapter in the Normalizer to "up-migrate" the old shape to the Canonical Hub.
+
+*(Note: For infinitely sprawling schemas like Terraform providers where a Canonical Hub is impossible, semantic policies must rely on **Structural Duck Typing**—e.g., `if node.has_capability("encryption")`—rather than strict version ranges).*
+
+### 3. The Operational Dilemma: Handling Version Skew
+
+**Scenario:** *A CI pipeline targets Kubernetes 1.28. The validator was built against 1.27 schemas. A new field is introduced in 1.28, and another field is removed. What happens?*
+
+A structurally sound architecture solves this via **Target Context Injection** and **Dynamic Schema Hydration**. The CI pipeline must pass `--target-k8s-version=1.28`. The validator engine connects to a Schema Registry and downloads the 1.28 contract.
+
+However, if the validator operates completely offline or the 1.28 schema doesn't exist in the registry yet, it enters a state of **Version Skew** ($V_{target} > V_{known}$). It must acknowledge this mathematically and gracefully degrade:
+
+* **The New 1.28 Field:** Strict validation (`additionalProperties: false`) will view this as an "unknown field" (a typo). If the validator **FAILS**, it blocks developers from using legitimate new features (a False Positive pipeline block). Therefore, during Version Skew, the validator must downgrade unknown fields to a **WARN**, ignoring the field structurally while passing the rest of the AST to the policy engine.
+* **The Removed 1.28 Field:** The 1.27 validator's schema considers this field valid. It will **PASS**. The configuration will subsequently blow up during `kubectl apply`. This is an unavoidable **False Negative**. A static tool cannot predict future deprecations without access to future schemas.
+
+### 4. Borrowing from Prior Art
+
+* **Protocol Buffers (Lenient Forward Compatibility):** Protobuf survives version mismatches by explicitly ignoring unknown field tags during deserialization. Our validation architecture must do the same when skewed: preserve the unknown field in the AST, but mark it with a `<tainted>` primitive.
+* **The "Default Deny" Imperative:** Because we must tolerate unknown fields for forward compatibility, semantic policies must be written as "default deny." If a new K8s version introduces a `bypassSecurityChecks: true` field, our 1.27 validator will ignore it. If our policy says `if bypassSecurityChecks == true { fail }`, it will fail-open (evaluate as safe). Policies must instead assert the presence of safety: `if securityContext.enabled != true { fail }`.
+* **SQL Migrations (State Transitions):** SQL tools like Flyway manage schema drift via imperative `UP`/`DOWN` scripts. Our Normalization Layer acts as an in-memory SQL migration. When it reads a deprecated Docker Compose v2 spec, it executes an "Up" migration to mutate the AST into the canonical v3 model before applying policies.
+* **OpenAPI Schema Evolution:** OpenAPI utilizes `$ref` and explicit `deprecated: true` lifecycle flags. The IaC Schema Registry must host this metadata. When a user utilizes a field marked `deprecated`, the engine triggers a warning. When it enters the `removed` window, the structural validator triggers a hard failure.
+
+### 5. The Irreducible Complexities
+
+Even with a pristine, decoupled, dynamically-resolving architecture, certain complexities cannot be engineered away:
+
+1. **The Typo vs. Innovation Paradox:** As established in the operational scenario, when a validator lacks the exact schema of the target environment, static analysis cannot mathematically differentiate between a developer making a typo (`privleged: true`) and a cloud provider introducing a new API field. You must perpetually choose between breaking CI pipelines (strict mode) or permitting typos to bypass security checks (lenient mode).
+2. **Late Binding & Turing Completeness:** Terraform configurations rely heavily on dynamically computed values (e.g., an AWS VPC ID that doesn't exist until `apply`). Helm relies on server-side capabilities and Turing-complete templating. Static validation is irreducibly blind to server-side generated state. The validator must introduce a `<computed>` primitive, and policies must gracefully yield or assert conditionally against variables that cannot be statically resolved.
+3. **Semantic Shifts Without Structural Change:** A cloud vendor might release an update where the default value of an omitted field (e.g., `encryption_enabled`) quietly changes from `true` to `false` on their backend API. Because the schema contract (the JSON representation) remains perfectly identical, structural validation passes, and the Canonicalizer sees no difference. Static analysis cannot catch behavioral changes in the underlying API that do not manifest as changes in the structural schema.

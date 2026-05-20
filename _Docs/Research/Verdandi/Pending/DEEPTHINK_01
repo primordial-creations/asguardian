@@ -1,9 +1,0 @@
-Think deeply about how to define meaningful SLOs for a static performance analysis tool — a tool that analyzes telemetry data (traces, metrics, logs) and produces reports or scores, rather than serving live user traffic. Traditional SLOs measure availability (the service is up and responding) and latency (requests complete within a threshold), but these concepts apply poorly to a batch analysis tool.
-
-What would a meaningful SLO look like for a tool like this? Consider: analysis correctness (the scores and anomaly detections are accurate versus a ground truth), analysis completeness (what percentage of submitted datasets are fully analyzed without errors), analysis latency (how long does analysis take, and what is the acceptable P95 deadline), and freshness (how stale can results be before they lose operational value?).
-
-The hardest part: ground truth doesn't exist for anomaly detection. You cannot know whether a flagged anomaly is a true positive without human review. So "accuracy SLO" may be unmeasurable in production. Think through: what proxy metrics could substitute for accuracy? Could recall (percentage of known incidents that were detected in retrospect) serve as an SLO indicator measured over incident post-mortems? What is the lag between detection and validation, and how does that lag affect the SLO window choice?
-
-Think through the error budget implications: if the analysis tool has a 99.5% completeness SLO, what kinds of analysis failures consume error budget? A crash that drops an entire dataset is clearly an error. But what about a timeout that returns partial results? What about a case where the anomaly detector returns results but the underlying statistical test had too few samples to be valid — should that count as an error?
-
-Propose a concrete SLO framework for a static analysis tool with three to five SLIs, justify each SLI choice, and identify the biggest measurement challenges.

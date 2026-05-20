@@ -1,0 +1,103 @@
+To meet the aggressive sub-3-second latency target for a 50-file changed set (an average budget of ~60ms per file) while maintaining strict precision (FP < 20%) and recall (FN < 30%) thresholds, a production static scanner must ruthlessly align the computational cost of the detection layer with the semantic requirements of the vulnerability.
+
+Here is the analysis of the 10 vulnerability categories, evaluating where the progression from Regex (Layer 1) to AST (Layer 2) to Intra-function Taint Tracking (Layer 3) is mandatory, and where additional complexity is wasted compute.
+
+### Vulnerability Category Analysis
+
+**1. SQL injection where the query is constructed via f-string concatenation**
+
+* **Minimum Layer:** Layer 3 (Intra-function Taint)
+* **Why lower is insufficient:** Regex cannot reliably parse nested curly braces or multi-line strings. AST can easily flag inline f-strings (`execute(f"...")`), but doing so blindly violates the FP < 20% limit because developers frequently use f-strings safely for static configuration (e.g., `f"SELECT * FROM {STATIC_TABLE}"`). Furthermore, AST structurally misses decoupled queries (`q = f"..."; execute(q)`), violating the FN < 30% limit.
+* **FP Scenario Eliminated:** Taint tracking mathematically distinguishes between interpolating an untrusted HTTP parameter versus interpolating a safe, local constant.
+* **Latency Justification:** Mandatory. Without data-flow analysis, rules banning f-strings in SQL are too noisy for production use.
+
+**2. SQL injection where the query uses `string.format()` with named parameters**
+
+* **Minimum Layer:** Layer 3 (Intra-function Taint)
+* **Why lower is insufficient:** Identical to f-strings. AST natively identifies the `.format()` call, but query formatting is very frequently decoupled from execution across multiple lines.
+* **FP Scenario Eliminated:** Eliminates FPs where `.format()` is used to merge trusted configurations or sanitized, type-cast variables into a query string.
+* **Latency Justification:** Mandatory to correlate decoupled sources and sinks.
+
+**3. Hardcoded AWS access keys**
+
+* **Minimum Layer:** Layer 1 (Regex)
+* **Why lower is insufficient:** N/A.
+* **FP Scenario Eliminated:** Moving to AST or Taint provides **no precision benefit**. AWS keys (e.g., `AKIA...`) possess strict structural prefixes and high entropy, which regex combined with a Shannon entropy check handles perfectly on raw text. In fact, moving to AST *hurts* recall, as AST drops comments and docstrings where keys are frequently leaked.
+* **Latency Justification:** Bootstrapping AST or Control Flow Graphs (CFG) for well-structured secrets is a pure waste of the latency budget.
+
+**4. Hardcoded cryptographic keys passed to AES cipher constructors**
+
+* **Minimum Layer:** Layer 3 (Intra-function Taint)
+* **Why lower is insufficient:** Regex searching for "any 16/32 byte string" yields massive FPs. AST perfectly identifies inline literals (`AES.new(key=b"secret")`), but fails on the ubiquitous developer pattern of local assignment (`k = b"secret"; AES.new(k)`), pushing the FN rate > 30%.
+* **FP Scenario Eliminated:** Taint traces the hardcoded literal assignment directly to the cipher. This eliminates AST FPs where a safely generated variable happens to be passed (`k = os.urandom(32); AES.new(k)`).
+* **Latency Justification:** Tracking local literal assignments is required to achieve the < 30% FN constraint.
+
+**5. SSRF where the URL is constructed from `request.args.get()` directly**
+
+* **Minimum Layer:** Layer 3 (Intra-function Taint)
+* **Why lower is insufficient:** Even if embedded "directly" (e.g., `requests.get(request.args.get('url'))`), relying on AST to find this exact syntactic nesting leads to massive FNs, as developers usually assign intermediate variables for readability. Conversely, AST flagging the mere presence of both functions in the same scope yields unacceptable FPs.
+* **FP Scenario Eliminated:** Eliminates FPs where `request.args.get()` safely fetches a pagination integer, while `requests.get()` independently calls a hardcoded internal microservice in the same function.
+* **Latency Justification:** Mandatory. SSRF is fundamentally a source-to-sink data-flow problem.
+
+**6. Path traversal where `os.path.join()` receives a user-controlled segment**
+
+* **Minimum Layer:** Layer 3 (Intra-function Taint)
+* **Why lower is insufficient:** `os.path.join` is one of the most frequently used Python functions for safe, internal path resolution. Flagging its usage via AST yields a near-99% FP rate.
+* **FP Scenario Eliminated:** Eliminates FPs where `os.path.join()` concatenates completely safe, server-controlled directories (e.g., `os.path.join(BASE_DIR, 'templates')`).
+* **Latency Justification:** Mandatory to differentiate between safe system constants and untrusted user input.
+
+**7. Use of `yaml.load()` without a `Loader` argument**
+
+* **Minimum Layer:** Layer 2 (AST Analysis)
+* **Why lower is insufficient:** Regex is extremely brittle here. It triggers FPs if `Loader` is passed as a keyword argument on a subsequent line, or if dictionary unpacking (`kwargs`) is used.
+* **FP Scenario Eliminated:** AST evaluates the `Call` node structurally. It accurately checks the `keywords` array, eliminating Regex FPs caused by comments, spacing, or alternative argument ordering.
+* **Latency Justification:** AST parsing is very fast (~5ms per file) and solves the structural context problem perfectly. Taint tracking delivers no benefit because this is an API misconfiguration, not a data-flow issue.
+
+**8. Missing `@login_required` on a Django view function**
+
+* **Minimum Layer:** Layer 2 (AST Analysis)
+* **Why lower is insufficient:** Regex routinely misses decorators if they are preceded by comments, or separated by newlines, and cannot reliably correlate the decorator to the correct function body.
+* **FP Scenario Eliminated:** AST evaluates the `decorator_list` on the `FunctionDef` node. It eliminates FPs where regex gets confused by stacked custom decorators or where a decorator is commented out.
+* **Latency Justification:** Near-perfect precision for near-zero marginal latency.
+
+**9. Use of `random.random()` for a security token**
+
+* **Minimum Layer:** Layer 3 (Intra-function Taint)
+* **Why lower is insufficient:** Both Regex and AST can easily find `random.random()`, but they lack semantic context. Weak PRNGs are heavily used for benign purposes like exponential backoff, A/B testing, and math.
+* **FP Scenario Eliminated:** Taint tracking ensures the scanner only flags the weak PRNG if its output actually flows into a security-sensitive sink (e.g., `jwt.encode`, `set_cookie`, or a database token assignment).
+* **Latency Justification:** Flagging every instance of `random` renders the scanner unusable due to alert fatigue. Taint is the only way to establish "security context."
+
+**10. Regex pattern with catastrophic backtracking**
+
+* **Minimum Layer:** Layer 2 (AST Analysis) *(To extract the pattern for an external heuristic engine)*
+* **Why lower is insufficient:** Analyzing Python syntax with a regex to extract a regex string is practically impossible due to raw strings (`r""`), multi-line triple quotes, and escape sequences.
+* **FP Scenario Eliminated:** AST targets the explicit `Constant` node passed to `re.compile()`. This eliminates FPs/FNs where naive regex extractors accidentally mangle the string, causing the external ReDoS analyzer to evaluate a broken pattern.
+* **Latency Justification:** AST extraction is virtually free and guarantees precision for the external analyzer.
+
+---
+
+### Principled Architecture Recommendation
+
+To meet the strict 3-second SLA for 50 files, **you should not run all three layers universally and merge the results.** You must utilize a **Dispatch Table (Routing) Architecture** with lazy evaluation.
+
+**The Recommended Pipeline:**
+
+1. **Layer 1 (Regex):** Run globally across all raw file text to catch high-entropy secrets instantly.
+2. **Layer 2 (AST & Pre-filter):** Parse the file into an AST exactly *once*.
+* Evaluate all structural rules immediately (YAML, AES, Django decorators, ReDoS extraction).
+* **The Gateway:** Scan the AST for "trigger nodes"—known sources (e.g., `request.args`) or sinks (e.g., `cursor.execute`, `os.path.join`).
+
+
+3. **Layer 3 (Lazy Taint Tracking):** Taint tracking is dynamically invoked. The scanner only builds a Control Flow Graph (CFG) and computes taint arrays for the specific functions that Layer 2 explicitly flagged as containing a trigger.
+
+#### Operational Risks of the Approaches
+
+**Risks of "Run-All and Merge" (Not Recommended):**
+
+* **Latency Blowout:** Generating CFGs and solving data-flow equations unconditionally for every function in 50 files will consistently violate the 3-second pre-commit limit. When hooks take 15 seconds, developers universally bypass them (`git commit --no-verify`), reducing the scanner's effective organizational recall to 0%.
+* **Deduplication Complexity:** If both AST and Taint layers flag the same inline f-string SQLi, merging requires complex, error-prone line/column deduplication to prevent spamming the developer with duplicate alerts.
+
+**Risks of the Dispatch Architecture (Recommended):**
+
+* **Pre-filter Blindspots (False Negatives):** The primary operational risk is a "Missed Handoff." If a developer imports a network library under an alias (`from requests import get as fetch`), and the Layer 2 AST pre-filter only routes to Layer 3 if it sees `requests.get`, the taint engine never runs. The vulnerability is silently missed.
+* **Mitigation:** The dispatch engine requires robust import-aliasing resolution during the AST traversal phase to ensure files are routed correctly, accepting that a tiny fraction of highly obfuscated edge-cases is a worthy tradeoff for preserving the sub-3-second developer SLA.

@@ -1,0 +1,90 @@
+Designing a composite code quality score is fundamentally a **Multi-Criteria Decision Analysis (MCDA)** problem. A naive aggregation (like a weighted sum) inevitably creates a "Frankenstein metric": it double-counts heavily correlated inputs, unfairly penalizes large files, and allows trivial metrics to mathematically mask critical vulnerabilities.
+
+To construct a rigorous, mathematically sound, and psychologically effective scoring system, we must adopt a **Hierarchical Gated Geometric Model**. Here is the principled reasoning and concrete formulation for each of your five design decisions.
+
+---
+
+### 1. Normalizing for File Size (The Scale Problem)
+
+**The Problem:** Absolute counts (tech debt hours, smells, bugs) scale intrinsically with file size. If unnormalized, a pristine 2,000-line file will mathematically score worse than a terrible 50-line file. However, converting to pure densities ($Value / LOC$) creates mathematical volatility in small files (1 smell in a 10-line file yields an absurd 100 smells/KLOC).
+
+**The Solution: Laplace Densities, Extrema, and Utility Mapping**
+Map all 10 raw metrics to a standardized utility scale $u \in [0, 1]$ (where $1.0$ is perfect) using size-aware transformations:
+
+1. **Count-Based Metrics (Bugs, Smells, Debt):** Convert to densities using **Laplace smoothing** to protect small files, then apply an exponential decay function.
+* $\rho = \frac{\text{Severity-Weighted Count}}{\text{LOC} + 200}$ *(the +200 baseline prevents small-file volatility)*
+* $u = e^{-\lambda \cdot \rho}$ *(where $\lambda$ is tuned to your organization's risk tolerance)*
+
+
+2. **Complexity Metrics (Cyclomatic/Cognitive):** *Never aggregate complexity across a file.* Summed complexity is practically identical to LOC. Instead, extract **Maximum Complexity** (to catch localized "God functions") and **Mean Complexity** (to measure average cognitive load). Map these to $[0,1]$ via exponential decay.
+3. **Bounded Metrics (MI, Type %, Doc %, Duplication %):** Map linearly. e.g., $u_{type} = \text{Type} / 100$.
+4. **Lines of Code (LOC) as a Penalty:** Treat file size as an independent architectural constraint. Apply a **logistic (sigmoid) decay function** that stays near 1.0 for acceptable sizes but drops sharply after a critical threshold ($L_c \approx 600$ lines):
+* $u_{LOC} = 1 - \frac{1}{1 + e^{-k(\text{LOC} - L_c)}}$
+
+
+
+---
+
+### 2. Setting the Weights (The Collinearity Problem)
+
+**The Problem:** Weighting by expert opinion devolves into subjective bikeshedding. Weighting by developer ranking turns quality into a popularity contest (where aesthetics often outrank structural safety). Pure empirical regression fails because metrics like Complexity, MI, and LOC are highly collinear, destroying the stability of statistical models.
+
+**The Solution: PCA + Empirical Defect Regression**
+Use a two-stage statistical pipeline to set weights objectively:
+
+1. **De-correlate via PCA (Intra-Category):** Group the metrics into logical categories (e.g., *Maintainability* contains LOC, MI, Complexity, Duplication, Debt). Run a Principal Component Analysis (PCA) on historical codebase data for these specific metrics. The normalized loadings of the first principal component (PC1) dictate the weights inside the category. This mathematically prevents double-counting LOC and complexity.
+2. **Anchor to Reality (Inter-Category):** Regress your top-level categories against historical business outcomes (e.g., a Poisson regression predicting *Defect Density* or *Change-Failure Rate* over the last 12 months). The resulting coefficients objectively answer how much weight each category should carry. (Empirically, Reliability will naturally claim the highest weight).
+
+---
+
+### 3. The Aggregation Function (The Substitutability Problem)
+
+**The Problem:** An arithmetic mean assumes perfect substitutability (100% documentation coverage could mathematically mask a critical SQL injection). A worst-case (min) function is too pessimistic; fixing 9 out of 10 bugs yields zero score improvement, demoralizing teams.
+
+**The Solution: A Hierarchical WAM-to-WGM Model**
+
+1. **Within Categories (Weighted Arithmetic Mean):** Inside a category like *Comprehensibility*, metrics are substitutable. High type-annotation coverage can compensate for slightly lower documentation coverage. We use a WAM here:
+
+$$C_j = \sum (w_i \cdot u_i)$$
+
+
+2. **Across Categories (Weighted Geometric Mean):** Across major pillars (*Reliability, Maintainability, Comprehensibility*), metrics are **not** substitutable. Beautiful documentation cannot compensate for catastrophic reliability. We use a WGM to combine the categories into a base score:
+
+$$S_{base} = \prod (C_j)^{W_j}$$
+
+
+
+*Why? The geometric mean naturally penalizes severe imbalance. If any single category approaches zero, it aggressively drags the entire score down.*
+
+---
+
+### 4. Handling Catastrophic Outliers (The Blocker Problem)
+
+**The Problem:** If a file scores a $0.95$ (A) on 9 metrics, but contains a single Blocker-severity vulnerability, the math of averages will still output a passing grade. If we force the mathematical formula to output $0$, we destroy the gradient of improvement (a 50-line file with 1 blocker scores the same $0$ as a 5,000-line spaghetti monster with 1 blocker).
+
+**The Solution: Non-Compensatory Gating (Threshold Ceilings)**
+Calculate the continuous $S_{base}$ normally, but apply a discrete **maximum ceiling ($Max_{cap}$)** based on the worst severity issue present.
+
+$$S_{final} = \min(S_{base}, Max_{cap})$$
+
+* If `Blocker Bug Count > 0` $\rightarrow Max_{cap} = 0.59$ (Score is capped at 'F')
+* If `Max Function Complexity > 50` $\rightarrow Max_{cap} = 0.69$ (Score is capped at 'D')
+* Else $\rightarrow Max_{cap} = 1.0$ (Score is uncapped)
+
+*Psychological Benefit:* If a file has 3 critical bugs, fixing 1 increases the underlying $S_{base}$, but the final score remains capped at an 'F'. The developer's dashboard shows that their base effort was recognized, but the CI/CD pipeline correctly refuses to let the file pass until the cap is lifted.
+
+---
+
+### 5. Presentation UX (The Actionability Problem)
+
+**The Problem:** Handing a developer a raw composite score (e.g., "68.4") is opaque, unactionable, and induces metric fatigue.
+
+**The Solution: A 3-Tiered Actionability Pipeline**
+Leverage progressive disclosure tailored to the developer's workflow:
+
+1. **Macro Level (The Gatekeeper): A Letter Grade.** Map the final $[0,1]$ score to standard grades (A $\ge$ 0.90, B $\ge$ 0.80, C $\ge$ 0.70). This abstracts away meaningless fractional fluctuations and provides an emotional, binary gate for Pull Requests ("Reject PRs that drop this file below a B").
+2. **Meso Level (The Context): A 3-Axis Radar Chart.** Plot the category scores ($C_{rel}, C_{maint}, C_{comp}$). If a developer sees a 'C', the radar chart instantly visually diagnoses *why* (e.g., a massive dent in the Comprehensibility axis).
+3. **Micro Level (The Rx Plan): Marginal ROI List.** Because your mathematical model uses continuous exponential and geometric functions, it is differentiable. Programmatically calculate the partial derivative of the score with respect to effort for each metric ($\frac{\partial S}{\partial u_i}$). Translate this into a ranked **Return on Investment (ROI)** checklist:
+* 🚨 *Top ROI:* "Fix 1 Blocker Bug $\rightarrow$ lifts 'F' cap, instantly raises grade to **B+**"
+* 💡 *Next Best:* "Extract logic from `process_data()` to drop Max Complexity below 25 $\rightarrow$ raises score **+6%**"
+* 📉 *Low ROI:* "Adding documentation will currently yield **<1%** improvement due to complexity bottlenecks."

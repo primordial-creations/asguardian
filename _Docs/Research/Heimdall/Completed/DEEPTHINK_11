@@ -1,0 +1,84 @@
+The challenge of normalizing severity across 25+ distinct security modules is one of the most notoriously difficult problems in Application Security. When independent scanning modules act as isolated "severity oracles," the result is semantic drift: a "HIGH" from the secrets module might signify an imminent business compromise, while a "HIGH" from a configuration module might simply mean a missed compliance benchmark.
+
+To ensure that findings of the same nominal severity represent comparable levels of actual risk, a scanner must systematically deconstruct the overloaded concept of "Severity" into four independent dimensions: **Impact, Confidence, Context,** and **Effort**.
+
+Here is a rigorous reasoning through the four core problems, followed by a concrete cross-module normalization framework.
+
+---
+
+### Part 1: Resolving the Four Core Problems
+
+#### 1. The Severity Definition Problem: CVSS vs. Intrinsic Impact
+
+**The Problem:** CVSS was designed as a lagging indicator for *known vulnerabilities* (CVEs) in *deployed systems*. SAST, IaC, and Secrets scanners largely find *theoretical weaknesses* (CWEs) in abstract code. Applying CVSS directly to static analysis requires the tool to guess runtime variables like Attack Vector, Privileges Required, and Scope. Because scanners want to avoid false negatives, they typically default to worst-case assumptions. This results in standard SQL injections or path traversals receiving automated CVSS 9.8 scores, destroying prioritisation and burying deterministically scored SCA findings.
+
+**The Solution:** Scanners must abandon CVSS for static findings. The cross-module foundation for severity must be **Intrinsic Technical Impact** (heavily inspired by the Common Weakness Scoring System - CWSS). Severity must measure only one thing: *Assuming this weakness is fully reachable and successfully exploited, what is the theoretical maximum damage to Confidentiality, Integrity, and Availability (CIA)?* An RCE is intrinsically CRITICAL; a missing header is intrinsically LOW.
+
+#### 2. The Exploitability Uncertainty Problem: Decoupling Confidence
+
+**The Problem:** Equating a 30% probability of a catastrophic breach (a complex SAST taint path) with a 90% probability of a minor bug (a known CVE in an SCA dependency) onto a single 1–4 severity scale conflates impact with likelihood.
+
+**The Solution:** **Severity must never be diluted by uncertainty.** If a taint analyzer finds a potential path to Remote Code Execution, the severity is CRITICAL, even if the tool is only 15% confident it is a true positive. Downgrading a low-confidence CRITICAL to a "Medium" hides a potential company-ending blast radius from the security team.
+
+Instead, scanners must output two orthogonal dimensions:
+
+1. **Severity (Impact):** How bad is the blast radius if this is real?
+2. **Confidence (Probability):** How certain is the scanner that this is a true, reachable positive?
+
+These two dimensions combine to dictate the **Triage Workflow**. A *CRITICAL-Severity / HIGH-Confidence* finding breaks the build. A *CRITICAL-Severity / LOW-Confidence* finding does not break the build, but is routed to the AppSec team for manual review.
+
+#### 3. The Context Dependency Problem: Progressive Contextualization
+
+**The Problem:** A missing Content-Security-Policy (CSP) is a MEDIUM severity risk for a web application, but technically irrelevant for a backend JSON API. Blindly conservative scoring breeds alert fatigue, while blind optimism misses risks.
+
+**The Solution:** Scanners must adopt **Progressive Contextualization**:
+
+1. **Pragmatic Baseline:** Assume a standard threat model (network-connected, handles standard user data) rather than an absolute worst-case scenario.
+2. **Heuristic Inference:** Modules must infer context dynamically. If the SAST AST parser sees `application/json` responses, or identifies gRPC configurations, it applies an `is_api` contextual modifier, automatically downgrading browser-centric vulnerabilities.
+3. **Developer Declarations:** The scanner must accept repository-level metadata (e.g., a `.scanner.yml` defining `tier: internal-service` or `data: non-sensitive`) to dynamically scale the baseline severity down globally.
+
+#### 4. The Remediation Cost Problem: Risk vs. Effort
+
+**The Problem:** Does a 5-minute fix (rotate an AWS key) warrant a different severity than a 2-week refactor (add RBAC to legacy endpoints)?
+
+**The Solution:** Remediation cost has **absolutely no place in a severity rating**. A catastrophic architectural flaw is not less dangerous because it takes two weeks to fix; in fact, the extended window of exposure increases the temporal risk. Downgrading severity based on fix-difficulty corrupts risk metrics and hides technical debt from leadership.
+
+However, effort is vital for **Sprint Planning**. Modules should output an independent `Estimated_Effort` tag (Trivial, Moderate, Complex). Engineering teams use this to calculate *Return on Remediation Effort* (Risk ÷ Effort), allowing them to prioritize Quick Wins (High Risk / Trivial Effort) first.
+
+---
+
+### Part 2: The Cross-Module Normalization Framework
+
+To ensure cross-module parity, individual modules are stripped of the right to assign subjective text labels. Instead, they report the *Mechanism* and *Confidence* to a **Central Normalization Engine**, which categorizes the finding against a universal matrix.
+
+#### Step 1: The Universal Technical Impact Criteria
+
+Severity is determined strictly by the violation of CIA and the scope of the compromise.
+
+* **CRITICAL (System Compromise):** Immediate, unauthenticated compromise of the host system, complete backend database takeover, arbitrary code execution, or total bypass of core authentication.
+* **HIGH (Significant / Data Compromise):** Substantial data compromise (e.g., PII extraction), authenticated privilege escalation (user to admin), lateral movement, or compromise of isolated subsystems.
+* **MEDIUM (Limited / Defense-in-Depth):** Bypass of defense-in-depth mechanisms, limited/localized information disclosure, Denial of Service (DoS), or theoretical attacks requiring highly complex preconditions.
+* **LOW (Hygiene / Informational):** Best-practice violations, code hygiene issues, or disclosure of non-sensitive environmental metadata.
+
+#### Step 2: The Cross-Module Equivalency Matrix
+
+Here is how findings from independent modules map to the unified criteria, ensuring a "HIGH" means the exact same level of technical impact regardless of the tool:
+
+| Module Category | CRITICAL | HIGH | MEDIUM | LOW |
+| --- | --- | --- | --- | --- |
+| **Secrets & Crypto** | Validated AWS Admin token; Prod DB root password; Active Private RSA keys. | Scoped 3rd-party API token (Stripe, Twilio); Use of broken crypto (DES) for sensitive data. | Hardcoded internal test/staging passwords; Weak PRNG used in a non-critical feature. | Hardcoded internal IPs; Suspicious base64 strings; Dummy example keys. |
+| **SAST (Code)** | Unauthenticated RCE; OS Command Injection; Deserialization of untrusted data. | Authenticated SQL Injection; Stored XSS; Path Traversal (Read); SSRF to external networks. | Reflected XSS; SSRF to internal non-critical networks; Missing anti-CSRF tokens. | Unhandled exceptions leaking stack traces; Dead code; Server fingerprinting. |
+| **SCA / Dependencies** | Reachable Known Exploited Vulnerability (KEV) allowing unauthenticated RCE (e.g., Log4Shell). | Reachable vulnerability allowing authenticated data exfiltration or High-impact DoS. | Outdated library with a complex DoS vector; CVEs with unproven reachability. | Outdated dev-dependency (e.g., testing frameworks like Jest/Mocha). |
+| **Containers & IaC** | Container runs as root with `--privileged`; S3 bucket open to public writes. | Container runs as non-privileged root; overly permissive IAM wildcards (`s3:*`); Unencrypted DBs. | Missing CPU/Memory limits (potential local DoS); Missing network egress rules. | Outdated base image with no known exploits; Missing `HEALTHCHECK`. |
+| **Auth & Headers** | Complete lack of authentication on core endpoints; Hardcoded master auth bypass. | Insecure Direct Object Reference (IDOR); CORS `*` with credentials allowed. | Missing CSP (in Web Context); Missing HSTS; TLS 1.1 support. | Missing `X-Frame-Options` (in API context). |
+
+#### Step 3: Generating the Actionable Priority Score
+
+To solve the "apples vs. oranges" problem for the end-user, the Normalization Engine calculates a final, sortable **Actionable Priority** by combining the decoupled dimensions:
+
+**Formula:** `Priority = (Base Severity Impact) × (Confidence %) × (Context Modifier)`
+
+* **Finding A (SAST):** Unauthenticated RCE found. Base Severity is CRITICAL (100). The taint path is complex and spans 5 files, so Confidence is TENTATIVE (0.4). Context is baseline (1.0). **Priority Score = 40**.
+* **Finding B (Secrets):** A Twilio API key is found. Base Severity is HIGH (80). The scanner validated the key against the live API, so Confidence is CERTAIN (1.0). Context is baseline (1.0). **Priority Score = 80**.
+
+**The Result:** The platform correctly instructs the developer to drop everything and fix the leaked API key (Priority 80) *before* investigating the potential RCE (Priority 40). It achieves this without ever lying to the developer about the fact that the RCE, if proven real, carries a worse technical blast radius.

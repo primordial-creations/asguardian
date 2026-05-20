@@ -1,9 +1,0 @@
-What are the state-of-the-art methods for detecting SSRF (Server-Side Request Forgery, CWE-918) and XXE (XML External Entity, CWE-611) vulnerabilities using static analysis, and what are the documented gaps between static detection and real-world exploitability?
-
-Provide a detailed survey covering: how CodeQL's SSRF query for Python and Java models URL sink functions and source parameters, how Semgrep's SSRF rules handle indirect URL construction (string concatenation, f-strings, template rendering), and what patterns distinguishes an exploitable SSRF from a false positive (e.g., URL constructed from configuration rather than user input).
-
-For SSRF chain detection specifically: what techniques exist for tracking taint through HTTP redirect responses (where the server follows a redirect to an attacker-controlled location), through DNS rebinding scenarios, and through cloud metadata endpoint access (169.254.169.254, IMDSv2 bypasses). Do any static analysis tools model these multi-hop chains?
-
-For XXE: what is the current state of static detection for Python (lxml, xml.etree, defusedxml), Java (DocumentBuilder, SAXParser, StAX), and PHP (simplexml, DOMDocument)? How do tools distinguish safe from unsafe XML parsing configurations at the AST level? What does the research say about the rate of XXE false negatives caused by configuration-at-distance (where the unsafe setting is in a different file from the XML parse call)?
-
-Include: NVD CVE statistics for SSRF and XXE from 2020-2025, CVSS score distribution, and which industries/application types are most affected. Provide any published precision/recall figures for SSRF detection from academic evaluations.

@@ -1,0 +1,89 @@
+Designing Service Level Objectives (SLOs) for highly variable, multimodal workloads is one of the classic traps in Site Reliability Engineering. A single statistical threshold (like `P99 < X ms`) inherently assumes a unimodal performance distribution. When applied to a multimodal system, it results in a "watermelon metric"—green on the outside, red on the inside. It masks massive regressions in the fast path, while your error budget remains entirely at the mercy of shifts in user traffic rather than actual system degradation.
+
+Here is a structural analysis of the three conceptual approaches you raised, followed by a proposed practical framework for taming multimodal SLOs.
+
+---
+
+### 1. Segmenting Continuous Workload Distributions
+
+When query complexity is a continuous distribution (e.g., scanning 10 rows vs. 10 million rows) rather than a clean boolean flag (`cache_hit=true/false`), attempting to segment the workload into discrete SLOs introduces major fragility.
+
+* **The Overfitting Trap:** The most common mistake is segmenting based on *historical latency*. If you look at current traffic and decree "the bottom 80% are fast queries, the top 20% are slow," you are overfitting to today's user behavior. If user behavior shifts next week and they naturally run heavier queries, the traffic mix shifts. The proportion of "slow" queries spikes, causing your SLO to breach even if the database is processing those complex queries as efficiently as physically possible. You end up penalizing the system for a shift in product usage.
+* **The Cliff-Edge Problem:** To avoid overfitting, you might try to bucket based on an input proxy for complexity (e.g., "Queries $< 10,000$ rows get a 500ms target"). However, this introduces arbitrary cliff-edges. A query scanning 9,999 rows that takes 550ms is marked as a "failure," while a query scanning 10,001 rows that takes 2,000ms is marked as a "success."
+
+**Conclusion:** Segmenting a continuous distribution into static buckets is a trap. It leads to endless threshold tweaking and alert fatigue caused by user behavior, rather than underlying system health.
+
+### 2. The "Apdex per Endpoint" Illusion
+
+Apdex transforms a latency distribution into a single score by bucketing requests into Satisfied ($\le T$), Tolerating ($\le 4T$), and Frustrated ($> 4T$). Does applying Apdex per endpoint solve the multimodal problem?
+
+**No. It mathematically obfuscates it.**
+Apdex was designed for unimodal (typically log-normal) distributions. If an endpoint serves 10ms cache hits and 3,000ms database scans, choosing the target parameter ($T$) forces an impossible compromise:
+
+* **Normalizing Slow-Path Failure:** If you set $T = 50ms$ to protect the cache, all database scans are permanently classified as "Frustrated." Your Apdex score will fluctuate wildly based entirely on the ratio of cache hits to DB scans, generating false alarms when the traffic mix changes.
+* **Masking Fast-Path Regression:** If you set $T = 1,000ms$, the DB scans are "Tolerating," but your in-memory cache could experience a catastrophic 90x degradation (from 10ms to 900ms) and still be categorized as perfectly "Satisfied."
+
+Apdex merely translates the threshold calibration problem from a percentile target to an index parameter. It suffers from the exact same blind spots as a static P99 SLO.
+
+### 3. User-Centric vs. Request-Centric SLIs
+
+A **request-centric** SLI evaluates every query as an independent event. A **user-centric** SLI evaluates the aggregate experience of a user over a time window or interaction (e.g., "What percentage of users had a session with $> 95\%$ successful queries?").
+
+**When the distinction matters operationally:**
+
+1. **The Fan-out Penalty (The Math of Frustration):** Modern UIs often require multiple concurrent API requests. If a dashboard makes 10 queries, and 9 are fast cache hits but 1 is a hanging DB scan, the page fails to render. A request-centric SLI reports a 90% success rate (which looks acceptable to backend teams), while a user-centric SLI recognizes the 0% user success rate, accurately reflecting the broken UX.
+2. **The Heavy-Hitter Skew:** In a request-centric model, an automated internal script making 50,000 fast cache hits will mathematically drown out 500 human users suffering through slow DB scans. You implicitly optimize your alerting for bots. User-centric SLIs normalize impact: a bot having a bad time counts as 1 unhappy user, exactly the same as a human.
+
+**The Operational Trade-off:** User-centric SLIs are for *product health*—they tell you if you should page an engineer or halt a release. Request-centric metrics are for *component health*—they tell the paged engineer what gear in the machine is actually malfunctioning.
+
+---
+
+### Proposed Approach: Dynamic Latency Budgets (Work-Normalized SLIs)
+
+The most practical, resilient way to design SLOs for continuous, multimodal workloads is to abandon absolute time thresholds altogether. Instead, define the SLI as a **function of the work requested**, creating a **Dynamic Latency Budget**.
+
+Instead of asking: *"Did this request finish in under 500ms?"*
+You ask: *"Did this request finish within its allocated budget, given the complexity of the work?"*
+
+#### The Math
+
+You define a formula for the expected latency based on an objective proxy for complexity (e.g., `rows_scanned`, `bytes_read`, `time_range_days`, or the database's `query_planner_cost`).
+
+`Target Budget = Base Network Overhead + (Complexity Proxy × Cost per Unit)`
+
+*Example:* If your complexity proxy is `rows_scanned`, the formula might be:
+`Budget = 50ms + (rows_scanned × 0.5ms)`
+
+* **Cache Hit:** `rows_scanned` is 0. The budget is **50ms**.
+* **Small DB Scan:** `rows_scanned` is 1,000. The budget is **550ms**.
+* **Massive DB Scan:** `rows_scanned` is 10,000. The budget is **5,050ms**.
+
+*(Note: The formula doesn't have to be linear; if your system's time complexity is $O(N \log N)$, your budget formula should reflect that).*
+
+#### Justification
+
+1. **Traffic-Mix Immunity:** Because every single request is evaluated against its *own* complexity, a sudden influx of massive database scans will not burn your error budget. Heavy queries are given heavy targets. You are strictly measuring the *efficiency of the system*, completely isolated from the shifts in user behavior.
+2. **Solves the Cache/DB Dichotomy:** A broken cache naturally fails the dynamic budget (because a 0-row query taking 300ms violates the 50ms budget). A degraded DB also fails the budget (because a 10,000-row query taking 9,000ms violates the 5,050ms budget). Both modes are protected simultaneously.
+3. **No Cliff-Edges:** Because the formula scales along a continuous spectrum, you avoid the arbitrary boundary problem of guessing where a "Medium" query ends and a "Large" query begins.
+
+### Required Monitoring Instrumentation
+
+To implement Dynamic Latency Budgets, you cannot rely on pre-aggregated metrics (like Prometheus histograms scraping raw API gateway latency), because the mathematical evaluation must happen per-request.
+
+**1. Application-Side Evaluation (Middleware)**
+Do not try to perform this math in your observability platform. Your application code must intercept the request right before the response is returned, calculate the dynamic budget based on the context (e.g., fetching the row count from the DB driver), compare it to the actual duration, and evaluate a boolean: `sli_passed = true | false`.
+
+**2. Low-Cardinality Metrics for Alerting**
+The application emits a simple, low-cardinality counter to your metrics backend:
+`http_requests_total{endpoint="/api/v1/query", sli_passed="true"}`
+Your SLO simply becomes: **"99% of all requests evaluate to `sli_passed=true`."** This makes alerting math trivial and computationally cheap.
+
+**3. High-Cardinality Distributed Tracing for Debugging**
+To make this actionable for on-call engineers, requests must generate a distributed trace (e.g., an OpenTelemetry span) enriched with the raw variables:
+
+* `app.query.rows_scanned: 10000`
+* `app.query.latency_ms: 9000`
+* `app.query.target_budget_ms: 5050`
+* `app.query.sli_passed: false`
+
+When the low-cardinality SLO alerts burn, the engineer opens the tracing backend, filters by `sli_passed: false`, and immediately sees exactly where the system is failing to meet its dynamic efficiency targets.

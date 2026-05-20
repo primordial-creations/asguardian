@@ -1,9 +1,0 @@
-What are the state-of-the-art techniques for interprocedural taint analysis in static security tools, specifically for Python codebases, and how do production tools implement cross-function and cross-file taint propagation without full type resolution?
-
-Cover the following: how CodeQL models taint flow in Python (its taint-tracking library, the concept of flow steps, sanitizer nodes, and barrier guards), how Semgrep's taint mode works at the intra-procedural level and what its documented limitations are for cross-file flows, and how Pysa (Meta's Python static analyzer) constructs its model files (stubs) for third-party library sources and sinks.
-
-For each approach, provide: the algorithm used (summary-based, whole-program, on-demand), how function summaries are computed or approximated, how library calls are handled when source is unavailable, performance characteristics (files per second, memory usage at scale), and published false negative rates for second-order injection (where taint passes through a database write then a read).
-
-Also specifically address: how taint analysis handles Python's dynamic features (getattr, **kwargs unpacking, decorators that wrap request handlers), what the community consensus is on handling taint through ORM query results (e.g., Django ORM values that arrive from the database but were originally user-supplied), and any open-source Python taint analysis implementations beyond Pysa and Semgrep worth evaluating (e.g., Pyre, Bandit plugins, custom CodeQL packs).
-
-Include findings from any 2022-2025 papers on Python-specific taint analysis precision and recall.

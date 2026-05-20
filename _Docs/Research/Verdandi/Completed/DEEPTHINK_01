@@ -1,0 +1,67 @@
+Transitioning from a synchronous, user-facing service to an asynchronous, batch-analytical tool requires a fundamental shift in Site Reliability Engineering (SRE) philosophy. Traditional SLOs measure the **transport** of data (e.g., HTTP 200s, millisecond response times). For a static analysis tool, you must measure the **utility, timeliness, and trustworthiness** of the output.
+
+If a performance analysis tool successfully returns a report in 200ms, but that report silently dropped half the traces and flagged 100 false positives, the tool has technically achieved 100% availability and latency, while completely failing its business objective.
+
+Here is a deep dive into how to conceptualize error budgets for static analysis, followed by a concrete SLO framework.
+
+---
+
+### Part 1: Deconstructing the Error Budget
+
+In a transactional system, a dropped request is a clear error. In batch analysis, the lines are blurrier. You must explicitly define what constitutes an "error" to avoid punishing the tool for bad upstream data or statistical realities.
+
+* **Total Crashes (Data Drops):** A complete job failure (e.g., an Out-Of-Memory kill) drops the entire dataset. This is a 100% failure and explicitly consumes the error budget.
+* **Timeouts and Partial Results:** If an analysis times out but scores 80% of the submitted telemetry, is it a failure?
+* *If the failure is silent:* This is a critical correctness failure. Returning a "complete" report missing 20% of the data destroys user trust.
+* *If the failure is explicit:* It should consume error budget *fractionally*. Instead of binary "Job Success," you measure **Analytical Yield**. A timeout that explicitly returns a "Degraded" report with 80% of the data analyzed consumes 20% of the error budget for that execution.
+
+
+* **Insufficient Data / Statistical Invalidity:** If an anomaly detector requires 30 baseline samples to run a valid P99 test, but the user only supplied 5, what happens? **If the tool gracefully aborts and flags the metric as `INSUFFICIENT_DATA`, this is a SUCCESS.** The tool correctly analyzed the state of the world and refused to produce a junk score. This is analogous to an HTTP `400 Bad Request` (client error), and it should burn **zero** error budget.
+
+### Part 2: The "Ground Truth" and Lag Problem
+
+Because true anomaly ground truth is unmeasurable in real-time, you cannot calculate standard Precision and Recall synchronously. You must substitute real-time accuracy with **asynchronous proxy metrics**, specifically retrospective incident recall.
+
+However, using incident post-mortems introduces a massive temporal lag. If an incident happens on Day 1, the post-mortem might establish ground truth on Day 14.
+
+**The Window Implication:** Because of this lag, and because high-severity incidents are relatively rare, an "Accuracy SLO" cannot be evaluated on a standard 7-day or 28-day rolling window—the recent data is fundamentally unverified, and a single missed incident could drop your score by 30%. Recall must be evaluated over a **rolling 90-day window, offset by 14 to 30 days** to allow for incident resolution and data maturity.
+
+**The Paging Implication:** When an operational SLO (Completeness/Freshness) burns, you page an SRE to scale infrastructure. When an analytical SLO (Recall) burns, you do *not* page on-call. Instead, it triggers a **Data Science Freeze**: halting new feature development to dedicate the next sprint to tuning thresholds and retraining models.
+
+---
+
+### Part 3: A Concrete SLO Framework (4 SLIs)
+
+Here is a proposed 4-SLI framework that balances infrastructure reliability with analytical validity.
+
+#### SLI 1: Analytical Yield (The Completeness Proxy)
+
+* **Definition:** The percentage of submitted telemetry entities (traces, metrics) that result in a mathematically sound score OR a valid, graceful rejection (e.g., `INSUFFICIENT_SAMPLES`).
+* **Formula:** `(Entities Successfully Scored + Valid Rejections) / Total Entities Submitted`
+* **Target:** 99.5% over a 28-day rolling window.
+* **Justification:** Moving from binary "Job Success" to "Yield" accounts for partial results and timeouts fairly. It guarantees that users know exactly how much of their data was actually evaluated.
+* **Measurement Challenge:** You must rigorously instrument the tool's execution loop to differentiate between an internal infrastructure timeout (burns budget) and a failure to parse malformed customer telemetry (does not burn budget).
+
+#### SLI 2: Freshness / Time-to-Insight (The Latency Proxy)
+
+* **Definition:** The percentage of analysis reports completed and available to the user before the telemetry data loses operational value.
+* **Formula:** `Reports generated where (Report Publish Timestamp - Newest Telemetry Timestamp) < X minutes / Total Reports`
+* **Target:** 95% of reports available within 15 minutes of the telemetry window closing.
+* **Justification:** Execution latency (how long the CPU grinds) matters for cost, but *Freshness* matters to the user. A batch analysis tool's output loses value exponentially. A performance regression report delivered 15 minutes after a deployment is highly actionable; one delivered 6 hours later is useless. Freshness holds the system accountable for ingestion lag, queueing delays, and processing time combined.
+* **Measurement Challenge:** Clock skew between the client devices generating the telemetry (event time) and your ingestion servers (processing time). Strict NTP synchronization and policies for dropping "late-arriving" network data are required to measure this accurately.
+
+#### SLI 3: Retrospective Incident Recall (The False Negative Proxy)
+
+* **Definition:** The percentage of officially declared, high-severity performance incidents (Sev-1/Sev-2) where the tool successfully flagged a high-severity anomaly for the affected service in the preceding or concurrent time window.
+* **Formula:** `Sev-1 & 2 Incidents with an overlapping tool anomaly / Total Sev-1 & 2 performance incidents`
+* **Target:** 85% over a **90-day** rolling window (lagged by 14 days).
+* **Justification:** This is the ultimate judge of the tool’s underlying math. If production is burning down but your static analysis tool reported a perfect health score, the tool failed its primary business objective.
+* **Measurement Challenge:** Semantic attribution. If an incident ticket just says "Checkout is broken" without tagging the specific microservice, timeframe, or trace IDs, your automated script cannot verify if the analysis tool caught it. Automating this SLI requires exceptional hygiene in your incident management system (Jira/PagerDuty).
+
+#### SLI 4: Actionability Rate (The False Positive Proxy)
+
+* **Definition:** The percentage of high-severity anomalies generated by the tool that result in positive human engagement or automated mitigation.
+* **Formula:** `Anomalies Acknowledged, Linked to a Ticket, or Investigated / Total High-Severity Anomalies Generated`
+* **Target:** > 30% over a 28-day rolling window.
+* **Justification:** You can easily achieve 100% Recall (SLI 3) by simply configuring the tool to flag *everything* as an anomaly. SLI 4 acts as the required counter-balance. If the tool is too noisy, users suffer alert fatigue and will ignore the tool completely.
+* **Measurement Challenge:** Capturing human intent. Users often view an anomaly, go fix the code, and never click "Thumbs Up" in your UI. To measure this accurately, you must track implicit actions (e.g., tracking if a developer clicks to expand the stack trace in the report, or if a subsequent Git commit mentions the anomaly's ID).

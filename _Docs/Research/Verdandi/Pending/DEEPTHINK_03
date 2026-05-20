@@ -1,9 +1,0 @@
-Think deeply about when Apdex scoring is misleading and when it is genuinely useful as a performance indicator. Apdex compresses a full latency distribution into a single number between 0 and 1, which is both its appeal and its fundamental limitation.
-
-Consider the masking problem: a service with 80% of requests completing in 50ms and 20% completing in 5000ms (far above the frustration threshold) can have the same Apdex score as a service with 100% of requests completing at 450ms (just under the satisfied threshold T=500ms). These two services have radically different user experience profiles but identical Apdex scores. Work through the mathematics to confirm this masking effect, then think about what kinds of services are most vulnerable to this masking.
-
-Consider the threshold calibration problem: Apdex requires choosing T, but T is often set once and never revisited. What happens when the nature of a service changes — for instance, when new heavy features are added that legitimately require more processing time? Should T be recalibrated as service behavior evolves? What is the process for recalibrating T without invalidating historical trend data?
-
-Consider multi-endpoint services: an API with 20 endpoints will have very different natural latency ranges for a lightweight health check endpoint (T should be 50ms) versus a heavy report generation endpoint (T should be 10,000ms). A single aggregate Apdex score for the whole service is almost meaningless. Think through: should Apdex always be computed per-endpoint, and if so, how do you aggregate per-endpoint Apdex scores into a service-level summary without losing information?
-
-Finally, argue for the cases where Apdex is genuinely the right metric: what properties of a use case make Apdex an appropriate summary statistic rather than a misleading one?

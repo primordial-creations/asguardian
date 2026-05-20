@@ -1,0 +1,69 @@
+To build a code quality tool that developers actually respect, you must shift its core paradigm from **dogmatic enforcement** (expert opinions on abstract code purity) to **empirical risk management**.
+
+When subjective thresholds dictate severity (e.g., "cyclomatic complexity > 15 is a blocker"), the tool inevitably suffers from alert fatigue. Developers quickly learn that "Blocker" doesn't actually mean "this will break production," so they build psychological filters to ignore the tool altogether.
+
+To prevent this, severity calibration must be treated as a data science problem combined with behavioral psychology. Here is a rigorous, four-step methodology for calibrating severity tiers.
+
+---
+
+### 1. Empirical Data: The Calibration Inputs
+
+Relying on a single data point creates severe blind spots. To calibrate effectively, you must synthesize three distinct datasets:
+
+* **Defect-Density Correlation (The Risk Vector):** You must prove mathematically that a metric is dangerous. Using algorithms like SZZ (mapping bug-fix commits back to the exact commit that introduced the bug), plot the historical defect rate of code against specific metric values. *Example: "In our codebase, functions with a Cyclomatic Complexity (CC) > 18 appear in 4x more bug-fix commits than those with a CC < 5."*
+* **Frequency Distribution (The Noise Vector):** Map the distribution of metric values across your specific codebase. This determines the "Alert Volume" a threshold will generate. A rule that flags 20% of your repository cannot be a top-tier alert, regardless of how theoretically correct it is.
+* **Remediation Cost (The Effort Vector):** Measure CI/CD cycle times for refactoring commits to estimate the time required to fix violations. Fixing an unused import is an $O(1)$ effort with near-zero regression risk. Decoupling a cyclical dependency is an $O(N)$ effort with massive regression risk.
+
+### 2. Setting Boundaries: Budget-Constrained Inflection Points
+
+How do you draw the line between a Warning and a Blocker?
+
+* **Fixed percentiles** (e.g., "top 5% are blockers") are flawed because they penalize excellent codebases and excuse terrible ones.
+* **Remediation cost thresholds** are flawed because they ignore the actual danger of the defect.
+
+The optimal methodology uses **Empirical Inflection Points constrained by an Alert Budget:**
+
+1. **Find the "Hockey Stick" Inflection Point:** Software metrics rarely scale linearly with bugs. Defect rates typically stay flat until they exceed the limits of human working memory, at which point they spike exponentially. Look for the "knee" in the curve. If defect probability is 2% at CC=10, 2.5% at CC=14, but jumps to 8% at CC=16, **16 is your mathematical baseline for severe risk.**
+2. **Apply an "Alert Budget":** Cognitive load research shows developers will ignore a tool if more than 2–3% of their Pull Requests are blocked. If your empirical inflection point (CC=16) triggers on 12% of PRs, you cannot enforce it as a Blocker yet; the engineering culture cannot absorb the friction. You must temporarily raise the highest severity threshold (e.g., to CC=25) to capture only the worst 2% of offenders.
+3. **Tighten Over Time:** As developers fix the worst 2%, the baseline improves. You then incrementally ratchet the threshold down each quarter until it aligns with the true mathematical inflection point.
+
+### 3. Contextual Modulation: Code Age and Churn
+
+Static analysis without temporal context is fundamentally flawed. To answer your specific question: **Yes, a function with a cyclomatic complexity of 25 should absolutely be downgraded from a Blocker if it hasn't been touched in two years.**
+
+This is due to the **Lindy Effect**: code that has survived in production for years without requiring modification or causing bugs is battle-tested. Demanding a developer refactor a stable, dormant file just to satisfy a linter introduces *massive new regression risk* for zero functional gain.
+
+Severity tiers must dynamically interact with Git history (Churn vs. Age):
+
+* **The Sleeping Bear (High Metric, Low Churn):** Ugly but stable legacy code. **Action: Downgrade.** (e.g., Blocker → Informational). Let sleeping bears lie.
+* **The Minefield (High Metric, High Churn):** Code that is highly complex and modified frequently by multiple developers. This is the highest statistical predictor of future regressions. **Action: Retain maximum severity.**
+* **The Boy Scout Trigger (State Change):** When a developer opens a PR to modify a "Sleeping Bear" to add a new feature, the context changes. Active modification activates the regression risk. **Action: Dynamically upgrade** the severity back to the top tier for that specific PR. *"Since you are modifying this historically complex file, the risk of regressions is elevated. Please refactor while you are here."*
+
+### 4. Psychological Framing: Action Over Judgment
+
+The traditional taxonomy—*Blocker, Critical, Major, Minor, Informational*—is inherited from 1990s QA incident management. When applied to code quality, these terms fail because they are **judgmental adjectives**, not **actionable directives**. When a machine calls a developer's working feature a "Critical Violation," it triggers ego-defensiveness. Furthermore, it lacks temporal context: *When* exactly am I supposed to fix a "Major"?
+
+To drive behavioral change, map severity tiers to the **Software Development Lifecycle (SDLC) timeline**:
+
+* 🔴 **"Prevent Merge"** *(Replaces Blocker/Critical)*
+* **Criteria:** Crosses the defect inflection point + Active new code or high-churn hotspot.
+* **Psychology:** Objective and systemic. It doesn't say "your code is bad"; it says "the CI pipeline mathematically cannot accept the risk of this diff."
+
+
+* 🟠 **"Fix This Sprint"** *(Replaces Major)*
+* **Criteria:** Elevated defect risk, but requires significant refactoring time that shouldn't derail the current PR.
+* **Psychology:** Acknowledges shipping pressure. It says: "We trust you to ship this feature today, but we are automatically opening a fast-follow tech-debt ticket so we can pay down the principal."
+
+
+* 🟡 **"Fix When Touching"** *(Replaces Minor)*
+* **Criteria:** Dormant, stable legacy code that crosses defect thresholds.
+* **Psychology:** Leverages the Boy Scout Rule. It explicitly grants developers permission to ignore the alert *unless* they are actively editing that specific neighborhood. Highly empathetic to developer focus.
+
+
+* 🔵 **"Track in Backlog / Consider Next Time"** *(Replaces Informational)*
+* **Criteria:** Micro-optimizations or stylistic drift with no statistical defect correlation.
+* **Psychology:** Framed as a helpful mentor or architectural data point, kept out of the daily PR review UI to prevent noise and alert fatigue.
+
+
+
+By combining empirical defect rates with strict alert budgets, modulating for historical context, and using action-oriented language, developers will stop viewing your tool as a pedantic auditor and start treating it as a trusted risk-management co-pilot.

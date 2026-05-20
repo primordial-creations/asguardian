@@ -1,0 +1,116 @@
+To design a principled static analysis strategy, we must recognize the fundamental constraint of program analysis: **the trade-off between semantic depth and computational tractability**. The theoretical limit of any static analysis tool is strictly bounded by its visibility—the size of the context graph it is allowed to hold in memory. When an analyzer reaches the boundary of its visibility, it must either guess (yielding false positives) or assume safety (yielding false negatives).
+
+Here is a rigorous classification of code quality analyses based on their theoretical scope requirements, followed by an engineering architecture for integrating them effectively into modern CI pipelines.
+
+---
+
+### 1. The Analysis Scope Hierarchy
+
+To classify quality rules accurately, we must define five strict boundaries of context:
+
+1. **Intra-function (Method Level):** The analyzer parses only the Abstract Syntax Tree (AST) and local Control Flow Graph (CFG) of a single function. External calls and class states are treated as black boxes.
+2. **Intra-file (Module Level):** The analyzer evaluates all functions, classes, and explicit `import` declarations within one file. It understands local state and encapsulation but treats the implementations of imported dependencies as opaque.
+3. **Inter-file Single Package (Component Level):** The analyzer builds a graph of sibling files within a cohesive directory or logical module, resolving internal API contracts and package-private visibility.
+4. **Project-wide (Global Level):** The analyzer constructs a whole-program Abstract Semantic Graph (ASG) and Interprocedural Control Flow Graph (ICFG), resolving global type hierarchies, cross-module pointer aliasing, and deep dataflow.
+5. **Runtime (Dynamic Analysis):** The analyzer observes the concrete execution state, capturing dynamic dispatch, hardware-level thread interleaving, and actual heap memory.
+
+---
+
+### 2. Quality Dimensions: Minimum Scopes & Degradation
+
+For each quality dimension, attempting analysis below its **minimum required scope** inevitably destroys the tool's signal-to-noise ratio.
+
+**Cyclomatic and Cognitive Complexity**
+
+* **Minimum Scope:** **Intra-function**
+* **Degradation at narrower scope:** None. Complexity is inherently a localized mathematical property of branching (`if`, `while`, `catch`) and nesting within a discrete block of code.
+
+**Code Duplication**
+
+* **Minimum Scope:** **Inter-file** (Project-wide is optimal)
+* **Degradation at file-level:** Massive false negatives. An intra-file tool only catches trivial self-plagiarism within a single file. It is entirely blind to systemic, architectural duplication where disparate teams copy-paste utility logic across the repository to avoid coupling.
+
+**Coupling Metrics (e.g., CBO - Coupling Between Objects)**
+
+* **Minimum Scope:** **Project-wide** (or Inter-file at minimum)
+* **Degradation at file-level:** An intra-file analyzer can measure *efferent* coupling (fan-out) by counting `import` statements. However, it is structurally blind to *afferent* coupling (fan-in: how many other files depend on *this* file). Without fan-in, you cannot calculate a component's rigidity or impact radius.
+
+**The SOLID Principles**
+Because SOLID comprises both structural and behavioral constraints, it must be analyzed piecemeal:
+
+* **SRP (Single Responsibility):** **Intra-file**. Can be approximated locally by measuring Lack of Cohesion in Methods (LCOM)—analyzing how heavily local methods share local fields within the file.
+* **OCP (Open/Closed):** **Project-wide**. To prove a class is closed for modification but open for extension, the analyzer must observe if developers globally are implementing new features via subclassing/composition rather than continually mutating the base file.
+* **LSP (Liskov Substitution):** **Project-wide**. Requires comparing the preconditions, postconditions, and invariants of a base class against *all* of its subclasses across the codebase, as well as analyzing how clients invoke them.
+* **ISP (Interface Segregation):** **Project-wide**. An interface is only "fat" if its *clients* are forced to depend on methods they don't use. Evaluating this requires mapping all global call sites to prove subsets of methods are systematically ignored.
+* **DIP (Dependency Inversion):** **Inter-file**. Intra-file analysis can see an `import` and a constructor injection, but checking the neighboring file's AST is required to verify if the imported symbol is genuinely an abstract interface or just a concrete implementation.
+
+**Thread Safety and Race Conditions**
+
+* **Minimum Scope:** **Project-wide** (Interprocedural dataflow / Escape Analysis)
+* **Degradation at file-level:** Catastrophic false positives and negatives. A file-level tool sees a mutated variable, but it cannot know if the object is thread-confined, or if it is protected by a Mutex acquired in a caller function residing in another file (False Positive). Conversely, it might assume local state is safe, unaware that a reference to the data leaked to a background thread elsewhere (False Negative).
+
+**Technical Debt Estimation**
+
+* **Minimum Scope:** **Split** (Intra-file for Code Debt; Project-wide for Design Debt)
+* **Degradation at file-level:** Code debt (style, magic numbers, naming) is accurately calculated per-file. However, design debt (architectural rot, circular dependencies, "God objects") requires a whole-program view. File-level analysis will happily report zero technical debt on a perfectly formatted "Big Ball of Mud."
+
+**Type Coverage vs. Type Correctness**
+
+* **Minimum Scope:** **Split** (Intra-file for Coverage; Project-wide for Correctness)
+* **Degradation at file-level:** Intra-file analysis can trivially parse ASTs to guarantee that `def process(user: User):` has a type annotation (Coverage). But without a project-wide type environment, it must degrade imported external return types to `Any`, making it impossible to prove that callers actually pass a valid `User` object (Correctness).
+
+**Resource Cleanup Correctness**
+
+* **Minimum Scope:** **Project-wide** (Interprocedural analysis)
+* **Degradation at file-level:** Resource lifetimes (DB connections, file handles) are frequently opened in factories, passed via dependency injection, and closed by lifecycle managers. A file-level analyzer cannot trace lifetimes across function boundaries. To avoid false negatives, it must enforce strictly localized RAII or context managers (e.g., Python's `with` statement), which will falsely flag valid, decoupled injected resources as "leaks."
+
+---
+
+### 3. The Engineering Trade-off: Speed vs. Context
+
+There is a non-negotiable mathematical reality in static analysis:
+
+* **Intra-file analysis** scales linearly $O(N)$ relative to codebase size. Because each file is treated as an isolated universe, it is embarrassingly parallel, requires almost no memory graph, and completes in milliseconds.
+* **Project-wide interprocedural analysis** scales non-linearly (ranging from $O(N \log N)$ to $O(N^3)$). Building global symbol tables, resolving cross-module alias tracking, and computing interprocedural dataflow requires loading a massive graph into memory.
+
+**The 100,000 LOC CI Constraint:**
+Developer flow requires feedback in **under two minutes**. Modern intra-file linters (like Ruff or ESLint) can parse 100k LOC in under 3 seconds. Cached, incremental project-wide type checkers (like MyPy or TypeScript) can usually resolve in 15–30 seconds. However, deep interprocedural dataflow and alias analysis (e.g., CodeQL, Infer, SonarQube) will consistently take 5 to 15+ minutes.
+
+If you put deep interprocedural analysis in the blocking synchronous path of a PR, developers will context-switch, complain about latency, and ultimately lobby to turn the tool off.
+
+---
+
+### 4. Proposed Two-Tier Architecture
+
+To balance developer velocity with systemic structural integrity, platform engineering teams must explicitly bifurcate analysis into a fast synchronous path and a deep asynchronous path. The right default for CI is **Tier 1 blocking, Tier 2 monitoring.**
+
+#### Tier 1: The PR Gatekeeper (Fast, Synchronous, Blocking)
+
+* **Goal:** Prevent objectively bad local logic and style violations from merging.
+* **Trigger:** Synchronously on every commit. Pipeline fails on error.
+* **Time Budget:** $< 30$ seconds.
+* **Scope Permitted:** Intra-function, Intra-file, and Cached Symbol Resolution.
+* **Analyses Executed:**
+* AST Linting and formatting (parallelized across changed files).
+* Cyclomatic and cognitive complexity bounds.
+* Intra-file code debt (LCOM/SRP metrics, unused variables).
+* Type annotation *presence* and fast, incrementally cached global type checking.
+* Lexical resource checks (enforcing local context managers for local resources).
+
+
+* **Philosophy:** Treat this tier like a syntax spell-checker. Because it relies almost entirely on local context, the false-positive rate is practically zero. Developers trust it because it is instantaneous and deterministic.
+
+#### Tier 2: The Deep Auditor (Slow, Asynchronous, Non-Blocking)
+
+* **Goal:** Catch systemic architectural decay, complex data races, and interprocedural bugs.
+* **Trigger:** Asynchronously on merge to `main`, via a merge queue, or on a nightly schedule.
+* **Time Budget:** Unbounded (10+ minutes).
+* **Scope Permitted:** Full Project-wide interprocedural analysis and Runtime fuzzing.
+* **Analyses Executed:**
+* Deep interprocedural dataflow analysis (e.g., SQL injection taint tracking, cross-file resource leaks).
+* Escape analysis and lock-set graphing for thread safety/race conditions.
+* Global architecture metrics (Afferent CBO, cyclic dependencies, OCP/ISP/LSP validation).
+* Cross-file AST clone detection (systemic architectural duplication).
+
+
+* **Philosophy:** The outputs of Tier 2 are treated as structural telemetry rather than pass/fail syntax tests. Instead of breaking an individual developer's PR dynamically, the tool generates automated Jira tickets for Technical Debt, annotates future PRs with warnings, tracks metric trends on an engineering health dashboard, and serves as a hard gate for *production releases* rather than *code commits*.

@@ -1,0 +1,103 @@
+Designing a thread safety analyzer that operates strictly under a single-file constraint requires a fundamental paradigm shift. Traditional concurrency analysis relies on whole-program dataflow, alias analysis, and inter-procedural call graphs to prove safety. When constrained to the file level, we must abandon the impossible goal of proving **global correctness** and instead aim to detect **local structural inconsistencies** and **violations of implicit intent**.
+
+Here is the reasoned design of such a system.
+
+### 1. Principled Characterization: The Boundaries of File-Level Analysis
+
+To rigorously define what a single-file analyzer can and cannot do, we must establish its theoretical bounds. The system operates under the **Strictly Local Closed-World Assumption**. Its capabilities are defined by three core principles:
+
+1. **The Principle of Lexical Intent (Symmetry of Evidence):** A concurrency defect is only reliably detectable if the *synchronization primitive* (the rule), the *shared resource* (the state), and the *unsafe operation* (the violation) all reside within the same Abstract Syntax Tree (AST). The presence of a lock in a class is empirical evidence of the developer's *intent* to synchronize. The analyzer can reliably detect when the file contradicts its own localized intent.
+2. **The Opaque Boundary Limit:** Any imported function, external class, or dependency injected via arguments represents an opaque event horizon ($\bot$). The analyzer must assume zero knowledge of external pre-conditions or side effects. If a file passes unprotected state to an imported function, the analyzer cannot know if that external function spawns threads to mutate it.
+3. **The Caller-Held-Lock Exemption:** Without a whole-program call graph, the analyzer cannot know if a local method is safely called by an external file that already acquired a lock. Consequently, file-level analysis is inherently conservative and must rely on heuristics (e.g., treating public vs. private methods differently) to avoid false positives.
+
+**Conclusion:** The analyzer *cannot* mathematically verify thread safety or spot emergent bugs composed across modules. It *can* act as an extremely fast, highly deterministic "Structural Concurrency Linter" that catches internally contradictory locking disciplines and inherently dangerous syntactic anti-patterns.
+
+---
+
+### 2. Enumeration & Classification of Thread Safety Violations
+
+Based on the boundaries above, we can classify the major concurrency violation categories by whether file-level analysis is sufficient to detect them.
+
+| Violation Category | File-Level Sufficiency | Rationale |
+| --- | --- | --- |
+| **Double-Checked Locking (DCL) Flaws** | **Sufficient** | The entire logic block (outer check $\rightarrow$ lock $\rightarrow$ missing inner re-check $\rightarrow$ initialize) is structurally localized to a single block of control flow. |
+| **Daemon Thread Misuse** | **Sufficient** | Instantiating a `daemon=True` thread targeting a local function that performs sensitive I/O is completely visible within the single file's AST. |
+| **Shared Mutable Default Arguments** | **Sufficient** | Evaluated purely syntactically at definition time (`def f(x=[])`). While arguably a general correctness issue, in multithreaded environments it manifests as an unsynchronized global state race condition. |
+| **Data Races on Shared State** | **Partial** | **Sufficient** for detecting intra-class inconsistencies (e.g., inconsistent use of `self.lock` for `self.data`). **Insufficient** if the state is injected via arguments (aliased escaping state) or if synchronization is handled by an external caller. |
+| **Deadlocks (Lock Inversion)** | **Partial** | **Sufficient** for intra-file lock inversions (Method A locks $X \rightarrow Y$; Method B locks $Y \rightarrow X$). **Insufficient** for emergent inter-file deadlocks (File 1 locks $X$ and calls File 2 which locks $Y$). |
+
+---
+
+### 3. Concrete Detection Strategies
+
+Given the absence of cross-file context, a file-level analyzer is highly susceptible to false positives if not carefully tuned. The detection strategies below rely on rigid AST shape matching and explicit heuristic "blind spots."
+
+#### Pattern 1: Asymmetric Locking (Intra-Class Data Races)
+
+* **Concept:** A class clearly demonstrates intent to protect an instance variable by locking it in one method, but exposes it unprotected in another method.
+* **AST Pattern:**
+1. Traverse a `ClassDef` node.
+2. Identify "Lock Contexts": Look for `With` nodes where the context expression is an attribute (e.g., `self._lock`).
+3. Identify "Protected State": Walk the AST of these `With` blocks. Whenever an `Attribute` (e.g., `self.data`) is loaded or assigned, add it to a `ProtectedSet`.
+4. Scan for Violations: Walk all methods in the class. If an attribute in the `ProtectedSet` is accessed *outside* of a `With self._lock` block, flag it.
+5. *False Positive Mitigation:* Explicitly ignore `__init__` (mutations are safe before the object escapes) and `__del__`. Ignore methods prefixed with `_` (assuming they are private helpers that rely on the public caller to acquire the lock first).
+
+
+* **Confidence:** **Medium-High**. The developer provided explicit local evidence of intent to synchronize.
+* **Severity:** **High**. A classic race condition that will yield corrupted state.
+
+#### Pattern 2: Flawed Double-Checked Locking
+
+* **Concept:** The developer uses DCL for lazy initialization but forgets the crucial second check inside the synchronized block, allowing multiple blocked threads to blindly overwrite the state once they acquire the lock.
+* **AST Pattern:**
+1. Locate an `If` node (Outer Check) checking a condition (e.g., `if self.instance is None:`).
+2. Inside its body, locate a `With` node acquiring a lock.
+3. Inspect the first statement inside the `With` block's body.
+4. *Violation:* Flag if the first statement is **not** an `If` node (Inner Check) that evaluates the exact same AST condition as the Outer Check. Alternatively, flag if a state mutation (`Assign` to `self.instance`) occurs before the Inner Check.
+
+
+* **Confidence:** **Very High**. Missing the inner check structurally defeats the entire purpose of the pattern; it is an objective logical flaw.
+* **Severity:** **Medium**. In memory-safe languages like Python, this usually results in redundant initializations or resource leaks (e.g., opening two DB connections) rather than fatal segmentation faults.
+
+#### Pattern 3: Unsafe Daemon Thread Teardown
+
+* **Concept:** Daemon threads are violently killed by the OS when the main thread exits, bypassing `finally` blocks and teardown routines. If they hold open files or DB transactions, data corruption or torn writes occur.
+* **AST Pattern:**
+1. Find `Call` nodes to thread constructors (e.g., `threading.Thread`) containing the keyword argument `daemon=True` (or a subsequent `.daemon = True` assignment).
+2. Extract the `target=` argument.
+3. If the target resolves to a `FunctionDef` in the **same file**, traverse its AST.
+4. *Violation:* Flag if the target function contains `With` nodes wrapping `open()`, network socket writes, or explicit database `.commit()`/`.execute()` calls.
+5. *Constraint:* If the target is an imported function, the analyzer must remain silent to honor the Opaque Boundary Limit.
+
+
+* **Confidence:** **Medium-High**. It is technically possible the main thread registers an OS signal handler to shut down cleanly, but structurally, daemons combined with local I/O is an explicit anti-pattern.
+* **Severity:** **High**. Risk of silent data corruption.
+
+#### Pattern 4: Shared Mutable Default Arguments
+
+* **Concept:** Default arguments are evaluated once at module load. In a multi-threaded web server or thread pool, a mutable default acts as an unsynchronized, implicit global variable.
+* **AST Pattern:**
+1. Inspect all `FunctionDef` and `AsyncFunctionDef` nodes.
+2. Examine the `args.defaults` and `args.kw_defaults` lists.
+3. *Violation:* Flag if any default is an AST `List`, `Dict`, `Set`, or a `Call` to a known mutable type constructor (`list()`, `dict()`).
+
+
+* **Confidence:** **Absolute (100%)**. This is a statically guaranteed syntactic match.
+* **Severity:** **Medium-High**. Causes cross-thread data bleeding (e.g., User A's private data silently appearing in User B's web request).
+
+#### Pattern 5: Intra-File Lock Inversion (Deadlock)
+
+* **Concept:** Two different execution paths within the same file acquire the same locks in reversed orders.
+* **AST Pattern:**
+1. Walk the file's AST looking for nested lock acquisitions (e.g., a `With lock_B:` node nested inside the body of a `With lock_A:` node).
+2. Record a directed edge: `lock_A` $\rightarrow$ `lock_B`.
+3. Aggregate these edges across all methods in the file to build a local lock dependency graph.
+4. *Violation:* Run a cycle detection algorithm. If a cycle exists (Path 1 does A $\rightarrow$ B; Path 2 does B $\rightarrow$ A), flag the AST nodes.
+
+
+* **Confidence:** **High**, assuming the variable names for the locks point to the same instances across the methods.
+* **Severity:** **Critical**. Deterministic deadlock if the two paths execute concurrently.
+
+### Summary
+
+By strictly accepting the constraints of single-file visibility, this analysis system trades the computationally intractable goal of whole-program verification for **heuristic inconsistency detection**. Because it requires both the "rule" and the "violation" to exist in the same AST to trigger a warning, it operates with extreme speed and an exceptionally low false-positive rate, making it an ideal real-time guardrail for IDEs and CI/CD pipelines.
