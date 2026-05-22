@@ -1,9 +1,0 @@
-Research distributed tracing standards, specifically OpenTelemetry trace data models, sampling strategies, and critical path analysis algorithms. Cover the full OpenTelemetry trace data model: TraceId, SpanId, ParentSpanId, SpanKind (CLIENT, SERVER, PRODUCER, CONSUMER, INTERNAL), SpanStatus, Span events, Span links, and the resource vs scope vs span attribute hierarchy.
-
-Research tail-based sampling in depth: how does it differ from head-based sampling, what are the implementation challenges (you need to buffer spans until the trace is complete before making a sampling decision), and what sampling criteria does the OpenTelemetry Collector's tail sampling processor support? What are typical buffer size and timeout configurations for tail sampling in production? How does probabilistic sampling interact with tail-based sampling in a multi-tier architecture?
-
-Cover critical path analysis in distributed traces: what algorithm is used to find the critical path through a directed acyclic graph of spans? How do you handle parallel spans (where the critical path is through whichever branch takes longer)? What is the correct treatment of asynchronous spans (spans that don't block the parent) in critical path computation? Are there published algorithms specifically for trace critical path analysis in distributed systems literature?
-
-Research W3C TraceContext standard (traceparent and tracestate headers), B3 propagation format, and AWS X-Ray propagation format. What are the differences in how they encode sampling decisions, and how do you correctly parse and translate between formats in a trace analysis tool?
-
-Cover Jaeger, Zipkin, and OTLP trace formats: what are the structural differences between Jaeger's thrift format, Zipkin's JSON format, and OpenTelemetry's proto format? Research common normalization challenges when building a trace parser that must handle all three formats.

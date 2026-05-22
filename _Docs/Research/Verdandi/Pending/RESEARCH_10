@@ -1,9 +1,0 @@
-Research web performance metrics, specifically Core Web Vitals and their thresholds, and how they relate to business outcomes. Cover the current Core Web Vitals set as of 2024-2025: Largest Contentful Paint (LCP), Cumulative Layout Shift (CLS), Interaction to Next Paint (INP), and Time to First Byte (TTFB). For each metric, provide: the Google-defined Good/Needs Improvement/Poor thresholds, the measurement methodology (what does "75th percentile of field data" mean in this context?), and the technical factors that most commonly cause poor scores.
-
-Research the relationship between web performance metrics and business outcomes: what published studies connect LCP, INP, and CLS improvements to conversion rate, bounce rate, and revenue? Cover Google's own research on performance and user behavior, as well as third-party studies from Akamai, Cloudflare, and e-commerce operators. What is the documented revenue impact of a 100ms improvement in page load time?
-
-Cover the Lighthouse scoring model: how does Lighthouse compute its composite performance score from individual metrics? What are the current metric weightings, and how have they changed across Lighthouse versions 6-12? How does the Lighthouse lab score differ from real-user (field) CrUX data, and why do they frequently diverge?
-
-Research the HTTP Archive and Chrome User Experience Report (CrUX) as data sources: what percentile of pages in the HTTP Archive pass Core Web Vitals thresholds? What are the median LCP, CLS, and INP values across the top 1 million websites?
-
-Cover emerging web performance metrics: Total Blocking Time (TBT), Speed Index, Time to Interactive (TTI), First Contentful Paint (FCP) — which of these are still used and which have been deprecated or de-emphasized in favor of newer metrics?

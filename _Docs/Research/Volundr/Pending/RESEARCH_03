@@ -1,7 +1,0 @@
-Produce a deep technical comparison of container image vulnerability scanners — Trivy, Grype, Snyk Container, and Docker Scout — focused on their CVE detection recall and precision against the NVD, OSV, and vendor-specific advisories (Amazon Linux, Red Hat, Debian, Ubuntu, Alpine).
-
-I need empirical data on scanner accuracy. Specifically: what percentage of known CVEs in a given image are detected by each scanner? What is the false positive rate (CVEs reported that are not actually applicable due to OS-level patches or non-vulnerable configurations)? How do scanners handle OS package vulnerabilities versus application-layer dependencies (Python pip, Node npm, Java Maven/Gradle, Go modules) within the same image?
-
-Research the concept of reachability analysis — the idea that a CVE in a library is only exploitable if the vulnerable code path is actually called. Which scanners, if any, implement reachability filtering? What is the practical impact on alert fatigue in a CI pipeline?
-
-Cover the following operational dimensions: scan speed for a 500MB image, offline/air-gapped operation support, SBOM (Software Bill of Materials) generation in SPDX and CycloneDX formats, integration with OCI registries, and support for distroless and scratch base images. What are the latest benchmark studies (2023-2025) comparing these tools on standardized test corpora? Include information on how frequently vulnerability databases are updated and the lag between CVE publication and scanner database inclusion.

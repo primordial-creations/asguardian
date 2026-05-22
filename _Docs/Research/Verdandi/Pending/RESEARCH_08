@@ -1,9 +1,0 @@
-Research database query performance analysis techniques that can be performed without direct database access — that is, analyzing query text, query plans represented as JSON or text, and historical execution metrics rather than running EXPLAIN against a live database.
-
-Cover slow query detection thresholds: what are the industry-standard slow query log thresholds used by MySQL (long_query_time), PostgreSQL (log_min_duration_statement), MongoDB (slowOpThresholdMs), and cloud database services like Amazon RDS and Google Cloud SQL? What do major database performance monitoring tools like pgBadger, Percona Monitoring and Management, and SolarWinds DPA consider a "slow" query by default?
-
-Research query complexity anti-patterns detectable through static analysis of SQL text: N+1 query patterns, SELECT *, missing WHERE clause on large tables, Cartesian products from missing JOIN conditions, non-sargable predicates (functions applied to indexed columns in WHERE clauses), implicit type conversions that prevent index use. For each anti-pattern, what is the expected performance impact and how is it reliably detected through text analysis alone?
-
-Cover EXPLAIN plan analysis: what are the key operators in PostgreSQL query plans (Seq Scan, Index Scan, Index Only Scan, Hash Join, Nested Loop, Sort, Aggregate) and what cost thresholds indicate a problematic plan? How do you interpret plan row estimates versus actual rows to detect plan instability? What JSON fields in pg_stat_statements are most useful for identifying high-impact queries without running EXPLAIN?
-
-Research connection pool analysis: what metrics indicate a connection pool is undersized or misconfigured? What are the standard connection pool sizing formulas (e.g., the Hikari "about the pool sizing" guidance), and how do connection wait time metrics relate to application latency percentiles?

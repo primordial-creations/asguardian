@@ -1,9 +1,0 @@
-What are the published detection rates, benchmarks, and state-of-the-art techniques for identifying cryptographic implementation vulnerabilities in Python source code, covering weak algorithms, insecure modes of operation, and key management failures?
-
-Survey the following vulnerability categories and provide CWE mappings, example vulnerable patterns, and what static detection approaches exist for each: use of MD5/SHA1 for security purposes (CWE-327, CWE-328), use of DES/3DES/RC4 (CWE-327), ECB mode block cipher usage (CWE-327), static IVs or predictable nonces (CWE-329, CWE-330), hardcoded cryptographic keys (CWE-321), insecure RSA padding (PKCS1v15 vs OAEP, CWE-780), use of random.random() instead of secrets module for cryptographic purposes (CWE-338), and insufficient key lengths.
-
-For Python specifically: what are the AST-level patterns that distinguish insecure from secure usage in the cryptography library, PyCryptodome, hashlib, and hmac? How do tools distinguish between an MD5 call used for checksumming (acceptable) versus password hashing (unacceptable)?
-
-Cover detection tool capabilities: does Bandit's B303-B413 series cover all the above categories, what are its documented false positive and false negative rates, and how does it compare to Semgrep's crypto rules and CodeQL's Python crypto queries?
-
-Then address: what NIST SP 800-131A Rev 2 (2019) and SP 800-57 Part 1 Rev 5 prescribe as the current cryptographic algorithm transition requirements, what the FIPS 140-3 validation implications are for Python crypto libraries, and whether any open benchmark dataset exists specifically for evaluating cryptographic vulnerability detection accuracy.

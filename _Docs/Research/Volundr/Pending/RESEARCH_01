@@ -1,7 +1,0 @@
-Conduct a comprehensive empirical comparison of open-source Infrastructure-as-Code static analysis tools — specifically Checkov, tfsec, KICS, and Terrascan — evaluated against publicly available Terraform corpora and real-world misconfiguration datasets. I need to understand their true detection rates across the OWASP IaC Top 10 categories, including hardcoded secrets, overly permissive IAM policies, missing encryption at rest, public S3 buckets, and unrestricted security groups.
-
-For each tool, report: precision, recall, and F1 score against ground-truth labeled misconfigurations. Include data on false positive rates, since a tool that flags everything is useless in a CI pipeline. Discuss how each tool handles multi-file Terraform modules where a misconfiguration only becomes visible when variables are resolved across files. Do any tools perform inter-file analysis or are they purely per-resource?
-
-Investigate whether these tools have been benchmarked on multi-cloud corpora (AWS, GCP, Azure) or only against AWS-heavy datasets, since the Volundr module generates modules for all three providers. Also cover: how frequently are rule sets updated relative to new CVEs and cloud provider API changes? What is the operational cost of integrating these tools into a CI pipeline in terms of scan time per thousand lines of Terraform HCL?
-
-Summarize the state-of-the-art as of 2024-2025, citing any academic papers, NIST publications, or vendor benchmark reports that provide reproducible methodology.

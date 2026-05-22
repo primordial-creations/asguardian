@@ -1,9 +1,0 @@
-Research APM tool comparison across Datadog, New Relic, Dynatrace, and AppDynamics, specifically focused on their anomaly detection and performance baseline capabilities. For each vendor, cover: what statistical methods they use for automatic baseline computation, how they handle seasonality (daily, weekly patterns), what their anomaly detection sensitivity settings correspond to in statistical terms, and how their alerting models compare to manual threshold-based alerting.
-
-For Datadog specifically: research their Watchdog AI engine, how it automatically detects anomalies across services, and what algorithms are documented or inferred from their engineering blog posts. How does Datadog's anomaly monitor compare to their forecast monitor? What machine learning models does Datadog use for its APM error rate and latency anomaly detection?
-
-For Dynatrace: research their Davis AI engine, the causal AI approach to root cause analysis, and how they claim to distinguish symptoms from root causes in a distributed system. What does Dynatrace's automated baselining use, and how does it adapt to traffic patterns?
-
-Research the OpenTelemetry project's approach to semantic conventions for APM data: what are the required and recommended span attributes for HTTP, database, messaging, and RPC operations? Where does the OTel spec stand on latency histograms and exemplars as of 2024-2025? How do the OTel semantic conventions for database spans (db.system, db.operation, db.statement) map to what a static analysis tool would need to annotate query performance?
-
-Cover the emerging OpenTelemetry Collector as an APM data processing pipeline: what processors exist for tail-based sampling, span enrichment, and metrics derivation from traces? How does the spanmetrics connector work for deriving RED (Rate, Errors, Duration) metrics from trace data?
