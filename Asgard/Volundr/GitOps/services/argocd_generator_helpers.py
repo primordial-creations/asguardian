@@ -128,6 +128,18 @@ def validate_application(app: ArgoApplication) -> List[str]:
     if not app.finalizers:
         issues.append("Missing finalizers - resources may not be cleaned up properly")
 
+    if not app.source.target_revision or app.source.target_revision == "HEAD":
+        issues.append(
+            "VOL-GITOPS-0001: targetRevision must be pinned to a branch/tag/commit "
+            "- 'HEAD' floats with the default branch and defeats auditability"
+        )
+
+    if app.project == "default":
+        issues.append(
+            "VOL-GITOPS-0002: Application uses the unrestricted 'default' AppProject "
+            "- create a scoped AppProject with repo and destination allowlists"
+        )
+
     return issues
 
 
@@ -165,6 +177,10 @@ def calculate_best_practice_score(app: ArgoApplication) -> float:
 
     max_score += 5
     if app.source.target_revision and app.source.target_revision != "HEAD":
+        score += 5
+
+    max_score += 5
+    if app.project and app.project != "default":
         score += 5
 
     return (score / max_score) * 100 if max_score > 0 else 0.0
