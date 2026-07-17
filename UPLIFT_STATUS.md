@@ -44,8 +44,22 @@ Wave 2 leftovers to schedule after: Freya testing/packaging (Fr/07).
 
 **Cross-module CLI wiring slice: MERGED** (this worktree). 40 new CLI tests, zero new failures vs baseline (full suite 8372 pass / 50 fail == baseline minus 1). Delivered: asguardian module-flag passthrough (pre-argparse dispatch; `forseti --format sarif ...` verified valid SARIF on Kairos spec); Heimdall `--scoring {v1,v2}` + LOC-normalized dual scores, security scan routed through DispatchEngine with qualitative confidence buckets + priority ordering, `.heimdall.yml` test_context_enabled/strict_scan_paths + `--include-test-context`, gate `--diff/--base/--tier {pr,main}` -> evaluate_differential; Verdandi `web cwv-assess`, `slo burn-rate-policy`, `cache warmup`, `db pool-signature`; Volundr `score` (grade+remediation, threshold exit), `gitops validate`, docker `--digest/--secret-mount`, compose `--edge-service`; ASGARD_NO_CACHE env + `heimdall scan --no-cache` disable Bragi graph/license disk caches (Adrasta scan verified clean). Freya `--fail-on/--min-grade` confirmed already documented in crawl help.
 
-### Wave 3 — P2/P3
-H/02 SOLID CIR, H/03 architecture CSP, H/07 domain scanners, H/05 cohesion, H/10 eval; F/06 contract testing, F/07 cross-format alignment; Fr/06 crawler/config, Fr/07 testing/packaging; Ve/05 network, Ve/08 tracing/APM, Ve/09 Apdex; Vo/02 Terraform; B/04 presentation/context, B/05 calibration. Docs reconciliation continuous.
+### Wave 2x — CLI wiring
+**MERGED** — asguardian passthrough (SARIF verified end-to-end), heimdall dispatch/--scoring/--include-test-context/gate --diff --tier, verdandi cwv-assess/burn-rate-policy/cache warmup/pool-signature, volundr score/gitops validate/--digest/--secret-mount/--edge-service, ASGARD_NO_CACHE + heimdall --no-cache. 40 new tests; full suite 8,372 pass.
+
+### Wave 3 — P2/P3 (LAUNCHED — 8 agents in worktrees)
+| Slice | Plans | Status |
+|---|---|---|
+| Heimdall SOLID CIR + cohesion/coupling | H/02, H/05 | agent running |
+| Heimdall architecture CSP | H/03 | agent running |
+| Heimdall domain scanners (adversarial review to follow) | H/07 | agent running |
+| Forseti contract testing/mocks + cross-format alignment | F/06, F/07 | agent running |
+| Freya crawler/config/CI + testing/packaging/docs | Fr/06, Fr/07 | agent running |
+| Verdandi network/tracing/Apdex + SLO 02.5-8 + STL 03F | Ve/05, 08, 09, 02.5-8, 03F | agent running |
+| Volundr Terraform + plan-JSON validation | Vo/02 | agent running |
+| Bragi presentation/context + calibration | B/04, B/05 | agent running |
+
+Remaining after W3: H/10 evaluation/benchmarking machinery, docs reconciliation sweep (`_Docs/Asgard/` + README), global acceptance run on all reference repos.
 
 ## Verification contract per slice
 1. Full suite green (`python3 -m pytest Asgard_Test/ -q`).
