@@ -109,7 +109,16 @@ class ClassCohesionMetrics:
     line_number: int
 
     lcom: float = 0.0
-    lcom4: float = 0.0
+    lcom4: float = 0.0  # LEGACY: Henderson-Sellers density form; see lcom5.
+
+    #: True LCOM4 (Hitz & Montazeri): connected components of the
+    #: method/field graph including method-call edges. LCOM4 = k means the
+    #: class splits into k structurally independent classes. See
+    #: ``_Docs/Planning/Heimdall/05_Cohesion_Coupling.md``.
+    true_lcom4: int = 0
+    #: LCOM5 (Henderson-Sellers density form), report-only for trend
+    #: continuity with the legacy ``lcom4`` field above.
+    lcom5: float = 0.0
 
     method_count: int = 0
     attribute_count: int = 0

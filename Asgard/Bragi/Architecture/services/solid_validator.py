@@ -52,6 +52,8 @@ from Asgard.Bragi.Architecture.services._treesitter_solid_checks import (
 )
 from Asgard.Heimdall.treesitter._language_loader import is_available as _ts_available
 from Asgard.Shared.common.language_registry import EXTENSION_TO_LANGUAGE
+from Asgard.Bragi.Architecture.cir.builder import build_file_cir
+from Asgard.Bragi.Architecture.evaluators import evaluate_file as _evaluate_cir
 
 
 class SOLIDValidator:
@@ -264,6 +266,15 @@ class SOLIDValidator:
             "solid.dip-concrete-dependency": True,
             "solid.ocp-type-dispatch": True,
         }
+
+        # CIR pipeline (plan 02): one extraction pass -> language-agnostic
+        # ClassInfo/MethodInfo -> pure-Python evaluators with confidence
+        # grades. Falls back to the legacy tree-sitter ad-hoc-walk checks,
+        # then to regex, when CIR extraction has no handler for `language`
+        # or the parse fails.
+        file_info = build_file_cir(path_str, source, language)
+        if file_info is not None and file_info.classes:
+            return _evaluate_cir(file_info)
 
         if _ts_available(language):
             raw = []
