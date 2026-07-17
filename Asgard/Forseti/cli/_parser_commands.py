@@ -304,3 +304,34 @@ def _add_audit_parser(subparsers: argparse._SubParsersAction) -> None:
     audit.add_argument("path", help="Path to audit")
     audit.add_argument("--output", "-o", help="Output report path")
     add_performance_flags(audit)
+
+
+def _add_compat_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Add compat subparser (unified compatibility engine, plan 01)."""
+    compat = subparsers.add_parser(
+        "compat",
+        help="Unified cross-format compatibility engine",
+    )
+    compat_sub = compat.add_subparsers(dest="command")
+
+    check = compat_sub.add_parser(
+        "check",
+        help="Check compatibility between schema versions (any format)",
+    )
+    check.add_argument("specs", nargs="+",
+                       help="Schema files, oldest first (two or more)")
+    check.add_argument("--format-hint",
+                       choices=["auto", "openapi", "asyncapi", "avro",
+                                "proto", "protobuf", "graphql", "jsonschema"],
+                       default="auto", help="Schema format (default: auto-detect)")
+    check.add_argument("--mode",
+                       choices=["backward", "forward", "full",
+                                "backward-transitive", "forward-transitive",
+                                "full-transitive"],
+                       default="backward", help="Compatibility mode (default: backward)")
+    check.add_argument("--min-score", type=int, default=None,
+                       help="Fail (exit 1) when the compatibility score is below N")
+    check.add_argument("--usage-report", default=None,
+                       help="JSON usage telemetry file; unused elements downgrade "
+                            "FAILED to CONDITIONALLY_PASSED")
+    add_performance_flags(check)
