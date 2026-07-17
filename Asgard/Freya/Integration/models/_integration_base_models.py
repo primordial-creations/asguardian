@@ -292,6 +292,22 @@ class CrawlConfig(BaseModel):
         default=0.5,
         description="Delay between page loads (seconds)"
     )
+    concurrency: int = Field(
+        default=4,
+        description="Bounded worker concurrency for the test phase "
+                    "(PROVISIONAL pending RESEARCH_06)"
+    )
+    concurrency_discovery: int = Field(
+        default=2,
+        description="Bounded sibling-fetch concurrency during BFS discovery "
+                    "(PROVISIONAL pending RESEARCH_06)"
+    )
+    min_request_interval_ms: int = Field(
+        default=500,
+        description="Minimum interval between requests to the same host, "
+                    "enforced across workers (same effective default as the "
+                    "legacy delay_between_requests; PROVISIONAL pending RESEARCH_06)"
+    )
     auth_config: Optional[Dict[str, Any]] = Field(
         default=None,
         description="Authentication configuration"

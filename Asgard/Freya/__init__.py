@@ -172,6 +172,12 @@ from Asgard.Freya.Images import (
     ImageReport,
 )
 
+from Asgard.Freya.Config import (
+    FreyaConfig,
+    RouteBudgetRef,
+    VisualConfig,
+)
+
 __all__ = [
     # Version info
     "__version__",
@@ -276,4 +282,8 @@ __all__ = [
     "ImageIssueSeverity",
     "ImageIssueType",
     "ImageReport",
+    # Config
+    "FreyaConfig",
+    "RouteBudgetRef",
+    "VisualConfig",
 ]

@@ -41,6 +41,14 @@ def create_parser() -> argparse.ArgumentParser:
         version="Freya 2.0.0",
     )
 
+    parser.add_argument(
+        "--config",
+        type=str,
+        default=None,
+        help="Path to a .freyarc/freya.yaml config file (overrides discovery order: "
+             "--config PATH > ./.freyarc > ./freya.yaml > defaults)",
+    )
+
     subparsers = parser.add_subparsers(dest="command", help="Available commands")
 
     add_accessibility_parser(subparsers)

@@ -45,6 +45,11 @@ from Asgard.Freya.cli._handlers_images_integration import (
     run_baseline_delete,
     run_crawl,
 )
+from Asgard.Freya.cli._handlers_config import (
+    run_config_init,
+    run_config_show,
+    run_config_validate,
+)
 
 
 def main(args=None) -> int:
@@ -251,16 +256,15 @@ def main(args=None) -> int:
 
     elif args.command == "config":
         if args.config_command == "show":
-            print("Configuration: (defaults)")
-            print("  WCAG Level: AA")
-            print("  Output Format: text")
-            print("  Baseline Directory: ./freya_baselines")
+            exit_code = run_config_show(args, verbose)
         elif args.config_command == "init":
-            print("Configuration file created: .freyarc")
+            exit_code = run_config_init(args, verbose)
+        elif args.config_command == "validate":
+            exit_code = run_config_validate(args, verbose)
         else:
-            print("Error: Please specify a config command (e.g., 'show', 'init')")
+            print("Error: Please specify a config command (e.g., 'show', 'init', 'validate')")
             sys.exit(1)
-        sys.exit(0)
+        sys.exit(exit_code)
 
     else:
         print(f"Unknown command: {args.command}")

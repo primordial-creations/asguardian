@@ -234,6 +234,30 @@ Unified testing framework and reporting.
 - `--username`: Username for authentication
 - `--password`: Password for authentication
 - `--headless`: Run in headless mode (default: true)
+- `--concurrency`: Bounded worker concurrency for the crawl test phase (default: 4)
+- `--concurrency-discovery`: Bounded sibling-fetch concurrency during discovery (default: 2)
+- `--min-request-interval-ms`: Minimum per-host interval between requests, in ms (default: 500)
+- `--gate` / `--no-gate`: Evaluate the CI quality gate (default: on) or run report-only
+
+### `.freyarc` Config File
+
+`freya config init` writes a commented default `.freyarc` to the current directory. Discovery order: `--config PATH` > `./.freyarc` > `./freya.yaml` > built-in defaults. CLI flags always override values loaded from a config file.
+
+```bash
+freya config init        # write a default .freyarc
+freya config show         # print the merged effective config, with source annotations
+freya config validate     # validate a config file, reporting Pydantic errors with context
+```
+
+### CI Quality Gate Exit Codes
+
+`freya crawl` (and other gated commands) use distinct exit codes so pipelines can tell a real failure from a flake:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Gate passed (or `--no-gate` report-only mode with no crawl errors) |
+| `1` | Gate failed (fail_on severities present, grade below `min_grade`, or findings over `max_findings`) |
+| `2` | Inconclusive — e.g. every page errored during the crawl, so there is nothing to grade |
 
 ## Troubleshooting
 
@@ -316,7 +340,7 @@ Documentation-friendly markdown format for inclusion in README files.
 
 ## Version
 
-Version: 1.0.0
+Version is managed dynamically via setuptools-scm; see package metadata (`pip show asguardian`) for the installed version. Requires Python >= 3.11.
 
 ## Author
 

@@ -245,7 +245,7 @@ async def run_crawl(args: argparse.Namespace, verbose: bool = False) -> int:
     if args.exclude:
         exclude_patterns.extend(args.exclude)
 
-    config = CrawlConfig(
+    config_kwargs = dict(
         start_url=args.url,
         max_depth=args.depth,
         max_pages=args.max_pages,
@@ -261,6 +261,14 @@ async def run_crawl(args: argparse.Namespace, verbose: bool = False) -> int:
             headless=not args.no_headless
         ),
     )
+    if isinstance(getattr(args, "concurrency", None), int):
+        config_kwargs["concurrency"] = args.concurrency
+    if isinstance(getattr(args, "concurrency_discovery", None), int):
+        config_kwargs["concurrency_discovery"] = args.concurrency_discovery
+    if isinstance(getattr(args, "min_request_interval_ms", None), int):
+        config_kwargs["min_request_interval_ms"] = args.min_request_interval_ms
+
+    config = CrawlConfig(**config_kwargs)
 
     crawler = SiteCrawler(config)
 
@@ -335,6 +343,19 @@ async def run_crawl(args: argparse.Namespace, verbose: bool = False) -> int:
     print(f"\nReports saved to: {args.output}")
     print(f"  - JSON: {args.output}/crawl_report.json")
     print(f"  - HTML: {args.output}/crawl_report.html")
+
+    # Inconclusive: crawl produced no usable results (e.g. every page errored).
+    # Exit code 2, distinct from a real gate FAIL, so pipelines can treat
+    # environment/network flake differently from a genuine regression.
+    pages_tested = getattr(report, "pages_tested", 0)
+    pages_errored = getattr(report, "pages_errored", 0)
+    if pages_tested == 0 and pages_errored > 0:
+        print("Quality gate: INCONCLUSIVE (no pages tested successfully)")
+        return 2
+
+    if not getattr(args, "gate", True):
+        print("Quality gate: SKIPPED (--no-gate / report-only mode)")
+        return 0
 
     gate = QualityGate(_build_gate_config(args))
     grade = None

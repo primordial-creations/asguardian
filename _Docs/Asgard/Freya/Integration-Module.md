@@ -101,15 +101,16 @@ Manages visual regression baselines:
 
 ## Technology Stack
 
+Zero heavy dependencies by design: no axe-core, Pillow, pixelmatch, BeautifulSoup4, cssutils, or Jinja2.
+
 | Component | Technology |
 |-----------|------------|
 | Browser Automation | Playwright |
-| Screenshot Comparison | pixelmatch, Pillow |
-| Accessibility Testing | axe-core |
-| HTML Parsing | BeautifulSoup4 |
-| CSS Parsing | cssutils |
-| Image Processing | Pillow |
-| Reporting | Jinja2 |
+| Screenshot Comparison | Pure-Python PNG decode + pixel-diff/SSIM/pHash |
+| Accessibility Testing | Custom JS-injected heuristic checks |
+| DOM/HTML Inspection | Playwright DOM APIs (no BeautifulSoup4) |
+| CSS Inspection | Playwright computed-style queries (no cssutils) |
+| Reporting | Hand-built HTML reporter, no templating engine |
 
 ---
 

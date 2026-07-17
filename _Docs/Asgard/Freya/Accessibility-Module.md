@@ -182,6 +182,9 @@ for violation in report.violations:
 
 ## Technology
 
-- **axe-core** (via playwright-axe) for automated accessibility testing
-- **Playwright** for browser automation
-- **BeautifulSoup4** for HTML parsing
+Zero heavy dependencies: no axe-core / playwright-axe, no BeautifulSoup4.
+
+- **Custom JS-injected heuristic checks**, run in-page via Playwright, for automated accessibility testing
+- **Playwright** for browser automation and DOM inspection (no BeautifulSoup4)
+
+Coverage note: these heuristics cover an estimated ~20-30% of WCAG success criteria (pending RESEARCH_01 calibration) — this is lab-data automated coverage, a tripwire, not a substitute for manual/assistive-technology testing or a full WCAG audit.

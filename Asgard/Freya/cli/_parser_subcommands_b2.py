@@ -187,6 +187,26 @@ def add_crawl_parser(subparsers) -> None:
         "--min-grade", type=str, default=None, choices=["A", "B", "C", "D"],
         help="Quality gate: fail when the site grade is below this letter grade"
     )
+    crawl_parser.add_argument(
+        "--gate", dest="gate", action="store_true", default=True,
+        help="Evaluate the CI quality gate and use its exit code (default: on)"
+    )
+    crawl_parser.add_argument(
+        "--no-gate", dest="gate", action="store_false",
+        help="Report-only mode: skip gate evaluation, always exit 0 on a clean crawl"
+    )
+    crawl_parser.add_argument(
+        "--concurrency", type=int, default=None,
+        help="Bounded worker concurrency for the test phase (default: 4)"
+    )
+    crawl_parser.add_argument(
+        "--concurrency-discovery", type=int, default=None,
+        help="Bounded sibling-fetch concurrency during discovery (default: 2)"
+    )
+    crawl_parser.add_argument(
+        "--min-request-interval-ms", type=int, default=None,
+        help="Minimum per-host interval between requests, in ms (default: 500)"
+    )
     add_performance_flags(crawl_parser)
 
 
@@ -254,3 +274,4 @@ def add_config_parser(subparsers) -> None:
 
     config_subparsers.add_parser("show", help="Show current configuration")
     config_subparsers.add_parser("init", help="Initialize configuration file")
+    config_subparsers.add_parser("validate", help="Validate configuration file")
