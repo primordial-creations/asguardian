@@ -37,7 +37,7 @@
 | Forseti JSON-Schema core (JSONSchema/ dir only) | F/05 | agent running |
 | Freya perf budgets + visual epistemics + security framing | Fr/03-05 | **MERGED** — 117 new tests (1203 pass ex-L1). Flags: html_reporter epistemic mirrors + CSP/route Blocker escalation deferred to Fr/06 slice; baseline-compare inconclusive = exit 2 (new convention). |
 | Verdandi system/cache/database + small-batch/baselines | Ve/06.1-3, 04.1-3, 07.1-2, 03D-E | **MERGED** — 83 new tests (1035 pass); System/Cache/Database docs rewritten to real APIs. Flag: CLI parity for new APIs deferred. |
-| Volundr Docker + composite scoring + GitOps/Kustomize/Helm rest | Vo/03, 07, 05 | agent running |
+| Volundr Docker + composite scoring + GitOps/Kustomize/Helm rest | Vo/03, 07, 05 | **MERGED** — 85 new tests (901 pass). Deferred: CLI flags (volundr score etc.), Terraform scorer (Vo/02), Helm chart internals, non-GHA CICD engine scoring. |
 | Bragi graph service/SBOM B-E + differential gate remainder | B/03B-E, B/06 rest | agent running |
 
 Wave 2 leftovers to schedule after: cross-module CLI wiring slice (asguardian passthrough of Forseti global flags; Heimdall dispatch/--scoring=v2/confidence buckets; Verdandi new-API CLI; Freya crawler gate flags Fr/06), Freya testing/packaging (Fr/07).
