@@ -16,6 +16,90 @@ class VitalsRating(str, Enum):
     GOOD = "good"
     NEEDS_IMPROVEMENT = "needs_improvement"
     POOR = "poor"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class VitalsDistributionInput(BaseModel):
+    """RUM sample distribution for one web-vitals metric."""
+
+    metric: str = Field(
+        ..., description="Metric name: lcp, inp, cls, fid, ttfb, or fcp"
+    )
+    samples: List[float] = Field(
+        default_factory=list, description="Raw RUM samples (ms; unitless for CLS)"
+    )
+    phase: Optional[str] = Field(
+        default=None, description="Optional phase/segment label"
+    )
+
+
+class VitalsDistributionResult(BaseModel):
+    """Distribution-based (p75) assessment of one metric."""
+
+    metric: str = Field(..., description="Metric name")
+    p75: Optional[float] = Field(
+        default=None, description="75th percentile of the samples"
+    )
+    rating: VitalsRating = Field(
+        ..., description="Tri-band rating of the p75 (or INSUFFICIENT_DATA)"
+    )
+    good_fraction: Optional[float] = Field(
+        default=None, description="Fraction of samples <= good threshold"
+    )
+    ni_fraction: Optional[float] = Field(
+        default=None, description="Fraction of samples in the needs-improvement band"
+    )
+    poor_fraction: Optional[float] = Field(
+        default=None, description="Fraction of samples > poor threshold"
+    )
+    sample_count: int = Field(default=0, description="Number of samples")
+    insufficient_data: bool = Field(
+        default=False,
+        description="True when sample_count < MIN_SAMPLES; no rating is junk-banded",
+    )
+    recommendations: List[str] = Field(
+        default_factory=list, description="Improvement recommendations"
+    )
+
+
+class CWVAssessment(BaseModel):
+    """
+    Page/origin-level Core Web Vitals assessment at the 75th percentile.
+
+    Core = {LCP, INP, CLS} (INP replaced FID as a Core Web Vital in March
+    2024). A page passes CWV iff all three core metrics are GOOD at p75.
+    """
+
+    lcp: Optional[VitalsDistributionResult] = Field(default=None)
+    inp: Optional[VitalsDistributionResult] = Field(default=None)
+    cls: Optional[VitalsDistributionResult] = Field(default=None)
+    core_passing: Optional[bool] = Field(
+        default=None,
+        description=(
+            "True iff LCP, INP and CLS are all GOOD at p75; None when any "
+            "core metric is missing or has insufficient data"
+        ),
+    )
+    diagnostics: Dict[str, VitalsDistributionResult] = Field(
+        default_factory=dict,
+        description="Non-core metrics (ttfb, fcp) and legacy FID",
+    )
+    legacy_fid_rating: Optional[VitalsRating] = Field(
+        default=None,
+        description=(
+            "DEPRECATED: FID was replaced by INP as a Core Web Vital in "
+            "March 2024; provided for backwards comparison only"
+        ),
+    )
+    masking_warning: bool = Field(
+        default=False,
+        description=(
+            "True when metric ratings disagree by >= 2 bands (e.g. GOOD LCP "
+            "+ POOR INP): any single composite score would mask a bimodal "
+            "user experience"
+        ),
+    )
+    recommendations: List[str] = Field(default_factory=list)
 
 
 class CoreWebVitalsInput(BaseModel):

@@ -4,10 +4,15 @@ Core Web Vitals Calculator
 Calculates and rates Core Web Vitals metrics according to Google's standards.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional, Sequence
 
+from Asgard.Verdandi.Analysis.services.percentile_calculator import (
+    PercentileCalculator,
+)
 from Asgard.Verdandi.Web.models.web_models import (
     CoreWebVitalsInput,
+    CWVAssessment,
+    VitalsDistributionResult,
     VitalsRating,
     WebVitalsResult,
 )
@@ -56,6 +61,197 @@ class CoreWebVitalsCalculator:
 
     FCP_GOOD = 1800
     FCP_POOR = 3000
+
+    #: (good_threshold, poor_threshold) per metric for distribution rating.
+    THRESHOLDS = {
+        "lcp": (LCP_GOOD, LCP_POOR),
+        "fid": (FID_GOOD, FID_POOR),
+        "cls": (CLS_GOOD, CLS_POOR),
+        "inp": (INP_GOOD, INP_POOR),
+        "ttfb": (TTFB_GOOD, TTFB_POOR),
+        "fcp": (FCP_GOOD, FCP_POOR),
+    }
+
+    #: Core Web Vitals as of March 2024: INP replaced FID.
+    CORE_METRICS = ("lcp", "inp", "cls")
+
+    #: Minimum RUM samples before a p75 rating is meaningful (CrUX itself
+    #: suppresses low-traffic segments). Below this, INSUFFICIENT_DATA is
+    #: returned instead of a junk band, and it must never trip alerts.
+    MIN_SAMPLES = 30
+
+    _BAND_ORDER = {
+        VitalsRating.GOOD: 0,
+        VitalsRating.NEEDS_IMPROVEMENT: 1,
+        VitalsRating.POOR: 2,
+    }
+
+    def rate_value(self, metric: str, value: float) -> VitalsRating:
+        """Rate a single value of a metric on its tri-band thresholds."""
+        try:
+            good, poor = self.THRESHOLDS[metric.lower()]
+        except KeyError:
+            raise ValueError(
+                f"Unknown metric '{metric}'; expected one of "
+                f"{sorted(self.THRESHOLDS)}"
+            )
+        if value <= good:
+            return VitalsRating.GOOD
+        if value <= poor:
+            return VitalsRating.NEEDS_IMPROVEMENT
+        return VitalsRating.POOR
+
+    def assess_distribution(
+        self,
+        samples: Sequence[float],
+        metric: str,
+    ) -> VitalsDistributionResult:
+        """
+        Distribution-based assessment: rate the 75th percentile of RUM
+        samples on the metric's tri-band, plus threshold-fraction SLIs.
+
+        The good/ni/poor fractions merge perfectly across pages and time
+        windows (the fraction over concatenated samples equals the
+        traffic-weighted mean of per-window fractions) — unlike p75 values,
+        which must NEVER be averaged.
+
+        Fewer than MIN_SAMPLES samples yields rating=INSUFFICIENT_DATA
+        rather than a junk band.
+        """
+        metric = metric.lower()
+        good, poor = self.THRESHOLDS.get(metric, (None, None))
+        if good is None:
+            raise ValueError(
+                f"Unknown metric '{metric}'; expected one of "
+                f"{sorted(self.THRESHOLDS)}"
+            )
+
+        n = len(samples)
+        if n < self.MIN_SAMPLES:
+            return VitalsDistributionResult(
+                metric=metric,
+                rating=VitalsRating.INSUFFICIENT_DATA,
+                sample_count=n,
+                insufficient_data=True,
+                recommendations=[
+                    f"Only {n} samples for {metric}; at least "
+                    f"{self.MIN_SAMPLES} are required for a meaningful p75 "
+                    "rating. Collect more RUM data or widen the window."
+                ],
+            )
+
+        p75 = PercentileCalculator().calculate_percentile(samples, 75)
+        rating = self.rate_value(metric, p75)
+
+        good_count = sum(1 for s in samples if s <= good)
+        poor_count = sum(1 for s in samples if s > poor)
+        good_fraction = good_count / n
+        poor_fraction = poor_count / n
+        ni_fraction = 1.0 - good_fraction - poor_fraction
+
+        recommendations: List[str] = []
+        if rating == VitalsRating.GOOD and poor_fraction > 0.1:
+            recommendations.append(
+                f"{metric}: p75 is GOOD but {poor_fraction:.0%} of samples "
+                "are POOR — a tail problem. Investigate the slow "
+                "device/network segment rather than the median experience."
+            )
+        elif rating != VitalsRating.GOOD:
+            recommendations.append(
+                f"{metric}: p75 itself is {rating.value} — a systemic "
+                "problem affecting typical users, not just the tail."
+            )
+
+        return VitalsDistributionResult(
+            metric=metric,
+            p75=p75,
+            rating=rating,
+            good_fraction=good_fraction,
+            ni_fraction=ni_fraction,
+            poor_fraction=poor_fraction,
+            sample_count=n,
+            insufficient_data=False,
+            recommendations=recommendations,
+        )
+
+    def assess_page(
+        self,
+        samples_by_metric: Dict[str, Sequence[float]],
+    ) -> CWVAssessment:
+        """
+        Assess a page/origin against Core Web Vitals at the 75th percentile.
+
+        A page passes CWV iff LCP, INP and CLS are ALL GOOD at p75 (Google's
+        compliance model — vitals are never averaged into one number).
+        TTFB/FCP are reported as diagnostics; FID only as a deprecated
+        legacy rating (INP replaced it in March 2024).
+
+        Origin-level rollup: pool the raw samples (or merge sketches) across
+        pages before calling this; never average per-page p75s.
+        """
+        results: Dict[str, VitalsDistributionResult] = {
+            metric: self.assess_distribution(samples, metric)
+            for metric, samples in samples_by_metric.items()
+            if metric.lower() in self.THRESHOLDS
+        }
+
+        core = {m: results.get(m) for m in self.CORE_METRICS}
+        core_present = [r for r in core.values() if r is not None]
+        core_ratable = [r for r in core_present if not r.insufficient_data]
+
+        core_passing: Optional[bool] = None
+        if len(core_ratable) == len(self.CORE_METRICS):
+            core_passing = all(
+                r.rating == VitalsRating.GOOD for r in core_ratable
+            )
+        elif any(
+            r.rating in (VitalsRating.NEEDS_IMPROVEMENT, VitalsRating.POOR)
+            for r in core_ratable
+        ):
+            # A definite core failure is decidable even with missing metrics.
+            core_passing = False
+
+        diagnostics = {
+            m: r for m, r in results.items() if m not in self.CORE_METRICS
+        }
+
+        legacy_fid = results.get("fid")
+        legacy_fid_rating = legacy_fid.rating if legacy_fid else None
+
+        rated_bands = [
+            self._BAND_ORDER[r.rating]
+            for r in results.values()
+            if r.rating in self._BAND_ORDER
+        ]
+        masking_warning = bool(rated_bands) and (
+            max(rated_bands) - min(rated_bands) >= 2
+        )
+
+        recommendations: List[str] = []
+        for r in results.values():
+            recommendations.extend(r.recommendations)
+        if masking_warning:
+            recommendations.append(
+                "Metric ratings disagree by 2+ bands: a composite score "
+                "would mask a bimodal user experience. Evaluate each vital "
+                "on its own tri-band."
+            )
+        if legacy_fid is not None:
+            recommendations.append(
+                "FID is deprecated as a Core Web Vital (replaced by INP in "
+                "March 2024); its rating is reported as legacy only."
+            )
+
+        return CWVAssessment(
+            lcp=core["lcp"],
+            inp=core["inp"],
+            cls=core["cls"],
+            core_passing=core_passing,
+            diagnostics=diagnostics,
+            legacy_fid_rating=legacy_fid_rating,
+            masking_warning=masking_warning,
+            recommendations=recommendations,
+        )
 
     def calculate(
         self,

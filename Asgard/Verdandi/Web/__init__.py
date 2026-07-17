@@ -20,6 +20,9 @@ __author__ = "Asgard Contributors"
 
 from Asgard.Verdandi.Web.models.web_models import (
     CoreWebVitalsInput,
+    CWVAssessment,
+    VitalsDistributionInput,
+    VitalsDistributionResult,
     NavigationTimingInput,
     ResourceTimingInput,
     VitalsRating,
@@ -34,6 +37,9 @@ from Asgard.Verdandi.Web.services.resource_timing import ResourceTimingCalculato
 __all__ = [
     "CoreWebVitalsCalculator",
     "CoreWebVitalsInput",
+    "CWVAssessment",
+    "VitalsDistributionInput",
+    "VitalsDistributionResult",
     "NavigationTimingCalculator",
     "NavigationTimingInput",
     "NavigationTimingResult",
