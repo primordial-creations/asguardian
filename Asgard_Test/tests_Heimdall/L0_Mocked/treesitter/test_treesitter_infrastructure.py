@@ -83,13 +83,20 @@ def test_parse_source_empty_bytes_does_not_raise():
 def test_parse_source_graceful_when_unavailable(monkeypatch):
     """Even if language binding is absent, parse_source returns None gracefully."""
     import Asgard.Heimdall.treesitter._language_loader as ll
+    import Asgard.Heimdall.treesitter._parser_pool as pp
+
     original = ll._AVAILABLE.copy()
+    # A parser cached by an earlier test would otherwise short-circuit the
+    # availability check, so drop the cache too and restore it afterwards.
+    original_parsers = pp._PARSERS.copy()
     ll._AVAILABLE.clear()
+    pp._PARSERS.clear()
     try:
         result = parse_source(SIMPLE_JAVA, "java")
         assert result is None
     finally:
         ll._AVAILABLE.update(original)
+        pp._PARSERS.update(original_parsers)
 
 
 # ---------------------------------------------------------------------------
