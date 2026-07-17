@@ -279,6 +279,84 @@ def _build_default_registry() -> RuleRegistry:
     ]
     for rule in defaults:
         registry.register(rule)
+
+    # Legacy rule IDs emitted by the existing per-format validators are
+    # registered 1:1 so suppressions and SARIF emission cover them too.
+    legacy = {
+        # Kubernetes (legacy KubernetesValidator IDs)
+        "missing-selector": (RuleSeverity.HIGH, schema, "Add spec.selector."),
+        "no-containers": (RuleSeverity.HIGH, schema, "Define at least one container."),
+        "missing-image": (RuleSeverity.HIGH, schema, "Set the container image."),
+        "unpinned-image": (RuleSeverity.MEDIUM, bp, "Pin the image tag or digest."),
+        "missing-resource-limits": (RuleSeverity.MEDIUM, rel, "Add resources.limits."),
+        "missing-resource-requests": (RuleSeverity.MEDIUM, rel, "Add resources.requests."),
+        "missing-security-context": (RuleSeverity.MEDIUM, sec, "Add a securityContext."),
+        "not-running-as-non-root": (RuleSeverity.HIGH, sec, "Set runAsNonRoot: true."),
+        "privileged-container": (RuleSeverity.CRITICAL, sec, "Remove privileged: true."),
+        "privilege-escalation-allowed": (
+            RuleSeverity.HIGH, sec, "Set allowPrivilegeEscalation: false."),
+        "missing-liveness-probe": (RuleSeverity.MEDIUM, rel, "Add a livenessProbe."),
+        "missing-readiness-probe": (RuleSeverity.MEDIUM, rel, "Add a readinessProbe."),
+        "missing-labels": (RuleSeverity.LOW, bp, "Add metadata.labels."),
+        "ingress-no-tls": (RuleSeverity.MEDIUM, sec, "Configure TLS on the Ingress."),
+        "ingress-no-rules": (RuleSeverity.MEDIUM, schema, "Add Ingress rules."),
+        "service-no-selector": (RuleSeverity.MEDIUM, bp, "Add a Service selector."),
+        "service-no-ports": (RuleSeverity.MEDIUM, schema, "Add Service ports."),
+        "unknown-api-version": (RuleSeverity.MEDIUM, schema, "Use a supported apiVersion."),
+        # Terraform (legacy TerraformValidator IDs)
+        "hardcoded-credential": (RuleSeverity.CRITICAL, sec, "Move secrets to variables/Vault."),
+        "iam-wildcard-action": (RuleSeverity.HIGH, sec, "Scope IAM actions explicitly."),
+        "iam-wildcard-resource": (RuleSeverity.HIGH, sec, "Scope IAM resources explicitly."),
+        "sg-open-ingress": (RuleSeverity.HIGH, sec, "Restrict the ingress CIDR."),
+        "sg-all-ports": (RuleSeverity.HIGH, sec, "Restrict the port range."),
+        "s3-no-encryption": (RuleSeverity.HIGH, sec, "Enable server-side encryption."),
+        "s3-no-versioning": (RuleSeverity.MEDIUM, rel, "Enable bucket versioning."),
+        "module-no-version": (RuleSeverity.MEDIUM, bp, "Pin the module version."),
+        "variable-no-description": (RuleSeverity.LOW, bp, "Describe the variable."),
+        "variable-no-type": (RuleSeverity.LOW, bp, "Type the variable."),
+        "variable-not-sensitive": (RuleSeverity.MEDIUM, sec, "Mark as sensitive = true."),
+        "output-not-sensitive": (RuleSeverity.MEDIUM, sec, "Mark as sensitive = true."),
+    }
+    for rule_id, (severity, category, remediation) in legacy.items():
+        registry.register(RegisteredRule(
+            id=rule_id, name=rule_id,
+            description=f"Legacy rule {rule_id}",
+            severity=severity, category=category, remediation=remediation,
+        ))
+
+    # hadolint-compatible Dockerfile rule IDs (kept verbatim).
+    hadolint_ids = {
+        "DL3000": "Use absolute WORKDIR.",
+        "DL3001": "Avoid irrelevant shell commands in RUN.",
+        "DL3002": "Do not switch to root (USER root) last.",
+        "DL3004": "Do not use sudo.",
+        "DL3007": "Do not use :latest tag; pin the version.",
+        "DL3008": "Pin versions in apt-get install.",
+        "DL3009": "Delete apt lists after install.",
+        "DL3011": "Use a valid UNIX port range.",
+        "DL3014": "Use apt-get -y.",
+        "DL3016": "Pin versions in npm install.",
+        "DL3020": "Use COPY instead of ADD.",
+        "DL3025": "Use JSON notation for CMD/ENTRYPOINT.",
+        "DL3032": "yum clean all after install.",
+        "DL3042": "Use pip --no-cache-dir.",
+        "DL3045": "COPY to a relative destination needs WORKDIR.",
+        "DL3046": "useradd without -l and high UID.",
+        "DL3055": "Pin image digests.",
+        "DL3059": "Consolidate consecutive RUN instructions.",
+        "DL4001": "Do not use both wget and curl.",
+        "DL4002": "Use HEALTHCHECK.",
+        "DL0001": "Dockerfile parse issue.",
+        "DL0002": "Dockerfile structure issue.",
+    }
+    for rule_id, remediation in hadolint_ids.items():
+        registry.register(RegisteredRule(
+            id=rule_id, name=rule_id,
+            description=f"hadolint {rule_id}",
+            severity=RuleSeverity.MEDIUM, category=bp, remediation=remediation,
+            framework_mappings={"hadolint": rule_id},
+        ))
+
     return registry
 
 
