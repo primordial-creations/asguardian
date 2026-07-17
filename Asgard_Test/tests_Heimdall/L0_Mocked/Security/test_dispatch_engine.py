@@ -15,7 +15,7 @@ def _scan(code: str, filename: str = "app.py", **engine_kwargs):
 
 class TestLayer1RegexSweep:
     def test_aws_key_prefix_detected_in_raw_text(self):
-        result = _scan("KEY = 'AKIAIOSFODNN7EXAMPLE'\n")
+        result = _scan("KEY = 'AKIAJG74NB5XQTJ7Q2VZ'\n")
         hits = [f for f in result.structural_findings if f.layer == 1]
         assert len(hits) == 1
         assert hits[0].rule_id == "L1.aws_access_key"
@@ -96,7 +96,7 @@ class TestDedupAndDeterminism:
         """Determinism gate: consecutive scans yield identical findings."""
         code = (
             "import yaml\n"
-            "KEY = 'AKIAIOSFODNN7EXAMPLE'\n"
+            "KEY = 'AKIAJG74NB5XQTJ7Q2VZ'\n"
             "def handler():\n"
             "    q = request.args.get('q')\n"
             "    cursor.execute(q)\n"

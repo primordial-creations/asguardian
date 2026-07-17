@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
+from Asgard.Heimdall.Security.context.test_context import is_test_context
 from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
 from Asgard.Heimdall.Security.TaintAnalysis.catalog.sinks import lookup_sink
 from Asgard.Heimdall.Security.TaintAnalysis.catalog.sources import lookup_source
@@ -82,15 +83,28 @@ class DispatchEngine:
     def __init__(
         self,
         custom_sanitizers: Optional[Set[str]] = None,
-        is_test_context: bool = False,
+        is_test_context: Optional[bool] = None,
+        strict_scan_paths: Sequence[str] = (),
     ):
+        """
+        ``is_test_context=None`` (default) auto-classifies each scanned
+        file through the Security/context engine; pass an explicit bool
+        to force the context. ``strict_scan_paths`` regexes bypass the
+        test-context engine entirely (security-regression tests).
+        """
         self.custom_sanitizers = custom_sanitizers or set()
-        self.is_test_context = is_test_context
+        self._forced_test_context = is_test_context
+        self.is_test_context = bool(is_test_context)
+        self.strict_scan_paths = tuple(strict_scan_paths)
 
     # ------------------------------------------------------------------ API
 
     def scan_file(self, file_path: Path, source: Optional[str] = None) -> DispatchResult:
         file_path = Path(file_path)
+        if self._forced_test_context is None:
+            self.is_test_context = is_test_context(
+                str(file_path), self.strict_scan_paths
+            )
         if source is None:
             try:
                 source = file_path.read_text(encoding="utf-8", errors="ignore")
@@ -131,7 +145,13 @@ class DispatchEngine:
         for name, mechanism, pattern in _LAYER1_PATTERNS:
             for match in pattern.finditer(source):
                 line = source.count("\n", 0, match.start()) + 1
-                conf = 0.1 if self.is_test_context else 0.95
+                # Hardcoded secrets are NEVER suppressed or confidence-capped
+                # by test context (plan 08): a live credential in conftest.py
+                # is exactly as compromised as one in production code. Dummy
+                # values are handled by the dummy filter, not the context.
+                if self._looks_dummy(match.group(0)):
+                    continue
+                conf = 0.95
                 findings.append(StructuralFinding(
                     rule_id=f"L1.{name}",
                     mechanism_id=mechanism,
@@ -145,6 +165,15 @@ class DispatchEngine:
                     cwe_id="CWE-798",
                 ))
         return findings
+
+    _DUMMY_TOKEN_RE = re.compile(
+        r"EXAMPLE|XXXX|0000000000|1234567890|placeholder|dummy", re.IGNORECASE
+    )
+
+    @classmethod
+    def _looks_dummy(cls, token: str) -> bool:
+        """Dummy-value filter (plan 07.3): obvious placeholder tokens."""
+        return bool(cls._DUMMY_TOKEN_RE.search(token))
 
     # -------------------------------------------------------------- layer 2
 

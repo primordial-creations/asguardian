@@ -436,7 +436,7 @@ class TestSecurityHotspotContract:
         sh = SecurityHotspot(
             file_path="/a.py",
             line_number=10,
-            category=HotspotCategory.COOKIE_CONFIG,
+            category=HotspotCategory.WEAK_HASHING,
             review_priority=ReviewPriority.HIGH,
             title="Weak cipher usage",
         )
