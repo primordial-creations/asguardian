@@ -84,6 +84,24 @@ def _add_terraform_commands(subparsers: argparse._SubParsersAction) -> None:
         help="Module complexity",
     )
     generate.add_argument("--description", default="", help="Module description")
+    generate.add_argument(
+        "--environment",
+        choices=["production", "staging", "development", "sandbox"],
+        default="production",
+        help="Scoring environment weight profile",
+    )
+    generate.add_argument(
+        "--suppress",
+        action="append",
+        default=[],
+        metavar="RULE:TARGET:REASON",
+        help="Reified suppression (repeatable). Requires rule, target, and a non-empty reason.",
+    )
+    generate.add_argument(
+        "--kms-encryption",
+        action="store_true",
+        help="Use KMS (aws:kms) instead of AES256 for generated storage encryption blocks",
+    )
     generate.add_argument("--output-dir", default="modules", help="Output directory")
 
     add_performance_flags(tf_parser)

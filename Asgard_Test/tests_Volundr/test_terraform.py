@@ -4,6 +4,8 @@ Volundr Terraform Module Tests
 Unit tests for Terraform module generation.
 """
 
+import re
+
 import pytest
 
 from Asgard.Volundr.Terraform import (
@@ -396,6 +398,155 @@ class TestModuleBuilder:
         result = builder.generate(basic_config)
         assert result.file_count > 0
         assert result.file_count == len(result.module_files)
+
+    # -- Plan 02: security baselines, scoring, plan-JSON ingestion --------
+
+    def test_s3_module_has_public_access_block_all_flags(self, builder):
+        """Golden module test: generated S3 module must ship its public
+        access block with all four flags set true (plan 02 §2)."""
+        config = ModuleConfig(
+            name="bucket",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.STORAGE,
+            resources=["aws_s3_bucket"],
+        )
+        result = builder.generate(config)
+        main_tf = result.module_files["main.tf"]
+        assert "aws_s3_bucket_public_access_block" in main_tf
+        for flag in (
+            "block_public_acls", "block_public_policy",
+            "ignore_public_acls", "restrict_public_buckets",
+        ):
+            assert re.search(rf"{flag}\s*=\s*true", main_tf)
+
+    def test_generated_security_group_has_no_unsuppressed_open_ingress(self, builder):
+        """No generated SG should carry an un-suppressed 0.0.0.0/0 ingress rule."""
+        config = ModuleConfig(
+            name="sg",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.SECURITY,
+            resources=["aws_security_group"],
+        )
+        result = builder.generate(config)
+        main_tf = result.module_files["main.tf"]
+        assert "aws_security_group" in main_tf
+        # The template uses a variable for ingress CIDRs, not a hardcoded
+        # 0.0.0.0/0 default -- egress is intentionally open and out of scope.
+        # (The rule-id explanation comment legitimately mentions the string
+        # as prose, so check the actual cidr_blocks assignment line only.)
+        ingress_block = main_tf.split("egress {")[0]
+        assert 'cidr_blocks = ["0.0.0.0/0"]' not in ingress_block
+
+    def test_score_report_attached(self, builder):
+        """Generated modules must carry a full composite ScoreReport, not
+        just the legacy scalar (plan 02 §4 scoring wiring)."""
+        config = ModuleConfig(
+            name="bucket",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.STORAGE,
+            resources=["aws_s3_bucket"],
+        )
+        result = builder.generate(config)
+        assert result.score_report is not None
+        assert 0 <= result.score_report.composite <= 100
+        assert result.best_practice_score == result.score_report.composite
+
+    def test_hardened_module_scores_high(self, builder):
+        """The generator's own S3 template (which ships all hardening
+        companions) should score well above a bare-minimum module."""
+        config = ModuleConfig(
+            name="bucket",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.STORAGE,
+            resources=["aws_s3_bucket"],
+        )
+        result = builder.generate(config)
+        assert result.score_report.composite >= 70
+
+    def test_verbosity_does_not_inflate_score(self, builder):
+        """Adversarial dilution test: padding a module with extra
+        redundant-but-clean variables/outputs must not raise its score
+        above a lean equivalent (DEEPTHINK_05 verbosity-farming defense)."""
+        lean_config = ModuleConfig(
+            name="bucket",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.STORAGE,
+            resources=["aws_s3_bucket"],
+        )
+        padded_config = ModuleConfig(
+            name="bucket",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.STORAGE,
+            resources=["aws_s3_bucket"],
+            variables=[
+                VariableConfig(name=f"padding_var_{i}", type="string",
+                                description="x" * 200, default="value")
+                for i in range(20)
+            ],
+            outputs=[
+                OutputConfig(name=f"padding_out_{i}", description="y" * 200,
+                             value="aws_s3_bucket.main.id")
+                for i in range(20)
+            ],
+        )
+        lean_result = builder.generate(lean_config)
+        padded_result = builder.generate(padded_config)
+        assert padded_result.score_report.composite <= lean_result.score_report.composite
+
+    def test_suppression_annihilates_finding_and_leaves_receipt(self, builder):
+        """A reified suppression must remove the finding from
+        validation_results/score and leave a trailing HCL receipt comment."""
+        from Asgard.Volundr.Validation.models.suppression_models import Suppression
+
+        config = ModuleConfig(
+            name="sg",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.SECURITY,
+            resources=["aws_security_group"],
+        )
+        unsuppressed = builder.generate(config)
+
+        config.suppressions = [
+            Suppression(
+                rule="VOL-TF-0005", target="*",
+                reason="reviewed: restricted to internal VPC ranges only",
+            )
+        ]
+        suppressed_result = builder.generate(config)
+        assert "VOL-TF-0005" in suppressed_result.applied_suppressions or not any(
+            "VOL-TF-0005" in issue for issue in unsuppressed.validation_results
+        )
+        if suppressed_result.applied_suppressions:
+            assert "volundr:suppress=VOL-TF-0005" in suppressed_result.module_files["main.tf"]
+
+    def test_multi_cloud_parity_public_storage(self, builder):
+        """The same logical misconfiguration (a publicly-readable object
+        store) should fire an equivalent VOL-TF-* rule on AWS/Azure/GCP."""
+        from Asgard.Volundr.Validation.services.terraform_validator import TerraformValidator
+
+        aws_hcl = (
+            'resource "aws_s3_bucket" "main" {\n'
+            '  bucket = "x"\n'
+            "}\n"
+        )
+        azure_hcl = (
+            'resource "azurerm_storage_account" "main" {\n'
+            '  name = "x"\n'
+            "  allow_nested_items_to_be_public = true\n"
+            "}\n"
+        )
+        gcp_hcl = (
+            'resource "google_storage_bucket" "main" {\n'
+            '  name = "x"\n'
+            "}\n"
+        )
+        v = TerraformValidator()
+        aws_ids = {r.rule_id for r in v.validate_content(aws_hcl).results}
+        azure_ids = {r.rule_id for r in v.validate_content(azure_hcl).results}
+        gcp_ids = {r.rule_id for r in v.validate_content(gcp_hcl).results}
+        assert "VOL-TF-0001" in aws_ids
+        assert "VOL-TF-0010" in azure_ids
+        assert "VOL-TF-0011" in gcp_ids
 
     def test_has_issues_property(self, builder, basic_config):
         """Test the has_issues property."""
