@@ -17,6 +17,10 @@ from Asgard.Volundr.cli.handlers_gitops import (
     run_flux_source,
     run_flux_kustomization,
 )
+from Asgard.Volundr.cli.handlers_score_gitops import (
+    run_gitops_validate,
+    run_score,
+)
 from Asgard.Volundr.cli.handlers_compose_validate_scaffold import (
     run_compose_generate,
     run_compose_validate,
@@ -123,6 +127,16 @@ def main(args=None) -> int:
             sys.exit(run_compose_generate(parsed_args))
         elif parsed_args.compose_command == "validate":
             sys.exit(run_compose_validate(parsed_args))
+
+    elif parsed_args.command == "score":
+        sys.exit(run_score(parsed_args))
+
+    elif parsed_args.command == "gitops":
+        if not hasattr(parsed_args, "gitops_command") or parsed_args.gitops_command is None:
+            print("Error: Please specify a gitops command (e.g., 'validate')")
+            sys.exit(1)
+        if parsed_args.gitops_command == "validate":
+            sys.exit(run_gitops_validate(parsed_args))
 
     elif parsed_args.command == "validate":
         if not hasattr(parsed_args, "validate_command") or parsed_args.validate_command is None:

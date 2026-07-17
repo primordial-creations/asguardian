@@ -102,6 +102,18 @@ def _add_docker_commands(subparsers: argparse._SubParsersAction) -> None:
     dockerfile.add_argument("--user", default="appuser", help="Non-root user")
     dockerfile.add_argument("--output-dir", default=".", help="Output directory")
     dockerfile.add_argument("--multi-stage", action="store_true", help="Use multi-stage build")
+    dockerfile.add_argument(
+        "--digest", default=None,
+        help="Base-image digest (sha256:...) for immutable supply-chain pinning",
+    )
+    dockerfile.add_argument(
+        "--secret-mount", action="append", dest="secret_mounts", default=[],
+        metavar="ID[:TARGET]",
+        help=(
+            "BuildKit secret mount (repeatable): secrets are mounted at build "
+            "time and never enter image layers"
+        ),
+    )
 
     compose = docker_subparsers.add_parser("compose", help="Generate docker-compose.yml")
     compose.add_argument("--name", required=True, help="Project name")

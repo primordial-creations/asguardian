@@ -51,7 +51,11 @@ def run_compose_generate(args: argparse.Namespace) -> int:
             ports=["8080:8080"],
         ))
 
-    project = ComposeProject(name=args.name, services=services)
+    project = ComposeProject(
+        name=args.name,
+        services=services,
+        edge_services=list(getattr(args, "edge_services", None) or []),
+    )
     generator = ComposeProjectGenerator(output_dir=args.output_dir)
     result = generator.generate_with_override(project, args.environment)
 
