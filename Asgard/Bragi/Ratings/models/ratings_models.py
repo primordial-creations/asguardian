@@ -22,6 +22,14 @@ from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Bragi.Ratings.models._scoring_models import (
+    FileQualityScore,
+    MeasurementConfidence,
+    RiskProfile,
+    ROIAction,
+    ScoreConfidence,
+)
+
 
 class LetterRating(str, Enum):
     """A-E letter rating."""
@@ -46,6 +54,13 @@ class DimensionRating(BaseModel):
     score: float = Field(0.0, description="Numeric score used to derive the rating")
     rationale: str = Field("", description="Explanation of how the rating was determined")
     issues_count: int = Field(0, description="Number of issues contributing to this rating")
+    confidence: MeasurementConfidence = Field(
+        MeasurementConfidence.MEASURED,
+        description=(
+            "Whether the underlying report was actually supplied. NOT_MEASURED "
+            "means the letter is a default, not evidence of quality."
+        ),
+    )
 
     class Config:
         use_enum_values = True
@@ -80,6 +95,26 @@ class ProjectRatings(BaseModel):
     )
     scan_path: str = Field("", description="Root path that was rated")
     scanned_at: datetime = Field(default_factory=datetime.now, description="When rating was calculated")
+
+    # Composite scoring engine outputs (Plan 01). Optional for backward compat.
+    composite_score: Optional[float] = Field(
+        None, description="Hierarchical gated geometric composite score in [0, 1]; None when nothing was measured"
+    )
+    composite_grade: Optional[str] = Field(
+        None, description="Project grade from the risk-profile footprint (not a mean of file scores)"
+    )
+    risk_profile: Optional[RiskProfile] = Field(
+        None, description="Distribution of LOC across file grade bands (SIG risk profile)"
+    )
+    file_scores: List[FileQualityScore] = Field(
+        default_factory=list, description="Per-file composite scores"
+    )
+    confidence: Optional[ScoreConfidence] = Field(
+        None, description="Which report sources were present when scoring"
+    )
+    roi_actions: List[ROIAction] = Field(
+        default_factory=list, description="Ranked marginal-ROI improvement actions"
+    )
 
     class Config:
         use_enum_values = True
