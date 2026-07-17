@@ -1,39 +1,67 @@
 # Architecture layer configuration for hexagonal (ports and adapters) analysis.
 #
-# Schema:
+# Schema (Plan 03 — Architecture Enforcement):
 #   language: source language (default: python)
 #   layers: list of layer definitions
 #     - name: unique layer identifier
-#       path_patterns: glob patterns matched against source file paths
-#       allowed_imports: layers this layer may import from
+#       level: concentric integer level; 0 = innermost. Enables the
+#              import-graph layer-inference CSP (min/max bound propagation)
+#              and drift-paradox detection. Omit `level` on every layer to
+#              fall back to the old glob-only classification.
+#       heuristics:
+#         paths: glob patterns matched against source file paths
+#                (equivalent to the old top-level `path_patterns:`)
+#         suffixes: class/module name suffixes that pin this layer
+#                   (e.g. "Service", "Repository")
+#         external_imports: third-party import roots that anchor a file at
+#                            this level even with no path/suffix match
+#                            (e.g. sqlalchemy -> infrastructure)
+#       allowed_imports: layers this layer may import from (informational;
+#                        derivable from levels, kept for readability)
 #       forbidden_imports: layers this layer must NOT import from
+#   rules:
+#     max_module_fan_out: warn when a module (directory) imports from more
+#                          than this many distinct other modules
+#     detect_module_cycles: run Tarjan SCC at module (directory) granularity
+#
+# Backward compatible: the old schema (top-level `path_patterns:` per layer,
+# no `level:`, no `rules:`) is still read as-is and keeps the original
+# glob-only classification path.
 
 language: python
+
 layers:
   - name: domain
-    path_patterns:
-      - "*/domain/*"
-      - "*/models/*"
+    level: 0
+    heuristics:
+      paths: ["*/domain/*", "*/models/*"]
+      suffixes: ["Entity", "ValueObject", "Model"]
     allowed_imports: []
     forbidden_imports: [infrastructure, adapters]
 
   - name: ports
-    path_patterns:
-      - "*/ports/*"
+    level: 0
+    heuristics:
+      paths: ["*/ports/*"]
     allowed_imports: [domain]
     forbidden_imports: [infrastructure]
 
   - name: application
-    path_patterns:
-      - "*/services/*"
-      - "*/use_cases/*"
+    level: 1
+    heuristics:
+      paths: ["*/services/*", "*/use_cases/*"]
+      suffixes: ["UseCase", "Service", "Handler"]
     allowed_imports: [domain, ports]
     forbidden_imports: [infrastructure]
 
   - name: infrastructure
-    path_patterns:
-      - "*/infrastructure/*"
-      - "*/adapters/*"
-      - "*/repositories/*"
+    level: 2
+    heuristics:
+      paths: ["*/infrastructure/*", "*/adapters/*", "*/repositories/*"]
+      external_imports: ["sqlalchemy", "psycopg2", "requests", "boto3", "django.db"]
     allowed_imports: [domain, ports, application]
     forbidden_imports: []
+
+rules:
+  max_module_fan_out: 12
+  detect_module_cycles: true

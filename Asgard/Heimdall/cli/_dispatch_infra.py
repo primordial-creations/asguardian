@@ -11,6 +11,7 @@ from Asgard.Heimdall.cli.handlers import (
     run_deps_analysis,
     run_deps_export,
     run_arch_analysis,
+    run_arch_explain,
     run_coverage_analysis,
     run_syntax_analysis,
     run_requirements_analysis,
@@ -62,6 +63,9 @@ def dispatch_infra(args, verbose: bool) -> None:
             print("  patterns  Detect design patterns and flag antipatterns")
             print("\nUse 'heimdall architecture <subcommand> -h' for help on a specific subcommand.")
             sys.exit(1)
+
+        if args.arch_command == "layers" and getattr(args, "explain", None):
+            sys.exit(run_arch_explain(args, verbose))
 
         arch_types = {"analyze": "all", "solid": "solid", "layers": "layers", "patterns": "patterns", "hexagonal": "hexagonal"}
         if args.arch_command in arch_types:

@@ -49,6 +49,7 @@ from Asgard.Heimdall.cli.handlers.performance import run_performance_analysis
 from Asgard.Heimdall.cli.handlers.oop_arch import (
     run_oop_analysis,
     run_arch_analysis,
+    run_arch_explain,
 )
 from Asgard.Heimdall.cli.handlers.deps import (
     run_deps_analysis,
@@ -158,6 +159,7 @@ __all__ = [
     "run_performance_analysis",
     "run_oop_analysis",
     "run_arch_analysis",
+    "run_arch_explain",
     "run_deps_analysis",
     "run_deps_export",
     "run_coverage_analysis",
