@@ -20,12 +20,16 @@ def _escape(token: str) -> str:
 
 
 def _walk(node: "yaml.Node", path: str, sourcemap: SourceMap) -> None:
-    sourcemap[path or "/"] = (node.start_mark.line + 1, node.start_mark.column + 1)
+    # Key positions win over value positions (setdefault): a finding at
+    # '/info/title' should point at the 'title' key, not its value.
+    sourcemap.setdefault(path or "/", (node.start_mark.line + 1, node.start_mark.column + 1))
     if isinstance(node, yaml.MappingNode):
         for key_node, value_node in node.value:
             key = str(getattr(key_node, "value", key_node))
             child = f"{path}/{_escape(key)}"
-            sourcemap[child] = (key_node.start_mark.line + 1, key_node.start_mark.column + 1)
+            sourcemap.setdefault(
+                child, (key_node.start_mark.line + 1, key_node.start_mark.column + 1)
+            )
             _walk(value_node, child, sourcemap)
     elif isinstance(node, yaml.SequenceNode):
         for index, item in enumerate(node.value):

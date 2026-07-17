@@ -47,7 +47,7 @@ def compute_exit_code(
 def wants_unified_output(args: argparse.Namespace) -> bool:
     """Whether the invocation opted into the unified finding pipeline."""
     return bool(
-        getattr(args, "format", "text") in ("sarif", "github")
+        getattr(args, "format", "text") in ("sarif", "github", "json")
         or getattr(args, "quiet", False)
         or getattr(args, "explain", False)
         or getattr(args, "profile", None)

@@ -71,6 +71,17 @@ def parse_comment_suppressions(text: str) -> list[SuppressionEntry]:
     return suppressions
 
 
+def _normalize_pointer(path: str) -> str:
+    """Unescape a JSON pointer and collapse duplicate slashes.
+
+    Legacy findings embed raw keys ('/paths/users/{id}/get') while
+    suppression scopes are escaped ('/paths/~1users~1{id}/get'); both
+    normalize to the same comparable form.
+    """
+    unescaped = path.replace("~1", "/").replace("~0", "~")
+    return re.sub(r"/+", "/", unescaped)
+
+
 def _scope_matches(finding: Finding, scope: str) -> bool:
     if scope.startswith("line:"):
         try:
@@ -79,7 +90,9 @@ def _scope_matches(finding: Finding, scope: str) -> bool:
             return False
     if scope in ("", "/"):
         return True
-    return finding.coordinates.json_path.startswith(scope)
+    return _normalize_pointer(finding.coordinates.json_path).startswith(
+        _normalize_pointer(scope)
+    )
 
 
 def apply_suppressions(

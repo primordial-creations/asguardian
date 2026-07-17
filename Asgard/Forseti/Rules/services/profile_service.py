@@ -53,12 +53,27 @@ def load_config(path: Optional[str | Path] = None) -> Optional[ForsetiConfig]:
     if not candidate.is_file():
         return None
     raw = yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
-    overrides = [PathOverride(**entry) for entry in raw.get("overrides", []) or []]
+
+    def _coerce(value) -> str:
+        # Unquoted YAML `off`/`on` parse as booleans; map them back.
+        if value is False:
+            return "off"
+        if value is True:
+            return "on"
+        return str(value)
+
+    overrides = [
+        PathOverride(
+            path=str(entry.get("path", "")),
+            rules={str(k): _coerce(v) for k, v in (entry.get("rules") or {}).items()},
+        )
+        for entry in raw.get("overrides", []) or []
+    ]
     return ForsetiConfig(
         version=raw.get("version", 1),
         ruleset_version=raw.get("ruleset_version"),
         profile=raw.get("profile", "ci"),
-        rules={str(k): str(v) for k, v in (raw.get("rules") or {}).items()},
+        rules={str(k): _coerce(v) for k, v in (raw.get("rules") or {}).items()},
         overrides=overrides,
     )
 
