@@ -219,6 +219,12 @@ def add_baseline_parser(subparsers) -> None:
     compare_parser.add_argument("--name", "-n", type=str, required=True, help="Baseline name")
     compare_parser.add_argument("--device", "-d", type=str, help="Device to emulate")
     compare_parser.add_argument("--threshold", "-t", type=float, default=0.1, help="Difference threshold")
+    compare_parser.add_argument(
+        "--allow-env-mismatch",
+        action="store_true",
+        help="Compare despite a hard environment mismatch (result is "
+             "flagged and capped at WARNING severity)"
+    )
 
     list_parser = baseline_subparsers.add_parser(
         "list",

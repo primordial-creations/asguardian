@@ -145,6 +145,16 @@ class VisualRegressionTester:
         analysis_time = time.time() - start_time
         is_similar = similarity_score >= config.threshold
 
+        divergence_pct = (1.0 - similarity_score) * 100
+        framing = (
+            f"Structural tripwire: {divergence_pct:.2f}% divergence from "
+            f"baseline '{Path(baseline_path).name}'. This indicates an "
+            "unintended layout cascade, not an aesthetic judgment; validity "
+            "assumes both images were captured in an identical environment. "
+            "A pass does not guarantee readability under user zoom, OS text "
+            "scaling, or high-contrast modes."
+        )
+
         return VisualComparisonResult(
             baseline_path=baseline_path,
             comparison_path=comparison_path,
@@ -155,6 +165,7 @@ class VisualRegressionTester:
             annotated_image_path=annotated_image_path,
             comparison_method=config.method,
             analysis_time=round(analysis_time, 3),
+            framing=framing,
             metadata={
                 "baseline_size": baseline_img.size,
                 "comparison_size": comparison_img.size,

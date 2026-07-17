@@ -139,12 +139,36 @@ async def run_baseline_compare(args: argparse.Namespace, verbose: bool = False) 
         args.url,
         args.name,
         device=getattr(args, "device", None),
-        threshold=args.threshold
+        threshold=args.threshold,
+        allow_env_mismatch=getattr(args, "allow_env_mismatch", False),
     )
 
     if not result["success"]:
         print(f"Error: {result['error']}")
         return 1
+
+    baseline_fp = (result.get("baseline") or {}).get("fingerprint")
+    current_fp = result.get("current_fingerprint")
+    if baseline_fp or current_fp:
+        print("Environment (baseline vs current):")
+        for field in ("os_name", "browser_name", "browser_version",
+                      "viewport", "device_scale_factor", "font_stack_hash"):
+            base_value = (baseline_fp or {}).get(field, "unverified")
+            curr_value = (current_fp or {}).get(field, "unverified")
+            print(f"  {field}: {base_value} vs {curr_value}")
+
+    if result.get("status") == "environment_mismatch":
+        print("INCONCLUSIVE: environment mismatch — comparison refused.")
+        print(f"Mismatched fields: {', '.join(result.get('mismatched_fields', []))}")
+        print(result.get("rationale", ""))
+        # Inconclusive is distinct from regression-found (exit 2, not 1)
+        return 2
+
+    if result.get("environment_warning"):
+        print(f"WARNING: {result['environment_warning']}")
+
+    if result.get("framing"):
+        print(result["framing"])
 
     print(f"Passed: {'Yes' if result['passed'] else 'No'}")
     print(f"Difference: {result['difference_percentage']:.2f}%")

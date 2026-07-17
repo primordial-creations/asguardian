@@ -24,22 +24,109 @@ from Asgard.Freya.Visual.services._image_ops_analysis import (
 from Asgard.Freya.Visual.services._image_ops_draw import fill_rectangle
 
 
+def _is_antialiasing_pixel(
+    img1: Image,
+    img2: Image,
+    x: int,
+    y: int,
+    tolerance: int,
+) -> bool:
+    """
+    Classic pixelmatch anti-aliasing heuristic: a differing pixel is
+    treated as anti-aliasing when the comparison pixel's color already
+    exists (within tolerance) somewhere in the baseline's 8-neighborhood
+    of the same location — i.e. the edge merely shifted sub-pixel.
+    """
+    r2, g2, b2 = img2.get_pixel(x, y)
+    for dy in (-1, 0, 1):
+        for dx in (-1, 0, 1):
+            if dx == 0 and dy == 0:
+                continue
+            nx, ny = x + dx, y + dy
+            if nx < 0 or ny < 0 or nx >= img1.width or ny >= img1.height:
+                continue
+            r1, g1, b1 = img1.get_pixel(nx, ny)
+            luma_delta = abs(
+                (0.299 * r1 + 0.587 * g1 + 0.114 * b1)
+                - (0.299 * r2 + 0.587 * g2 + 0.114 * b2)
+            )
+            if luma_delta <= tolerance:
+                return True
+    return False
+
+
+def apply_antialiasing_filter(
+    img1: Image,
+    img2: Image,
+    binary: List[int],
+    tolerance: int,
+) -> List[int]:
+    """Zero out diff-mask pixels explainable as anti-aliasing."""
+    filtered = list(binary)
+    width = img1.width
+    for i, flagged in enumerate(binary):
+        if not flagged:
+            continue
+        x, y = i % width, i // width
+        if _is_antialiasing_pixel(img1, img2, x, y, tolerance):
+            filtered[i] = 0
+    return filtered
+
+
+def merge_overlapping_regions(
+    regions: List[DifferenceRegion],
+    max_regions: int = 50,
+) -> List[DifferenceRegion]:
+    """
+    Merge overlapping difference regions and cap the count so reports
+    say "3 regions: ..." instead of raw pixel noise. When more than
+    max_regions remain, the smallest are folded into the largest.
+    """
+    merged: List[DifferenceRegion] = []
+    for region in sorted(regions, key=lambda r: -(r.width * r.height)):
+        absorbed = False
+        for existing in merged:
+            if (region.x < existing.x + existing.width
+                    and region.x + region.width > existing.x
+                    and region.y < existing.y + existing.height
+                    and region.y + region.height > existing.y):
+                x_min = min(existing.x, region.x)
+                y_min = min(existing.y, region.y)
+                x_max = max(existing.x + existing.width, region.x + region.width)
+                y_max = max(existing.y + existing.height, region.y + region.height)
+                existing.x, existing.y = x_min, y_min
+                existing.width, existing.height = x_max - x_min, y_max - y_min
+                existing.pixel_count += region.pixel_count
+                absorbed = True
+                break
+        if not absorbed:
+            merged.append(region)
+    if len(merged) > max_regions:
+        overflow = merged[max_regions:]
+        merged = merged[:max_regions]
+        merged[-1].pixel_count += sum(r.pixel_count for r in overflow)
+        merged[-1].description += f" (+{len(overflow)} smaller regions folded in)"
+    return merged
+
+
 def pixel_comparison(
     img1: Image,
     img2: Image,
     config: ComparisonConfig,
 ) -> Tuple[float, List[DifferenceRegion]]:
-    """Pixel-by-pixel comparison."""
+    """Pixel-by-pixel comparison (with optional anti-aliasing tolerance)."""
     diff_array = grayscale_difference_array(img1, img2)
 
     total_pixels = len(diff_array)
-    different_pixels = count_above_threshold(diff_array, config.color_tolerance)
+    binary = threshold_to_binary(diff_array, config.color_tolerance)
+    if config.ignore_antialiasing and any(binary):
+        binary = apply_antialiasing_filter(img1, img2, binary, config.color_tolerance)
+    different_pixels = sum(binary)
     similarity_score = 1.0 - (different_pixels / total_pixels)
 
     difference_regions = []
 
     if different_pixels > 0:
-        binary = threshold_to_binary(diff_array, config.color_tolerance)
         num_labels, labels = connected_components(binary, img1.width, img1.height)
         boxes = component_bounding_boxes(labels, img1.width, img1.height, num_labels)
 
@@ -55,6 +142,9 @@ def pixel_comparison(
                     description="Pixel differences detected",
                     pixel_count=pixel_count,
                 ))
+        difference_regions = merge_overlapping_regions(
+            difference_regions, config.max_difference_regions
+        )
 
     return similarity_score, difference_regions
 

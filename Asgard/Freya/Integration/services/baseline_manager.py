@@ -16,7 +16,10 @@ from Asgard.Freya.Integration.models.integration_models import (
     BaselineEntry,
 )
 from Asgard.Freya.Integration.services._baseline_manager_helpers import (
+    ENV_MISMATCH_RATIONALE,
     calculate_hash,
+    capture_fingerprint,
+    classify_fingerprint_mismatch,
     generate_key,
     load_index,
     save_index,
@@ -96,6 +99,15 @@ class BaselineManager:
 
         image_hash = calculate_hash(str(baseline_path))
 
+        fingerprint = await capture_fingerprint(
+            viewport_width=viewport_width,
+            viewport_height=viewport_height,
+            device_scale_factor=(
+                screenshot.metadata.get("device_scale_factor", 1.0)
+                if isinstance(screenshot.metadata, dict) else 1.0
+            ),
+        )
+
         entry = BaselineEntry(
             url=url,
             name=name,
@@ -106,6 +118,7 @@ class BaselineManager:
             viewport_height=viewport_height,
             device=device,
             hash=image_hash,
+            fingerprint=fingerprint,
             metadata={
                 "format": screenshot.metadata.get("format", "png"),
                 "file_size": screenshot.file_size_bytes,
@@ -156,16 +169,25 @@ class BaselineManager:
         url: str,
         name: str,
         device: Optional[str] = None,
-        threshold: Optional[float] = None
+        threshold: Optional[float] = None,
+        allow_env_mismatch: Optional[bool] = None,
     ) -> Dict:
         """
         Compare current page to baseline.
+
+        A hard environment mismatch (device_scale_factor / viewport /
+        os_name) refuses the comparison by default: cross-environment
+        pixel comparison measures the environment, not your code
+        (DEEPTHINK_03). Pass allow_env_mismatch=True (or set it in
+        BaselineConfig) to compare anyway; the result then carries an
+        environment_warning and is capped at WARNING severity.
 
         Args:
             url: URL to compare
             name: Baseline name
             device: Optional device name
             threshold: Difference threshold
+            allow_env_mismatch: Override for BaselineConfig.allow_env_mismatch
 
         Returns:
             Comparison result dict
@@ -191,6 +213,54 @@ class BaselineManager:
         else:
             current = await capture.capture_full_page(url)
 
+        # Environment mismatch policy (DEEPTHINK_03: baselines are only
+        # valid as controlled deltas).
+        if allow_env_mismatch is None:
+            allow_env_mismatch = self.config.allow_env_mismatch
+        current_fingerprint = await capture_fingerprint(
+            viewport_width=baseline.viewport_width,
+            viewport_height=baseline.viewport_height,
+            device_scale_factor=(
+                baseline.fingerprint.device_scale_factor
+                if baseline.fingerprint else 1.0
+            ),
+        )
+        mismatch_level, mismatch_fields = classify_fingerprint_mismatch(
+            baseline.fingerprint, current_fingerprint
+        )
+        environment_warning: Optional[str] = None
+        if mismatch_level == "unverified":
+            environment_warning = (
+                "Unverified baseline environment (no fingerprint recorded); "
+                "re-capture recommended."
+            )
+        elif mismatch_level == "soft":
+            environment_warning = (
+                "Soft environment mismatch (" + ", ".join(mismatch_fields) +
+                "); result flagged — rendering may differ for environmental reasons."
+            )
+        elif mismatch_level == "hard":
+            if not allow_env_mismatch:
+                return {
+                    "success": True,
+                    "status": "environment_mismatch",
+                    "passed": False,
+                    "inconclusive": True,
+                    "baseline": baseline.model_dump(),
+                    "current_fingerprint": current_fingerprint.model_dump(),
+                    "mismatched_fields": mismatch_fields,
+                    "rationale": ENV_MISMATCH_RATIONALE,
+                    "has_difference": False,
+                    "difference_percentage": 0.0,
+                    "diff_image_path": None,
+                    "severity_cap": "major",
+                }
+            environment_warning = (
+                "HARD environment mismatch (" + ", ".join(mismatch_fields) +
+                ") overridden via allow_env_mismatch; result capped at "
+                "WARNING severity regardless of diff size. " + ENV_MISMATCH_RATIONALE
+            )
+
         effective_threshold = threshold if threshold is not None else self.config.diff_threshold
         regression = VisualRegressionTester(output_directory=str(self.storage_dir / "diffs"))
         comparison_config = ComparisonConfig(threshold=1.0 - effective_threshold)
@@ -203,10 +273,29 @@ class BaselineManager:
         if has_difference and self.config.auto_update:
             await self.update_baseline(url, name, device)
 
+        framing = (
+            f"Structural tripwire: {difference_percentage:.2f}% of pixels "
+            f"diverged from baseline '{name}'"
+            + (
+                " captured in an identical environment."
+                if mismatch_level == "none" else
+                f" (environment status: {mismatch_level})."
+            )
+            + " This indicates an unintended layout cascade, not an "
+            "aesthetic judgment. A pass does not guarantee readability "
+            "under user zoom, OS text scaling, or high-contrast modes."
+        )
+
         return {
             "success": True,
+            "status": "compared",
             "baseline": baseline.model_dump(),
             "current_screenshot": current.file_path,
+            "current_fingerprint": current_fingerprint.model_dump(),
+            "environment_status": mismatch_level,
+            "environment_warning": environment_warning,
+            "severity_cap": "major" if environment_warning else None,
+            "framing": framing,
             "has_difference": has_difference,
             "difference_percentage": difference_percentage,
             "diff_image_path": result.diff_image_path,
