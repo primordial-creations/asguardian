@@ -58,6 +58,8 @@ from Asgard.Heimdall.Security.TaintAnalysis.summaries import (
     compute_file_summaries,
 )
 
+from Asgard.Heimdall.Security.context.test_context import is_test_context
+
 _TEST_PATH_MARKERS = ("test_", "_test.py", "conftest.py")
 
 
@@ -86,12 +88,16 @@ def _collect_python_files(scan_path: Path, exclude_patterns: List[str]) -> List[
 
 
 def _is_test_path(path: Path) -> bool:
-    """Heuristic test-context detection (confidence cap, plan 08)."""
-    parts = {p.lower() for p in path.parts}
-    if "tests" in parts or "test" in parts:
-        return True
-    name = path.name.lower()
-    return name.startswith("test_") or name.endswith("_test.py") or name == "conftest.py"
+    """
+    Test-context detection (confidence cap, plan 08).
+
+    Delegates to the Security/context engine: word-boundary directory
+    matching AND filename-convention conjunction, plus standalone
+    test-infrastructure filenames. This replaces the earlier
+    any-'test'-segment heuristic (which false-positived on /ab_testing/
+    and false-suppressed prod scripts named test_db_connection.py).
+    """
+    return is_test_context(str(path))
 
 
 class _ParsedFile:

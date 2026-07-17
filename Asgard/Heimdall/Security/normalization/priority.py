@@ -44,6 +44,24 @@ def confidence_bucket(confidence: float) -> str:
     return "unlikely"
 
 
+# Context-tag -> priority context modifier (plan 08 Part B). Test-context
+# findings that survive the severity matrix (downgrades, secrets) still
+# rank below equivalent production findings in report ordering.
+CONTEXT_TAG_MODIFIERS: Dict[str, float] = {
+    "production": 1.0,
+    "test_integration": 0.5,
+    "test_unit": 0.25,
+    "test_function": 0.25,
+    # Secrets bypass this via their own kind: callers must not apply a
+    # test modifier to hardcoded-secret findings (plan 08).
+}
+
+
+def context_modifier_for_tag(context_tag: str) -> float:
+    """Priority context modifier for a test-context tag (default 1.0)."""
+    return CONTEXT_TAG_MODIFIERS.get(str(context_tag).lower(), 1.0)
+
+
 def priority(severity: str, confidence: float, context_modifier: float = 1.0) -> float:
     """
     Actionable priority for report ordering.

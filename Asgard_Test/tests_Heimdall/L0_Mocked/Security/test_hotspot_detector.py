@@ -1,8 +1,9 @@
 """
-Tests for Heimdall Hotspot Detector Service
+Tests for Heimdall Hotspot Detector Service (plan 08 Part A).
 
-Unit tests for security hotspot detection. Tests write real Python code to
-temporary files and run the HotspotDetector against them.
+Exception-only hotspot discipline: exactly six pattern families, each a
+question only extrinsic context can answer. Tests write real source code
+to temporary files and run HotspotDetector against them.
 """
 
 import tempfile
@@ -11,6 +12,7 @@ from pathlib import Path
 import pytest
 
 from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import (
+    PR_HOTSPOT_CAP,
     HotspotCategory,
     HotspotConfig,
     HotspotReport,
@@ -19,707 +21,365 @@ from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import (
     SecurityHotspot,
 )
 from Asgard.Heimdall.Security.Hotspots.services.hotspot_detector import HotspotDetector
+from Asgard.Heimdall.Security.Hotspots.services.pr_summary import (
+    build_pr_hotspot_comments,
+)
+
+
+def _scan_source(code: str, filename: str = "app.py", config: HotspotConfig = None):
+    with tempfile.TemporaryDirectory() as tmpdir:
+        path = Path(tmpdir) / filename
+        path.write_text(code)
+        detector = HotspotDetector(config=config)
+        return detector.scan(Path(tmpdir))
+
+
+def _categories(report) -> set:
+    return {h.category for h in report.hotspots}
 
 
 class TestHotspotDetectorInitialization:
-    """Tests for HotspotDetector initialization."""
-
     def test_default_initialization(self):
-        """Test that detector initializes with default config."""
         detector = HotspotDetector()
         assert detector.config is not None
 
     def test_custom_config_initialization(self):
-        """Test that detector accepts a custom config."""
         config = HotspotConfig(min_priority=ReviewPriority.HIGH)
         detector = HotspotDetector(config=config)
         assert detector.config.min_priority == ReviewPriority.HIGH.value
 
     def test_scan_nonexistent_path_raises(self):
-        """Test that scanning a nonexistent path raises FileNotFoundError."""
         detector = HotspotDetector()
         with pytest.raises(FileNotFoundError):
             detector.scan(Path("/nonexistent/path/that/does/not/exist"))
 
-
-class TestHotspotDetectorEmptyInputs:
-    """Tests for edge cases with empty or minimal inputs."""
-
     def test_empty_directory_returns_empty_report(self):
-        """Test that an empty directory yields a report with zero hotspots."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            detector = HotspotDetector()
-            report = detector.scan(Path(tmpdir))
-
+            report = HotspotDetector().scan(Path(tmpdir))
             assert report.total_hotspots == 0
-            assert report.hotspots == []
-
-    def test_empty_file_returns_empty_report(self):
-        """Test that an empty Python file yields no hotspots."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "empty.py").write_text("")
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert report.total_hotspots == 0
-
-    def test_scan_returns_hotspot_report_type(self):
-        """Test that scan always returns a HotspotReport."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            detector = HotspotDetector()
-            report = detector.scan(Path(tmpdir))
-
             assert isinstance(report, HotspotReport)
 
 
-class TestDynamicCodeExecutionDetection:
-    """Tests for DYNAMIC_EXECUTION hotspot detection."""
+class TestCategorySetDiscipline:
+    """The enum is exactly the six defensible families (DEEPTHINK_10 s5)."""
 
-    def test_eval_usage_detected(self):
-        """Test that eval() usage is detected as a DYNAMIC_EXECUTION hotspot."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "code.py").write_text(
-                "def run_code(user_input):\n"
-                "    result = eval(user_input)\n"
-                "    return result\n"
-            )
+    def test_exactly_six_families(self):
+        assert len(HotspotCategory) == 6
 
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
+    def test_cop_out_categories_removed(self):
+        names = {c.name for c in HotspotCategory}
+        for removed in ("REGEX_DOS", "SSRF", "PERMISSION_CHECK", "XXE",
+                        "CRYPTO_USAGE", "DYNAMIC_EXECUTION", "COOKIE_CONFIG",
+                        "INSECURE_RANDOM", "TLS_VERIFICATION"):
+            assert removed not in names
 
-            assert report.total_hotspots > 0
-            categories = [h.category for h in report.hotspots]
-            assert HotspotCategory.DYNAMIC_EXECUTION.value in categories
-
-    def test_exec_usage_detected(self):
-        """Test that exec() usage is detected as a DYNAMIC_EXECUTION hotspot."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "exec_code.py").write_text(
-                "def execute_code(script):\n"
-                "    exec(script)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            dynamic_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.DYNAMIC_EXECUTION.value
-            ]
-            assert len(dynamic_hotspots) > 0
-
-    def test_eval_hotspot_has_high_priority(self):
-        """Test that eval() hotspot has HIGH review priority."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "eval_code.py").write_text(
-                "x = eval(user_data)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            dynamic_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.DYNAMIC_EXECUTION.value
-            ]
-            assert len(dynamic_hotspots) > 0
-            assert dynamic_hotspots[0].review_priority == ReviewPriority.HIGH.value
-
-    def test_eval_hotspot_has_owasp_category(self):
-        """Test that eval() hotspot includes OWASP category reference."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "eval_use.py").write_text(
-                "result = eval(expression)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            dynamic_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.DYNAMIC_EXECUTION.value
-            ]
-            assert len(dynamic_hotspots) > 0
-            assert dynamic_hotspots[0].owasp_category is not None
-            assert dynamic_hotspots[0].cwe_id is not None
+    def test_no_acknowledged_risk_status(self):
+        assert "ACKNOWLEDGED_RISK" not in {s.name for s in ReviewStatus}
+        assert {s.value for s in ReviewStatus} == {"to_review", "safe_in_context", "fixed"}
 
 
-class TestInsecureDeserializationDetection:
-    """Tests for INSECURE_DESERIALIZATION hotspot detection."""
+class TestWeakHashing:
+    def test_md5_call_detected(self):
+        report = _scan_source("import hashlib\nh = hashlib.md5(data)\n")
+        assert HotspotCategory.WEAK_HASHING.value in _categories(report)
 
+    def test_sha1_call_detected(self):
+        report = _scan_source("import hashlib\nh = hashlib.sha1(data)\n")
+        assert HotspotCategory.WEAK_HASHING.value in _categories(report)
+
+    def test_usedforsecurity_false_not_flagged(self):
+        report = _scan_source(
+            "import hashlib\nh = hashlib.md5(data, usedforsecurity=False)\n"
+        )
+        assert HotspotCategory.WEAK_HASHING.value not in _categories(report)
+
+    def test_sha256_not_flagged(self):
+        report = _scan_source("import hashlib\nh = hashlib.sha256(data)\n")
+        assert HotspotCategory.WEAK_HASHING.value not in _categories(report)
+
+    def test_bare_hashlib_import_not_flagged(self):
+        """Generic 'any use of hashlib' flagging is a removed cop-out."""
+        report = _scan_source("import hashlib\n")
+        assert report.total_hotspots == 0
+
+
+class TestStandardPRNG:
+    def test_random_call_detected(self):
+        report = _scan_source("import random\ntoken = random.randint(0, 99)\n")
+        assert HotspotCategory.STANDARD_PRNG.value in _categories(report)
+
+    def test_bare_random_import_not_flagged(self):
+        report = _scan_source("import random\n")
+        assert report.total_hotspots == 0
+
+    def test_secrets_module_not_flagged(self):
+        report = _scan_source("import secrets\nt = secrets.token_hex(16)\n")
+        assert report.total_hotspots == 0
+
+
+class TestDisabledTLS:
+    def test_verify_false_kwarg_detected(self):
+        report = _scan_source(
+            "import requests\nrequests.get('https://x', verify=False)\n"
+        )
+        assert HotspotCategory.DISABLED_TLS.value in _categories(report)
+
+    def test_unverified_context_detected(self):
+        report = _scan_source("import ssl\nctx = ssl._create_unverified_context()\n")
+        assert HotspotCategory.DISABLED_TLS.value in _categories(report)
+
+    def test_verify_true_not_flagged(self):
+        report = _scan_source(
+            "import requests\nrequests.get('https://x', verify=True)\n"
+        )
+        assert HotspotCategory.DISABLED_TLS.value not in _categories(report)
+
+
+class TestPermissiveBinding:
+    def test_bind_all_interfaces_detected(self):
+        report = _scan_source("app.run(host='0.0.0.0', port=8000)\n")
+        assert HotspotCategory.PERMISSIVE_BINDING.value in _categories(report)
+
+    def test_wildcard_cors_detected(self):
+        report = _scan_source(
+            "app.add_middleware(CORSMiddleware, allow_origins=['*'])\n"
+        )
+        assert HotspotCategory.PERMISSIVE_BINDING.value in _categories(report)
+
+    def test_loopback_bind_not_flagged(self):
+        report = _scan_source("app.run(host='127.0.0.1', port=8000)\n")
+        assert HotspotCategory.PERMISSIVE_BINDING.value not in _categories(report)
+
+
+class TestOpaqueDeserialization:
     def test_pickle_loads_detected(self):
-        """Test that pickle.loads() is detected as INSECURE_DESERIALIZATION hotspot."""
+        report = _scan_source("import pickle\nobj = pickle.loads(blob)\n")
+        assert HotspotCategory.OPAQUE_DESERIALIZATION.value in _categories(report)
+
+    def test_marshal_load_detected(self):
+        report = _scan_source("import marshal\nobj = marshal.load(fh)\n")
+        assert HotspotCategory.OPAQUE_DESERIALIZATION.value in _categories(report)
+
+    def test_yaml_load_without_safeloader_detected(self):
+        report = _scan_source("import yaml\ncfg = yaml.load(text)\n")
+        assert HotspotCategory.OPAQUE_DESERIALIZATION.value in _categories(report)
+
+    def test_yaml_load_with_safeloader_not_flagged(self):
+        report = _scan_source(
+            "import yaml\ncfg = yaml.load(text, Loader=yaml.SafeLoader)\n"
+        )
+        assert HotspotCategory.OPAQUE_DESERIALIZATION.value not in _categories(report)
+
+    def test_yaml_safe_load_not_flagged(self):
+        report = _scan_source("import yaml\ncfg = yaml.safe_load(text)\n")
+        assert HotspotCategory.OPAQUE_DESERIALIZATION.value not in _categories(report)
+
+    def test_pickle_is_high_priority(self):
+        report = _scan_source("import pickle\nobj = pickle.loads(blob)\n")
+        priorities = {
+            h.review_priority for h in report.hotspots
+            if h.category == HotspotCategory.OPAQUE_DESERIALIZATION.value
+        }
+        assert ReviewPriority.HIGH.value in priorities
+
+
+class TestHazmatCrypto:
+    def test_hazmat_import_detected(self):
+        report = _scan_source(
+            "from cryptography.hazmat.primitives.ciphers import Cipher\n"
+        )
+        assert HotspotCategory.HAZMAT_CRYPTO.value in _categories(report)
+
+    def test_fernet_recipes_not_flagged(self):
+        report = _scan_source("from cryptography.fernet import Fernet\n")
+        assert report.total_hotspots == 0
+
+
+class TestRemovedCopOutsStaySilent:
+    """If the scanner lacks proof it emits a taint Finding or stays silent."""
+
+    def test_eval_is_not_a_hotspot(self):
+        report = _scan_source("eval(user_input)\n")
+        assert report.total_hotspots == 0
+
+    def test_variable_url_request_is_not_a_hotspot(self):
+        report = _scan_source("import requests\nrequests.get(url)\n")
+        assert report.total_hotspots == 0
+
+    def test_os_chmod_is_not_a_hotspot(self):
+        report = _scan_source("import os\nos.chmod('/tmp/f', 0o777)\n")
+        assert report.total_hotspots == 0
+
+    def test_nested_quantifier_regex_is_not_a_hotspot(self):
+        report = _scan_source("import re\np = re.compile(r'(a+)+$')\n")
+        assert report.total_hotspots == 0
+
+    def test_xml_import_is_not_a_hotspot(self):
+        report = _scan_source("import xml.etree.ElementTree as ET\n")
+        assert report.total_hotspots == 0
+
+    def test_cookie_config_is_not_a_hotspot(self):
+        report = _scan_source("resp.set_cookie('sid', v, secure=False)\n")
+        assert report.total_hotspots == 0
+
+
+class TestNonPythonRegexFallback:
+    def test_js_weak_hash_detected(self):
+        report = _scan_source(
+            "const h = crypto.createHash('md5').update(x);\n", filename="app.js"
+        )
+        assert HotspotCategory.WEAK_HASHING.value in _categories(report)
+
+    def test_js_math_random_detected(self):
+        report = _scan_source("const t = Math.random();\n", filename="app.js")
+        assert HotspotCategory.STANDARD_PRNG.value in _categories(report)
+
+    def test_go_insecure_skip_verify_detected(self):
+        report = _scan_source(
+            "cfg := &tls.Config{InsecureSkipVerify: true}\n", filename="main.go"
+        )
+        assert HotspotCategory.DISABLED_TLS.value in _categories(report)
+
+    def test_python_ast_and_regex_deduplicated(self):
+        """verify=False on a parsed Python file yields ONE hotspot, not two."""
+        report = _scan_source(
+            "import requests\nrequests.get('https://x', verify=False)\n"
+        )
+        tls = [
+            h for h in report.hotspots
+            if h.category == HotspotCategory.DISABLED_TLS.value
+        ]
+        assert len(tls) == 1
+
+
+class TestTestContextRouting:
+    """Hotspots in test code are contextually suppressed (plan 08 Part B)."""
+
+    def _scan_in_tests_dir(self, code, filename="test_app.py", config=None):
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "deser.py").write_text(
-                "import pickle\n"
-                "\n"
-                "def load_data(raw_bytes):\n"
-                "    obj = pickle.loads(raw_bytes)\n"
-                "    return obj\n"
+            tests_dir = Path(tmpdir) / "tests"
+            tests_dir.mkdir()
+            (tests_dir / filename).write_text(code)
+            return HotspotDetector(config=config).scan(Path(tmpdir))
+
+    def test_weak_hash_in_test_file_suppressed(self):
+        report = self._scan_in_tests_dir("import hashlib\nh = hashlib.md5(b'x')\n")
+        assert report.total_hotspots == 0
+        assert report.suppressed_by_context_count == 1
+
+    def test_suppressed_retained_with_include_test_context(self):
+        config = HotspotConfig(include_test_context=True)
+        report = self._scan_in_tests_dir(
+            "import hashlib\nh = hashlib.md5(b'x')\n", config=config
+        )
+        assert report.total_hotspots == 1
+        hotspot = report.hotspots[0]
+        assert hotspot.suppressed_by_context is True
+        assert hotspot.context_tag == "test_unit"
+
+    def test_enforce_pragma_keeps_production_severity(self):
+        report = self._scan_in_tests_dir(
+            "import hashlib\nh = hashlib.md5(b'x')  # heimdall: enforce\n"
+        )
+        assert report.total_hotspots == 1
+        assert report.hotspots[0].suppressed_by_context is False
+
+    def test_strict_scan_paths_bypass_engine(self):
+        config = HotspotConfig(strict_scan_paths=[r"tests/security/"])
+        with tempfile.TemporaryDirectory() as tmpdir:
+            sec_dir = Path(tmpdir) / "tests" / "security"
+            sec_dir.mkdir(parents=True)
+            (sec_dir / "test_crypto.py").write_text(
+                "import hashlib\nh = hashlib.md5(b'x')\n"
             )
+            report = HotspotDetector(config=config).scan(Path(tmpdir))
+        assert report.total_hotspots == 1
+        assert report.hotspots[0].context_tag == "production"
 
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
+    def test_context_engine_disabled(self):
+        config = HotspotConfig(test_context_enabled=False)
+        report = self._scan_in_tests_dir(
+            "import hashlib\nh = hashlib.md5(b'x')\n", config=config
+        )
+        assert report.total_hotspots == 1
+        assert report.suppressed_by_context_count == 0
 
-            deser_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_DESERIALIZATION.value
-            ]
-            assert len(deser_hotspots) > 0
+    def test_prod_file_not_suppressed(self):
+        report = _scan_source("import hashlib\nh = hashlib.md5(b'x')\n")
+        assert report.total_hotspots == 1
+        assert report.hotspots[0].context_tag == "production"
 
-    def test_pickle_load_detected(self):
-        """Test that pickle.load() is detected as INSECURE_DESERIALIZATION hotspot."""
+    def test_deserialization_in_integration_tests_downgraded(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "pickle_load.py").write_text(
-                "import pickle\n"
-                "\n"
-                "def read_pickle(f):\n"
-                "    return pickle.load(f)\n"
+            d = Path(tmpdir) / "tests" / "integration"
+            d.mkdir(parents=True)
+            (d / "test_load.py").write_text("import pickle\no = pickle.loads(b)\n")
+            report = HotspotDetector().scan(Path(tmpdir))
+        assert report.total_hotspots == 1
+        hotspot = report.hotspots[0]
+        assert hotspot.context_tag == "test_integration"
+        assert hotspot.review_priority == ReviewPriority.LOW.value
+
+
+class TestPRVolumeGuard:
+    """>5 hotspots on one PR collapse to a single summary (DEEPTHINK_10)."""
+
+    def _make(self, n):
+        return [
+            SecurityHotspot(
+                file_path=f"/src/f{i}.py", line_number=i + 1,
+                category=HotspotCategory.WEAK_HASHING,
+                review_priority=ReviewPriority.MEDIUM,
+                title=f"hotspot {i}",
             )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            deser_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_DESERIALIZATION.value
-            ]
-            assert len(deser_hotspots) > 0
-
-    def test_pickle_hotspot_has_high_priority(self):
-        """Test that pickle.loads() hotspot has HIGH priority."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "pickle_use.py").write_text(
-                "import pickle\n"
-                "data = pickle.loads(raw)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            deser_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_DESERIALIZATION.value
-            ]
-            assert len(deser_hotspots) > 0
-            assert deser_hotspots[0].review_priority == ReviewPriority.HIGH.value
-
-    def test_yaml_load_without_safe_loader_detected(self):
-        """Test that yaml.load() without SafeLoader is detected."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "yaml_parse.py").write_text(
-                "import yaml\n"
-                "\n"
-                "def parse_config(data):\n"
-                "    return yaml.load(data)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            deser_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_DESERIALIZATION.value
-            ]
-            assert len(deser_hotspots) > 0
-
-    def test_yaml_safe_load_not_detected(self):
-        """Test that yaml.safe_load() does NOT trigger an INSECURE_DESERIALIZATION hotspot."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "safe_yaml.py").write_text(
-                "import yaml\n"
-                "\n"
-                "def parse_config(data):\n"
-                "    return yaml.safe_load(data)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            deser_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_DESERIALIZATION.value
-            ]
-            assert len(deser_hotspots) == 0
-
-    def test_yaml_load_with_safe_loader_not_detected(self):
-        """Test that yaml.load() with Loader=yaml.SafeLoader is not flagged."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "safe_yaml2.py").write_text(
-                "import yaml\n"
-                "\n"
-                "def parse_config(data):\n"
-                "    return yaml.load(data, Loader=yaml.SafeLoader)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            deser_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_DESERIALIZATION.value
-            ]
-            assert len(deser_hotspots) == 0
-
-
-class TestSSRFDetection:
-    """Tests for SSRF hotspot detection."""
-
-    def test_requests_get_with_variable_url_detected(self):
-        """Test that requests.get() with a variable URL argument is detected as SSRF."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "api_call.py").write_text(
-                "import requests\n"
-                "\n"
-                "def fetch(url):\n"
-                "    response = requests.get(url)\n"
-                "    return response.text\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            ssrf_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.SSRF.value
-            ]
-            assert len(ssrf_hotspots) > 0
-
-    def test_requests_post_with_variable_url_detected(self):
-        """Test that requests.post() with a variable URL is detected as SSRF."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "post_call.py").write_text(
-                "import requests\n"
-                "\n"
-                "def send_data(endpoint):\n"
-                "    requests.post(endpoint, json={'key': 'value'})\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            ssrf_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.SSRF.value
-            ]
-            assert len(ssrf_hotspots) > 0
-
-    def test_ssrf_hotspot_has_high_priority(self):
-        """Test that SSRF hotspots have HIGH review priority."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "ssrf_code.py").write_text(
-                "import requests\n"
-                "resp = requests.get(target_url)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            ssrf_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.SSRF.value
-            ]
-            assert len(ssrf_hotspots) > 0
-            assert ssrf_hotspots[0].review_priority == ReviewPriority.HIGH.value
-
-    def test_requests_get_with_literal_url_not_ssrf(self):
-        """Test that requests.get() with a string literal URL does not trigger SSRF."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "safe_call.py").write_text(
-                "import requests\n"
-                "\n"
-                "def fetch_api():\n"
-                "    return requests.get('https://api.example.com/data')\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            ssrf_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.SSRF.value
-            ]
-            assert len(ssrf_hotspots) == 0
-
-
-class TestCryptoUsageDetection:
-    """Tests for CRYPTO_USAGE hotspot detection."""
-
-    def test_hashlib_import_detected(self):
-        """Test that importing hashlib is detected as a CRYPTO_USAGE hotspot."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "crypto_code.py").write_text(
-                "import hashlib\n"
-                "\n"
-                "def hash_password(password):\n"
-                "    return hashlib.md5(password.encode()).hexdigest()\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            crypto_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.CRYPTO_USAGE.value
-            ]
-            assert len(crypto_hotspots) > 0
-
-    def test_crypto_hotspot_has_low_priority(self):
-        """Test that cryptographic import hotspots have LOW review priority."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "hmac_use.py").write_text(
-                "import hmac\n"
-                "\n"
-                "key = b'secret'\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            crypto_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.CRYPTO_USAGE.value
-            ]
-            assert len(crypto_hotspots) > 0
-            assert crypto_hotspots[0].review_priority == ReviewPriority.LOW.value
-
-    def test_cryptography_import_from_detected(self):
-        """Test that from cryptography import ... is detected."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "crypto_from.py").write_text(
-                "from cryptography.fernet import Fernet\n"
-                "\n"
-                "key = Fernet.generate_key()\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            crypto_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.CRYPTO_USAGE.value
-            ]
-            assert len(crypto_hotspots) > 0
-
-
-class TestCleanCodeProducesNoHotspots:
-    """Tests that clean code does not produce false positives."""
-
-    def test_clean_code_no_hotspots(self):
-        """Test that code with no security-sensitive patterns yields no hotspots."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "clean.py").write_text(
-                "def add(a, b):\n"
-                "    return a + b\n"
-                "\n"
-                "def greet(name):\n"
-                "    return f'Hello, {name}'\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert report.total_hotspots == 0
-
-
-class TestReviewPriorityClassification:
-    """Tests for review priority classification."""
-
-    def test_high_priority_hotspots_counted(self):
-        """Test that HIGH priority hotspots are counted correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "high_risk.py").write_text(
-                "import pickle\n"
-                "data = pickle.loads(raw_bytes)\n"
-                "result = eval(expression)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert report.high_priority_count > 0
-
-    def test_medium_priority_hotspots_counted(self):
-        """Test that MEDIUM priority hotspots are counted correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "medium_risk.py").write_text(
-                "import random\n"
-                "\n"
-                "token = random.randint(0, 999999)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert report.medium_priority_count > 0
-
-    def test_low_priority_hotspots_counted(self):
-        """Test that LOW priority hotspots are counted correctly."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "low_risk.py").write_text(
-                "import hashlib\n"
-                "\n"
-                "digest = hashlib.sha256(data).hexdigest()\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert report.low_priority_count > 0
-
-    def test_min_priority_filter_excludes_low(self):
-        """Test that min_priority=HIGH excludes LOW and MEDIUM hotspots."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            # hashlib import triggers LOW; no HIGH hotspots
-            (tmpdir_path / "low_only.py").write_text(
-                "import hashlib\n"
-                "digest = hashlib.sha256(b'data').hexdigest()\n"
-            )
-
-            config = HotspotConfig(min_priority=ReviewPriority.HIGH)
-            detector = HotspotDetector(config=config)
-            report = detector.scan(tmpdir_path)
-
-            # All returned hotspots must be HIGH
-            for hotspot in report.hotspots:
-                assert hotspot.review_priority == ReviewPriority.HIGH.value
-
-    def test_min_priority_high_still_reports_high_hotspots(self):
-        """Test that min_priority=HIGH still reports HIGH hotspots."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "eval_use.py").write_text(
-                "result = eval(user_input)\n"
-            )
-
-            config = HotspotConfig(min_priority=ReviewPriority.HIGH)
-            detector = HotspotDetector(config=config)
-            report = detector.scan(tmpdir_path)
-
-            assert report.total_hotspots > 0
-
-
-class TestHotspotReportMetadata:
-    """Tests for hotspot report metadata and structure."""
-
-    def test_report_scan_path_set(self):
-        """Test that the report records the scan path."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert str(tmpdir_path) in report.scan_path
-
-    def test_report_scan_duration_non_negative(self):
-        """Test that scan duration is a non-negative float."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            detector = HotspotDetector()
-            report = detector.scan(Path(tmpdir))
-
-            assert report.scan_duration_seconds >= 0.0
-
-    def test_hotspot_includes_code_snippet(self):
-        """Test that detected hotspots include a code snippet."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "eval_use.py").write_text(
-                "x = eval(code)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert report.total_hotspots > 0
-            for hotspot in report.hotspots:
-                assert hotspot.code_snippet != ""
-
-    def test_hotspot_includes_review_guidance(self):
-        """Test that hotspots include review guidance."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "pickle_use.py").write_text(
-                "import pickle\n"
-                "data = pickle.loads(raw)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            deser_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_DESERIALIZATION.value
-            ]
-            assert len(deser_hotspots) > 0
-            assert deser_hotspots[0].review_guidance != ""
-
-    def test_hotspot_review_status_defaults_to_to_review(self):
-        """Test that newly detected hotspots have TO_REVIEW status."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "eval_use.py").write_text(
-                "result = eval(expr)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert report.total_hotspots > 0
-            for hotspot in report.hotspots:
-                assert hotspot.review_status == ReviewStatus.TO_REVIEW.value
-
-    def test_hotspots_by_category_populated(self):
-        """Test that hotspots_by_category dict is populated after scan."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "multi.py").write_text(
-                "import pickle\n"
-                "data = pickle.loads(raw)\n"
-                "result = eval(expr)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            assert len(report.hotspots_by_category) > 0
-
-    def test_hotspot_line_number_positive(self):
-        """Test that all hotspot line numbers are positive integers."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "code.py").write_text(
-                "import hashlib\n"
-                "import pickle\n"
-                "data = pickle.loads(raw)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            for hotspot in report.hotspots:
-                assert hotspot.line_number > 0
-
-
-class TestInsecureRandomDetection:
-    """Tests for INSECURE_RANDOM hotspot detection."""
-
-    def test_random_import_detected(self):
-        """Test that importing random module is detected."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "random_use.py").write_text(
-                "import random\n"
-                "\n"
-                "session_id = random.randint(0, 1000000)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            random_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_RANDOM.value
-            ]
-            assert len(random_hotspots) > 0
-
-    def test_random_import_has_medium_priority(self):
-        """Test that random import hotspot has MEDIUM priority."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "random_import.py").write_text(
-                "import random\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            random_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.INSECURE_RANDOM.value
-            ]
-            assert len(random_hotspots) > 0
-            assert random_hotspots[0].review_priority == ReviewPriority.MEDIUM.value
-
-
-class TestCookieConfigDetection:
-    """Tests for COOKIE_CONFIG hotspot detection."""
-
-    def test_secure_false_detected(self):
-        """Test that secure=False in cookie configuration is detected."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "cookie_config.py").write_text(
-                "response.set_cookie('session', value, secure=False)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            cookie_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.COOKIE_CONFIG.value
-            ]
-            assert len(cookie_hotspots) > 0
-
-    def test_httponly_false_detected(self):
-        """Test that httponly=False in cookie configuration is detected."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "httponly_config.py").write_text(
-                "response.set_cookie('session', value, httponly=False)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            cookie_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.COOKIE_CONFIG.value
-            ]
-            assert len(cookie_hotspots) > 0
-
-
-class TestTLSVerificationDetection:
-    """Tests for TLS_VERIFICATION hotspot detection."""
-
-    def test_verify_false_detected(self):
-        """Test that verify=False is detected as a TLS_VERIFICATION hotspot."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmpdir_path = Path(tmpdir)
-            (tmpdir_path / "tls_skip.py").write_text(
-                "import requests\n"
-                "response = requests.get('https://example.com', verify=False)\n"
-            )
-
-            detector = HotspotDetector()
-            report = detector.scan(tmpdir_path)
-
-            tls_hotspots = [
-                h for h in report.hotspots
-                if h.category == HotspotCategory.TLS_VERIFICATION.value
-            ]
-            assert len(tls_hotspots) > 0
+            for i in range(n)
+        ]
+
+    def test_cap_is_five(self):
+        assert PR_HOTSPOT_CAP == 5
+
+    def test_under_cap_inline_comments(self):
+        comments = build_pr_hotspot_comments(self._make(3))
+        assert len(comments.inline) == 3
+        assert comments.summary == ""
+        assert comments.collapsed is False
+
+    def test_eight_hotspots_collapse_to_single_summary(self):
+        comments = build_pr_hotspot_comments(self._make(8))
+        assert comments.inline == []
+        assert comments.collapsed is True
+        assert "8" in comments.summary
+
+    def test_suppressed_hotspots_never_decorate(self):
+        hotspots = self._make(8)
+        for h in hotspots:
+            h.suppressed_by_context = True
+        comments = build_pr_hotspot_comments(hotspots)
+        assert comments.inline == [] and comments.summary == ""
+
+
+class TestReportAggregation:
+    def test_counts_by_priority_and_category(self):
+        code = (
+            "import hashlib, pickle\n"
+            "h = hashlib.md5(d)\n"
+            "o = pickle.loads(b)\n"
+        )
+        report = _scan_source(code)
+        assert report.total_hotspots == 2
+        assert report.high_priority_count == 1
+        assert report.medium_priority_count == 1
+        assert report.hotspots_by_category[HotspotCategory.WEAK_HASHING.value] == 1
+
+    def test_min_priority_filter(self):
+        config = HotspotConfig(min_priority=ReviewPriority.HIGH)
+        code = "import random\nt = random.random()\n"  # LOW priority
+        report = _scan_source(code, config=config)
+        assert report.total_hotspots == 0
+
+    def test_hotspot_defaults(self):
+        report = _scan_source("import pickle\no = pickle.loads(b)\n")
+        hotspot = report.hotspots[0]
+        assert hotspot.review_status == ReviewStatus.TO_REVIEW.value
+        assert hotspot.review_guidance
+        assert hotspot.cwe_id == "CWE-502"

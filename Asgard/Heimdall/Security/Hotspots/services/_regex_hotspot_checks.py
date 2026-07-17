@@ -1,11 +1,13 @@
 """
 Heimdall Regex Hotspot Checks
 
-Regex-based hotspot detection logic for HotspotDetector.
+Regex fallback for the six hotspot families on languages without an AST
+front-end yet (JS/TS, Go, Java, ...). For Python files the AST checks are
+authoritative; the detector deduplicates (category, line) overlaps.
 """
 
 import re
-from typing import List
+from typing import List, Optional, Pattern, Tuple
 
 from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import (
     HotspotCategory,
@@ -15,11 +17,57 @@ from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import (
     SecurityHotspot,
 )
 
-_RE_SECURE_FALSE = re.compile(r"\bsecure\s*=\s*False", re.IGNORECASE)
-_RE_HTTPONLY_FALSE = re.compile(r"\bhttponly\s*=\s*False", re.IGNORECASE)
-_RE_VERIFY_FALSE = re.compile(r"\bverify\s*=\s*False")
-_RE_NESTED_QUANTIFIER = re.compile(r"[*+?{][*+?{]|(?:\([^)]*[*+?]\)[*+?{])")
-_RE_YAML_LOAD_UNSAFE = re.compile(r"\byaml\.load\s*\((?!.*Loader\s*=\s*yaml\.SafeLoader)")
+# (category, priority, pattern, title, description, guidance, owasp, cwe)
+_RULES: Tuple[Tuple, ...] = (
+    (
+        HotspotCategory.WEAK_HASHING, ReviewPriority.MEDIUM,
+        re.compile(r"""createHash\s*\(\s*['"](?:md5|sha1)['"]\s*\)|MessageDigest\.getInstance\s*\(\s*"(?:MD5|SHA-?1)"|\b(?:md5|sha1)\.New\s*\(""", re.IGNORECASE),
+        "Weak hash algorithm (MD5/SHA-1)",
+        "MD5/SHA-1 are broken for security purposes; acceptability depends on the business domain (checksum vs credential).",
+        "If security-sensitive, migrate to SHA-256+ (bcrypt/argon2 for passwords).",
+        "A02:Cryptographic Failures", "CWE-328",
+    ),
+    (
+        HotspotCategory.STANDARD_PRNG, ReviewPriority.LOW,
+        re.compile(r"\bMath\.random\s*\(|\bmath/rand\b|new\s+Random\s*\("),
+        "Standard (non-cryptographic) PRNG usage",
+        "Standard PRNGs are predictable; whether that matters depends on intent (simulation vs token generation).",
+        "Use a CSPRNG (crypto.randomBytes, crypto/rand, SecureRandom) for anything security-relevant.",
+        "A02:Cryptographic Failures", "CWE-338",
+    ),
+    (
+        HotspotCategory.DISABLED_TLS, ReviewPriority.HIGH,
+        re.compile(r"\bverify\s*=\s*False\b|rejectUnauthorized\s*:\s*false|InsecureSkipVerify\s*:\s*true|NODE_TLS_REJECT_UNAUTHORIZED|ssl\._create_unverified_context", re.IGNORECASE),
+        "TLS certificate verification disabled",
+        "Certificate verification is disabled; acceptability is a network-topology question.",
+        "Enable verification or pin a CA bundle; never disable for internet-facing endpoints.",
+        "A02:Cryptographic Failures", "CWE-295",
+    ),
+    (
+        HotspotCategory.PERMISSIVE_BINDING, ReviewPriority.MEDIUM,
+        re.compile(r"""['"]0\.0\.0\.0['"]|Access-Control-Allow-Origin['"]?\s*[:,]\s*['"]\*|allow_origins\s*=\s*\[?\s*['"]\*"""),
+        "Permissive binding or wildcard CORS",
+        "Binding to all interfaces / wildcard CORS exposes the service broadly; safety depends on deployment topology.",
+        "Bind to loopback or restrict origins unless external exposure is intentional and controlled.",
+        "A05:Security Misconfiguration", "CWE-942",
+    ),
+    (
+        HotspotCategory.OPAQUE_DESERIALIZATION, ReviewPriority.HIGH,
+        re.compile(r"\bpickle\.loads?\s*\(|\bmarshal\.loads?\s*\(|\byaml\.load\s*\((?!.*SafeLoader)|ObjectInputStream|Marshal\.load|node-serialize"),
+        "Opaque deserialization of possibly untrusted data",
+        "Deserialization primitives execute code when fed attacker-controlled bytes; provenance cannot be proven statically.",
+        "Confirm the data source is trusted; prefer JSON or another data-only format across trust boundaries.",
+        "A08:Software and Data Integrity Failures", "CWE-502",
+    ),
+    (
+        HotspotCategory.HAZMAT_CRYPTO, ReviewPriority.MEDIUM,
+        re.compile(r"\bcryptography\.hazmat\b|from\s+cryptography\.hazmat"),
+        "Low-level crypto primitive usage (hazmat)",
+        "Low-level primitives are only as safe as their composition; requires mathematical-soundness review.",
+        "Prefer high-level recipes (Fernet); otherwise obtain expert review of the construction.",
+        "A02:Cryptographic Failures", "CWE-327",
+    ),
+)
 
 
 def detect_regex_hotspots(
@@ -27,119 +75,26 @@ def detect_regex_hotspots(
     file_path: str,
     config: HotspotConfig,
 ) -> List[SecurityHotspot]:
-    """Perform regex-based hotspot detection on raw source lines."""
+    """Regex-based hotspot detection over raw source lines."""
     hotspots: List[SecurityHotspot] = []
+    enabled = set(config.enabled_categories)
 
     for line_num, line in enumerate(lines, start=1):
-        if HotspotCategory.COOKIE_CONFIG in config.enabled_categories:
-            if _RE_SECURE_FALSE.search(line):
+        for category, priority, pattern, title, description, guidance, owasp, cwe in _RULES:
+            if category not in enabled:
+                continue
+            if pattern.search(line):
                 hotspots.append(SecurityHotspot(
                     file_path=file_path,
                     line_number=line_num,
-                    category=HotspotCategory.COOKIE_CONFIG,
-                    review_priority=ReviewPriority.MEDIUM,
-                    title="Cookie set with secure=False",
-                    description=(
-                        "Cookie is set with secure=False. This allows the cookie to be "
-                        "transmitted over unencrypted HTTP connections."
-                    ),
+                    category=category,
+                    review_priority=priority,
+                    title=title,
+                    description=description,
                     code_snippet=line.strip(),
-                    review_guidance=(
-                        "Set secure=True on all cookies to ensure they are only sent "
-                        "over HTTPS. Also set httponly=True to prevent JavaScript access."
-                    ),
+                    review_guidance=guidance,
                     review_status=ReviewStatus.TO_REVIEW,
-                    owasp_category="A07:Identification and Authentication Failures",
-                    cwe_id="CWE-614",
+                    owasp_category=owasp,
+                    cwe_id=cwe,
                 ))
-
-            if _RE_HTTPONLY_FALSE.search(line):
-                hotspots.append(SecurityHotspot(
-                    file_path=file_path,
-                    line_number=line_num,
-                    category=HotspotCategory.COOKIE_CONFIG,
-                    review_priority=ReviewPriority.MEDIUM,
-                    title="Cookie set with httponly=False",
-                    description=(
-                        "Cookie is set with httponly=False. This allows JavaScript to access "
-                        "the cookie, increasing XSS risk."
-                    ),
-                    code_snippet=line.strip(),
-                    review_guidance=(
-                        "Set httponly=True on session cookies to prevent JavaScript access "
-                        "and mitigate XSS attacks."
-                    ),
-                    review_status=ReviewStatus.TO_REVIEW,
-                    owasp_category="A07:Identification and Authentication Failures",
-                    cwe_id="CWE-1004",
-                ))
-
-        if HotspotCategory.TLS_VERIFICATION in config.enabled_categories:
-            if _RE_VERIFY_FALSE.search(line):
-                hotspots.append(SecurityHotspot(
-                    file_path=file_path,
-                    line_number=line_num,
-                    category=HotspotCategory.TLS_VERIFICATION,
-                    review_priority=ReviewPriority.LOW,
-                    title="TLS certificate verification disabled (verify=False)",
-                    description=(
-                        "TLS certificate verification is disabled. This allows connections to "
-                        "servers with invalid or self-signed certificates."
-                    ),
-                    code_snippet=line.strip(),
-                    review_guidance=(
-                        "Enable TLS verification (verify=True or use a custom CA bundle). "
-                        "If a self-signed certificate is needed, provide it via verify='/path/to/ca.crt'."
-                    ),
-                    review_status=ReviewStatus.TO_REVIEW,
-                    owasp_category="A02:Cryptographic Failures",
-                    cwe_id="CWE-295",
-                ))
-
-        if HotspotCategory.REGEX_DOS in config.enabled_categories:
-            if "re.compile" in line or "re.match" in line or "re.search" in line or "re.fullmatch" in line:
-                if _RE_NESTED_QUANTIFIER.search(line):
-                    hotspots.append(SecurityHotspot(
-                        file_path=file_path,
-                        line_number=line_num,
-                        category=HotspotCategory.REGEX_DOS,
-                        review_priority=ReviewPriority.LOW,
-                        title="Potentially vulnerable regex pattern (ReDoS risk)",
-                        description=(
-                            "Regex pattern contains nested quantifiers which may cause "
-                            "catastrophic backtracking on certain inputs."
-                        ),
-                        code_snippet=line.strip(),
-                        review_guidance=(
-                            "Review the regex pattern for nested quantifiers such as (a+)+ or (a*)*. "
-                            "Consider using atomic groups or possessive quantifiers if available, "
-                            "or rewrite to avoid ambiguity."
-                        ),
-                        review_status=ReviewStatus.TO_REVIEW,
-                        owasp_category="A04:Insecure Design",
-                        cwe_id="CWE-1333",
-                    ))
-
-        if HotspotCategory.INSECURE_DESERIALIZATION in config.enabled_categories:
-            if _RE_YAML_LOAD_UNSAFE.search(line):
-                hotspots.append(SecurityHotspot(
-                    file_path=file_path,
-                    line_number=line_num,
-                    category=HotspotCategory.INSECURE_DESERIALIZATION,
-                    review_priority=ReviewPriority.HIGH,
-                    title="Unsafe yaml.load() without SafeLoader",
-                    description=(
-                        "yaml.load() without Loader=yaml.SafeLoader can execute arbitrary "
-                        "Python code embedded in YAML input."
-                    ),
-                    code_snippet=line.strip(),
-                    review_guidance=(
-                        "Replace yaml.load(data) with yaml.safe_load(data) or "
-                        "yaml.load(data, Loader=yaml.SafeLoader) to prevent code execution."
-                    ),
-                    review_status=ReviewStatus.TO_REVIEW,
-                    owasp_category="A08:Software and Data Integrity Failures",
-                    cwe_id="CWE-502",
-                ))
-
     return hotspots

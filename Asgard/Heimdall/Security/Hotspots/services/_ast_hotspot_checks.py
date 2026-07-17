@@ -1,11 +1,20 @@
 """
 Heimdall AST Hotspot Checks
 
-AST-based hotspot detection logic for HotspotDetector.
+AST-based detection for the six hotspot families (plan 08 Part A) on
+Python source. Each check flags only *syntactically flawless* code whose
+safety depends on extrinsic context; anything provable stays with the
+taint/finding pipeline (never rerouted here).
+
+Removed cop-outs (rerouted per plan 08): REGEX_DOS -> ReDoS analyzer,
+SSRF -> SSRF pipeline, PERMISSION_CHECK -> dropped, XXE -> AST kwarg
+finding, generic CRYPTO_CODE import flag -> only weak-hash calls and
+cryptography.hazmat remain, DYNAMIC_EXECUTION / COOKIE_CONFIG -> finding
+pipelines.
 """
 
 import ast
-from typing import List
+from typing import List, Optional
 
 from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import (
     HotspotCategory,
@@ -14,6 +23,71 @@ from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import (
     ReviewStatus,
     SecurityHotspot,
 )
+
+_WEAK_HASH_CALLS = ("hashlib.md5", "hashlib.sha1")
+_PRNG_SECURITY_ADJACENT = (
+    "random.random", "random.randint", "random.randrange", "random.choice",
+    "random.choices", "random.getrandbits", "random.sample", "random.uniform",
+    "random.randbytes", "random.shuffle",
+)
+_UNVERIFIED_CONTEXT_CALLS = (
+    "ssl._create_unverified_context",
+)
+_OPAQUE_DESER_CALLS = (
+    "pickle.loads", "pickle.load", "cPickle.loads", "cPickle.load",
+    "marshal.loads", "marshal.load",
+    "shelve.open",
+    "dill.loads", "dill.load",
+)
+
+
+def _kwarg(node: ast.Call, name: str) -> Optional[ast.expr]:
+    for kw in node.keywords:
+        if kw.arg == name:
+            return kw.value
+    return None
+
+
+def _is_const(node: Optional[ast.expr], value) -> bool:
+    return isinstance(node, ast.Constant) and node.value == value
+
+
+def _attr_str(node: Optional[ast.expr]) -> str:
+    """Dotted-name string for a Name/Attribute expression ('' otherwise)."""
+    parts: List[str] = []
+    while isinstance(node, ast.Attribute):
+        parts.append(node.attr)
+        node = node.value
+    if isinstance(node, ast.Name):
+        parts.append(node.id)
+    return ".".join(reversed(parts))
+
+
+def _hotspot(
+    file_path: str,
+    line: int,
+    category: HotspotCategory,
+    priority: ReviewPriority,
+    title: str,
+    description: str,
+    snippet: str,
+    guidance: str,
+    owasp: str,
+    cwe: str,
+) -> SecurityHotspot:
+    return SecurityHotspot(
+        file_path=file_path,
+        line_number=line,
+        category=category,
+        review_priority=priority,
+        title=title,
+        description=description,
+        code_snippet=snippet,
+        review_guidance=guidance,
+        review_status=ReviewStatus.TO_REVIEW,
+        owasp_category=owasp,
+        cwe_id=cwe,
+    )
 
 
 def detect_ast_hotspots(
@@ -24,254 +98,198 @@ def detect_ast_hotspots(
     get_line_fn,
     get_call_name_fn,
 ) -> List[SecurityHotspot]:
-    """Perform AST-based hotspot detection."""
+    """Detect the six hotspot families via Python AST analysis."""
     hotspots: List[SecurityHotspot] = []
+    enabled = set(config.enabled_categories)
 
     for node in ast.walk(tree):
-        if HotspotCategory.DYNAMIC_EXECUTION in config.enabled_categories:
-            if isinstance(node, ast.Call):
-                func_name = get_call_name_fn(node)
-                if func_name in ("eval", "exec", "compile", "__import__"):
-                    snippet = get_line_fn(lines, node.lineno)
-                    hotspots.append(SecurityHotspot(
-                        file_path=file_path,
-                        line_number=node.lineno,
-                        category=HotspotCategory.DYNAMIC_EXECUTION,
-                        review_priority=ReviewPriority.HIGH,
-                        title=f"Dynamic code execution: {func_name}()",
-                        description=(
-                            f"Call to '{func_name}()' executes arbitrary code. "
-                            "Ensure the input is never derived from user-controlled data."
+        # --- Family 1: weak hashing (business-domain question) ------------
+        if HotspotCategory.WEAK_HASHING in enabled and isinstance(node, ast.Call):
+            func_name = get_call_name_fn(node)
+            if func_name in _WEAK_HASH_CALLS:
+                # usedforsecurity=False is an explicit non-security
+                # declaration: the extrinsic question is answered.
+                if not _is_const(_kwarg(node, "usedforsecurity"), False):
+                    algo = func_name.split(".")[-1].upper()
+                    hotspots.append(_hotspot(
+                        file_path, node.lineno,
+                        HotspotCategory.WEAK_HASHING, ReviewPriority.MEDIUM,
+                        f"Weak hash algorithm: {func_name}()",
+                        (
+                            f"{algo} is broken for security purposes but fine for "
+                            "checksums/dedup. Whether this usage is security-"
+                            "sensitive is a business-domain question."
                         ),
-                        code_snippet=snippet,
-                        review_guidance=(
-                            "Verify the argument cannot be influenced by external input. "
-                            "Consider replacing with safer alternatives such as ast.literal_eval "
-                            "for data parsing."
+                        get_line_fn(lines, node.lineno),
+                        (
+                            "If used for passwords, signatures, or integrity of "
+                            "untrusted data, replace with SHA-256+ (or bcrypt/argon2 "
+                            "for passwords). If non-security, annotate with "
+                            "usedforsecurity=False."
                         ),
-                        review_status=ReviewStatus.TO_REVIEW,
-                        owasp_category="A03:Injection",
-                        cwe_id="CWE-94",
+                        "A02:Cryptographic Failures", "CWE-328",
                     ))
 
-        if HotspotCategory.INSECURE_DESERIALIZATION in config.enabled_categories:
-            if isinstance(node, ast.Call):
-                func_name = get_call_name_fn(node)
-                if func_name in ("pickle.loads", "pickle.load", "marshal.loads", "marshal.load"):
-                    snippet = get_line_fn(lines, node.lineno)
-                    hotspots.append(SecurityHotspot(
-                        file_path=file_path,
-                        line_number=node.lineno,
-                        category=HotspotCategory.INSECURE_DESERIALIZATION,
-                        review_priority=ReviewPriority.HIGH,
-                        title=f"Insecure deserialization: {func_name}()",
-                        description=(
-                            f"'{func_name}()' deserializes untrusted data which can "
-                            "lead to arbitrary code execution."
+        # --- Family 2: standard PRNG (intent question) ---------------------
+        if HotspotCategory.STANDARD_PRNG in enabled and isinstance(node, ast.Call):
+            func_name = get_call_name_fn(node)
+            if func_name in _PRNG_SECURITY_ADJACENT:
+                hotspots.append(_hotspot(
+                    file_path, node.lineno,
+                    HotspotCategory.STANDARD_PRNG, ReviewPriority.LOW,
+                    f"Standard PRNG usage: {func_name}()",
+                    (
+                        "The 'random' module is not cryptographically secure. "
+                        "Whether that matters depends on intent (simulation vs "
+                        "token generation) — taint analysis upgrades proven "
+                        "security-sink flows to findings."
+                    ),
+                    get_line_fn(lines, node.lineno),
+                    (
+                        "If the value feeds tokens, passwords, session IDs, or "
+                        "any security decision, use the 'secrets' module."
+                    ),
+                    "A02:Cryptographic Failures", "CWE-338",
+                ))
+
+        # --- Family 3: disabled transport security (topology question) -----
+        if HotspotCategory.DISABLED_TLS in enabled and isinstance(node, ast.Call):
+            func_name = get_call_name_fn(node)
+            if func_name in _UNVERIFIED_CONTEXT_CALLS or _is_const(_kwarg(node, "verify"), False):
+                hotspots.append(_hotspot(
+                    file_path, node.lineno,
+                    HotspotCategory.DISABLED_TLS, ReviewPriority.HIGH,
+                    "TLS certificate verification disabled",
+                    (
+                        "Certificate verification is disabled. Whether this is "
+                        "acceptable depends on network topology (e.g. a pinned "
+                        "internal endpoint vs the open internet)."
+                    ),
+                    get_line_fn(lines, node.lineno),
+                    (
+                        "Enable verification or pin a CA bundle "
+                        "(verify='/path/to/ca.crt'). Never disable verification "
+                        "for internet-facing endpoints."
+                    ),
+                    "A02:Cryptographic Failures", "CWE-295",
+                ))
+
+        # --- Family 4: permissive bindings / CORS (deployment question) ----
+        if HotspotCategory.PERMISSIVE_BINDING in enabled and isinstance(node, ast.Call):
+            host = _kwarg(node, "host")
+            if _is_const(host, "0.0.0.0") or (
+                node.args and _is_const(node.args[0], "0.0.0.0")
+            ):
+                hotspots.append(_hotspot(
+                    file_path, node.lineno,
+                    HotspotCategory.PERMISSIVE_BINDING, ReviewPriority.MEDIUM,
+                    "Service bound to all interfaces (0.0.0.0)",
+                    (
+                        "Binding to 0.0.0.0 exposes the service on every "
+                        "interface. Safety depends on the deployment topology "
+                        "(container-internal vs edge host)."
+                    ),
+                    get_line_fn(lines, node.lineno),
+                    (
+                        "Bind to 127.0.0.1 unless external exposure is intended "
+                        "and fronted by appropriate network controls."
+                    ),
+                    "A05:Security Misconfiguration", "CWE-1327",
+                ))
+            allow_origins = _kwarg(node, "allow_origins")
+            wildcard = False
+            if isinstance(allow_origins, (ast.List, ast.Tuple)):
+                wildcard = any(_is_const(el, "*") for el in allow_origins.elts)
+            elif _is_const(allow_origins, "*"):
+                wildcard = True
+            if wildcard:
+                hotspots.append(_hotspot(
+                    file_path, node.lineno,
+                    HotspotCategory.PERMISSIVE_BINDING, ReviewPriority.MEDIUM,
+                    "CORS configured with wildcard origin",
+                    (
+                        "allow_origins=['*'] permits any site to call this API. "
+                        "Acceptability depends on whether the API is public and "
+                        "credential-free (deployment question)."
+                    ),
+                    get_line_fn(lines, node.lineno),
+                    (
+                        "Restrict origins to an explicit allow-list unless the "
+                        "API is intentionally public and unauthenticated."
+                    ),
+                    "A05:Security Misconfiguration", "CWE-942",
+                ))
+
+        # --- Family 5: opaque deserialization (provenance question) --------
+        if HotspotCategory.OPAQUE_DESERIALIZATION in enabled and isinstance(node, ast.Call):
+            func_name = get_call_name_fn(node)
+            if func_name in _OPAQUE_DESER_CALLS:
+                hotspots.append(_hotspot(
+                    file_path, node.lineno,
+                    HotspotCategory.OPAQUE_DESERIALIZATION, ReviewPriority.HIGH,
+                    f"Opaque deserialization: {func_name}()",
+                    (
+                        f"'{func_name}()' executes arbitrary code when fed "
+                        "attacker-controlled bytes. Static analysis cannot prove "
+                        "the data's provenance; only a human can."
+                    ),
+                    get_line_fn(lines, node.lineno),
+                    (
+                        "Confirm the data source is fully trusted and tamper-"
+                        "proof; prefer JSON or another data-only format for "
+                        "anything crossing a trust boundary."
+                    ),
+                    "A08:Software and Data Integrity Failures", "CWE-502",
+                ))
+            elif func_name == "yaml.load":
+                loader = _kwarg(node, "Loader")
+                if "Safe" not in _attr_str(loader):
+                    hotspots.append(_hotspot(
+                        file_path, node.lineno,
+                        HotspotCategory.OPAQUE_DESERIALIZATION, ReviewPriority.HIGH,
+                        "yaml.load() without SafeLoader",
+                        (
+                            "yaml.load without SafeLoader can instantiate "
+                            "arbitrary Python objects. Safety depends entirely on "
+                            "the provenance of the YAML input."
                         ),
-                        code_snippet=snippet,
-                        review_guidance=(
-                            "Verify the data source is trusted and cannot be tampered with. "
-                            "Consider using JSON or another safer serialization format."
+                        get_line_fn(lines, node.lineno),
+                        (
+                            "Use yaml.safe_load() or Loader=yaml.SafeLoader "
+                            "unless object construction from trusted input is "
+                            "explicitly required."
                         ),
-                        review_status=ReviewStatus.TO_REVIEW,
-                        owasp_category="A08:Software and Data Integrity Failures",
-                        cwe_id="CWE-502",
+                        "A08:Software and Data Integrity Failures", "CWE-502",
                     ))
 
-        if HotspotCategory.CRYPTO_USAGE in config.enabled_categories:
+        # --- Family 6: cryptography.hazmat (soundness review) --------------
+        if HotspotCategory.HAZMAT_CRYPTO in enabled:
+            module_name = ""
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    if alias.name in ("hashlib", "hmac", "cryptography", "Crypto"):
-                        hotspots.append(SecurityHotspot(
-                            file_path=file_path,
-                            line_number=node.lineno,
-                            category=HotspotCategory.CRYPTO_USAGE,
-                            review_priority=ReviewPriority.LOW,
-                            title=f"Cryptographic module import: {alias.name}",
-                            description=(
-                                f"Import of '{alias.name}' detected. Review cryptographic "
-                                "implementation for algorithm strength and correct usage."
-                            ),
-                            code_snippet=get_line_fn(lines, node.lineno),
-                            review_guidance=(
-                                "Ensure strong algorithms are used (SHA-256+, AES-128+). "
-                                "Avoid MD5, SHA-1 for security-sensitive operations. "
-                                "Ensure keys and IVs are generated securely."
-                            ),
-                            review_status=ReviewStatus.TO_REVIEW,
-                            owasp_category="A02:Cryptographic Failures",
-                            cwe_id="CWE-327",
-                        ))
-            if isinstance(node, ast.ImportFrom):
-                if node.module and node.module.split(".")[0] in ("hashlib", "hmac", "cryptography", "Crypto"):
-                    hotspots.append(SecurityHotspot(
-                        file_path=file_path,
-                        line_number=node.lineno,
-                        category=HotspotCategory.CRYPTO_USAGE,
-                        review_priority=ReviewPriority.LOW,
-                        title=f"Cryptographic module import: {node.module}",
-                        description=(
-                            f"Import from '{node.module}' detected. Review cryptographic "
-                            "implementation for algorithm strength and correct usage."
-                        ),
-                        code_snippet=get_line_fn(lines, node.lineno),
-                        review_guidance=(
-                            "Ensure strong algorithms are used (SHA-256+, AES-128+). "
-                            "Avoid MD5, SHA-1 for security-sensitive operations."
-                        ),
-                        review_status=ReviewStatus.TO_REVIEW,
-                        owasp_category="A02:Cryptographic Failures",
-                        cwe_id="CWE-327",
-                    ))
-
-        if HotspotCategory.XXE in config.enabled_categories:
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name in ("xml.etree.ElementTree", "xml.etree", "lxml", "minidom"):
-                        hotspots.append(SecurityHotspot(
-                            file_path=file_path,
-                            line_number=node.lineno,
-                            category=HotspotCategory.XXE,
-                            review_priority=ReviewPriority.MEDIUM,
-                            title=f"XML parsing library imported: {alias.name}",
-                            description=(
-                                f"Import of '{alias.name}' detected. XML parsers may be "
-                                "vulnerable to XXE attacks if external entity processing is enabled."
-                            ),
-                            code_snippet=get_line_fn(lines, node.lineno),
-                            review_guidance=(
-                                "Disable external entity processing. For lxml, use "
-                                "etree.XMLParser(resolve_entities=False). For xml.etree, "
-                                "external entities are disabled by default in Python 3.8+."
-                            ),
-                            review_status=ReviewStatus.TO_REVIEW,
-                            owasp_category="A05:Security Misconfiguration",
-                            cwe_id="CWE-611",
-                        ))
-            if isinstance(node, ast.ImportFrom):
-                if node.module and any(
-                    node.module.startswith(m) for m in ("xml.etree", "lxml", "xml.dom.minidom")
-                ):
-                    hotspots.append(SecurityHotspot(
-                        file_path=file_path,
-                        line_number=node.lineno,
-                        category=HotspotCategory.XXE,
-                        review_priority=ReviewPriority.MEDIUM,
-                        title=f"XML parsing module imported: {node.module}",
-                        description=(
-                            f"Import from '{node.module}' detected. Verify external entity "
-                            "processing is disabled."
-                        ),
-                        code_snippet=get_line_fn(lines, node.lineno),
-                        review_guidance=(
-                            "Ensure external entity resolution is disabled for all XML parsing. "
-                            "Use defusedxml library for untrusted XML input."
-                        ),
-                        review_status=ReviewStatus.TO_REVIEW,
-                        owasp_category="A05:Security Misconfiguration",
-                        cwe_id="CWE-611",
-                    ))
-
-        if HotspotCategory.INSECURE_RANDOM in config.enabled_categories:
-            if isinstance(node, ast.Import):
-                for alias in node.names:
-                    if alias.name == "random":
-                        hotspots.append(SecurityHotspot(
-                            file_path=file_path,
-                            line_number=node.lineno,
-                            category=HotspotCategory.INSECURE_RANDOM,
-                            review_priority=ReviewPriority.MEDIUM,
-                            title="Use of random module (not cryptographically secure)",
-                            description=(
-                                "The 'random' module uses a pseudo-random number generator "
-                                "unsuitable for security-sensitive operations."
-                            ),
-                            code_snippet=get_line_fn(lines, node.lineno),
-                            review_guidance=(
-                                "If used for security-sensitive operations (tokens, passwords, "
-                                "session IDs), replace with the 'secrets' module."
-                            ),
-                            review_status=ReviewStatus.TO_REVIEW,
-                            owasp_category="A02:Cryptographic Failures",
-                            cwe_id="CWE-338",
-                        ))
-            if isinstance(node, ast.ImportFrom):
-                if node.module == "random":
-                    hotspots.append(SecurityHotspot(
-                        file_path=file_path,
-                        line_number=node.lineno,
-                        category=HotspotCategory.INSECURE_RANDOM,
-                        review_priority=ReviewPriority.MEDIUM,
-                        title="Import from random module (not cryptographically secure)",
-                        description=(
-                            "Import from 'random' module detected. The random module is not "
-                            "suitable for security-sensitive operations."
-                        ),
-                        code_snippet=get_line_fn(lines, node.lineno),
-                        review_guidance=(
-                            "Replace with 'secrets' module for security-sensitive operations."
-                        ),
-                        review_status=ReviewStatus.TO_REVIEW,
-                        owasp_category="A02:Cryptographic Failures",
-                        cwe_id="CWE-338",
-                    ))
-
-        if HotspotCategory.PERMISSION_CHECK in config.enabled_categories:
-            if isinstance(node, ast.Call):
-                func_name = get_call_name_fn(node)
-                if func_name in ("os.chmod", "os.access", "os.chown"):
-                    snippet = get_line_fn(lines, node.lineno)
-                    hotspots.append(SecurityHotspot(
-                        file_path=file_path,
-                        line_number=node.lineno,
-                        category=HotspotCategory.PERMISSION_CHECK,
-                        review_priority=ReviewPriority.LOW,
-                        title=f"Permission management call: {func_name}()",
-                        description=(
-                            f"Call to '{func_name}()' modifies or checks file permissions. "
-                            "Verify that permissions are set securely and not too permissive."
-                        ),
-                        code_snippet=snippet,
-                        review_guidance=(
-                            "Ensure file permissions follow the principle of least privilege. "
-                            "Avoid world-writable (0o777) or overly permissive modes."
-                        ),
-                        review_status=ReviewStatus.TO_REVIEW,
-                        owasp_category="A01:Broken Access Control",
-                        cwe_id="CWE-269",
-                    ))
-
-        if HotspotCategory.SSRF in config.enabled_categories:
-            if isinstance(node, ast.Call):
-                func_name = get_call_name_fn(node)
-                ssrf_funcs = (
-                    "requests.get", "requests.post", "requests.put",
-                    "requests.delete", "requests.request", "requests.patch",
-                    "urllib.request.urlopen", "urllib.urlopen",
-                )
-                if func_name in ssrf_funcs:
-                    if node.args and isinstance(node.args[0], ast.Name):
-                        snippet = get_line_fn(lines, node.lineno)
-                        hotspots.append(SecurityHotspot(
-                            file_path=file_path,
-                            line_number=node.lineno,
-                            category=HotspotCategory.SSRF,
-                            review_priority=ReviewPriority.HIGH,
-                            title=f"Potential SSRF: {func_name}() with variable URL",
-                            description=(
-                                f"'{func_name}()' is called with a variable URL argument. "
-                                "If the URL originates from user input, this may be vulnerable to SSRF."
-                            ),
-                            code_snippet=snippet,
-                            review_guidance=(
-                                "Validate and whitelist allowed URL schemes and hosts. "
-                                "Reject requests to internal IP ranges (RFC 1918). "
-                                "Use an allow-list of permitted external hosts."
-                            ),
-                            review_status=ReviewStatus.TO_REVIEW,
-                            owasp_category="A10:Server-Side Request Forgery",
-                            cwe_id="CWE-918",
-                        ))
+                    if alias.name.startswith("cryptography.hazmat"):
+                        module_name = alias.name
+                        break
+            elif isinstance(node, ast.ImportFrom):
+                if node.module and node.module.startswith("cryptography.hazmat"):
+                    module_name = node.module
+            if module_name:
+                hotspots.append(_hotspot(
+                    file_path, node.lineno,
+                    HotspotCategory.HAZMAT_CRYPTO, ReviewPriority.MEDIUM,
+                    f"Low-level crypto primitive usage: {module_name}",
+                    (
+                        "cryptography.hazmat primitives are correct only when "
+                        "composed correctly (modes, IVs, padding, key handling). "
+                        "Mathematical soundness requires expert review."
+                    ),
+                    get_line_fn(lines, node.lineno),
+                    (
+                        "Prefer the high-level recipes layer (Fernet) where "
+                        "possible; otherwise have the construction reviewed "
+                        "against current cryptographic guidance."
+                    ),
+                    "A02:Cryptographic Failures", "CWE-327",
+                ))
 
     return hotspots
