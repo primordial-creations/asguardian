@@ -9,6 +9,7 @@ mirroring SonarQube's default quality gate behaviour.
 """
 
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, List, Union
 
 from Asgard.Bragi.QualityGate.models.quality_gate_models import (
@@ -179,11 +180,15 @@ class QualityGateEvaluator:
         *,
         project_path=None,
         base_branch: str = "main",
+        head: str = "HEAD",
         sources=None,
         suppressions=None,
         flaky_rules=None,
         break_glass=None,
         baseline=None,
+        mode: str = "baseline",
+        changed_files=None,
+        small_change_threshold_lines=None,
     ):
         """
         Evaluate the fingerprint-based differential ("clean as you code") gate.
@@ -201,6 +206,15 @@ class QualityGateEvaluator:
             flaky_rules: rule ids demoted to warn-only (zero-flakiness policy)
             break_glass: optional BreakGlassRecord for an audited bypass
             baseline: explicit BranchBaseline (overrides store lookup)
+            mode: "baseline" (fingerprints only) or "diff" — in diff mode the
+                git-diff engine computes changed files/lines from
+                `base_branch...head`, enabling the small-change threshold and
+                the legacy-touched warning channel
+            changed_files: pre-computed {path: [LineRange]} (overrides the
+                git diff; implies diff behaviour)
+            small_change_threshold_lines: below this many changed lines the
+                gate returns PASSED (small change) with conditions skipped
+                by explicit policy (QualityGateConfig wiring)
 
         Returns:
             DifferentialGateResult
@@ -209,9 +223,14 @@ class QualityGateEvaluator:
         from Asgard.Bragi.QualityGate.services._differential_engine import (
             DifferentialGateEngine,
         )
+        from Asgard.Bragi.QualityGate.services._git_diff import git_changed_lines
 
         if baseline is None and project_path is not None:
             baseline = FingerprintBaselineStore(project_path).load(base_branch)
+
+        if mode == "diff" and changed_files is None and project_path is not None:
+            changed_files = git_changed_lines(
+                Path(project_path), base=base_branch, head=head)
 
         engine = DifferentialGateEngine(flaky_rules=flaky_rules)
         return engine.evaluate(
@@ -220,6 +239,8 @@ class QualityGateEvaluator:
             sources=sources,
             suppressions=suppressions,
             break_glass=break_glass,
+            changed_files=changed_files,
+            small_change_threshold_lines=small_change_threshold_lines,
         )
 
     def _compute_status(self, condition_results: List[ConditionResult]) -> GateStatus:

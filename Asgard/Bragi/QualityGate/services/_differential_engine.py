@@ -19,6 +19,12 @@ Implements the Heimdall-09 / Bragi-06 blocking policy:
 from datetime import date
 from typing import Dict, Iterable, List, Optional, Sequence, Set
 
+from Asgard.Bragi.QualityGate.services._git_diff import (
+    LineRange,
+    line_in_changes,
+    total_changed_lines,
+)
+
 from Asgard.Bragi.QualityGate.baseline_store import BranchBaseline
 from Asgard.Bragi.QualityGate.fingerprint import compute_fingerprint
 from Asgard.Bragi.QualityGate.models.quality_gate_models import (
@@ -154,11 +160,20 @@ class DifferentialGateEngine:
         sources: Optional[Dict[str, str]] = None,
         suppressions: Optional[Sequence[SuppressionDirective]] = None,
         break_glass: Optional[BreakGlassRecord] = None,
+        changed_files: Optional[Dict[str, List[LineRange]]] = None,
+        small_change_threshold_lines: Optional[int] = None,
     ) -> DifferentialGateResult:
         """
         Classify findings against the baseline and apply the blocking policy.
 
         Missing baseline never silently passes: the result is NOT_EVALUATED.
+
+        When `changed_files` (from the git-diff engine) is supplied:
+        - changes below `small_change_threshold_lines` skip evaluation by
+          explicit policy: PASSED (small change), annotated as skipped;
+        - pre-existing findings on MODIFIED lines surface as
+          `legacy_touched_findings` warnings (DEEPTHINK_09's "legacy the
+          developer directly modified" rule).
         """
         gate_findings = [
             ensure_fingerprint(coerce_finding(f), sources) for f in findings
@@ -176,6 +191,20 @@ class DifferentialGateEngine:
             ),
         )
 
+        if changed_files is not None:
+            result.changed_lines = total_changed_lines(changed_files)
+            if (small_change_threshold_lines is not None
+                    and result.changed_lines < small_change_threshold_lines):
+                result.skipped_small_change = True
+                result.status = GateStatus.PASSED
+                result.summary = (
+                    f"Differential gate: PASSED (small change) — "
+                    f"{result.changed_lines} changed line(s) below the "
+                    f"{small_change_threshold_lines}-line threshold; "
+                    "conditions skipped by explicit policy."
+                )
+                return result
+
         if baseline is None:
             result.status = GateStatus.NOT_EVALUATED
             result.summary = (
@@ -191,6 +220,9 @@ class DifferentialGateEngine:
         for finding in gate_findings:
             if finding.fingerprint in baseline_fps:
                 result.preexisting_count += 1
+                if changed_files is not None and line_in_changes(
+                        changed_files, finding.file_path, finding.line):
+                    result.legacy_touched_findings.append(finding)
                 continue
             if self._is_suppressed(finding, active_suppressions):
                 result.suppressed_findings.append(finding)
@@ -243,7 +275,8 @@ class DifferentialGateEngine:
             return GateStatus.WARNING
         if blocked:
             return GateStatus.FAILED
-        if result.advisory_findings or result.suppressed_findings:
+        if (result.advisory_findings or result.suppressed_findings
+                or result.legacy_touched_findings):
             return GateStatus.WARNING
         return GateStatus.PASSED
 
@@ -255,6 +288,11 @@ class DifferentialGateEngine:
             f"{len(result.blocking_findings)} blocking",
             f"{result.preexisting_count} pre-existing (async burndown)",
         ]
+        if result.legacy_touched_findings:
+            parts.append(
+                f"{len(result.legacy_touched_findings)} legacy finding(s) on "
+                "modified lines (warnings)"
+            )
         if result.suppression_violations:
             parts.append(
                 f"{len(result.suppression_violations)} invalid/expired suppression(s)"

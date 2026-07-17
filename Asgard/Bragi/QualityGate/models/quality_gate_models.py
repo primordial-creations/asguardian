@@ -319,6 +319,24 @@ class DifferentialGateResult(BaseModel):
     preexisting_count: int = Field(
         0, description="Findings already in the baseline (never block; async burndown)"
     )
+    legacy_touched_findings: List[GateFinding] = Field(
+        default_factory=list,
+        description=(
+            "Pre-existing findings sitting on lines the PR modified — "
+            "surfaced as warnings (DEEPTHINK_09); untouched legacy stays "
+            "invisible in this channel"
+        ),
+    )
+    changed_lines: int = Field(
+        0, description="Total added/modified lines when a diff was supplied"
+    )
+    skipped_small_change: bool = Field(
+        False,
+        description=(
+            "True when evaluation was skipped by policy because the change "
+            "was below small_change_threshold_lines"
+        ),
+    )
     suppression_violations: List[str] = Field(
         default_factory=list,
         description="Invalid/expired suppression directives (each fails the gate)",
