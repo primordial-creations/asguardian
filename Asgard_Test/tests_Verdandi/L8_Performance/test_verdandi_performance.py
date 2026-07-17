@@ -89,7 +89,7 @@ class TestVerdandiPerformance:
         """Benchmark error budget consumption for a 30-day SLO window with 720 metrics."""
         calc = ErrorBudgetCalculator()
 
-        result = benchmark(calc.calculate, SLO_DEFINITION, _SLI_METRICS)
+        result = benchmark(calc.calculate, SLO_DEFINITION, _SLI_METRICS, _now)
 
         assert result is not None
         assert result.total_events > 0
