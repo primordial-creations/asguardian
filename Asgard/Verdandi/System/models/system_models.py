@@ -19,6 +19,24 @@ class MemoryMetrics(BaseModel):
     swap_total_bytes: Optional[int] = Field(default=None, description="Total swap space")
     swap_used_bytes: Optional[int] = Field(default=None, description="Used swap space")
     swap_percent: Optional[float] = Field(default=None, description="Swap usage percentage")
+    major_faults_ps: Optional[float] = Field(
+        default=None, description="Major page faults per second (saturation signal)"
+    )
+    swap_in_ps: Optional[float] = Field(default=None, description="Swap-in pages/sec")
+    swap_out_ps: Optional[float] = Field(default=None, description="Swap-out pages/sec")
+    oom_kills: Optional[int] = Field(default=None, description="OOM kills observed in window")
+    available_based_usage: bool = Field(
+        default=False,
+        description="True when usage_percent was derived from MemAvailable (not 'free')",
+    )
+    thrashing_stall: bool = Field(
+        default=False,
+        description="THRASHING_STALL: low CPU + high major faults ('idle but slow')",
+    )
+    saturation_signals: List[str] = Field(
+        default_factory=list,
+        description="Memory saturation evidence (majflt/swap activity/OOM kills)",
+    )
     status: str = Field(..., description="Status (healthy, warning, critical)")
     recommendations: List[str] = Field(default_factory=list)
 
@@ -36,6 +54,24 @@ class CpuMetrics(BaseModel):
     load_average_1m: Optional[float] = Field(default=None, description="1-minute load average")
     load_average_5m: Optional[float] = Field(default=None, description="5-minute load average")
     load_average_15m: Optional[float] = Field(default=None, description="15-minute load average")
+    steal_percent: Optional[float] = Field(
+        default=None, description="CPU steal percentage (hypervisor contention)"
+    )
+    steal_status: Optional[str] = Field(
+        default=None, description="Steal band: ok (<2%), warning (2-5%), critical (>5%)"
+    )
+    utilization_rho: Optional[float] = Field(
+        default=None, description="Utilization as a fraction (rho) used for queueing projection"
+    )
+    latency_multiplier: Optional[float] = Field(
+        default=None,
+        description="M/M/1 residence-time multiplier 1/(1-rho); >5x means the hockey stick",
+    )
+    iowait_unreliable_on_multicore: bool = Field(
+        default=True,
+        description="%iowait is a CPU-state artifact, not a disk-health signal; "
+        "route disk concerns to await/PSI-io",
+    )
     status: str = Field(..., description="Status (healthy, warning, critical)")
     recommendations: List[str] = Field(default_factory=list)
 
@@ -53,6 +89,23 @@ class IoMetrics(BaseModel):
     avg_write_latency_ms: Optional[float] = Field(default=None, description="Avg write latency")
     queue_depth: Optional[float] = Field(default=None, description="Average queue depth")
     utilization_percent: Optional[float] = Field(default=None, description="Disk utilization")
+    device_type: Optional[str] = Field(
+        default=None, description="Device class: hdd, ssd, or nvme"
+    )
+    aqu_sz: Optional[float] = Field(
+        default=None, description="Average queue size (iostat aqu-sz)"
+    )
+    r_await_ms: Optional[float] = Field(
+        default=None, description="Average read wait incl. queueing (iostat r_await)"
+    )
+    w_await_ms: Optional[float] = Field(
+        default=None, description="Average write wait incl. queueing (iostat w_await)"
+    )
+    utilization_misleading_for_parallel_devices: bool = Field(
+        default=False,
+        description="True for SSD/NVMe: %util means 'device busy', not saturated; "
+        "it is excluded from health rating",
+    )
     status: str = Field(..., description="Status (healthy, warning, critical)")
     recommendations: List[str] = Field(default_factory=list)
 

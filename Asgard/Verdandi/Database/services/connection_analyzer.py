@@ -1,9 +1,11 @@
 """
 Connection Pool Analyzer
 
-Analyzes database connection pool performance.
+Analyzes database connection pool performance with queue-wait vs
+service-time separation (RESEARCH_14) and Little's-law sizing (RESEARCH_12).
 """
 
+import math
 from typing import List, Optional
 
 from Asgard.Verdandi.Database.models.database_models import ConnectionPoolMetrics
@@ -35,18 +37,33 @@ class ConnectionAnalyzer:
         wait_times_ms: Optional[List[float]] = None,
         connection_errors: int = 0,
         timeout_count: int = 0,
+        acquisition_wait_samples: Optional[List[float]] = None,
+        qps: Optional[float] = None,
+        avg_query_ms: Optional[float] = None,
+        service_p95_ms: Optional[float] = None,
     ) -> ConnectionPoolMetrics:
         """
         Analyze connection pool metrics.
+
+        Queue-wait vs service-time separation (RESEARCH_14): in-process query
+        timers measure service time only — pass acquisition-wait samples
+        separately or the DB looks healthy while requests queue for a
+        connection. With qps and avg_query_ms, Little's law (L = lambda x W)
+        sizes the pool.
 
         Args:
             pool_size: Total pool size
             active_connections: Currently active connections
             idle_connections: Idle connections (calculated if not provided)
             waiting_requests: Requests waiting for connection
-            wait_times_ms: List of wait times for connections
+            wait_times_ms: List of wait times for connections (legacy avg/max)
             connection_errors: Count of connection errors
             timeout_count: Count of connection timeouts
+            acquisition_wait_samples: Per-request connection acquisition waits
+                in ms (the `wait_for_connection` child-span pattern)
+            qps: Query throughput (lambda) for Little's-law sizing
+            avg_query_ms: Average query service time (W) for Little's-law sizing
+            service_p95_ms: p95 query service time, enabling queue_share
 
         Returns:
             ConnectionPoolMetrics with analysis
@@ -62,6 +79,28 @@ class ConnectionAnalyzer:
             avg_wait = sum(wait_times_ms) / len(wait_times_ms)
             max_wait = max(wait_times_ms)
 
+        wait_p50 = wait_p95 = wait_p99 = None
+        queue_share = None
+        if acquisition_wait_samples:
+            s = sorted(acquisition_wait_samples)
+            wait_p50 = self._percentile(s, 50)
+            wait_p95 = self._percentile(s, 95)
+            wait_p99 = self._percentile(s, 99)
+            if not wait_times_ms:
+                avg_wait = sum(s) / len(s)
+                max_wait = s[-1]
+            if service_p95_ms is not None and (wait_p95 + service_p95_ms) > 0:
+                queue_share = wait_p95 / (wait_p95 + service_p95_ms)
+
+        required = headroom = None
+        recommended = None
+        if qps is not None and avg_query_ms is not None:
+            required = qps * (avg_query_ms / 1000.0)
+            headroom = pool_size - required
+            recommended = math.ceil(required / 0.7) if required > 0 else pool_size
+
+        leak_suspected = timeout_count > 0 and utilization < 70.0
+
         return ConnectionPoolMetrics(
             pool_size=pool_size,
             active_connections=active_connections,
@@ -72,7 +111,28 @@ class ConnectionAnalyzer:
             max_wait_time_ms=round(max_wait, 2),
             connection_errors=connection_errors,
             timeout_count=timeout_count,
+            wait_p50_ms=round(wait_p50, 3) if wait_p50 is not None else None,
+            wait_p95_ms=round(wait_p95, 3) if wait_p95 is not None else None,
+            wait_p99_ms=round(wait_p99, 3) if wait_p99 is not None else None,
+            queue_share=round(queue_share, 4) if queue_share is not None else None,
+            required_connections=round(required, 2) if required is not None else None,
+            headroom_connections=round(headroom, 2) if headroom is not None else None,
+            recommended_pool_size=recommended,
+            leak_suspected=leak_suspected,
         )
+
+    @staticmethod
+    def _percentile(sorted_values: List[float], pct: float) -> float:
+        if not sorted_values:
+            return 0.0
+        n = len(sorted_values)
+        if n == 1:
+            return float(sorted_values[0])
+        rank = (pct / 100) * (n - 1)
+        lower = int(rank)
+        upper = min(lower + 1, n - 1)
+        frac = rank - lower
+        return sorted_values[lower] + frac * (sorted_values[upper] - sorted_values[lower])
 
     def calculate_optimal_pool_size(
         self,
@@ -152,6 +212,33 @@ class ConnectionAnalyzer:
             recommendations.append(
                 f"{metrics.timeout_count} connection timeouts detected. "
                 "Review timeout settings and connection pool configuration."
+            )
+
+        if metrics.leak_suspected:
+            recommendations.append(
+                f"Timeouts at only {metrics.utilization_percent:.0f}% utilization "
+                "suggest a connection leak: connections are held (not returned) "
+                "rather than busy. Audit checkout/return paths and transaction "
+                "scoping."
+            )
+
+        if metrics.queue_share is not None and metrics.queue_share > 0.5:
+            recommendations.append(
+                f"{metrics.queue_share:.0%} of tail latency is connection-"
+                "acquisition wait, not query service time — the pool, not the "
+                "database, is the bottleneck."
+            )
+
+        if (
+            metrics.required_connections is not None
+            and metrics.headroom_connections is not None
+            and metrics.headroom_connections < 0
+        ):
+            recommendations.append(
+                f"Little's law requires ~{metrics.required_connections:.1f} "
+                f"connections but the pool has {metrics.pool_size}; queueing is "
+                f"guaranteed. Recommended size: {metrics.recommended_pool_size} "
+                "(70% target utilization)."
             )
 
         return recommendations
