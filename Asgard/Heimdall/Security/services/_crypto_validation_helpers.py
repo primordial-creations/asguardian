@@ -5,11 +5,63 @@ Standalone helper functions for false-positive filtering, severity
 comparison, and secure cryptographic recommendations.
 """
 
+import ast
 import re
 from pathlib import Path
 from typing import List
 
 from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
+
+
+def is_usedforsecurity_false(
+    file_path: Path,
+    content: str,
+    match_start: int,
+    match_text: str,
+) -> bool:
+    """Plan 07.4: honor Python's ``hashlib.md5(..., usedforsecurity=False)``
+    / ``hashlib.new("md5", ..., usedforsecurity=False)`` kwarg -- the
+    stdlib's own escape hatch for non-cryptographic uses (checksums, cache
+    keys, dedup) of a "weak" hash. When present, the call is explicitly
+    declaring it is NOT relying on the algorithm's security properties, so
+    the finding should be suppressed rather than reported as a crypto
+    weakness.
+
+    This only applies to Python files (the kwarg is Python-specific); for
+    other languages this always returns False (no suppression), matching
+    prior behaviour. Detection is line-local AST parsing of just the
+    matched call expression when possible, falling back to a regex check
+    on the surrounding text if the file doesn't parse as a whole (e.g. the
+    match sits inside an f-string or a non-Python-looking snippet).
+    """
+    if file_path.suffix.lower() != ".py":
+        return False
+
+    line_start = content.rfind("\n", 0, match_start) + 1
+    line_end = content.find("\n", match_start)
+    if line_end == -1:
+        line_end = len(content)
+    # Look a little past the matched call for the closing paren/kwarg,
+    # since `usedforsecurity=False` can appear after other args.
+    window_end = min(len(content), match_start + 300)
+    window = content[line_start:window_end]
+
+    try:
+        tree = ast.parse(window.strip())
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                for kw in node.keywords:
+                    if kw.arg == "usedforsecurity" and isinstance(kw.value, ast.Constant) \
+                            and kw.value.value is False:
+                        return True
+    except SyntaxError:
+        pass
+
+    # Fallback: the AST parse of a truncated window often fails (the
+    # call's closing paren may be past `window_end`, or it sits inside a
+    # larger expression) -- a bounded textual check on the same window is
+    # a reasonable, documented approximation for that case.
+    return bool(re.search(r"usedforsecurity\s*=\s*False", window))
 
 
 def is_in_test_context(
