@@ -169,5 +169,31 @@ def add_gate_args(parser: argparse.ArgumentParser) -> None:
         action="store_true",
         help="Save the gate result to the local history store (~/.asgard/history.db)",
     )
+    parser.add_argument(
+        "--diff",
+        action="store_true",
+        default=False,
+        help=(
+            "Also evaluate the differential ('clean as you code') gate: only "
+            "NEW HIGH/CRITICAL findings vs the base ref's fingerprint baseline "
+            "block; changed lines come from the git diff engine."
+        ),
+    )
+    parser.add_argument(
+        "--base",
+        type=str,
+        default="main",
+        help="Base git ref for the differential gate baseline/diff (default: main)",
+    )
+    parser.add_argument(
+        "--tier",
+        choices=["pr", "main"],
+        default=None,
+        help=(
+            "Gate tier: 'pr' runs the differential gate in git-diff mode "
+            "(implies --diff); 'main' evaluates fingerprints against the "
+            "baseline without a diff."
+        ),
+    )
 
 

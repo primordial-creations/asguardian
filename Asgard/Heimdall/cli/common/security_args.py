@@ -32,6 +32,26 @@ def add_security_args(parser: argparse.ArgumentParser) -> None:
         default=[],
         help="Glob patterns for paths to exclude from scanning",
     )
+    parser.add_argument(
+        "--scoring",
+        choices=["v1", "v2"],
+        default="v1",
+        help=(
+            "Security score formula: v1 = legacy linear-subtractive (default), "
+            "v2 = multiplicative decay with LOC size normalization. Both are "
+            "always computed and dual-reported."
+        ),
+    )
+    parser.add_argument(
+        "--include-test-context",
+        action="store_true",
+        default=False,
+        help=(
+            "Also report dispatch-engine findings in test files (secrets are "
+            "always reported regardless of context). Overrides "
+            ".heimdall.yml test_context_enabled filtering for display."
+        ),
+    )
 
 
 def add_taint_args(parser: argparse.ArgumentParser) -> None:
@@ -94,6 +114,12 @@ def add_hotspots_args(parser: argparse.ArgumentParser) -> None:
         "--include-tests",
         action="store_true",
         help="Include test files (test_*.py, *_test.py) in analysis",
+    )
+    parser.add_argument(
+        "--include-test-context",
+        action="store_true",
+        default=False,
+        help="Disable test-context confidence capping for hotspot display",
     )
     parser.add_argument(
         "--exclude",

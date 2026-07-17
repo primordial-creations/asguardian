@@ -154,6 +154,97 @@ def run_ratings_analysis(args: argparse.Namespace, verbose: bool = False) -> int
         return 1
 
 
+def _security_findings_to_gate(security_report) -> List:
+    """Coerce StaticSecurityService sub-report findings into GateFindings."""
+    from Asgard.Bragi.QualityGate.models.quality_gate_models import GateFinding
+
+    gate_findings = []
+    for attr in (
+        "secrets_report", "vulnerability_report", "crypto_report",
+        "access_report", "auth_report", "headers_report", "tls_report",
+        "container_report", "infrastructure_report",
+    ):
+        sub = getattr(security_report, attr, None)
+        if sub is None or not hasattr(sub, "findings"):
+            continue
+        for f in sub.findings:
+            severity = str(getattr(f, "severity", "medium")).lower()
+            if severity not in ("critical", "high", "medium", "low", "info"):
+                severity = "medium"
+            gate_findings.append(GateFinding(
+                rule_id=str(
+                    getattr(f, "rule_id", None)
+                    or getattr(f, "finding_type", None)
+                    or attr
+                ),
+                file_path=str(getattr(f, "file_path", "") or ""),
+                line=getattr(f, "line_number", None),
+                severity=severity,
+                confidence=float(getattr(f, "confidence", 1.0) or 1.0),
+                message=str(
+                    getattr(f, "title", None)
+                    or getattr(f, "description", "")
+                    or ""
+                ),
+                snippet=str(getattr(f, "code_snippet", "") or ""),
+            ))
+    return gate_findings
+
+
+def _run_differential_gate(args, scan_path: Path, security_report) -> int:
+    """Evaluate and print the differential gate. Returns exit contribution."""
+    evaluator = QualityGateEvaluator()
+    tier = getattr(args, "tier", None)
+    mode = "diff" if (getattr(args, "diff", False) or tier == "pr") else "baseline"
+    findings = _security_findings_to_gate(security_report)
+    result = evaluator.evaluate_differential(
+        findings,
+        project_path=scan_path,
+        base_branch=getattr(args, "base", "main"),
+        mode=mode,
+    )
+    raw_status = getattr(result, "status", "not_evaluated")
+    status = str(getattr(raw_status, "value", raw_status)).lower()
+    if args.format == "json":
+        payload = {
+            "differential_gate": {
+                "status": status,
+                "mode": mode,
+                "tier": tier,
+                "base": getattr(args, "base", "main"),
+                "baseline_available": result.baseline_available,
+                "new_findings": len(result.new_findings),
+                "blocking_findings": len(result.blocking_findings),
+                "advisory_findings": len(result.advisory_findings),
+                "suppressed_findings": len(result.suppressed_findings),
+                "preexisting_count": result.preexisting_count,
+            }
+        }
+        print(json.dumps(payload, indent=2))
+    else:
+        lines = [
+            "",
+            "-" * 70,
+            "  DIFFERENTIAL GATE (clean as you code)",
+            "-" * 70,
+            "",
+            f"  Mode:      {mode}" + (f" (tier: {tier})" if tier else ""),
+            f"  Base:      {getattr(args, 'base', 'main')}",
+            f"  Status:    [{status.upper()}]",
+            f"  Baseline:  {'available' if result.baseline_available else 'NOT AVAILABLE (gate not evaluated)'}",
+            f"  New: {len(result.new_findings)}  Blocking: {len(result.blocking_findings)}"
+            f"  Advisory: {len(result.advisory_findings)}"
+            f"  Pre-existing: {result.preexisting_count}",
+        ]
+        for f in result.blocking_findings[:20]:
+            lines.append(
+                f"    [BLOCK] {f.rule_id} {f.file_path}:{f.line or '?'} {f.message}"
+            )
+        lines.append("")
+        print("\n".join(lines))
+    return 1 if status == "failed" else 0
+
+
 def run_gate_evaluation(args: argparse.Namespace, verbose: bool = False) -> int:
     scan_path = Path(args.path).resolve()
 
@@ -246,7 +337,19 @@ def run_gate_evaluation(args: argparse.Namespace, verbose: bool = False) -> int:
             except Exception as hist_err:
                 print(f"Warning: could not save to history: {hist_err}")
 
-        return 1 if str(result.status).lower() == "failed" else 0
+        exit_code = 1 if str(result.status).lower() == "failed" else 0
+
+        # Differential ("clean as you code") gate: opt-in via --diff/--tier.
+        if getattr(args, "diff", False) or getattr(args, "tier", None):
+            try:
+                exit_code = max(
+                    exit_code,
+                    _run_differential_gate(args, scan_path, security_report),
+                )
+            except Exception as diff_err:
+                print(f"Warning: differential gate failed to evaluate: {diff_err}")
+
+        return exit_code
 
     except Exception as e:
         print(f"Error: {e}")
