@@ -31,6 +31,29 @@ def _add_openapi_parser(subparsers: argparse._SubParsersAction) -> None:
     diff.add_argument("spec1", help="First specification file")
     diff.add_argument("spec2", help="Second specification file")
 
+    completeness = openapi_sub.add_parser(
+        "completeness",
+        help="Assess spec completeness (4-vector matrix + maturity tier)",
+    )
+    completeness.add_argument("spec_file", help="Path to OpenAPI specification file")
+    completeness.add_argument("--profile", dest="completeness_profile",
+                              choices=["dx", "secops"], default="dx",
+                              help="Assessment profile: dx (default) weighs "
+                                   "descriptions/examples; secops ignores "
+                                   "experiential vectors")
+    completeness.add_argument("--min-tier",
+                              choices=["basic", "standard", "comprehensive"],
+                              default=None,
+                              help="Exit 1 when the assessed tier is below this")
+    add_performance_flags(completeness)
+
+    security = openapi_sub.add_parser(
+        "security",
+        help="Run only the static security (OWASP API Top 10) rules",
+    )
+    security.add_argument("spec_file", help="Path to OpenAPI specification file")
+    add_performance_flags(security)
+
 
 def _add_graphql_parser(subparsers: argparse._SubParsersAction) -> None:
     """Add GraphQL subparser."""

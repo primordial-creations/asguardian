@@ -79,7 +79,87 @@ def _handle_openapi(args: argparse.Namespace) -> int:
         print(json.dumps(diff, indent=2))
         return 0
 
+    elif args.command == "completeness":
+        return _handle_openapi_completeness(args)
+
+    elif args.command == "security":
+        return _handle_openapi_security(args)
+
     return 1
+
+
+def _handle_openapi_completeness(args: argparse.Namespace) -> int:
+    """Handle `forseti openapi completeness`."""
+    from Asgard.Forseti.cli._handler_runner import (
+        EXIT_GATE_FAILURE,
+        EXIT_INPUT_ERROR,
+        EXIT_OK,
+    )
+    from Asgard.Forseti.OpenAPI.models.completeness_models import MaturityTier
+    from Asgard.Forseti.OpenAPI.services.completeness_service import (
+        CompletenessService,
+    )
+
+    if not Path(args.spec_file).is_file():
+        print(f"Error: file not found: {args.spec_file}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    service = CompletenessService()
+    try:
+        report = service.assess(
+            args.spec_file,
+            profile=getattr(args, "completeness_profile", "dx") or "dx",
+        )
+    except Exception as exc:
+        print(f"Error: failed to parse specification: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    print(service.generate_report(report, getattr(args, "format", "text")))
+    min_tier = getattr(args, "min_tier", None)
+    if min_tier and not service.meets_tier(report, MaturityTier(min_tier)):
+        return EXIT_GATE_FAILURE
+    return EXIT_OK
+
+
+def _handle_openapi_security(args: argparse.Namespace) -> int:
+    """Handle `forseti openapi security` — security-category rules only."""
+    import yaml
+
+    from Asgard.Forseti.cli._handler_runner import (
+        EXIT_INPUT_ERROR,
+        run_and_report,
+    )
+    from Asgard.Forseti.Rules.models._rule_base_models import (
+        RuleCategory,
+        SchemaFormat,
+    )
+    from Asgard.Forseti.Rules.services.rule_registry_service import (
+        get_default_registry,
+    )
+
+    spec_path = Path(args.spec_file)
+    if not spec_path.is_file():
+        print(f"Error: file not found: {spec_path}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    try:
+        document = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"Error: failed to parse specification: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    if not isinstance(document, dict):
+        print(f"Error: document root is not an object: {spec_path}",
+              file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    registry = get_default_registry()
+    findings = []
+    for rule in registry.query(fmt=SchemaFormat.OPENAPI,
+                               category=RuleCategory.SECURITY):
+        for finding in rule.check(document):
+            finding.coordinates.file = str(spec_path)
+            findings.append(finding)
+    return run_and_report(
+        findings,
+        args,
+        rule_metas=[r.meta for r in registry.all_rules()],
+    )
 
 
 def _handle_graphql(args: argparse.Namespace) -> int:
