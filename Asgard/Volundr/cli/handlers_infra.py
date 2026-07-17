@@ -93,6 +93,12 @@ def run_kubernetes_generate(args: argparse.Namespace) -> int:
 
 def run_terraform_generate(args: argparse.Namespace) -> int:
     """Execute Terraform module generation."""
+    try:
+        suppressions = _parse_suppressions(getattr(args, "suppress", []))
+    except ValueError as e:
+        print(f"Error: {e}")
+        return 1
+
     variables = []
     outputs = []
     resources = []
@@ -129,10 +135,18 @@ def run_terraform_generate(args: argparse.Namespace) -> int:
         resources=resources,
         data_sources=data_sources,
         tags={"ManagedBy": "Terraform", "Module": args.name},
+        environment_profile=getattr(args, "environment", "production"),
+        suppressions=suppressions,
+        kms_encryption=getattr(args, "kms_encryption", False),
     )
 
     builder = ModuleBuilder(output_dir=args.output_dir)
     module = builder.generate(config)
+
+    if module.score_report is not None:
+        print(f"Composite Score: {module.score_report.composite:.1f}/100 ({module.score_report.grade})")
+        if module.score_report.veto_applied:
+            print(f"Security veto applied: {module.score_report.veto_applied}")
 
     if not args.dry_run:
         module_dir = builder.save_to_directory(module, args.output_dir)

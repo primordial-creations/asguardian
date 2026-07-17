@@ -18,7 +18,6 @@ from Asgard.Volundr.Terraform.models.terraform_models import (
 )
 from Asgard.Volundr.Terraform.services.module_builder_helpers import (
     PROVIDER_SOURCES,
-    calculate_best_practice_score,
     generate_data_source_block,
     generate_documentation,
     generate_examples,
@@ -31,6 +30,13 @@ from Asgard.Volundr.Terraform.services.module_builder_helpers import (
     generate_versions_tf,
     validate_module,
 )
+from Asgard.Volundr.Validation.models.suppression_models import SuppressionSet
+from Asgard.Volundr.Validation.services.scoring_engine import ScoringEngine
+from Asgard.Volundr.Validation.services.suppression_engine import (
+    SuppressionEngine,
+    append_comment_receipts,
+)
+from Asgard.Volundr.Validation.services.terraform_validator import TerraformValidator
 
 
 class ModuleBuilder:
@@ -53,14 +59,52 @@ class ModuleBuilder:
         if config.locals:
             module_files["locals.tf"] = generate_locals_tf(config)
 
+        # Render -> validate -> score (plan 02 §4; same decoupled pipeline
+        # as Kubernetes/Docker generators — never grade the generator's own
+        # config, only the rendered HCL, per the "Collusion Problem"
+        # (DEEPTHINK_05 §1A)).
+        structural_issues = validate_module(module_files, config)
+
+        rendered_hcl = "\n\n".join(
+            module_files[fname]
+            for fname in ("main.tf", "variables.tf", "outputs.tf", "versions.tf")
+            if fname in module_files
+        )
+        raw_report = TerraformValidator().validate_content(rendered_hcl, file_path="main.tf")
+
+        user_engine = SuppressionEngine(SuppressionSet(suppressions=config.suppressions))
+        outcome = user_engine.apply(list(raw_report.results))
+        final_results = outcome.results + outcome.hygiene
+        applied = outcome.applied
+
+        if applied:
+            seen_rules = set()
+            unique_suppressions = []
+            for s, _ in applied:
+                if s.rule not in seen_rules:
+                    seen_rules.add(s.rule)
+                    unique_suppressions.append(s)
+            unique_suppressions.sort(key=lambda s: s.rule)
+            module_files["main.tf"] = append_comment_receipts(
+                module_files["main.tf"], unique_suppressions
+            )
+
+        score_report = ScoringEngine().score(
+            final_results,
+            environment=config.environment_profile,
+            suppressed=applied,
+        )
+        best_practice_score = score_report.composite
+
+        validation_results = structural_issues + [
+            f"[{r.rule_id}] {r.severity.value}: {r.message}" for r in final_results
+        ]
+
         documentation = generate_documentation(config)
         module_files["README.md"] = documentation
 
         examples = generate_examples(config)
         tests = generate_tests(config)
-
-        validation_results = validate_module(module_files, config)
-        best_practice_score = calculate_best_practice_score(module_files, config)
 
         return GeneratedModule(
             id=module_id,
@@ -72,6 +116,8 @@ class ModuleBuilder:
             validation_results=validation_results,
             best_practice_score=best_practice_score,
             created_at=datetime.now(),
+            score_report=score_report,
+            applied_suppressions=sorted({s.rule for s, _ in applied}),
         )
 
     def save_to_directory(self, module: GeneratedModule, output_dir: Optional[str] = None) -> str:

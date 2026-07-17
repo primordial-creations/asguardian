@@ -67,6 +67,17 @@ def generate_resource_block(resource: str, config: ModuleConfig) -> List[str]:
                 'resource "aws_s3_bucket" "main" {',
                 "  bucket = var.bucket_name", "",
                 f"  tags = {tags_ref}", "}", "",
+                # Security companions (plan 02 §2): public-access block is
+                # "the most notorious cloud vulnerability" (RESEARCH_01).
+                'resource "aws_s3_bucket_public_access_block" "main" {',
+                "  bucket = aws_s3_bucket.main.id", "",
+                "  block_public_acls       = true",
+                "  block_public_policy     = true",
+                "  ignore_public_acls      = true",
+                "  restrict_public_buckets = true", "}", "",
+                'resource "aws_s3_bucket_ownership_controls" "main" {',
+                "  bucket = aws_s3_bucket.main.id", "",
+                "  rule {", '    object_ownership = "BucketOwnerEnforced"', "  }", "}", "",
                 'resource "aws_s3_bucket_versioning" "main" {',
                 "  bucket = aws_s3_bucket.main.id",
                 "  versioning_configuration {",
@@ -74,7 +85,45 @@ def generate_resource_block(resource: str, config: ModuleConfig) -> List[str]:
                 'resource "aws_s3_bucket_server_side_encryption_configuration" "main" {',
                 "  bucket = aws_s3_bucket.main.id", "", "  rule {",
                 "    apply_server_side_encryption_by_default {",
-                '      sse_algorithm = "AES256"', "    }", "  }", "}",
+                '      sse_algorithm = var.kms_encryption ? "aws:kms" : "AES256"',
+                "      kms_master_key_id = var.kms_encryption ? var.kms_key_id : null",
+                "    }",
+                "    bucket_key_enabled = true",
+                "  }", "}",
+            ])
+        elif "rds" in resource.lower() or "db_instance" in resource.lower():
+            lines.extend([
+                'resource "aws_db_instance" "main" {',
+                "  identifier     = var.db_identifier",
+                "  engine         = var.db_engine",
+                "  instance_class = var.db_instance_class",
+                "  allocated_storage = var.db_allocated_storage", "",
+                # Security baseline (plan 02 §2): encrypted storage,
+                # deletion protection, no hardcoded credentials.
+                "  storage_encrypted  = true",
+                "  deletion_protection = var.db_deletion_protection",
+                "  username = var.db_username",
+                "  password = var.db_password", "",
+                f"  tags = {tags_ref}", "}",
+            ])
+        elif "security_group" in resource.lower() or resource.lower() == "sg":
+            lines.extend([
+                'resource "aws_security_group" "main" {',
+                "  name        = var.security_group_name",
+                "  description = var.security_group_description",
+                "  vpc_id      = var.vpc_id", "",
+                "  ingress {",
+                "    description = \"restricted ingress (VOL-TF-0005: no 0.0.0.0/0 default)\"",
+                "    from_port   = var.ingress_from_port",
+                "    to_port     = var.ingress_to_port",
+                "    protocol    = var.ingress_protocol",
+                "    cidr_blocks = var.ingress_cidr_blocks", "  }", "",
+                "  egress {",
+                "    from_port   = 0",
+                "    to_port     = 0",
+                "    protocol    = \"-1\"",
+                "    cidr_blocks = [\"0.0.0.0/0\"]", "  }", "",
+                f"  tags = {tags_ref}", "}",
             ])
         elif "vpc" in resource.lower():
             lines.extend([
@@ -102,6 +151,19 @@ def generate_resource_block(resource: str, config: ModuleConfig) -> List[str]:
                 "  resource_group_name = azurerm_resource_group.main.name", "",
                 "  tags = var.tags", "}",
             ])
+        elif "storage_account" in resource.lower() or "storage" in resource.lower():
+            lines.extend([
+                'resource "azurerm_storage_account" "main" {',
+                "  name                     = var.storage_account_name",
+                "  resource_group_name      = azurerm_resource_group.main.name",
+                "  location                 = azurerm_resource_group.main.location",
+                '  account_tier             = "Standard"',
+                '  account_replication_type = "GRS"', "",
+                # Security baseline (plan 02 §2 Azure parity).
+                "  allow_nested_items_to_be_public = false",
+                '  min_tls_version                 = "TLS1_2"', "",
+                "  tags = var.tags", "}",
+            ])
     elif config.provider == CloudProvider.GCP:
         if "compute_instance" in resource.lower():
             lines.extend([
@@ -113,6 +175,16 @@ def generate_resource_block(resource: str, config: ModuleConfig) -> List[str]:
                 "      image = var.image", "    }", "}", "",
                 "  network_interface {", '    network = "default"',
                 "    access_config {}", "}", "",
+                "  labels = var.labels", "}",
+            ])
+        elif "storage_bucket" in resource.lower() or "storage" in resource.lower() or "gcs" in resource.lower():
+            lines.extend([
+                'resource "google_storage_bucket" "main" {',
+                "  name     = var.bucket_name",
+                "  location = var.gcp_region", "",
+                # Security baseline (plan 02 §2 GCP parity).
+                "  uniform_bucket_level_access = true", "",
+                "  versioning {", "    enabled = true", "  }", "",
                 "  labels = var.labels", "}",
             ])
     return lines

@@ -11,6 +11,9 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Volundr.Validation.models.score_models import ScoreReport
+from Asgard.Volundr.Validation.models.suppression_models import Suppression
+
 
 class CloudProvider(str, Enum):
     """Supported cloud providers."""
@@ -76,6 +79,22 @@ class ModuleConfig(BaseModel):
     required_providers: Dict[str, str] = Field(default_factory=dict, description="Additional required providers")
     tags: Dict[str, str] = Field(default_factory=dict, description="Default resource tags")
     terraform_version: str = Field(default=">= 1.0", description="Required Terraform version")
+    environment_profile: str = Field(
+        default="production",
+        description="Scoring environment weight profile (production/staging/development/sandbox)",
+    )
+    suppressions: List[Suppression] = Field(
+        default_factory=list,
+        description="Reified rule suppressions — the only sanctioned relaxation path",
+    )
+    sensitive_variables: List[str] = Field(
+        default_factory=list,
+        description="Extra variable names to mark sensitive=true beyond the generator defaults",
+    )
+    kms_encryption: bool = Field(
+        default=False,
+        description="Use KMS (aws:kms) instead of AES256 for generated storage encryption blocks",
+    )
 
 
 class GeneratedModule(BaseModel):
@@ -90,6 +109,13 @@ class GeneratedModule(BaseModel):
     best_practice_score: float = Field(ge=0, le=100, description="Best practice compliance score")
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
     output_path: Optional[str] = Field(default=None, description="Path where module was saved")
+    score_report: Optional[ScoreReport] = Field(
+        default=None, description="Full composite score report from the Validation ScoringEngine"
+    )
+    applied_suppressions: List[str] = Field(
+        default_factory=list,
+        description="Rule IDs annihilated by suppressions applied during generation",
+    )
 
     @property
     def has_issues(self) -> bool:

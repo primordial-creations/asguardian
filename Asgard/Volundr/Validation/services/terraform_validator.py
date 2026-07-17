@@ -19,9 +19,14 @@ from Asgard.Volundr.Validation.models.validation_models import (
     ValidationSeverity,
 )
 from Asgard.Volundr.Validation.services._terraform_aws_validators import (
+    validate_aws_db_instance,
     validate_aws_iam_policy,
     validate_aws_s3_bucket,
     validate_aws_security_group,
+)
+from Asgard.Volundr.Validation.services._terraform_cloud_validators import (
+    validate_azurerm_storage_account,
+    validate_google_storage_bucket,
 )
 from Asgard.Volundr.Validation.services._terraform_validator_report import build_report
 from Asgard.Volundr.Validation.services.terraform_validator_helpers import (
@@ -49,6 +54,17 @@ class TerraformValidator:
 
     def __init__(self, context: Optional[ValidationContext] = None):
         self.context = context or ValidationContext()
+
+    def validate_content(self, content: str, file_path: str = "main.tf") -> ValidationReport:
+        """Validate rendered HCL text directly (no filesystem round-trip).
+
+        Mirrors ``DockerfileValidator.validate_content`` so generators can
+        validate in-memory rendered output before writing anything to disk
+        (render -> validate -> score, plan 02 §4).
+        """
+        start_time = time.time()
+        results = self._validate_content(content, file_path)
+        return build_report([file_path], results, start_time, self.context)
 
     def validate_file(self, file_path: str) -> ValidationReport:
         start_time = time.time()
@@ -123,7 +139,8 @@ class TerraformValidator:
             resource_name = match.group(2)
             line_num = content[:match.start()].count("\n") + 1
             results.extend(self._validate_resource(
-                content, resource_type, resource_name, file_path, line_num
+                content, resource_type, resource_name, file_path, line_num,
+                match.end() - 1,
             ))
 
         for match in self.VARIABLE_PATTERN.finditer(content):
@@ -159,6 +176,7 @@ class TerraformValidator:
         resource_name: str,
         file_path: str,
         line_num: int,
+        block_start: Optional[int] = None,
     ) -> List[ValidationResult]:
         results: List[ValidationResult] = []
 
@@ -184,6 +202,21 @@ class TerraformValidator:
         elif resource_type == "aws_iam_policy":
             results.extend(validate_aws_iam_policy(
                 content, resource_name, file_path, line_num
+            ))
+        elif resource_type == "aws_db_instance" and block_start is not None:
+            block = extract_block(content, block_start)
+            results.extend(validate_aws_db_instance(
+                block, resource_name, file_path, line_num
+            ))
+        elif resource_type == "azurerm_storage_account" and block_start is not None:
+            block = extract_block(content, block_start)
+            results.extend(validate_azurerm_storage_account(
+                block, resource_name, file_path, line_num
+            ))
+        elif resource_type == "google_storage_bucket" and block_start is not None:
+            block = extract_block(content, block_start)
+            results.extend(validate_google_storage_bucket(
+                block, resource_name, file_path, line_num
             ))
 
         return results
