@@ -30,14 +30,38 @@ from Asgard.Bragi.Ratings.models.ratings_models import (
     RatingDimension,
     RatingsConfig,
 )
+from Asgard.Bragi.Ratings.models._scoring_models import (
+    CategoryScore,
+    FileMetricBundle,
+    FileQualityScore,
+    MeasurementConfidence,
+    MetricUtility,
+    RiskProfile,
+    ROIAction,
+    ScoreCap,
+    ScoreCategory,
+    ScoreConfidence,
+)
+from Asgard.Bragi.Ratings.services.composite_score_engine import CompositeScoreEngine
 from Asgard.Bragi.Ratings.services.ratings_calculator import RatingsCalculator
 
 __all__ = [
+    "CategoryScore",
+    "CompositeScoreEngine",
     "DebtThresholds",
     "DimensionRating",
+    "FileMetricBundle",
+    "FileQualityScore",
     "LetterRating",
+    "MeasurementConfidence",
+    "MetricUtility",
     "ProjectRatings",
     "RatingDimension",
     "RatingsCalculator",
     "RatingsConfig",
+    "RiskProfile",
+    "ROIAction",
+    "ScoreCap",
+    "ScoreCategory",
+    "ScoreConfidence",
 ]

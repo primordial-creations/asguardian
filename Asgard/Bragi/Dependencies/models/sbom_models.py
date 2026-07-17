@@ -29,10 +29,19 @@ class ComponentType(str, Enum):
     FIRMWARE = "firmware"
 
 
+class VersionResolution(str, Enum):
+    """How a component's version field was determined."""
+    RESOLVED = "resolved"            # actual installed version from metadata
+    DECLARED_ONLY = "declared-only"  # only the declaration spec was available
+    UNKNOWN = "unknown"              # no version information at all
+
+
 class SBOMComponent(BaseModel):
     """A single software component in the SBOM."""
     name: str
     version: str
+    version_spec: str = ""
+    version_resolution: VersionResolution = VersionResolution.UNKNOWN
     component_type: ComponentType = ComponentType.LIBRARY
     license_id: str = ""
     purl: str = ""
@@ -64,6 +73,13 @@ class SBOMDocument(BaseModel):
     total_components: int = 0
     direct_dependencies: int = 0
     transitive_dependencies: int = 0
+    # Honest completeness marker (Plan 03): this SBOM currently covers
+    # declared direct dependencies only; a value of "declared-only" says so
+    # explicitly instead of silently reporting transitive_dependencies=0.
+    resolution: str = Field(
+        "declared-only",
+        description="SBOM completeness: 'declared-only' (direct declarations) or 'installed-closure'",
+    )
 
     class Config:
         use_enum_values = True

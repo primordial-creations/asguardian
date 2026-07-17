@@ -17,6 +17,8 @@ from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 
@@ -44,6 +46,70 @@ class TimeHorizon(str, Enum):
     YEAR = "year"          # ~12 months
 
 
+class DebtRecommendation(str, Enum):
+    """Recommended handling for a debt item or file (Plan 02)."""
+    FIX = "fix"
+    FIX_WHEN_TOUCHING = "fix_when_touching"
+    REWRITE = "rewrite"
+    TOLERATE = "tolerate"
+
+
+class RemediationFunction(BaseModel):
+    """
+    SQALE-style remediation cost function attached to a debt rule.
+
+    Cost is a function shape, not a scalar: constant per issue, linear in
+    units above a threshold, or linear with a context-switch offset.
+    """
+    kind: Literal["constant", "linear", "linear_with_offset"] = Field(
+        "constant", description="Remediation function shape"
+    )
+    base_minutes: float = Field(0.0, ge=0.0, description="Constant part / offset in minutes")
+    coefficient_minutes: float = Field(
+        0.0, ge=0.0, description="Minutes per unit above threshold (linear kinds)"
+    )
+    unit: str = Field("issue", description="Unit the coefficient applies to")
+    batchability: float = Field(
+        0.5, ge=0.0, le=1.0,
+        description="Geometric discount d: ~0.05 for mechanical debt, ~0.9 for cognitive debt"
+    )
+    discount_floor: float = Field(
+        0.0, ge=0.0, le=1.0,
+        description=(
+            "Minimum per-item cost multiplier. 0 for mechanical debt (fully "
+            "batchable); ~0.25 for cognitive debt so a pile of smells stays "
+            "near-additive instead of being capped by the geometric series."
+        ),
+    )
+
+
+class EffortInterval(BaseModel):
+    """Remediation effort as an honest interval, never a point estimate."""
+    low_minutes: float = Field(0.0, ge=0.0, description="Optimistic bound in minutes")
+    high_minutes: float = Field(0.0, ge=0.0, description="Pessimistic bound in minutes")
+    confidence: Literal["high", "medium", "low"] = Field(
+        "medium", description="Confidence in the interval"
+    )
+    width_reason: str = Field("", description="Why the interval is as wide as it is")
+
+    @property
+    def midpoint_minutes(self) -> float:
+        """Midpoint of the interval in minutes."""
+        return (self.low_minutes + self.high_minutes) / 2.0
+
+    @property
+    def midpoint_hours(self) -> float:
+        """Midpoint of the interval in hours (backward-compat effort_hours feed)."""
+        return self.midpoint_minutes / 60.0
+
+
+class FileFriction(BaseModel):
+    """VCS-derived friction signals for a file (interest-model input, Plan 02 Phase D)."""
+    churn_commits_90d: int = Field(0, ge=0, description="Commits touching the file in 90 days")
+    distinct_authors_12m: int = Field(0, ge=0, description="Distinct authors in 12 months")
+    bugfix_commits_12m: int = Field(0, ge=0, description="Fix/bug/hotfix commits in 12 months")
+
+
 class DebtItem(BaseModel):
     """Individual technical debt item."""
     debt_type: DebtType = Field(..., description="Type of technical debt")
@@ -56,6 +122,16 @@ class DebtItem(BaseModel):
     interest_rate: float = Field(0.05, description="How much worse it gets over time (per quarter)")
     remediation_strategy: str = Field("", description="Suggested remediation approach")
     confidence: float = Field(0.8, ge=0.0, le=1.0, description="Detection confidence")
+    effort_interval: Optional[EffortInterval] = Field(
+        None, description="Pessimism-corrected effort interval (Plan 02); effort_hours stays the legacy point estimate"
+    )
+    non_remediation_factor: float = Field(
+        15.0, ge=0.0,
+        description="SBII business-impact penalty factor (Blocking 1000 / High 100 / Medium 15 / Low 10 / Info 4)"
+    )
+    recommendation: DebtRecommendation = Field(
+        DebtRecommendation.FIX, description="Recommended handling for this item"
+    )
 
     class Config:
         use_enum_values = True
@@ -101,8 +177,27 @@ class TimeProjection(BaseModel):
 
 class DebtReport(BaseModel):
     """Complete technical debt analysis report."""
-    total_debt_hours: float = Field(0.0, description="Total technical debt in hours")
-    debt_ratio: float = Field(0.0, description="Debt hours per 1000 lines of code")
+    total_debt_hours: float = Field(0.0, description="Total technical debt in hours (legacy linear sum)")
+    debt_ratio: float = Field(0.0, description="Debt hours per 1000 lines of code (legacy metric)")
+    tdr_percent: Optional[float] = Field(
+        None,
+        description=(
+            "Standard Technical Debt Ratio %: aggregated debt minutes / "
+            "(LOC x 30 min/LOC development cost). Single source of truth for "
+            "the Maintainability grade (Plan 02 Phase A)."
+        ),
+    )
+    aggregated_debt_hours: Optional[float] = Field(
+        None,
+        description="Batched, pessimism-corrected debt total in hours (DebtAggregator output)"
+    )
+    effort_interval: Optional[EffortInterval] = Field(
+        None, description="Project-level remediation effort interval"
+    )
+    file_recommendations: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Per-file recommendation (fix / fix_when_touching / rewrite / tolerate)"
+    )
     total_lines_of_code: int = Field(0, description="Total lines of code analyzed")
     debt_by_type: Dict[str, float] = Field(default_factory=dict, description="Hours by debt type")
     debt_by_severity: Dict[str, int] = Field(default_factory=dict, description="Count by severity")

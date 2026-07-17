@@ -195,11 +195,12 @@ class DependencyReport:
         self.total_cycles = len(self.circular_dependencies)
 
     def get_module(self, name: str) -> Optional[ModuleDependencies]:
-        """Get a module by name."""
-        for m in self.modules:
-            if m.module_name == name:
-                return m
-        return None
+        """Get a module by name (O(1) via a lazily maintained index)."""
+        index = getattr(self, "_module_index", None)
+        if index is None or len(index) != len(self.modules):
+            index = {m.module_name: m for m in self.modules}
+            object.__setattr__(self, "_module_index", index)
+        return index.get(name)
 
     def get_dependents(self, module_name: str) -> List[str]:
         """Get modules that depend on the given module."""

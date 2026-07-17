@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from Asgard.Bragi.Ratings.models._scoring_models import MeasurementConfidence
 from Asgard.Bragi.Ratings.models.ratings_models import (
     DebtThresholds,
     DimensionRating,
@@ -12,6 +13,9 @@ from Asgard.Bragi.Ratings.models.ratings_models import (
     RatingDimension,
     RatingsConfig,
 )
+from Asgard.Bragi.Ratings.services._report_extractors import extract_bundles
+from Asgard.Bragi.Ratings.services._roi_calculator import compute_roi_actions
+from Asgard.Bragi.Ratings.services.composite_score_engine import CompositeScoreEngine
 
 
 class RatingsCalculator:
@@ -41,6 +45,7 @@ class RatingsCalculator:
         """
         self.config = config or RatingsConfig()
         self.thresholds = self.config.debt_thresholds
+        self.engine = CompositeScoreEngine()
 
     def calculate_from_reports(
         self,
@@ -67,6 +72,26 @@ class RatingsCalculator:
 
         overall = self._derive_overall_rating(maintainability.rating, reliability.rating, security.rating)
 
+        # Composite scoring engine (Plan 01): per-file scores, risk-profile
+        # aggregation, non-compensatory caps, tri-state confidence, ROI.
+        file_bundles, project_bundle = extract_bundles(
+            debt_report=debt_report,
+            quality_report=quality_report,
+            security_report=security_report,
+        )
+        file_scores = [self.engine.score_file(bundle) for bundle in file_bundles]
+        for fs in file_scores:
+            fs.roi_actions = compute_roi_actions(fs)
+        composite_score, composite_grade, risk_profile = self.engine.score_project(
+            file_scores, project_bundle
+        )
+        project_score = self.engine.score_file(project_bundle)
+        confidence = project_score.confidence
+        if composite_score is None and project_score.confidence.overall != MeasurementConfidence.NOT_MEASURED.value:
+            composite_score = project_score.final_score
+            composite_grade = project_score.grade
+        roi_actions = compute_roi_actions(project_score)
+
         return ProjectRatings(
             maintainability=maintainability,
             reliability=reliability,
@@ -74,6 +99,12 @@ class RatingsCalculator:
             overall_rating=overall,
             scan_path=scan_path,
             scanned_at=datetime.now(),
+            composite_score=composite_score,
+            composite_grade=composite_grade,
+            risk_profile=risk_profile,
+            file_scores=file_scores,
+            confidence=confidence,
+            roi_actions=roi_actions,
         )
 
     def _calculate_maintainability(self, debt_report) -> DimensionRating:
@@ -83,30 +114,45 @@ class RatingsCalculator:
                 dimension=RatingDimension.MAINTAINABILITY,
                 rating=LetterRating.A,
                 score=0.0,
-                rationale="No debt report provided; defaulting to A",
+                rationale=(
+                    "No debt report provided; defaulting to A "
+                    "(not assessed - this default is not evidence of quality)"
+                ),
                 issues_count=0,
+                confidence=MeasurementConfidence.NOT_MEASURED,
             )
 
-        # Total debt hours vs estimated project size
+        issues_count = getattr(debt_report, "total_debt_items", 0) or 0
         total_debt = getattr(debt_report, "total_debt_hours", 0.0) or 0.0
         total_loc = getattr(debt_report, "total_lines_of_code", 0) or 0
 
-        # Estimate total development hours: 1 hour per 100 LOC (rough industry average)
-        estimated_dev_hours = max(total_loc / 100.0, 1.0)
-        debt_ratio = (total_debt / estimated_dev_hours) * 100.0
+        # Single source of truth: prefer the standard TDR computed by
+        # TechnicalDebtAnalyzer (debt minutes / (LOC x 30 min/LOC), Plan 02).
+        tdr_percent = getattr(debt_report, "tdr_percent", None)
+        if tdr_percent is not None:
+            debt_ratio = float(tdr_percent)
+            rationale = (
+                f"Technical debt ratio {debt_ratio:.2f}% "
+                f"({total_debt:.1f}h debt vs 30 min/LOC development cost)"
+            )
+        else:
+            # Legacy fallback for reports that predate the standard TDR.
+            estimated_dev_hours = max(total_loc / 100.0, 1.0)
+            debt_ratio = (total_debt / estimated_dev_hours) * 100.0
+            rationale = (
+                f"Technical debt ratio {debt_ratio:.1f}% "
+                f"({total_debt:.1f}h debt / {estimated_dev_hours:.1f}h estimated; legacy estimate)"
+            )
 
         rating = self._debt_ratio_to_rating(debt_ratio)
-        issues_count = getattr(debt_report, "total_debt_items", 0) or 0
 
         return DimensionRating(
             dimension=RatingDimension.MAINTAINABILITY,
             rating=rating,
             score=round(debt_ratio, 2),
-            rationale=(
-                f"Technical debt ratio {debt_ratio:.1f}% "
-                f"({total_debt:.1f}h debt / {estimated_dev_hours:.1f}h estimated)"
-            ),
+            rationale=rationale,
             issues_count=issues_count,
+            confidence=MeasurementConfidence.MEASURED,
         )
 
     def _debt_ratio_to_rating(self, debt_ratio: float) -> LetterRating:
@@ -131,6 +177,20 @@ class RatingsCalculator:
                 score=0.0,
                 rationale="Reliability rating disabled",
                 issues_count=0,
+                confidence=MeasurementConfidence.NOT_MEASURED,
+            )
+
+        if quality_report is None and debt_report is None:
+            return DimensionRating(
+                dimension=RatingDimension.RELIABILITY,
+                rating=LetterRating.A,
+                score=0.0,
+                rationale=(
+                    "No bugs or quality issues detected - no quality/debt report "
+                    "supplied (not assessed; defaulting to A)"
+                ),
+                issues_count=0,
+                confidence=MeasurementConfidence.NOT_MEASURED,
             )
 
         worst_severity = None
@@ -158,6 +218,11 @@ class RatingsCalculator:
 
         rating = self._severity_to_rating(worst_severity)
         rationale = self._reliability_rationale(worst_severity, issues_count)
+        confidence = (
+            MeasurementConfidence.MEASURED
+            if quality_report is not None and debt_report is not None
+            else MeasurementConfidence.PARTIAL
+        )
 
         return DimensionRating(
             dimension=RatingDimension.RELIABILITY,
@@ -165,6 +230,7 @@ class RatingsCalculator:
             score=float(issues_count),
             rationale=rationale,
             issues_count=issues_count,
+            confidence=confidence,
         )
 
     def _calculate_security(self, security_report) -> DimensionRating:
@@ -174,8 +240,12 @@ class RatingsCalculator:
                 dimension=RatingDimension.SECURITY,
                 rating=LetterRating.A,
                 score=0.0,
-                rationale="No security report provided; defaulting to A",
+                rationale=(
+                    "No security report provided; defaulting to A "
+                    "(not assessed - this default is not evidence of security)"
+                ),
                 issues_count=0,
+                confidence=MeasurementConfidence.NOT_MEASURED,
             )
 
         worst_severity = None
@@ -218,12 +288,23 @@ class RatingsCalculator:
         rating = self._severity_to_rating(worst_severity)
         rationale = self._security_rationale(worst_severity, total_findings)
 
+        # A report object that exposes none of the known findings shapes is
+        # not evidence of a clean scan - mark it PARTIAL, never MEASURED.
+        has_shape = any(
+            hasattr(security_report, attr)
+            for attr in ("vulnerability_findings", "vulnerabilities", "findings",
+                         "vulnerability_report", "secrets_report")
+        )
+        if not has_shape:
+            rationale += " (report shape unrecognized; treated as partial evidence)"
+
         return DimensionRating(
             dimension=RatingDimension.SECURITY,
             rating=rating,
             score=float(total_findings),
             rationale=rationale,
             issues_count=total_findings,
+            confidence=MeasurementConfidence.MEASURED if has_shape else MeasurementConfidence.PARTIAL,
         )
 
     def _worst_severity(self, current: Optional[str], candidate: str) -> str:
