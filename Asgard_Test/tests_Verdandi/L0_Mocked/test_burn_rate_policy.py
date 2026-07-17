@@ -204,6 +204,20 @@ class TestAlertPolicyTiers:
         assert all(a.severity == "insufficient_traffic" for a in alerts)
         assert all(not a.fired for a in alerts)
 
+    def test_blind_spot_note_only_when_evaluated_with_valid_data(self):
+        """Regression: the ticket-tier sub-critical-bleed note must not be
+        appended when the policy ran with no/insufficient traffic, and must
+        be present when evaluated with valid data."""
+        no_data = self.analyzer.evaluate_alert_policy(_slo(), [], _NOW)
+        ticket_empty = no_data[2]
+        assert not any("safety net" in r for r in ticket_empty.recommendations)
+
+        metrics = _steady_traffic(hours=72.0, failure_rate=0.0, per_minute=200)
+        with_data = self.analyzer.evaluate_alert_policy(_slo(), metrics, _NOW)
+        ticket = with_data[2]
+        assert not ticket.insufficient_traffic
+        assert any("safety net" in r for r in ticket.recommendations)
+
 
 class TestThresholdDerivation:
     def setup_method(self):

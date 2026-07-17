@@ -86,6 +86,9 @@ class PercentileCalculator:
         merged._compress()
         total = merged.count
         mean = sum(m * w for m, w in merged._centroids) / total
+        # Between-centroid variance only: within-centroid spread is lost by
+        # the sketch, so std_dev slightly UNDERESTIMATES the true standard
+        # deviation (mean is exact; the bias shrinks as compression grows).
         variance = sum(w * (m - mean) ** 2 for m, w in merged._centroids) / total
         std_dev = math.sqrt(variance)
 

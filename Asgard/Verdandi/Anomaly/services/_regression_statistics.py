@@ -178,13 +178,19 @@ def hodges_lehmann(
 
     Robust to skew and outliers, unlike a difference of means. For inputs
     larger than `max_pairs_per_side` per side, a deterministic random
-    subsample caps the O(n*m) pairwise computation at 250x250.
+    subsample caps the O(n*m) pairwise computation at 250x250. Both sides
+    use the SAME seed, so identical inputs select identical subsamples and
+    hodges_lehmann(x, x) is exactly 0 at any size; each subsample is still
+    uniform, so the estimator stays unbiased. Residual subsample error for
+    differing inputs is O(1/sqrt(250)) of the data's spread — negligible
+    against the >10-unit / >5% practical-significance gates, but do not
+    rely on digits beyond that resolution for capped inputs.
     """
     if not baseline or not candidate:
         return 0.0
 
     base = _capped_sample(baseline, max_pairs_per_side, seed=1)
-    cand = _capped_sample(candidate, max_pairs_per_side, seed=2)
+    cand = _capped_sample(candidate, max_pairs_per_side, seed=1)
 
     diffs = [c - b for c in cand for b in base]
     diffs.sort()

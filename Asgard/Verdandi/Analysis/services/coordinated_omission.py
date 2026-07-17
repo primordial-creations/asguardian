@@ -36,7 +36,7 @@ def correct_expected_interval(
     interval, synthesize the latencies of the requests that were blocked
     behind it: s - i*interval for i = 1, 2, ... while the result is still
     greater than the interval. A 100 ms sample at a 1 ms expected interval
-    backfills 99, 98, ..., 2 ms (matching HDR's
+    backfills 99, 98, ..., 1 ms (matching HDR's
     recordValueWithExpectedInterval semantics).
 
     Args:

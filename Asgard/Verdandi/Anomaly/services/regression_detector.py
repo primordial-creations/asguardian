@@ -140,8 +140,11 @@ class RegressionDetector:
 
         hl_shift = hodges_lehmann(before, after)
         baseline_pseudo_median = pseudo_median(before)
+        # Relative shift is undefined (None, not 0) for a non-positive
+        # baseline pseudo-median; the practical gate then relies on the
+        # absolute threshold alone.
         hl_shift_relative = (
-            hl_shift / baseline_pseudo_median if baseline_pseudo_median > 0 else 0.0
+            hl_shift / baseline_pseudo_median if baseline_pseudo_median > 0 else None
         )
         glass = _glass_delta(before_mean, before_std, after_mean)
 
@@ -165,9 +168,9 @@ class RegressionDetector:
             )
             severity_effect = effect_size
         else:
-            practical_gate = (
-                hl_shift > self.hl_absolute_threshold
-                or hl_shift_relative > self.hl_relative_threshold
+            practical_gate = hl_shift > self.hl_absolute_threshold or (
+                hl_shift_relative is not None
+                and hl_shift_relative > self.hl_relative_threshold
             )
             magnitude_gate = abs(glass) > self.glass_delta_threshold
             is_practically_significant = practical_gate and magnitude_gate
@@ -177,12 +180,17 @@ class RegressionDetector:
                 and magnitude_gate
                 and hl_shift > 0
             )
+            rel_part = (
+                f"rel={hl_shift_relative:.3%} (>{self.hl_relative_threshold:.0%})"
+                if hl_shift_relative is not None
+                else "rel=undefined (non-positive baseline pseudo-median; "
+                "absolute gate only)"
+            )
             verdict_basis = (
                 f"three_gate: statistical p={p_value:.4f} "
                 f"(<{self.significance_level}: {is_statistically_significant}); "
                 f"practical HL={hl_shift:.3f} (>{self.hl_absolute_threshold}) "
-                f"or rel={hl_shift_relative:.3%} "
-                f"(>{self.hl_relative_threshold:.0%}): {practical_gate}; "
+                f"or {rel_part}: {practical_gate}; "
                 f"magnitude |Glass's delta|={abs(glass):.2f} "
                 f"(>{self.glass_delta_threshold}): {magnitude_gate}"
             )

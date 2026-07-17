@@ -37,7 +37,13 @@ class TDigest:
         """
         Args:
             compression: delta parameter; higher = more centroids = more
-                accuracy and memory. 100 gives ~1% quantile accuracy.
+                accuracy and memory. Accuracy is in RANK space: with
+                compression 100 the estimated quantile sits within roughly
+                1 rank-percentile of the true one (tighter at the tails).
+                The corresponding VALUE-space error depends on the local
+                density of the distribution and can exceed 1% relative on
+                heavy tails; use DDSketch when a guaranteed relative
+                value-space error is required.
         """
         if compression < 20:
             raise ValueError("compression must be >= 20")

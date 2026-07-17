@@ -270,7 +270,7 @@ class BurnRateAnalyzer:
                     f"{long_h:g}h and {short_result.burn_rate:.1f}x over "
                     f"{short_h * 60:.0f}m both exceed {threshold}x."
                 )
-            if tier == "ticket":
+            if tier == "ticket" and total_events_long > 0 and not insufficient:
                 recommendations.append(
                     "Note: sustained burn just below the paging thresholds "
                     "(e.g. 14.0x for 55 minutes) never pages; this ticket tier "

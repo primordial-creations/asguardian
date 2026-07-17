@@ -103,6 +103,22 @@ class TestPageAssessment:
         assert assessment.masking_warning
         assert assessment.core_passing is False
 
+    def test_masking_warning_ignores_diagnostics_and_legacy_fid(self, calc):
+        """Regression: POOR TTFB/FCP or POOR legacy FID with all-GOOD core
+        vitals must NOT fire the masking warning (core-only concept)."""
+        assessment = calc.assess_page(
+            {
+                "lcp": [1000.0] * 100,
+                "inp": [100.0] * 100,
+                "cls": [0.05] * 100,
+                "ttfb": [5000.0] * 100,  # POOR diagnostic
+                "fcp": [4000.0] * 100,   # POOR diagnostic
+                "fid": [900.0] * 100,    # POOR legacy metric
+            }
+        )
+        assert not assessment.masking_warning
+        assert assessment.core_passing is True
+
     def test_missing_core_metric_is_undecided_not_passing(self, calc):
         assessment = calc.assess_page({"lcp": [1500.0] * 50, "cls": [0.05] * 50})
         assert assessment.core_passing is None

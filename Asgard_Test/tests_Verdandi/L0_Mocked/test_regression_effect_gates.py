@@ -39,6 +39,15 @@ class TestHodgesLehmann:
         assert hodges_lehmann([], [1, 2]) == 0.0
         assert hodges_lehmann([1, 2], []) == 0.0
 
+    def test_identical_large_inputs_give_exactly_zero(self):
+        """Regression: paired subsampling (same seed both sides) must make
+        HL(x, x) exactly 0 above the subsample cap, not ~1.6 on lognormal."""
+        import random
+
+        rng = random.Random(7)
+        samples = [rng.lognormvariate(3, 1) for _ in range(5000)]
+        assert hodges_lehmann(samples, list(samples)) == 0.0
+
     def test_large_inputs_are_subsampled_deterministically(self):
         base = [float(i % 50) for i in range(10_000)]
         cand = [v + 20 for v in base]
@@ -137,6 +146,45 @@ class TestThreeGateVerdict:
         result = detector.detect(base, cand)
         assert result.is_regression
         assert result.verdict_basis.startswith("legacy")
+
+    def test_nonpositive_baseline_relative_shift_is_none_not_zero(self):
+        """Regression: with a non-positive baseline pseudo-median the
+        relative gate is undefined (None), the absolute gate still applies,
+        and the verdict basis says so."""
+        detector = RegressionDetector()
+        base = [0.0] * 50
+        cand = [20.0 + (i % 3) for i in range(50)]
+        result = detector.detect(base, cand)
+        assert result.hl_shift_relative is None
+        assert result.hl_shift > 10
+        assert result.is_regression  # absolute gate alone carries it
+        assert "undefined" in result.verdict_basis
+
+    def test_cli_threshold_maps_to_relative_shift_gate(self):
+        """Regression: the CLI --threshold percent must gate the verdict
+        (mapped onto hl_relative_threshold), not be silently ignored."""
+        import argparse
+        import contextlib
+        import io
+
+        from Asgard.Verdandi.cli.handlers_anomaly_trend import run_regression_check
+
+        # ~20% relative shift, well under the 10-unit absolute gate:
+        # threshold 50% must suppress the verdict, threshold 10% must flag it.
+        # Keep strings short: load_json_or_parse stats them as paths first.
+        before = ",".join(str(round(1.0 + (i % 4) * 0.01, 2)) for i in range(40))
+        after = ",".join(str(round(1.2 + (i % 4) * 0.01, 2)) for i in range(40))
+
+        def run(threshold):
+            args = argparse.Namespace(before=before, after=after, threshold=threshold)
+            with contextlib.redirect_stdout(io.StringIO()) as out:
+                exit_code = run_regression_check(args, "json")
+            return exit_code, out.getvalue()
+
+        _, output_strict = run(50.0)
+        assert '"is_regression": false' in output_strict.lower()
+        _, output_lenient = run(10.0)
+        assert '"is_regression": true' in output_lenient.lower()
 
     def test_relative_gate_catches_small_absolute_shift_on_fast_metric(self):
         """A 1 -> 1.2 ms shift is < 10 ms absolute but 20% relative."""

@@ -218,9 +218,12 @@ class CoreWebVitalsCalculator:
         legacy_fid = results.get("fid")
         legacy_fid_rating = legacy_fid.rating if legacy_fid else None
 
+        # Masking is a CORE-vitals concept: a composite over {LCP, INP, CLS}
+        # would hide a bimodal experience. Diagnostics (TTFB/FCP) and the
+        # deprecated FID never participate.
         rated_bands = [
             self._BAND_ORDER[r.rating]
-            for r in results.values()
+            for r in core_present
             if r.rating in self._BAND_ORDER
         ]
         masking_warning = bool(rated_bands) and (

@@ -16,6 +16,9 @@ therefore requires **all three** gates (default `verdict_mode="three_gate"`):
 2. **Practical** — Hodges-Lehmann shift (median of all pairwise
    candidate-baseline differences; robust to skew and outliers) exceeds
    **10 units absolute** OR **5% relative** to the baseline pseudo-median.
+   When the baseline pseudo-median is non-positive the relative shift is
+   undefined (`hl_shift_relative=None`) and the gate falls back to the
+   absolute threshold alone, noted in `verdict_basis`.
 3. **Magnitude** — |Glass's delta| > **0.5**, standardized by the BASELINE
    standard deviation only, so a variance-inflating canary cannot dilute
    its own effect size.
