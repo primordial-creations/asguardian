@@ -1,5 +1,6 @@
 import argparse
 import json
+import sys
 from pathlib import Path
 
 from Asgard.Forseti.OpenAPI import (
@@ -36,6 +37,16 @@ def _handle_openapi(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "validate":
+        from pathlib import Path as _Path
+
+        from Asgard.Forseti.cli._handler_runner import EXIT_INPUT_ERROR, wants_unified_output
+        from Asgard.Forseti.cli.handlers_rules_baseline import run_governed_validation
+
+        if wants_unified_output(args):
+            return run_governed_validation(args.spec_file, args)
+        if not _Path(args.spec_file).is_file():
+            print(f"Error: file not found: {args.spec_file}", file=sys.stderr)
+            return EXIT_INPUT_ERROR
         config = OpenAPIConfig(strict_mode=args.strict if hasattr(args, 'strict') else False)
         validator = SpecValidatorService(config)
         result = validator.validate(args.spec_file)
@@ -140,6 +151,56 @@ def _handle_database(args: argparse.Namespace) -> int:
     return 1
 
 
+def _spec_version(path: str) -> str:
+    """Read info.version from a spec file (best-effort)."""
+    import yaml
+
+    try:
+        data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        return str((data or {}).get("info", {}).get("version", ""))
+    except Exception:
+        return ""
+
+
+def _apply_compat_waivers(result, args: argparse.Namespace):
+    """
+    Apply epoch waivers (.forseti-waivers.yaml) to a CompatibilityResult.
+
+    Waived breaking changes move to warnings with the waiver reason noted;
+    if every breaking change is waived, the gate opens for this epoch only.
+    """
+    from Asgard.Forseti.Rules.services.waiver_service import WAIVERS_FILENAME, WaiverService
+
+    waivers_path = getattr(args, "waivers", None)
+    if waivers_path is None and not Path(WAIVERS_FILENAME).is_file():
+        return result
+    service = WaiverService(waivers_path)
+    waivers = service.load()
+    if not waivers:
+        return result
+    from_version = _spec_version(args.old_spec)
+    to_version = _spec_version(args.new_spec)
+    remaining, waived = [], []
+    for change in result.breaking_changes:
+        change_rule = str(getattr(change, "change_type", "") or "")
+        waiver = service.is_waived(
+            change_rule, change.location, from_version, to_version, waivers=waivers
+        )
+        if waiver is None:
+            remaining.append(change)
+        else:
+            change.severity = "warning"
+            change.mitigation = (
+                f"WAIVED until {waiver.expires or 'merge'}: {waiver.reason}"
+            )
+            waived.append(change)
+    result.breaking_changes = remaining
+    result.warnings = list(result.warnings) + waived
+    if not remaining:
+        result.is_compatible = True
+    return result
+
+
 def _handle_contract(args: argparse.Namespace) -> int:
     """Handle Contract commands."""
     if not args.command:
@@ -155,6 +216,7 @@ def _handle_contract(args: argparse.Namespace) -> int:
     elif args.command == "check-compat":
         service = CompatibilityCheckerService()
         result = service.check(args.old_spec, args.new_spec)
+        result = _apply_compat_waivers(result, args)
         print(service.generate_report(result, args.format))
         return 0 if result.is_compatible else 1
 

@@ -95,6 +95,8 @@ def _add_contract_parser(subparsers: argparse._SubParsersAction) -> None:
     compat = contract_sub.add_parser("check-compat", help="Check backward compatibility")
     compat.add_argument("old_spec", help="Old version specification")
     compat.add_argument("new_spec", help="New version specification")
+    compat.add_argument("--waivers", default=None,
+                        help="Path to .forseti-waivers.yaml (epoch waivers for compat breaks)")
     add_performance_flags(compat)
 
     breaking = contract_sub.add_parser("breaking-changes", help="Detect breaking changes")
@@ -258,6 +260,39 @@ def _add_avro_parser(subparsers: argparse._SubParsersAction) -> None:
     compat.add_argument("--mode", choices=["backward", "forward", "full"], default="backward",
                        help="Compatibility mode (default: backward)")
     add_performance_flags(compat)
+
+
+def _add_rules_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Add rules subparser (rule catalog surface)."""
+    rules = subparsers.add_parser(
+        "rules",
+        help="Rule registry tools",
+    )
+    rules_sub = rules.add_subparsers(dest="command")
+
+    list_cmd = rules_sub.add_parser("list", help="List registered rules with metadata")
+    list_cmd.add_argument("--rule-format", choices=["openapi", "asyncapi", "graphql",
+                                                    "jsonschema", "avro", "protobuf",
+                                                    "sql", "contract"],
+                          default=None, help="Filter by schema format")
+
+
+def _add_baseline_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Add baseline subparser."""
+    baseline = subparsers.add_parser(
+        "baseline",
+        help="Finding baseline management",
+    )
+    baseline_sub = baseline.add_subparsers(dest="command")
+
+    update = baseline_sub.add_parser("update", help="Accept current findings as baseline")
+    update.add_argument("spec_file", help="Specification file to baseline")
+    update.add_argument("--baseline", "-B", default=None,
+                        help="Baseline file path (default: .forseti-baseline.json)")
+
+    show = baseline_sub.add_parser("show", help="Show baseline contents")
+    show.add_argument("--baseline", "-B", default=None,
+                      help="Baseline file path (default: .forseti-baseline.json)")
 
 
 def _add_audit_parser(subparsers: argparse._SubParsersAction) -> None:

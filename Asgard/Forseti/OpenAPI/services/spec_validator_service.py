@@ -124,15 +124,16 @@ class SpecValidatorService:
         if self.config.validate_examples:
             pass
 
-        if not self.config.allow_deprecated:
-            errors.extend(check_deprecated(spec_data))
+        # Deprecation is graceful lifecycle behaviour: always informational,
+        # never a build-breaking error (plan 02, oas.lifecycle.deprecated-operation).
+        info_messages.extend(check_deprecated(spec_data))
 
         if self.config.max_errors > 0:
             errors = errors[:self.config.max_errors]
 
         validation_time_ms = (time.time() - start_time) * 1000
 
-        return OpenAPIValidationResult(
+        result = OpenAPIValidationResult(
             is_valid=len(errors) == 0,
             spec_path=str(spec_path),
             openapi_version=openapi_version,
@@ -141,6 +142,8 @@ class SpecValidatorService:
             info_messages=info_messages,
             validation_time_ms=validation_time_ms,
         )
+        result.findings = self._build_findings(result)
+        return result
 
     def validate_spec_data(self, spec_data: dict[str, Any]) -> OpenAPIValidationResult:
         """
@@ -174,9 +177,11 @@ class SpecValidatorService:
             errors.extend([e for e in schema_errors if e.severity == ValidationSeverity.ERROR])
             warnings.extend([e for e in schema_errors if e.severity == ValidationSeverity.WARNING])
 
+        info_messages.extend(check_deprecated(spec_data))
+
         validation_time_ms = (time.time() - start_time) * 1000
 
-        return OpenAPIValidationResult(
+        result = OpenAPIValidationResult(
             is_valid=len(errors) == 0,
             openapi_version=openapi_version,
             errors=errors,
@@ -184,6 +189,18 @@ class SpecValidatorService:
             info_messages=info_messages,
             validation_time_ms=validation_time_ms,
         )
+        result.findings = self._build_findings(result)
+        return result
+
+    @staticmethod
+    def _build_findings(result: OpenAPIValidationResult) -> list:
+        """Build the unified Finding view over legacy errors/warnings."""
+        from Asgard.Forseti.Reporting.services.finding_adapter_service import (
+            result_to_findings,
+        )
+        from Asgard.Forseti.Rules.models._rule_base_models import SchemaFormat
+
+        return result_to_findings(result, SchemaFormat.OPENAPI, result.spec_path)
 
     def generate_report(
         self,

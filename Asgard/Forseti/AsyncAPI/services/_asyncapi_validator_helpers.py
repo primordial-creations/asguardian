@@ -15,59 +15,58 @@ from Asgard.Forseti.AsyncAPI.models.asyncapi_models import (
 
 
 def generate_text_report(result: AsyncAPIValidationResult) -> str:
-    """Generate a text format report."""
-    lines = []
-    lines.append("=" * 60)
-    lines.append("AsyncAPI Validation Report")
-    lines.append("=" * 60)
-    lines.append(f"File: {result.spec_path or 'N/A'}")
-    lines.append(f"Version: {result.asyncapi_version or 'Unknown'}")
-    lines.append(f"Valid: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"Errors: {result.error_count}")
-    lines.append(f"Warnings: {result.warning_count}")
-    lines.append(f"Time: {result.validation_time_ms:.2f}ms")
-    lines.append("-" * 60)
+    """Generate a text format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_text_report,
+    )
 
-    if result.errors:
-        lines.append("\nErrors:")
-        for error in result.errors:
-            lines.append(f"  [{error.rule or 'error'}] {error.path}: {error.message}")
+    return render_legacy_text_report(
+        "AsyncAPI Validation Report",
+        [
+            f"File: {result.spec_path or 'N/A'}",
+            f"Version: {result.asyncapi_version or 'Unknown'}",
+            f"Valid: {'Yes' if result.is_valid else 'No'}",
+            f"Errors: {result.error_count}",
+            f"Warnings: {result.warning_count}",
+            f"Time: {result.validation_time_ms:.2f}ms",
+        ],
+        [
+            ("Errors", [f"  [{e.rule or 'error'}] {e.path}: {e.message}"
+                        for e in result.errors]),
+            ("Warnings", [f"  [{w.rule or 'warning'}] {w.path}: {w.message}"
+                          for w in result.warnings]),
+        ],
+    )
 
-    if result.warnings:
-        lines.append("\nWarnings:")
-        for warning in result.warnings:
-            lines.append(f"  [{warning.rule or 'warning'}] {warning.path}: {warning.message}")
 
-    lines.append("=" * 60)
-    return "\n".join(lines)
+_MD_TABLE_HEADER = ["| Path | Rule | Message |", "|------|------|---------|"]
 
 
 def generate_markdown_report(result: AsyncAPIValidationResult) -> str:
-    """Generate a markdown format report."""
-    lines = []
-    lines.append("# AsyncAPI Validation Report\n")
-    lines.append(f"- **File**: {result.spec_path or 'N/A'}")
-    lines.append(f"- **Version**: {result.asyncapi_version or 'Unknown'}")
-    lines.append(f"- **Valid**: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"- **Errors**: {result.error_count}")
-    lines.append(f"- **Warnings**: {result.warning_count}")
-    lines.append(f"- **Time**: {result.validation_time_ms:.2f}ms\n")
+    """Generate a markdown format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_markdown_report,
+    )
 
-    if result.errors:
-        lines.append("## Errors\n")
-        lines.append("| Path | Rule | Message |")
-        lines.append("|------|------|---------|")
-        for error in result.errors:
-            lines.append(f"| `{error.path}` | {error.rule or 'error'} | {error.message} |")
-
-    if result.warnings:
-        lines.append("\n## Warnings\n")
-        lines.append("| Path | Rule | Message |")
-        lines.append("|------|------|---------|")
-        for warning in result.warnings:
-            lines.append(f"| `{warning.path}` | {warning.rule or 'warning'} | {warning.message} |")
-
-    return "\n".join(lines)
+    return render_legacy_markdown_report(
+        "AsyncAPI Validation Report",
+        [
+            f"- **File**: {result.spec_path or 'N/A'}",
+            f"- **Version**: {result.asyncapi_version or 'Unknown'}",
+            f"- **Valid**: {'Yes' if result.is_valid else 'No'}",
+            f"- **Errors**: {result.error_count}",
+            f"- **Warnings**: {result.warning_count}",
+            f"- **Time**: {result.validation_time_ms:.2f}ms\n",
+        ],
+        [
+            ("Errors", _MD_TABLE_HEADER + [
+                f"| `{e.path}` | {e.rule or 'error'} | {e.message} |"
+                for e in result.errors] if result.errors else []),
+            ("Warnings", _MD_TABLE_HEADER + [
+                f"| `{w.path}` | {w.rule or 'warning'} | {w.message} |"
+                for w in result.warnings] if result.warnings else []),
+        ],
+    )
 
 
 def validate_message(base_path: str, message: dict[str, Any]) -> list[AsyncAPIValidationError]:

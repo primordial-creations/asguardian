@@ -175,48 +175,42 @@ def validate_path(
 
 
 def generate_text_report(result: ContractValidationResult) -> str:
-    """Generate a text format report."""
-    lines = []
-    lines.append("=" * 60)
-    lines.append("Contract Validation Report")
-    lines.append("=" * 60)
-    lines.append(f"Contract: {result.contract_path or 'N/A'}")
-    lines.append(f"Implementation: {result.implementation_path or 'N/A'}")
-    lines.append(f"Valid: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"Errors: {result.error_count}")
-    lines.append("-" * 60)
+    """Generate a text format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_text_report,
+    )
 
-    if result.errors:
-        lines.append("\nErrors:")
-        for error in result.errors:
-            lines.append(f"  [{error.path}] {error.message}")
-
-    if result.warnings:
-        lines.append("\nWarnings:")
-        for warning in result.warnings:
-            lines.append(f"  [{warning.path}] {warning.message}")
-
-    lines.append("=" * 60)
-    return "\n".join(lines)
+    return render_legacy_text_report(
+        "Contract Validation Report",
+        [
+            f"Contract: {result.contract_path or 'N/A'}",
+            f"Implementation: {result.implementation_path or 'N/A'}",
+            f"Valid: {'Yes' if result.is_valid else 'No'}",
+            f"Errors: {result.error_count}",
+        ],
+        [
+            ("Errors", [f"  [{e.path}] {e.message}" for e in result.errors]),
+            ("Warnings", [f"  [{w.path}] {w.message}" for w in result.warnings]),
+        ],
+    )
 
 
 def generate_markdown_report(result: ContractValidationResult) -> str:
-    """Generate a markdown format report."""
-    lines = []
-    lines.append("# Contract Validation Report\n")
-    lines.append(f"- **Contract**: {result.contract_path or 'N/A'}")
-    lines.append(f"- **Implementation**: {result.implementation_path or 'N/A'}")
-    lines.append(f"- **Valid**: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"- **Errors**: {result.error_count}\n")
+    """Generate a markdown format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_markdown_report,
+    )
 
-    if result.errors:
-        lines.append("## Errors\n")
-        for error in result.errors:
-            lines.append(f"- `{error.path}`: {error.message}")
-
-    if result.warnings:
-        lines.append("\n## Warnings\n")
-        for warning in result.warnings:
-            lines.append(f"- `{warning.path}`: {warning.message}")
-
-    return "\n".join(lines)
+    return render_legacy_markdown_report(
+        "Contract Validation Report",
+        [
+            f"- **Contract**: {result.contract_path or 'N/A'}",
+            f"- **Implementation**: {result.implementation_path or 'N/A'}",
+            f"- **Valid**: {'Yes' if result.is_valid else 'No'}",
+            f"- **Errors**: {result.error_count}\n",
+        ],
+        [
+            ("Errors", [f"- `{e.path}`: {e.message}" for e in result.errors]),
+            ("Warnings", [f"- `{w.path}`: {w.message}" for w in result.warnings]),
+        ],
+    )
