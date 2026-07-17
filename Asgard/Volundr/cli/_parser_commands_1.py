@@ -35,6 +35,23 @@ def _add_kubernetes_commands(subparsers: argparse._SubParsersAction) -> None:
         help="Security profile",
     )
     generate.add_argument("--port", type=int, default=8080, help="Container port")
+    generate.add_argument(
+        "--target-k8s-version",
+        default="1.30",
+        help="Target Kubernetes version (drives AppArmor field shape and schema binding)",
+    )
+    generate.add_argument(
+        "--digest",
+        default=None,
+        help="Image digest (sha256:...) for immutable supply-chain pinning",
+    )
+    generate.add_argument(
+        "--suppress",
+        action="append",
+        default=[],
+        metavar="RULE:TARGET:REASON",
+        help="Reified suppression (repeatable). Requires rule, target, and a non-empty reason.",
+    )
     generate.add_argument("--output-dir", default="manifests", help="Output directory")
     generate.add_argument("--format", choices=["yaml", "json"], default="yaml", help="Output format")
 

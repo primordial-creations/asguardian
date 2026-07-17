@@ -27,17 +27,44 @@ from Asgard.Volundr.Docker import (
 )
 
 
+def _parse_suppressions(raw: list) -> list:
+    """Parse repeatable --suppress RULE:TARGET:REASON flags."""
+    from Asgard.Volundr.Validation.models.suppression_models import Suppression
+
+    suppressions = []
+    for item in raw or []:
+        parts = item.split(":", 2)
+        if len(parts) != 3:
+            raise ValueError(
+                f"Invalid --suppress '{item}': expected RULE:TARGET:REASON "
+                "(reason is mandatory)"
+            )
+        suppressions.append(
+            Suppression(rule=parts[0], target=parts[1], reason=parts[2])
+        )
+    return suppressions
+
+
 def run_kubernetes_generate(args: argparse.Namespace) -> int:
     """Execute Kubernetes manifest generation."""
+    try:
+        suppressions = _parse_suppressions(getattr(args, "suppress", []))
+    except ValueError as e:
+        print(f"Error: {e}")
+        return 1
+
     config = ManifestConfig(
         name=args.name,
         namespace=args.namespace,
         workload_type=WorkloadType(args.type),
         image=args.image,
+        image_digest=getattr(args, "digest", None),
         replicas=args.replicas,
         environment=EnvironmentType(args.environment),
         security_profile=SecurityProfile(args.security_profile),
         ports=[PortConfig(container_port=args.port)],
+        target_k8s_version=getattr(args, "target_k8s_version", "1.30"),
+        suppressions=suppressions,
     )
 
     generator = ManifestGenerator(output_dir=args.output_dir)
