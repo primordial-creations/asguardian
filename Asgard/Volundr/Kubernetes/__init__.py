@@ -17,6 +17,8 @@ from Asgard.Volundr.Kubernetes.models.kubernetes_models import (
     SecurityContext,
     ProbeConfig,
     PortConfig,
+    EgressRule,
+    PDBConfig,
     ManifestConfig,
     GeneratedManifest,
 )
@@ -30,6 +32,8 @@ __all__ = [
     "SecurityContext",
     "ProbeConfig",
     "PortConfig",
+    "EgressRule",
+    "PDBConfig",
     "ManifestConfig",
     "GeneratedManifest",
     "ManifestGenerator",
