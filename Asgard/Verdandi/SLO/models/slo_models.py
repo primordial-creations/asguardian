@@ -202,6 +202,92 @@ class BurnRate(BaseModel):
     )
 
 
+class BurnRateAlert(BaseModel):
+    """
+    One tier of the multi-window multi-burn-rate alert policy.
+
+    Each tier pairs a LONG alert window (smooths noise) with a SHORT guard
+    window at 1/12 of the long window (resets quickly once the burn stops).
+    The tier fires only when BOTH windows exceed the tier threshold.
+    """
+
+    tier: str = Field(
+        ..., description="Policy tier: page_fast, page_slow, or ticket"
+    )
+    severity: str = Field(
+        ...,
+        description="page / warning / ticket / none / insufficient_traffic",
+    )
+    long_window_hours: float = Field(..., description="Long (alert) window")
+    short_window_hours: float = Field(..., description="Short (guard) window")
+    threshold: float = Field(..., description="Burn-rate threshold for this tier")
+    long_burn_rate: float = Field(..., description="Burn rate over the long window")
+    short_burn_rate: float = Field(..., description="Burn rate over the short window")
+    fired: bool = Field(default=False, description="Whether this tier fired")
+    budget_consumed_pct: float = Field(
+        default=0.0,
+        description="Percent of total error budget consumed in the long window",
+    )
+    total_events_long_window: int = Field(
+        default=0, description="Total events observed in the long window"
+    )
+    min_events_required: int = Field(
+        default=0,
+        description="Minimum events for statistical validity: 10 / (1 - target)",
+    )
+    insufficient_traffic: bool = Field(
+        default=False,
+        description=(
+            "True when the long window had too few events for the alert to be "
+            "statistically valid; the tier never fires in this state"
+        ),
+    )
+    min_detectable_outage_seconds: Optional[float] = Field(
+        default=None,
+        description=(
+            "Detection limit: shortest full outage that can trip the long "
+            "window at this threshold"
+        ),
+    )
+    min_detectable_outage_seconds_short: Optional[float] = Field(
+        default=None,
+        description="Detection limit for the short (guard) window",
+    )
+    recommendations: List[str] = Field(
+        default_factory=list, description="Recommended actions"
+    )
+
+
+class ThresholdDerivation(BaseModel):
+    """
+    Window-scaled burn-rate threshold derivation (DEEPTHINK_05).
+
+    BR_threshold = budget_fraction / (alert_window / slo_window). The 14.4x
+    default is exact only for 30-day windows; rescaling for shorter windows
+    destroys the absolute noise floor, so the default recommendation stays
+    14.4 with the trade-off surfaced in `recommendations`.
+    """
+
+    slo_window_days: float = Field(..., description="SLO window in days")
+    alert_window_hours: float = Field(..., description="Alert window in hours")
+    budget_fraction: float = Field(
+        ..., description="Fraction of total budget consumed to trigger (e.g. 0.02)"
+    )
+    derived_threshold: float = Field(
+        ..., description="Window-rescaled burn-rate threshold"
+    )
+    default_threshold: float = Field(
+        default=14.4, description="Reference 30-day default threshold"
+    )
+    recommended_threshold: float = Field(
+        ..., description="Recommended threshold to actually configure"
+    )
+    recommendations: List[str] = Field(
+        default_factory=list,
+        description="Caveats, including the absolute-noise-floor trade-off",
+    )
+
+
 class SLOReport(BaseModel):
     """Comprehensive SLO compliance report."""
 

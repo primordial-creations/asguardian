@@ -32,6 +32,8 @@ from Asgard.Verdandi.SLO.models.slo_models import (
     SLIMetric,
     ErrorBudget,
     BurnRate,
+    BurnRateAlert,
+    ThresholdDerivation,
     SLOReport,
     SLOComplianceStatus,
 )
@@ -46,6 +48,8 @@ __all__ = [
     "SLIMetric",
     "ErrorBudget",
     "BurnRate",
+    "BurnRateAlert",
+    "ThresholdDerivation",
     "SLOReport",
     "SLOComplianceStatus",
     # Services

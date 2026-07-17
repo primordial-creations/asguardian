@@ -4,7 +4,52 @@ Helpers for BurnRateAnalyzer.
 Contains recommendation generation functions extracted from the burn rate analyzer.
 """
 
+import math
 from typing import List, Optional
+
+
+def minimum_traffic_for_target(target: float) -> int:
+    """
+    Minimum events per alert window for a burn-rate alert to be
+    statistically valid: 10 / (1 - target) (DEEPTHINK_04).
+
+    Args:
+        target: SLO target as a fraction (0.999 for 99.9%)
+
+    Returns:
+        Minimum event count (e.g. 10,000 for a 99.9% target)
+    """
+    if not 0.0 <= target < 1.0:
+        raise ValueError(f"target must be a fraction in [0, 1), got {target}")
+    # Round before ceiling so float artifacts (10/(1-0.999) = 10000.0000002)
+    # do not inflate the requirement by one event.
+    return math.ceil(round(10.0 / (1.0 - target), 6))
+
+
+def full_outage_burn_rate(target: float) -> float:
+    """
+    Burn rate during a 100% outage: 1 / (1 - target).
+
+    E.g. a 99.9% SLO burns at 1000x during a full outage.
+    """
+    if not 0.0 <= target < 1.0:
+        raise ValueError(f"target must be a fraction in [0, 1), got {target}")
+    return 1.0 / (1.0 - target)
+
+
+def min_detectable_outage_seconds(
+    target: float,
+    threshold: float,
+    window_hours: float,
+) -> float:
+    """
+    Detection limit: the shortest full outage that trips a burn-rate
+    threshold over a given window.
+
+    time_to_breach = threshold * window / full_outage_burn_rate
+    (99.9% target, 14.4x, 1h window -> 51.84 s; 5m guard -> 4.32 s)
+    """
+    return threshold * window_hours * 3600.0 / full_outage_burn_rate(target)
 
 
 def generate_burn_rate_recommendations(
