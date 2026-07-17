@@ -1,0 +1,293 @@
+"""
+Rule Registry for the Volundr Validation Engine.
+
+Every semantic check is a registered rule with a stable ID, a five-level
+severity taxonomy (CRITICAL/HIGH/MEDIUM/LOW/INFO), remediation markdown,
+framework mappings (CIS / NSA-CISA / hadolint / SLSA), and declared
+behavior for ``<computed>`` and ``<tainted>`` values.
+
+Rule ID namespaces:
+    VOL-K8S-*      Kubernetes manifests
+    VOL-TF-*       Terraform
+    VOL-CICD-*     CI/CD pipeline YAML
+    VOL-GITOPS-*   ArgoCD / Flux
+    VOL-HELM-*     Helm charts
+    VOL-KUST-*     Kustomize
+    VOL-COMPOSE-*  Docker Compose
+    DL3xxx/DL4xxx  Dockerfile (hadolint-compatible IDs)
+"""
+
+from enum import Enum
+from typing import Dict, List, Optional
+
+from pydantic import BaseModel, Field
+
+from Asgard.Volundr.Validation.models.validation_models import (
+    ValidationCategory,
+    ValidationSeverity,
+)
+
+
+class RuleSeverity(str, Enum):
+    """Five-level severity taxonomy required by composite scoring."""
+
+    CRITICAL = "critical"
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+    INFO = "info"
+
+    def to_validation_severity(self) -> ValidationSeverity:
+        """Map to the legacy four-level ValidationSeverity."""
+        return _SEVERITY_TO_LEGACY[self]
+
+    @classmethod
+    def from_validation_severity(cls, severity: ValidationSeverity) -> "RuleSeverity":
+        """Map a legacy four-level severity into the five-level taxonomy."""
+        return _LEGACY_TO_SEVERITY[severity]
+
+
+_SEVERITY_TO_LEGACY: Dict[RuleSeverity, ValidationSeverity] = {
+    RuleSeverity.CRITICAL: ValidationSeverity.ERROR,
+    RuleSeverity.HIGH: ValidationSeverity.ERROR,
+    RuleSeverity.MEDIUM: ValidationSeverity.WARNING,
+    RuleSeverity.LOW: ValidationSeverity.INFO,
+    RuleSeverity.INFO: ValidationSeverity.HINT,
+}
+
+_LEGACY_TO_SEVERITY: Dict[ValidationSeverity, RuleSeverity] = {
+    ValidationSeverity.ERROR: RuleSeverity.HIGH,
+    ValidationSeverity.WARNING: RuleSeverity.MEDIUM,
+    ValidationSeverity.INFO: RuleSeverity.LOW,
+    ValidationSeverity.HINT: RuleSeverity.INFO,
+}
+
+
+class UnknownValueBehavior(str, Enum):
+    """Declared rule behavior when a value is <computed> or <tainted>.
+
+    Default-deny principle: a rule may *soften* to WARN on unknown data,
+    but it never silently passes unless it explicitly declares SKIP.
+    """
+
+    SKIP = "skip"
+    WARN = "warn"
+    CONDITIONAL_ASSERT = "conditional-assert"
+
+
+class RegisteredRule(BaseModel):
+    """A validation rule with full metadata for SARIF emission."""
+
+    id: str = Field(description="Stable rule identifier (e.g. VOL-K8S-0001)")
+    name: str = Field(description="Short rule name")
+    description: str = Field(description="What the rule asserts (presence of safety)")
+    severity: RuleSeverity = Field(description="Five-level severity")
+    category: ValidationCategory = Field(description="Rule category")
+    documentation_url: Optional[str] = Field(default=None, description="Docs URL")
+    remediation: str = Field(default="", description="Remediation guidance (markdown)")
+    framework_mappings: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Compliance mappings, e.g. {'cis': '5.2.6', 'nsa-cisa': '...'}",
+    )
+    on_computed: UnknownValueBehavior = Field(
+        default=UnknownValueBehavior.WARN,
+        description="Behavior when the checked value is <computed>",
+    )
+    on_tainted: UnknownValueBehavior = Field(
+        default=UnknownValueBehavior.WARN,
+        description="Behavior when the checked node is <tainted>",
+    )
+    enabled: bool = Field(default=True, description="Is rule enabled")
+
+
+class RuleRegistry:
+    """Registry of all known validation rules, keyed by stable ID."""
+
+    def __init__(self) -> None:
+        self._rules: Dict[str, RegisteredRule] = {}
+
+    def register(self, rule: RegisteredRule) -> RegisteredRule:
+        self._rules[rule.id] = rule
+        return rule
+
+    def get(self, rule_id: str) -> Optional[RegisteredRule]:
+        return self._rules.get(rule_id)
+
+    def __contains__(self, rule_id: str) -> bool:
+        return rule_id in self._rules
+
+    def all_rules(self) -> List[RegisteredRule]:
+        return sorted(self._rules.values(), key=lambda r: r.id)
+
+    def ids(self) -> List[str]:
+        return sorted(self._rules.keys())
+
+
+def _build_default_registry() -> RuleRegistry:
+    registry = RuleRegistry()
+    sec = ValidationCategory.SECURITY
+    bp = ValidationCategory.BEST_PRACTICE
+    rel = ValidationCategory.RELIABILITY
+    schema = ValidationCategory.SCHEMA
+
+    defaults = [
+        # --- Kubernetes (presence-of-safety, default-deny) ---
+        RegisteredRule(
+            id="VOL-K8S-0001", name="run-as-non-root",
+            description="Container securityContext must explicitly set runAsNonRoot: true.",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Set `securityContext.runAsNonRoot: true` on the container.",
+            framework_mappings={"cis": "5.2.6", "nsa-cisa": "non-root containers"},
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0002", name="no-privilege-escalation",
+            description="Container must explicitly set allowPrivilegeEscalation: false.",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Set `securityContext.allowPrivilegeEscalation: false`.",
+            framework_mappings={"cis": "5.2.5"},
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0003", name="drop-all-capabilities",
+            description="Container must drop ALL Linux capabilities.",
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Set `securityContext.capabilities.drop: [ALL]`.",
+            framework_mappings={"cis": "5.2.9"},
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0004", name="read-only-root-filesystem",
+            description="Container must set readOnlyRootFilesystem: true.",
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Set `securityContext.readOnlyRootFilesystem: true` and mount an emptyDir for writable paths.",
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0005", name="pinned-image",
+            description="Container image must be pinned to a specific tag or digest (not :latest / untagged).",
+            severity=RuleSeverity.MEDIUM, category=bp,
+            remediation="Pin the image to an immutable tag or, preferably, a digest (`image@sha256:...`).",
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0006", name="resource-limits-and-requests",
+            description="Container must declare both resources.limits and resources.requests.",
+            severity=RuleSeverity.MEDIUM, category=rel,
+            remediation="Add `resources.requests` and `resources.limits` for cpu and memory.",
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0007", name="seccomp-runtime-default",
+            description="Pod or container must set seccompProfile.type: RuntimeDefault (or Localhost).",
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Set `securityContext.seccompProfile.type: RuntimeDefault`.",
+            framework_mappings={"nsa-cisa": "seccomp"},
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0008", name="no-automount-service-account-token",
+            description="Pod must explicitly set automountServiceAccountToken: false unless the workload needs the API.",
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Set `automountServiceAccountToken: false` on the pod spec.",
+            framework_mappings={"cis": "5.1.6"},
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0009", name="not-privileged",
+            description="Container must not run privileged; privileged must be absent or explicitly false.",
+            severity=RuleSeverity.CRITICAL, category=sec,
+            remediation="Remove `securityContext.privileged: true`.",
+            framework_mappings={"cis": "5.2.1"},
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0010", name="no-host-namespaces",
+            description="Pod must not share host network, PID, or IPC namespaces.",
+            severity=RuleSeverity.CRITICAL, category=sec,
+            remediation="Remove `hostNetwork`, `hostPID`, and `hostIPC` from the pod spec.",
+            framework_mappings={"cis": "5.2.2-5.2.4"},
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0011", name="known-schema",
+            description="Manifest fields must be present in the bound Kubernetes schema for the target version.",
+            severity=RuleSeverity.HIGH, category=schema,
+            remediation="Remove or correct unknown fields; check the apiVersion for the target cluster version.",
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0012", name="supported-api-version",
+            description="apiVersion must be a supported (non-deprecated) group/version for the kind.",
+            severity=RuleSeverity.HIGH, category=schema,
+            remediation="Migrate to the current stable apiVersion (e.g. batch/v1 for CronJob).",
+        ),
+        # --- Compose ---
+        RegisteredRule(
+            id="VOL-COMPOSE-0001", name="no-obsolete-version-key",
+            description="The top-level `version:` key is obsolete under the Compose Specification.",
+            severity=RuleSeverity.LOW, category=bp,
+            remediation="Delete the top-level `version:` key; the Compose Specification ignores it.",
+        ),
+        RegisteredRule(
+            id="VOL-COMPOSE-0002", name="not-privileged",
+            description="Compose service must not set privileged: true.",
+            severity=RuleSeverity.CRITICAL, category=sec,
+            remediation="Remove `privileged: true` from the service.",
+        ),
+        RegisteredRule(
+            id="VOL-COMPOSE-0003", name="no-host-network",
+            description="Compose service must not use network_mode: host.",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Use a named bridge network instead of `network_mode: host`.",
+        ),
+        RegisteredRule(
+            id="VOL-COMPOSE-0004", name="pinned-image",
+            description="Compose service image must be pinned (not :latest / untagged).",
+            severity=RuleSeverity.MEDIUM, category=bp,
+            remediation="Pin the image to an immutable tag or digest.",
+        ),
+        RegisteredRule(
+            id="VOL-COMPOSE-0005", name="loopback-port-binding",
+            description="Published ports should bind loopback (127.0.0.1) unless external exposure is intended.",
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Bind ports as `127.0.0.1:HOST:CONTAINER` unless the service must be reachable externally.",
+        ),
+        # --- CI/CD pipeline YAML (GitHub Actions first) ---
+        RegisteredRule(
+            id="VOL-CICD-0001", name="explicit-permissions",
+            description="Workflow (or every job) must declare an explicit least-privilege permissions block.",
+            severity=RuleSeverity.CRITICAL, category=sec,
+            remediation="Add `permissions: {}` at workflow level and grant per-job scopes explicitly.",
+            framework_mappings={"slsa": "provenance/least-privilege"},
+        ),
+        RegisteredRule(
+            id="VOL-CICD-0002", name="sha-pinned-actions",
+            description="Third-party actions must be pinned to a full commit SHA, not a mutable tag.",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Pin `uses:` references to a 40-char commit SHA with a trailing version comment.",
+            framework_mappings={"slsa": "dependency pinning"},
+        ),
+        RegisteredRule(
+            id="VOL-CICD-0003", name="job-timeout",
+            description="Every job must declare timeout-minutes.",
+            severity=RuleSeverity.LOW, category=rel,
+            remediation="Add `timeout-minutes:` to each job.",
+        ),
+        # --- GitOps ---
+        RegisteredRule(
+            id="VOL-GITOPS-0001", name="pinned-target-revision",
+            description="ArgoCD Application targetRevision must be pinned (not HEAD).",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Set `spec.source.targetRevision` to a branch, tag, or commit SHA — never HEAD.",
+        ),
+        RegisteredRule(
+            id="VOL-GITOPS-0002", name="non-default-project",
+            description="ArgoCD Application must use a scoped AppProject, not the unrestricted 'default' project.",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Create a scoped AppProject with repo/destination allowlists and reference it in `spec.project`.",
+        ),
+    ]
+    for rule in defaults:
+        registry.register(rule)
+    return registry
+
+
+_DEFAULT_REGISTRY: Optional[RuleRegistry] = None
+
+
+def default_registry() -> RuleRegistry:
+    """Return the process-wide default rule registry (lazily built)."""
+    global _DEFAULT_REGISTRY
+    if _DEFAULT_REGISTRY is None:
+        _DEFAULT_REGISTRY = _build_default_registry()
+    return _DEFAULT_REGISTRY

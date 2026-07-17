@@ -73,7 +73,20 @@ class ValidationResult(BaseModel):
 class ValidationContext(BaseModel):
     """Context for validation operations."""
     strict_mode: bool = Field(default=False, description="Enable strict validation")
-    ignore_rules: List[str] = Field(default_factory=list, description="Rules to ignore")
+    ignore_rules: List[str] = Field(
+        default_factory=list,
+        description=(
+            "DEPRECATED: unscoped, unjustified ignore list. Use reified "
+            "suppressions (Suppression/SuppressionSet) instead. Will be "
+            "removed in a future minor version."
+        ),
+    )
+    offline: bool = Field(
+        default=True, description="Never fetch schemas over the network (default)"
+    )
+    schema_dir: Optional[str] = Field(
+        default=None, description="Directory of user-supplied JSON schema fragments"
+    )
     severity_override: Dict[str, ValidationSeverity] = Field(
         default_factory=dict, description="Override rule severities"
     )
