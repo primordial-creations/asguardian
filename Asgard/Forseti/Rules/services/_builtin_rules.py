@@ -240,3 +240,107 @@ _register_meta_only(SchemaFormat.PROTOBUF, "proto", [
     ("naming-convention", Severity.WARNING, RuleCategory.STYLE, _H, False),
     ("efficient-field-number", Severity.HINT, RuleCategory.STYLE, _H, False),
 ])
+
+# Plan 06 (LiveContract drift/negative probing) and plan 07 (cross-format
+# Alignment) emit findings from bespoke check functions (they operate on
+# probe results / multi-source IR comparisons, not a single parsed
+# document), so their rule ids are registered here as metadata-only
+# entries: stable id, fixed severity and rationale for the reporting
+# pipeline, with execution living in LiveContract/Alignment services.
+for _rule_id, _severity, _category, _confidence, _rationale in [
+    (
+        "drift.undocumented-status",
+        Severity.ERROR,
+        RuleCategory.COMPATIBILITY,
+        _D,
+        "A live response used a status code the spec never declared - the spec no longer "
+        "describes the implementation's real contract.",
+    ),
+    (
+        "drift.schema-mismatch",
+        Severity.ERROR,
+        RuleCategory.COMPATIBILITY,
+        _D,
+        "A live response body failed the documented schema for its status code - consumers "
+        "generated from the spec will misparse real responses.",
+    ),
+    (
+        "negative.expected-4xx",
+        Severity.ERROR,
+        RuleCategory.SECURITY,
+        _D,
+        "A mutated/invalid request was accepted as success; the implementation is not "
+        "validating input the spec declares required.",
+    ),
+    (
+        "negative.server-error",
+        Severity.ERROR,
+        RuleCategory.SECURITY,
+        _D,
+        "A mutated/invalid request crashed the implementation (5xx) instead of being "
+        "rejected with a handled 4xx.",
+    ),
+    (
+        "align.type-contradiction",
+        Severity.ERROR,
+        RuleCategory.SEMANTICS,
+        _D,
+        "The same logical field has incompatible types across formats (e.g. string vs bool) - "
+        "no reasonable mapping exists.",
+    ),
+    (
+        "align.nullability-breach",
+        Severity.ERROR,
+        RuleCategory.SEMANTICS,
+        _D,
+        "A producer-side field is nullable/optional but the declared consumer requires a "
+        "non-null value - a real null will break the consumer.",
+    ),
+    (
+        "align.enum-divergence",
+        Severity.ERROR,
+        RuleCategory.SEMANTICS,
+        _D,
+        "Producer enum symbols are not a subset of the consumer's - the consumer cannot "
+        "represent every value the producer can emit.",
+    ),
+    (
+        "align.precision-risk",
+        Severity.WARNING,
+        RuleCategory.SEMANTICS,
+        _D,
+        "A numeric type is narrowed across formats (e.g. int64 -> int32) and may lose "
+        "precision or overflow.",
+    ),
+    (
+        "align.idiomatic-coercion",
+        Severity.INFO,
+        RuleCategory.SEMANTICS,
+        _D,
+        "A safe, idiomatic cross-format type mapping (e.g. int64 <-> String for GraphQL ids).",
+    ),
+    (
+        "align.subset-divergence",
+        Severity.INFO,
+        RuleCategory.SEMANTICS,
+        _D,
+        "A field exists in some sources but not others - may be intentional projection; "
+        "add to `ignore_fields` to suppress if so.",
+    ),
+    (
+        "align.lexical-divergence",
+        Severity.INFO,
+        RuleCategory.STYLE,
+        _D,
+        "The same logical field uses a different casing/naming convention across formats.",
+    ),
+]:
+    default_registry.register(RuleMeta(
+        rule_id=_rule_id,
+        formats={SchemaFormat.CONTRACT},
+        severity=_severity,
+        category=_category,
+        confidence=_confidence,
+        core=False,
+        rationale=_rationale,
+    ))

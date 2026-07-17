@@ -29,6 +29,35 @@ CITIES = [
     "Philadelphia", "San Antonio", "San Diego", "Dallas", "San Jose"
 ]
 COUNTRIES = ["USA", "Canada", "UK", "Australia", "Germany", "France"]
+
+# Coherent locale rows (RESEARCH_10 "semantically correlated data" open problem):
+# each row's city/region/postcode/country_code/currency belong together, so a
+# generator that draws one row (instead of independent fields) never produces
+# "Paris, USA" or a Tokyo postcode paired with a EUR currency.
+LOCALE_ROWS: list[dict[str, str]] = [
+    {"city": "New York", "region": "NY", "postcode": "10001", "country": "USA", "country_code": "US", "currency": "USD"},
+    {"city": "Los Angeles", "region": "CA", "postcode": "90001", "country": "USA", "country_code": "US", "currency": "USD"},
+    {"city": "Chicago", "region": "IL", "postcode": "60601", "country": "USA", "country_code": "US", "currency": "USD"},
+    {"city": "Toronto", "region": "ON", "postcode": "M5H 2N2", "country": "Canada", "country_code": "CA", "currency": "CAD"},
+    {"city": "Vancouver", "region": "BC", "postcode": "V6B 1A1", "country": "Canada", "country_code": "CA", "currency": "CAD"},
+    {"city": "London", "region": "England", "postcode": "EC1A 1BB", "country": "UK", "country_code": "GB", "currency": "GBP"},
+    {"city": "Manchester", "region": "England", "postcode": "M1 1AE", "country": "UK", "country_code": "GB", "currency": "GBP"},
+    {"city": "Sydney", "region": "NSW", "postcode": "2000", "country": "Australia", "country_code": "AU", "currency": "AUD"},
+    {"city": "Melbourne", "region": "VIC", "postcode": "3000", "country": "Australia", "country_code": "AU", "currency": "AUD"},
+    {"city": "Berlin", "region": "BE", "postcode": "10115", "country": "Germany", "country_code": "DE", "currency": "EUR"},
+    {"city": "Munich", "region": "BY", "postcode": "80331", "country": "Germany", "country_code": "DE", "currency": "EUR"},
+    {"city": "Paris", "region": "IDF", "postcode": "75001", "country": "France", "country_code": "FR", "currency": "EUR"},
+    {"city": "Lyon", "region": "ARA", "postcode": "69001", "country": "France", "country_code": "FR", "currency": "EUR"},
+]
+
+# Luhn-valid test card prefixes (IIN ranges), used only to produce
+# checksum-valid *fake* PANs for mock data — never real card numbers.
+CARD_IIN_PREFIXES = {
+    "visa": "4",
+    "mastercard": "51",
+    "amex": "34",
+}
+
 LOREM_WORDS = [
     "lorem", "ipsum", "dolor", "sit", "amet", "consectetur",
     "adipiscing", "elit", "sed", "do", "eiusmod", "tempor",
@@ -95,6 +124,72 @@ def generate_address(rng: random.Random) -> str:
 def generate_zip(rng: random.Random) -> str:
     """Generate a ZIP code."""
     return str(rng.randint(10000, 99999))
+
+
+def pick_locale_row(rng: random.Random) -> dict[str, str]:
+    """Pick one internally-coherent locale row (city/region/postcode/country/currency)."""
+    return rng.choice(LOCALE_ROWS)
+
+
+def generate_correlated_address(rng: random.Random) -> dict[str, str]:
+    """Generate a full address from a single coherent locale row, not independent fields."""
+    row = pick_locale_row(rng)
+    return {
+        "street": generate_street(rng),
+        "city": row["city"],
+        "region": row["region"],
+        "postcode": row["postcode"],
+        "country": row["country"],
+        "country_code": row["country_code"],
+    }
+
+
+def generate_currency_code(rng: random.Random) -> str:
+    """Generate an ISO 4217 currency code drawn from a coherent locale row."""
+    return pick_locale_row(rng)["currency"]
+
+
+def generate_country_code(rng: random.Random) -> str:
+    """Generate an ISO 3166-1 alpha-2 country code drawn from a coherent locale row."""
+    return pick_locale_row(rng)["country_code"]
+
+
+def luhn_checksum_digit(partial_number: str) -> str:
+    """Compute the Luhn checksum digit that makes `partial_number + digit` valid."""
+    digits = [int(d) for d in partial_number]
+    digits.reverse()
+    total = 0
+    for i, d in enumerate(digits):
+        if i % 2 == 0:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return str((10 - (total % 10)) % 10)
+
+
+def generate_luhn_card(rng: random.Random, scheme: str = "visa", length: int = 16) -> str:
+    """Generate a Luhn-checksum-valid *fake* card number (test IIN prefixes only)."""
+    prefix = CARD_IIN_PREFIXES.get(scheme, CARD_IIN_PREFIXES["visa"])
+    body_len = length - len(prefix) - 1
+    body = prefix + "".join(str(rng.randint(0, 9)) for _ in range(body_len))
+    return body + luhn_checksum_digit(body)
+
+
+def is_luhn_valid(number: str) -> bool:
+    """Validate a numeric string against the Luhn checksum algorithm."""
+    digits = [int(d) for d in number if d.isdigit()]
+    if len(digits) != len(number) or not digits:
+        return False
+    digits.reverse()
+    total = 0
+    for i, d in enumerate(digits):
+        if i % 2 == 1:
+            d *= 2
+            if d > 9:
+                d -= 9
+        total += d
+    return total % 10 == 0
 
 
 def generate_date(rng: random.Random) -> str:
@@ -177,11 +272,17 @@ def infer_from_property_name(property_name: str, rng: random.Random) -> Any:
     elif any(x in name_lower for x in ["address", "street"]):
         return generate_street(rng)
     elif "city" in name_lower:
-        return rng.choice(CITIES)
+        return pick_locale_row(rng)["city"]
+    elif any(x in name_lower for x in ["country_code", "countrycode"]):
+        return generate_country_code(rng)
     elif "country" in name_lower:
-        return rng.choice(COUNTRIES)
-    elif any(x in name_lower for x in ["zip", "postal"]):
-        return generate_zip(rng)
+        return pick_locale_row(rng)["country"]
+    elif "currency" in name_lower:
+        return generate_currency_code(rng)
+    elif any(x in name_lower for x in ["zip", "postal", "postcode"]):
+        return pick_locale_row(rng)["postcode"]
+    elif any(x in name_lower for x in ["card", "pan", "cardnumber", "card_number"]):
+        return generate_luhn_card(rng)
     elif any(x in name_lower for x in ["date", "created", "updated", "timestamp"]):
         return generate_datetime(rng)
     elif any(x in name_lower for x in ["description", "bio", "summary", "about"]):

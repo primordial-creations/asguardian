@@ -41,6 +41,11 @@ from Asgard.Forseti.Contracts.utilities import (
     is_breaking_change,
 )
 
+# Live spec-vs-implementation contract testing (plan 06-A). Re-exported here
+# so the documented Contracts import surface also covers drift detection;
+# the LiveContract package itself never runs probes implicitly.
+from Asgard.Forseti.LiveContract import LiveValidatorService, ProbePlannerService
+
 __all__ = [
     # Models
     "ContractConfig",
@@ -52,6 +57,8 @@ __all__ = [
     "ContractValidatorService",
     "CompatibilityCheckerService",
     "BreakingChangeDetectorService",
+    "LiveValidatorService",
+    "ProbePlannerService",
     # Utilities
     "load_contract_file",
     "compare_schemas",
