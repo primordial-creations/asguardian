@@ -34,11 +34,11 @@
 |---|---|---|
 | Heimdall hotspots/test-context | H/08 | **MERGED** — 121 tests; tests_Heimdall 1676 pass. Flags: CLI --include-test-context, PRDecoration + Shared/Issues consumption wiring wanted. |
 | Forseti OpenAPI linting + lifecycle | F/03, F/04 | **MERGED** — registry 50→112 rules (OpenAPI 7→69), completeness tiers, OWASP set, SemVer/migration guides; 82 new tests (1159 pass). Deferred: AsyncAPI payload-rule execution, Forseti module docs. |
-| Forseti JSON-Schema core (JSONSchema/ dir only) | F/05 | agent running |
+| Forseti JSON-Schema core (JSONSchema/ dir only) | F/05 | **MERGED** — compiled engine, 2020-12, 283-case suite parity, dialect converter, LLM profiles; tests_Forseti 1514 pass combined. Flags: OpenAPI spec_converter wiring, jsonschema CLI subcommands, llm.* registry registration. |
 | Freya perf budgets + visual epistemics + security framing | Fr/03-05 | **MERGED** — 117 new tests (1203 pass ex-L1). Flags: html_reporter epistemic mirrors + CSP/route Blocker escalation deferred to Fr/06 slice; baseline-compare inconclusive = exit 2 (new convention). |
 | Verdandi system/cache/database + small-batch/baselines | Ve/06.1-3, 04.1-3, 07.1-2, 03D-E | **MERGED** — 83 new tests (1035 pass); System/Cache/Database docs rewritten to real APIs. Flag: CLI parity for new APIs deferred. |
 | Volundr Docker + composite scoring + GitOps/Kustomize/Helm rest | Vo/03, 07, 05 | **MERGED** — 85 new tests (901 pass). Deferred: CLI flags (volundr score etc.), Terraform scorer (Vo/02), Helm chart internals, non-GHA CICD engine scoring. |
-| Bragi graph service/SBOM B-E + differential gate remainder | B/03B-E, B/06 rest | agent running |
+| Bragi graph service/SBOM B-E + differential gate remainder | B/03B-E, B/06 rest | **MERGED** — 70 new tests (1597 pass). CAUTION: `.asgard_cache/` writes into scanned path by default (best-effort); use `use_disk_cache=False` or clean up when scanning read-only reference repos. Flags: Heimdall CLI gate flags (--diff/--tier), Plan 02-E debt delta producer. |
 
 Wave 2 leftovers to schedule after: cross-module CLI wiring slice (asguardian passthrough of Forseti global flags; Heimdall dispatch/--scoring=v2/confidence buckets; Verdandi new-API CLI; Freya crawler gate flags Fr/06), Freya testing/packaging (Fr/07).
 
