@@ -152,6 +152,15 @@ class SecurityScanConfig(BaseModel):
     scan_container: bool = Field(True, description="Enable container security scanning")
     scan_infrastructure: bool = Field(True, description="Enable infrastructure security scanning")
     min_severity: SecuritySeverity = Field(SecuritySeverity.LOW, description="Minimum severity to report")
+    scoring_version: str = Field(
+        "v1",
+        description=(
+            "Security score formula: 'v1' = legacy linear-subtractive (default "
+            "for one deprecation cycle), 'v2' = multiplicative decay with size "
+            "normalization and per-category soft caps. Both values are always "
+            "computed and dual-reported (legacy_score / security_score_v2)."
+        ),
+    )
     exclude_patterns: List[str] = Field(
         default_factory=lambda: [
             "__pycache__",

@@ -1,0 +1,49 @@
+# Taint benchmark corpus (plan 04 Testing / plan 01 acceptance gate).
+#
+# Each case names a fixture file and the expected outcome:
+#   expect: flow      -> exactly `count` flows, with the given bucket/severity
+#   expect: no_flow   -> zero flows at default reporting confidence (>= 0.25)
+#
+# Fixture pairs are deliberate TP/FP siblings per the DEEPTHINK_01 category
+# list; new AST/taint-migrated rules must add cases here.
+cases:
+  - file: tp_fstring_sqli_decoupled.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: tp_format_sqli.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_constant_fstring_sql.py
+    expect: no_flow
+  - file: fp_safe_path_join.py
+    expect: no_flow
+  - file: tp_command_injection_shell_true.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain]
+    cwe: CWE-78
+  - file: fp_command_shell_false.py
+    expect: no_flow
+  - file: tp_cross_function_sqli.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [probable, certain]
+    cwe: CWE-89
+  - file: fp_parameterized_query.py
+    expect: no_flow
+  - file: fp_exact_sanitizer.py
+    expect: no_flow
+  - file: tp_heuristic_sanitizer_kept.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [possible]
+    cwe: CWE-89

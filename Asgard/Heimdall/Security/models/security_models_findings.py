@@ -190,11 +190,31 @@ class SecurityReport(BaseModel):
     medium_issues: int = Field(0, description="Medium severity issues")
     low_issues: int = Field(0, description="Low severity issues")
     security_score: float = Field(100.0, ge=0.0, le=100.0, description="Overall security score (0-100)")
+    legacy_score: float = Field(
+        100.0, ge=0.0, le=100.0,
+        description="Deprecated linear-subtractive score (100-25c-10h-5m-1l); kept for one minor version"
+    )
+    security_score_v2: float = Field(
+        100.0, ge=0.0, le=100.0,
+        description="Multiplicative-decay score (size-normalized, per-category soft caps)"
+    )
+    total_lines_of_code: int = Field(
+        0, ge=0,
+        description="Total LOC scanned; used for v2 size normalization (0 = unknown, no normalization)"
+    )
     scan_duration_seconds: float = Field(0.0, description="Total duration of all scans")
     scanned_at: datetime = Field(default_factory=datetime.now, description="When the scan was performed")
 
     class Config:
         use_enum_values = True
+
+    # Risk-level -> severity translation for dependency vulnerabilities.
+    _RISK_TO_SEVERITY = {
+        DependencyRiskLevel.CRITICAL.value: "critical",
+        DependencyRiskLevel.HIGH.value: "high",
+        DependencyRiskLevel.MODERATE.value: "medium",
+        DependencyRiskLevel.LOW.value: "low",
+    }
 
     def calculate_totals(self) -> None:
         """Calculate total issue counts from all reports."""
@@ -203,50 +223,61 @@ class SecurityReport(BaseModel):
         self.high_issues = 0
         self.medium_issues = 0
         self.low_issues = 0
+        # category -> severity -> score-weighted effective count (v2 formula).
+        score_counts: Dict[str, Dict[str, float]] = {}
 
-        if self.secrets_report:
-            for finding in self.secrets_report.findings:
+        categorized = [
+            ("secrets", self.secrets_report),
+            ("vulnerabilities", self.vulnerability_report),
+            ("crypto", self.crypto_report),
+            ("access", self.access_report),
+            ("auth", self.auth_report),
+            ("headers", self.headers_report),
+            ("tls", self.tls_report),
+            ("container", self.container_report),
+            ("infrastructure", self.infrastructure_report),
+        ]
+        for category, sub_report in categorized:
+            if not sub_report or not hasattr(sub_report, "findings"):
+                continue
+            for finding in sub_report.findings:
                 self.total_issues += 1
                 self._increment_severity_count(finding.severity)
-        if self.vulnerability_report:
-            for vuln_finding in self.vulnerability_report.findings:
-                self.total_issues += 1
-                self._increment_severity_count(vuln_finding.severity)
+                self._add_score_count(
+                    score_counts, category, finding.severity,
+                    getattr(finding, "confidence", None),
+                )
+
         if self.dependency_report:
             for vuln in self.dependency_report.vulnerabilities:
                 self.total_issues += 1
                 self._increment_risk_count(vuln.risk_level)
-        if self.crypto_report:
-            for crypto_finding in self.crypto_report.findings:
-                self.total_issues += 1
-                self._increment_severity_count(crypto_finding.severity)
-        if self.access_report and hasattr(self.access_report, 'findings'):
-            for finding in self.access_report.findings:
-                self.total_issues += 1
-                self._increment_severity_count(finding.severity)
-        if self.auth_report and hasattr(self.auth_report, 'findings'):
-            for finding in self.auth_report.findings:
-                self.total_issues += 1
-                self._increment_severity_count(finding.severity)
-        if self.headers_report and hasattr(self.headers_report, 'findings'):
-            for finding in self.headers_report.findings:
-                self.total_issues += 1
-                self._increment_severity_count(finding.severity)
-        if self.tls_report and hasattr(self.tls_report, 'findings'):
-            for finding in self.tls_report.findings:
-                self.total_issues += 1
-                self._increment_severity_count(finding.severity)
-        if self.container_report and hasattr(self.container_report, 'findings'):
-            for finding in self.container_report.findings:
-                self.total_issues += 1
-                self._increment_severity_count(finding.severity)
+                severity = self._RISK_TO_SEVERITY.get(vuln.risk_level)
+                if severity:
+                    # Dependency vulns carry no detection confidence: full weight.
+                    self._add_score_count(score_counts, "dependencies", severity, None)
 
-        if self.infrastructure_report and hasattr(self.infrastructure_report, 'findings'):
-            for finding in self.infrastructure_report.findings:
-                self.total_issues += 1
-                self._increment_severity_count(finding.severity)
+        self._calculate_security_score(score_counts)
 
-        self._calculate_security_score()
+    @staticmethod
+    def _add_score_count(
+        score_counts: Dict[str, Dict[str, float]],
+        category: str,
+        severity: str,
+        confidence: Optional[float],
+    ) -> None:
+        """Accumulate a finding's aggregate-hygiene weight into the v2 sums."""
+        from Asgard.Heimdall.Security.normalization.scoring import score_weight
+
+        if severity not in ("critical", "high", "medium", "low"):
+            return
+        weight = score_weight(confidence)
+        if weight <= 0.0:
+            return
+        bucket = score_counts.setdefault(
+            category, {"critical": 0.0, "high": 0.0, "medium": 0.0, "low": 0.0}
+        )
+        bucket[severity] += weight
 
     def _increment_severity_count(self, severity: str) -> None:
         """Increment the count for a severity level."""
@@ -270,14 +301,38 @@ class SecurityReport(BaseModel):
         elif risk == DependencyRiskLevel.LOW.value:
             self.low_issues += 1
 
-    def _calculate_security_score(self) -> None:
-        """Calculate the overall security score."""
-        score = 100.0
-        score -= self.critical_issues * 25
-        score -= self.high_issues * 10
-        score -= self.medium_issues * 5
-        score -= self.low_issues * 1
-        self.security_score = max(0.0, score)
+    def _calculate_security_score(
+        self, score_counts: Optional[Dict[str, Dict[str, float]]] = None
+    ) -> None:
+        """
+        Calculate the overall security score.
+
+        Both formulas are always computed and dual-reported:
+        - ``legacy_score``: linear-subtractive (deprecated).
+        - ``security_score_v2``: multiplicative decay with size
+          normalization and per-category soft caps (see
+          ``Security/normalization/scoring.py``).
+
+        ``security_score`` follows ``scan_config.scoring_version`` ('v1'
+        default for one deprecation cycle).
+        """
+        from Asgard.Heimdall.Security.normalization.scoring import (
+            legacy_security_score,
+            multiplicative_security_score,
+        )
+
+        self.legacy_score = legacy_security_score(
+            self.critical_issues, self.high_issues,
+            self.medium_issues, self.low_issues,
+        )
+        self.security_score_v2 = multiplicative_security_score(
+            score_counts or {}, self.total_lines_of_code
+        )
+        version = getattr(self.scan_config, "scoring_version", "v1")
+        if version == "v2":
+            self.security_score = self.security_score_v2
+        else:
+            self.security_score = self.legacy_score
 
     @property
     def has_issues(self) -> bool:

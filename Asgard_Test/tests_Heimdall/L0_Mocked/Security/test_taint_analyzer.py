@@ -228,8 +228,11 @@ class TestSanitizedInputNotFlagged:
             ]
             assert len(sql_flows) == 0
 
-    def test_sanitize_function_clears_taint(self):
-        """Test that calling sanitize() on user input prevents taint propagation."""
+    def test_sanitize_function_downgrades_confidence(self):
+        """A heuristic sanitizer (custom sanitize()) keeps the flow but
+        downgrades confidence (x0.4 -> 'possible' bucket): we cannot verify
+        statically that the custom function neutralizes the payload, so the
+        finding is kept, honestly labeled, instead of silently dropped."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmpdir_path = Path(tmpdir)
             (tmpdir_path / "sanitize_use.py").write_text(
@@ -247,7 +250,33 @@ class TestSanitizedInputNotFlagged:
                 f for f in report.flows
                 if f.sink_type == TaintSinkType.SQL_QUERY.value
             ]
-            assert len(sql_flows) == 0
+            assert len(sql_flows) == 1
+            flow = sql_flows[0]
+            assert flow.sanitizers_present is True
+            assert flow.confidence_bucket in ("possible", "unlikely")
+            # Severity is orthogonal to confidence: still a critical-impact sink.
+            assert flow.severity == "critical"
+            assert any(s.kind == "heuristic" for s in flow.sanitizers_applied)
+
+    def test_exact_custom_sanitizer_clears_taint(self):
+        """User-declared custom sanitizers are trusted as exact: flow dropped."""
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmpdir_path = Path(tmpdir)
+            (tmpdir_path / "sanitize_use.py").write_text(
+                "def process():\n"
+                "    user_data = request.form.get('data')\n"
+                "    clean = my_quoter(user_data)\n"
+                "    cursor.execute('INSERT INTO t VALUES (' + clean + ')')\n"
+            )
+
+            config = TaintConfig(
+                exclude_patterns=["__pycache__", ".git"],
+                custom_sanitizers=["my_quoter"],
+            )
+            analyzer = TaintAnalyzer(config=config)
+            report = analyzer.scan(tmpdir_path)
+
+            assert len(report.flows) == 0
 
 
 class TestMultipleTaintSources:
