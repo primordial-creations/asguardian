@@ -24,15 +24,23 @@ from Asgard.Verdandi.Database.models.database_models import (
     ConnectionPoolMetrics,
     TransactionMetrics,
     DatabaseHealthResult,
+    PoolModeStats,
+    PoolSignature,
+    PoolSignatureClass,
 )
 from Asgard.Verdandi.Database.services.query_metrics import QueryMetricsCalculator
 from Asgard.Verdandi.Database.services.throughput_calculator import ThroughputCalculator
 from Asgard.Verdandi.Database.services.connection_analyzer import ConnectionAnalyzer
+from Asgard.Verdandi.Database.services.pool_signature_detector import PoolSignatureDetector
 
 __all__ = [
     "ConnectionAnalyzer",
     "ConnectionPoolMetrics",
     "DatabaseHealthResult",
+    "PoolModeStats",
+    "PoolSignature",
+    "PoolSignatureClass",
+    "PoolSignatureDetector",
     "QueryMetricsCalculator",
     "QueryMetricsInput",
     "QueryMetricsResult",

@@ -68,6 +68,82 @@ class ConnectionPoolMetrics(BaseModel):
     max_wait_time_ms: float = Field(..., description="Maximum wait time observed")
     connection_errors: int = Field(default=0, description="Connection error count")
     timeout_count: int = Field(default=0, description="Connection timeout count")
+    # Queue-wait vs service-time separation (RESEARCH_14): in-process query
+    # timers measure service time only; acquisition wait must be measured
+    # separately or the DB looks healthy while requests queue.
+    wait_p50_ms: Optional[float] = Field(
+        default=None, description="p50 of connection acquisition wait"
+    )
+    wait_p95_ms: Optional[float] = Field(
+        default=None, description="p95 of connection acquisition wait"
+    )
+    wait_p99_ms: Optional[float] = Field(
+        default=None, description="p99 of connection acquisition wait"
+    )
+    queue_share: Optional[float] = Field(
+        default=None,
+        description="wait_p95 / (wait_p95 + service_p95): fraction of tail "
+        "latency spent waiting for a connection",
+    )
+    # Little's-law sizing (RESEARCH_12): required L = qps x avg query seconds.
+    required_connections: Optional[float] = Field(
+        default=None, description="Little's-law required connections (lambda x W)"
+    )
+    headroom_connections: Optional[float] = Field(
+        default=None, description="pool_size - required_connections"
+    )
+    recommended_pool_size: Optional[int] = Field(
+        default=None, description="ceil(required / 0.7) — 70% target utilization"
+    )
+    leak_suspected: bool = Field(
+        default=False,
+        description="Timeouts observed at < 70% utilization: connections held, not busy",
+    )
+
+
+class PoolSignatureClass(str, Enum):
+    """Classification of a blended latency distribution's shape."""
+
+    POOL_EXHAUSTION = "pool_exhaustion"
+    CACHE_ASIDE_PATTERN = "cache_aside_pattern"
+    AMBIGUOUS_BIMODAL = "ambiguous_bimodal"
+    UNIMODAL = "unimodal"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class PoolModeStats(BaseModel):
+    """Per-mode statistics of a bimodal latency distribution."""
+
+    median_ms: float = Field(...)
+    mad_ms: float = Field(...)
+    count: int = Field(...)
+    weight: float = Field(...)
+
+
+class PoolSignature(BaseModel):
+    """
+    Pool-exhaustion signature analysis (RESEARCH_11).
+
+    Pool exhaustion produces a bimodal latency distribution with two
+    near-equal-variance peaks; the distance between the peaks IS the mean
+    queue wait. Cache-aside bimodality instead shows a narrow fast peak and
+    a wide slow peak.
+    """
+
+    classification: PoolSignatureClass = Field(...)
+    mean_queue_wait_ms: Optional[float] = Field(
+        default=None, description="m2 - m1 when classified as pool exhaustion"
+    )
+    modes: List[PoolModeStats] = Field(default_factory=list)
+    mad_disparity: Optional[float] = Field(
+        default=None, description="|s1 - s2| / max(s1, s2); < 0.35 => equal-variance"
+    )
+    confidence: str = Field(
+        default="medium", description="low | medium | high (high when wait samples corroborate)"
+    )
+    corroborated_by_wait_samples: bool = Field(default=False)
+    warnings: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
 
 
 class TransactionMetrics(BaseModel):
