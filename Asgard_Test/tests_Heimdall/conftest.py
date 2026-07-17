@@ -36,6 +36,24 @@ def pytest_collection_modifyitems(config, items):
             item.add_marker(pytest.mark.integration)
 
 
+@pytest.fixture(params=["regex", "ast"])
+def dual_engine_mode(request, monkeypatch):
+    """Dual-engine fixture: run a test under both scanning engines.
+
+    - "regex": forces ``ast_engine.TS_AVAILABLE = False`` so the regex
+      implementations run even when tree-sitter is installed.
+    - "ast": skips when the optional tree-sitter extra is not installed.
+    """
+    from Asgard.Heimdall.treesitter import ast_engine
+
+    if request.param == "ast":
+        if not ast_engine.is_engine_enabled("python"):
+            pytest.skip("tree-sitter not installed — AST engine unavailable")
+    else:
+        monkeypatch.setattr(ast_engine, "TS_AVAILABLE", False)
+    return request.param
+
+
 @pytest.fixture(scope="session")
 def project_root():
     """Return the project root directory."""
