@@ -17,6 +17,10 @@ from Asgard.Freya.Accessibility.models.accessibility_models import (
     KeyboardIssueType,
     ViolationSeverity,
 )
+from Asgard.Freya.Accessibility.services._focus_order_spatial import (
+    analyze_focus_order_spatial,
+    centers_from_focusables,
+)
 from Asgard.Freya.Accessibility.services._keyboard_nav_checks import (
     check_skip_link,
     get_focusable_elements,
@@ -94,6 +98,18 @@ class KeyboardNavigationTester:
 
                 interactive_issues = await test_interactive_elements(page)
                 issues.extend(interactive_issues)
+
+                # DEEPTHINK_01 spatial vs DOM analysis (heuristic warning only).
+                try:
+                    viewport = page.viewport_size or {"width": 1920}
+                    spatial_issue = analyze_focus_order_spatial(
+                        centers_from_focusables(focusable_elements),
+                        viewport_width=float(viewport.get("width", 1920)),
+                    )
+                    if spatial_issue is not None:
+                        issues.append(spatial_issue)
+                except Exception:
+                    pass
 
             finally:
                 await browser.close()

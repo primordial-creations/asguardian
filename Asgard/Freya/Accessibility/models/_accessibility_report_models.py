@@ -12,12 +12,31 @@ from pydantic import BaseModel, Field
 from Asgard.Freya.Accessibility.models._accessibility_enums import (
     ARIAViolationType,
     AccessibilityCategory,
+    AutomatabilityTier,
+    CheckVerdict,
+    ComponentCriticality,
     KeyboardIssueType,
     ScreenReaderIssueType,
     TextSize,
+    UsabilityImpact,
     ViolationSeverity,
     WCAGLevel,
 )
+
+
+def compliance_debt_framing(severity: ViolationSeverity, impact: Optional[UsabilityImpact]) -> Optional[str]:
+    """
+    DEEPTHINK_01 compliance-debt framing for low-impact strict violations:
+    never plain "low priority" - a strict WCAG violation is real legal
+    exposure even when its usability impact is small.
+    """
+    if impact != UsabilityImpact.LOW:
+        return None
+    return (
+        "Severity: Micro-barrier. Status: Strict WCAG Violation. "
+        "Low usability impact but real compliance debt - typically a "
+        "quick win worth fixing to reduce automated-litigation exposure."
+    )
 
 
 class AccessibilityViolation(BaseModel):
@@ -32,6 +51,22 @@ class AccessibilityViolation(BaseModel):
     suggested_fix: str = Field(..., description="Suggested remediation")
     impact: Optional[str] = Field(None, description="Impact on users")
     help_url: Optional[str] = Field(None, description="URL to documentation")
+    # Dual-axis fields (DEEPTHINK_01/05) - optional for API compatibility
+    usability_impact: Optional[UsabilityImpact] = Field(
+        None, description="Axis 2: heuristic usability impact gradient"
+    )
+    criticality: Optional[ComponentCriticality] = Field(
+        None, description="Component criticality context weight"
+    )
+    verdict: CheckVerdict = Field(
+        CheckVerdict.FAIL, description="Check verdict (pass/fail/warning/needs_review)"
+    )
+    manual_test_directive: Optional[str] = Field(
+        None, description="Manual QA directive for needs_review verdicts"
+    )
+    framing: Optional[str] = Field(
+        None, description="Compliance-debt framing for low-impact strict violations"
+    )
 
 
 class AccessibilityReport(BaseModel):
@@ -45,6 +80,17 @@ class AccessibilityReport(BaseModel):
     notices: List[AccessibilityViolation] = Field(default_factory=list)
     passed_checks: int = Field(0, description="Number of passed checks")
     total_checks: int = Field(0, description="Total number of checks")
+    needs_review_count: int = Field(
+        0, description="Findings automation cannot decide - require human review"
+    )
+    conformance_ledger: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Axis 1 (auditor-facing): WCAG 2.1 success criterion id -> "
+            "pass/fail/needs_review/not_checked, explicitly listing criteria "
+            "this tool does NOT check (coverage honesty, DEEPTHINK_03)"
+        )
+    )
 
     @property
     def has_violations(self) -> bool:
@@ -189,6 +235,25 @@ class ARIAViolation(BaseModel):
     suggested_fix: str = Field(..., description="How to fix")
     aria_attribute: Optional[str] = Field(None, description="Related ARIA attribute")
     role: Optional[str] = Field(None, description="Element role")
+    # Automatability spectrum fields (DEEPTHINK_05) - optional for API compatibility
+    verdict: CheckVerdict = Field(
+        CheckVerdict.FAIL, description="Check verdict (fail/warning/needs_review)"
+    )
+    automatability: Optional[AutomatabilityTier] = Field(
+        None, description="How automatable this class of check is"
+    )
+    manual_test_directive: Optional[str] = Field(
+        None, description="Manual QA directive for needs_review verdicts"
+    )
+    usability_impact: Optional[UsabilityImpact] = Field(
+        None, description="Axis 2: heuristic usability impact gradient"
+    )
+    criticality: Optional[ComponentCriticality] = Field(
+        None, description="Component criticality context weight"
+    )
+    support_notes: Optional[str] = Field(
+        None, description="AT/browser support-matrix notes (future hook; no dataset yet)"
+    )
 
 
 class ARIAReport(BaseModel):
@@ -204,11 +269,29 @@ class ARIAReport(BaseModel):
         default_factory=dict,
         description="Count of ARIA attributes"
     )
+    needs_review: List[ARIAViolation] = Field(
+        default_factory=list,
+        description="Claims automation cannot decide - require human review"
+    )
+    warning_count: int = Field(0, description="Heuristic warnings (not hard failures)")
+    needs_review_count: int = Field(0, description="Count of needs_review items")
+    tier_counts: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Finding counts per automatability tier"
+    )
 
     @property
     def has_violations(self) -> bool:
         """Check if there are ARIA violations."""
         return len(self.violations) > 0
+
+    @property
+    def fully_passing(self) -> bool:
+        """
+        True only when nothing failed AND nothing needs human review.
+        A page with NEEDS_REVIEW items must never report as 100% passing.
+        """
+        return not self.violations and not self.needs_review
 
 
 class ScreenReaderIssue(BaseModel):

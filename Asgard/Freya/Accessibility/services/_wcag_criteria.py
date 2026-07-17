@@ -139,3 +139,58 @@ WCAG_CRITERIA = {
         "severity": ViolationSeverity.CRITICAL,
     },
 }
+
+
+#: All WCAG 2.1 success criteria (A, AA, AAA). Used by the conformance
+#: ledger to be explicit about the criteria this tool does NOT check
+#: (coverage honesty, DEEPTHINK_03).
+ALL_WCAG_21_CRITERIA = [
+    "1.1.1",
+    "1.2.1", "1.2.2", "1.2.3", "1.2.4", "1.2.5", "1.2.6", "1.2.7", "1.2.8", "1.2.9",
+    "1.3.1", "1.3.2", "1.3.3", "1.3.4", "1.3.5", "1.3.6",
+    "1.4.1", "1.4.2", "1.4.3", "1.4.4", "1.4.5", "1.4.6", "1.4.7", "1.4.8", "1.4.9",
+    "1.4.10", "1.4.11", "1.4.12", "1.4.13",
+    "2.1.1", "2.1.2", "2.1.3", "2.1.4",
+    "2.2.1", "2.2.2", "2.2.3", "2.2.4", "2.2.5", "2.2.6",
+    "2.3.1", "2.3.2", "2.3.3",
+    "2.4.1", "2.4.2", "2.4.3", "2.4.4", "2.4.5", "2.4.6", "2.4.7", "2.4.8", "2.4.9", "2.4.10",
+    "2.5.1", "2.5.2", "2.5.3", "2.5.4", "2.5.5", "2.5.6",
+    "3.1.1", "3.1.2", "3.1.3", "3.1.4", "3.1.5", "3.1.6",
+    "3.2.1", "3.2.2", "3.2.3", "3.2.4", "3.2.5",
+    "3.3.1", "3.3.2", "3.3.3", "3.3.4", "3.3.5", "3.3.6",
+    "4.1.1", "4.1.2", "4.1.3",
+]
+
+
+def build_conformance_ledger(violations, needs_review_refs=None) -> dict:
+    """
+    Build the Axis-1 conformance ledger: every WCAG 2.1 success criterion
+    mapped to pass/fail/needs_review/not_checked.
+
+    - Criteria in WCAG_CRITERIA (the checked set) default to "pass".
+    - Criteria with at least one violation become "fail".
+    - Criteria in needs_review_refs become "needs_review" (unless failed).
+    - All other WCAG 2.1 criteria are explicitly "not_checked".
+    """
+    needs_review_refs = set(needs_review_refs or [])
+    failed = set()
+    for violation in violations:
+        reference = getattr(violation, "wcag_reference", None) or getattr(violation, "wcag_criterion", None)
+        if reference:
+            failed.add(str(reference))
+
+    ledger = {}
+    checked = set(WCAG_CRITERIA.keys())
+    for criterion in ALL_WCAG_21_CRITERIA:
+        if criterion in failed:
+            ledger[criterion] = "fail"
+        elif criterion in needs_review_refs:
+            ledger[criterion] = "needs_review"
+        elif criterion in checked:
+            ledger[criterion] = "pass"
+        else:
+            ledger[criterion] = "not_checked"
+    # Keep any failed criteria outside the 2.1 catalog visible too.
+    for criterion in sorted(failed - set(ALL_WCAG_21_CRITERIA)):
+        ledger[criterion] = "fail"
+    return ledger

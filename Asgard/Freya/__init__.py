@@ -149,6 +149,18 @@ from Asgard.Freya.Links import (
     RedirectChain,
 )
 
+from Asgard.Freya.Scoring import (
+    Finding,
+    GateConfig,
+    GateResult,
+    GradeCalculator,
+    GradedScore,
+    QualityGate,
+    QualityGrade,
+    SeverityMapper,
+    UniversalSeverity,
+)
+
 from Asgard.Freya.Images import (
     ImageOptimizationScanner,
     ImageConfig,
@@ -245,6 +257,16 @@ __all__ = [
     "LinkConfig",
     "BrokenLink",
     "RedirectChain",
+    # Scoring (universal severity / grading)
+    "Finding",
+    "GateConfig",
+    "GateResult",
+    "GradeCalculator",
+    "GradedScore",
+    "QualityGate",
+    "QualityGrade",
+    "SeverityMapper",
+    "UniversalSeverity",
     # Images
     "ImageOptimizationScanner",
     "ImageConfig",
