@@ -21,6 +21,10 @@ from Asgard.Forseti.cli.handlers_docs_proto_avro_audit import (
     _handle_avro,
     _handle_audit,
 )
+from Asgard.Forseti.cli.handlers_rules_baseline import (
+    _handle_rules,
+    _handle_baseline,
+)
 
 
 def main(args: Optional[list[str]] = None) -> int:
@@ -57,6 +61,10 @@ def main(args: Optional[list[str]] = None) -> int:
             return _handle_avro(parsed)
         elif parsed.module == "audit":
             return _handle_audit(parsed)
+        elif parsed.module == "rules":
+            return _handle_rules(parsed)
+        elif parsed.module == "baseline":
+            return _handle_baseline(parsed)
         else:
             parser.print_help()
             return 1

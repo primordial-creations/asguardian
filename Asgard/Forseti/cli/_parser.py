@@ -14,6 +14,8 @@ from Asgard.Forseti.cli._parser_commands import (
     _add_protobuf_parser,
     _add_avro_parser,
     _add_audit_parser,
+    _add_rules_parser,
+    _add_baseline_parser,
 )
 
 
@@ -68,7 +70,7 @@ Examples:
 
     parser.add_argument(
         "--format",
-        choices=["text", "json", "markdown", "github"],
+        choices=["text", "json", "markdown", "github", "sarif"],
         default="text",
         help="Output format (default: text)",
     )
@@ -82,7 +84,38 @@ Examples:
     parser.add_argument(
         "--strict",
         action="store_true",
-        help="Enable strict validation mode",
+        help="Enable strict validation mode (alias for --profile ci)",
+    )
+
+    parser.add_argument(
+        "--profile",
+        choices=["ide", "pre-commit", "ci", "audit"],
+        default=None,
+        help="Validation profile (rule selection, budget and blocking policy)",
+    )
+
+    parser.add_argument(
+        "--config",
+        default=None,
+        help="Path to .forseti.yaml configuration file",
+    )
+
+    parser.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Errors-only output (dense greppable lines)",
+    )
+
+    parser.add_argument(
+        "--explain",
+        action="store_true",
+        help="Include rationale and remediation with each finding",
+    )
+
+    parser.add_argument(
+        "--no-baseline",
+        action="store_true",
+        help="Ignore any .forseti-baseline.json",
     )
 
     parser.add_argument(
@@ -104,5 +137,7 @@ Examples:
     _add_protobuf_parser(subparsers)
     _add_avro_parser(subparsers)
     _add_audit_parser(subparsers)
+    _add_rules_parser(subparsers)
+    _add_baseline_parser(subparsers)
 
     return parser

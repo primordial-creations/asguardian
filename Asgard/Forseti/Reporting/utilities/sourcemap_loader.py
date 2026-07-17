@@ -53,16 +53,39 @@ def load_with_sourcemap(path: str | Path) -> tuple[Any, SourceMap]:
 
 def lookup(sourcemap: SourceMap, json_path: str) -> tuple[Optional[int], Optional[int]]:
     """
-    Look up the position of a json path, falling back to the deepest
-    mapped ancestor. Returns (None, None) when nothing matches.
+    Look up the position of a json path, resolving as deep as possible.
+
+    Legacy finding paths embed raw keys containing '/' (e.g.
+    '/paths/pets/{petId}/get'); resolution greedily merges tokens into
+    slash-containing keys ('~1pets~1{petId}') when needed. Falls back to
+    the deepest mapped ancestor; (None, None) when nothing matches.
     """
-    candidate = json_path if json_path.startswith("/") else f"/{json_path}"
-    while True:
-        if candidate in sourcemap:
-            return sourcemap[candidate]
-        if candidate in ("", "/"):
-            return (None, None)
-        candidate = candidate.rsplit("/", 1)[0] or "/"
+    path = json_path if json_path.startswith("/") else f"/{json_path}"
+    if path in sourcemap:
+        return sourcemap[path]
+    tokens = [t for t in path.strip("/").split("/") if t]
+    best = sourcemap.get("/", (None, None))
+    current = ""
+    index = 0
+    while index < len(tokens):
+        advanced = False
+        for end in range(len(tokens), index, -1):
+            merged = "~1" + "~1".join(tokens[index:end])
+            for token in (tokens[index] if end == index + 1 else None, merged):
+                if token is None:
+                    continue
+                candidate = f"{current}/{token}"
+                if candidate in sourcemap:
+                    current = candidate
+                    best = sourcemap[candidate]
+                    index = end
+                    advanced = True
+                    break
+            if advanced:
+                break
+        if not advanced:
+            break
+    return best
 
 
 def annotate_findings(findings, sourcemap: SourceMap) -> None:
