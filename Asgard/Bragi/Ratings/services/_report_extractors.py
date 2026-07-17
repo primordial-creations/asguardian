@@ -66,11 +66,11 @@ def extract_bundles(
     missing: List[str] = []
     per_file_counts: Dict[str, Dict[str, int]] = {}
     project_counts: Dict[str, int] = {}
+    security_blocker_files: Dict[str, str] = {}
     has_blocker = False
     blocker_desc = ""
 
     def _tally(file_path: str, severity: Optional[str]) -> None:
-        nonlocal has_blocker, blocker_desc
         sev = severity or "medium"
         counts = per_file_counts.setdefault(file_path or "<unknown>", {})
         counts[sev] = counts.get(sev, 0) + 1
@@ -95,31 +95,30 @@ def extract_bundles(
         for finding in _iter_security_findings(security_report):
             severity = _severity_of(finding)
             _tally(_file_of(finding), severity)
-            if severity in ("blocker", "critical") and not has_blocker:
-                has_blocker = True
-                blocker_desc = (
+            # The blocker cap is reserved for Blocker/Critical BUGS and
+            # VULNERABILITIES (Plan 01 section 3.3) - a critical *debt* item
+            # (e.g. very high complexity) is capped at D by the complexity
+            # gate, never at E by this one.
+            if severity in ("blocker", "critical"):
+                description = (
                     f"{severity} security finding: "
                     f"{str(getattr(finding, 'description', '') or getattr(finding, 'message', '') or 'unnamed')[:80]}"
                 )
+                security_blocker_files.setdefault(_file_of(finding) or "<unknown>", description)
+                if not has_blocker:
+                    has_blocker = True
+                    blocker_desc = description
     else:
         missing.append(SOURCE_SECURITY)
 
-    # Any critical debt/quality item is also a blocker gate input.
-    if not has_blocker:
-        for counts in per_file_counts.values():
-            if counts.get("critical", 0) or counts.get("blocker", 0):
-                has_blocker = True
-                blocker_desc = "critical-severity issue detected"
-                break
-
     file_bundles: List[FileMetricBundle] = []
     for file_path, counts in sorted(per_file_counts.items()):
+        file_blocker = security_blocker_files.get(file_path, "")
         file_bundles.append(FileMetricBundle(
             file_path=file_path,
             bug_counts_by_severity=counts,
-            has_blocker_issue=bool(counts.get("critical", 0) or counts.get("blocker", 0)),
-            blocker_description="critical-severity issue in file" if
-            (counts.get("critical", 0) or counts.get("blocker", 0)) else "",
+            has_blocker_issue=bool(file_blocker),
+            blocker_description=file_blocker,
             sources_present=present,
             sources_missing=missing,
         ))

@@ -92,7 +92,10 @@ class SBOMGenerator:
                     version = ""
                     resolution = VersionResolution.UNKNOWN
 
-                purl = make_purl(name, resolved or version_spec)
+                # purl versions must be concrete: a spec range like ">=4.0,<5"
+                # is never a valid purl version. Unresolved -> version-less
+                # purl, with provenance recorded in version_resolution.
+                purl = make_purl(name, resolved)
 
                 component = SBOMComponent(
                     name=name,

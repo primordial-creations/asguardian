@@ -234,3 +234,90 @@ class TestGetModuleIndex:
         report.add_module(ModuleDependencies(
             module_name="late", file_path="/p/late.py", relative_path="late.py"))
         assert report.get_module("late") is not None
+
+
+class TestAdversarialExpressions:
+    """Regressions from the adversarial review (BLOCKERs 1-3, MAJORs 10-11)."""
+
+    def test_or_later_is_suffix_not_expression(self):
+        """BLOCKER-1: 'GPLv3 or later' must stay PROHIBITED, not be split
+        into arms GPLv3/later and laundered through UNKNOWN."""
+        decision = _policy().evaluate("GPLv3 or later")
+        assert decision.verdict == LicenseVerdict.PROHIBITED
+        decision = _policy().evaluate("GNU General Public License v3 or later")
+        assert decision.verdict == LicenseVerdict.PROHIBITED
+
+    def test_prohibited_not_laundered_via_unknown_arm(self):
+        """BLOCKER-1: OR with a prohibited arm and an unknown arm is
+        PROHIBITED, never UNKNOWN-better-than-PROHIBITED."""
+        decision = _policy().evaluate("GPL-3.0 OR SomeMysteryLicense")
+        assert decision.verdict == LicenseVerdict.PROHIBITED
+
+    def test_all_unknown_arms_is_unknown(self):
+        decision = _policy().evaluate("FooLicense OR BarLicense")
+        assert decision.verdict == LicenseVerdict.UNKNOWN
+
+    def test_or_known_allowed_arm_still_wins(self):
+        decision = _policy().evaluate("MysteryLicense OR MIT")
+        assert decision.verdict == LicenseVerdict.ALLOWED
+        assert decision.chosen_arm == "MIT"
+
+    def test_free_text_not_matched_by_substring_words(self):
+        """BLOCKER-2: 'permit'/'discretion' must not classify as MIT/ISC."""
+        for text in (
+            "Use is permitted at the sole discretion of the vendor",
+            "Commercial license; redistribution not permitted",
+        ):
+            spdx_id, category = normalize_license(text)
+            assert spdx_id is None, text
+            assert category == LicenseCategory.UNKNOWN
+
+    def test_long_free_text_conservatively_unknown(self):
+        """BLOCKER-2: a paragraph mentioning MIT is UNKNOWN, not ALLOWED."""
+        prose = ("This proprietary agreement was drafted in Cambridge near MIT and "
+                 "governs all use of the software; no rights are granted except as "
+                 "expressly stated herein by the licensor in writing.")
+        assert normalize_license(prose) == (None, LicenseCategory.UNKNOWN)
+        assert _policy().evaluate(prose).verdict == LicenseVerdict.UNKNOWN
+
+    def test_nested_parens_no_recursion_error(self):
+        """BLOCKER-3: '((MIT) OR GPL-3.0)' parses; garbage parens -> UNKNOWN."""
+        decision = _policy().evaluate("((MIT) OR GPL-3.0)")
+        assert decision.verdict == LicenseVerdict.ALLOWED
+        assert decision.chosen_arm == "MIT"
+        deep = "(" * 40 + "MIT OR GPL-3.0" + ")" * 40
+        decision = _policy().evaluate(deep)
+        assert decision.verdict == LicenseVerdict.UNKNOWN  # depth guard
+        assert "malformed" in decision.rationale or "deep" in decision.rationale
+
+    def test_unbalanced_parens_unknown_not_crash(self):
+        for expr in ("(MIT OR GPL-3.0", "MIT OR GPL-3.0)", "(()", "OR MIT", "MIT OR"):
+            decision = _policy().evaluate(expr)
+            assert decision.verdict == LicenseVerdict.UNKNOWN, expr
+
+    def test_warn_keeps_legacy_is_allowed_true(self):
+        """MAJOR-10: WARN packages keep is_allowed=True (legacy compliant
+        counts); the stricter signal lives in the verdict field."""
+        checker = _checker()
+        pkg = checker._classify_license(
+            PackageLicense(package_name="p", license_name="LGPL-3.0"))
+        assert pkg.is_allowed is True
+        assert pkg.is_warning is True
+        assert pkg.verdict == "warn"
+        mit = checker._classify_license(
+            PackageLicense(package_name="m", license_name="MIT"))
+        assert mit.verdict == "allowed"
+
+    def test_unresolved_purl_has_no_version(self):
+        """MAJOR-11: spec ranges never appear as purl versions."""
+        from Asgard.Bragi.Dependencies.models.sbom_models import SBOMConfig
+        from Asgard.Bragi.Dependencies.services.sbom_generator import SBOMGenerator
+        import pathlib, tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp)
+            (path / "requirements.txt").write_text("not-a-real-pkg-xyz>=4.0,<5.0\n")
+            document = SBOMGenerator(SBOMConfig(scan_path=path)).generate(str(path))
+        component = document.components[0]
+        assert component.purl == "pkg:pypi/not-a-real-pkg-xyz"
+        assert "@" not in component.purl
+        assert component.version_resolution == "declared-only"

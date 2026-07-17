@@ -382,3 +382,97 @@ class TestExtractors:
         assert score_to_grade(0.75) == "C"
         assert score_to_grade(0.65) == "D"
         assert score_to_grade(0.30) == "E"
+
+
+class TestAdversarialReviewRegressions:
+    """Regressions from the adversarial review (BLOCKERs 4-5, MAJORs 6, 12-13)."""
+
+    def test_critical_debt_item_does_not_trigger_blocker_cap(self):
+        """BLOCKER-4: a critical DEBT item (e.g. CC>30) must not cap the
+        project at E; the blocker cap is reserved for bugs/vulnerabilities."""
+        calc = RatingsCalculator()
+        debt_report = SimpleNamespace(
+            total_debt_hours=2.0, total_lines_of_code=5000, total_debt_items=1,
+            debt_items=[SimpleNamespace(
+                severity="critical", file_path="big.py",
+                description="High complexity function")],
+        )
+        ratings = calc.calculate_from_reports(scan_path=".", debt_report=debt_report)
+        # Heavily penalized via severity-weighted density, but not E-capped.
+        for fs in ratings.file_scores:
+            assert fs.cap.applied is False
+        from Asgard.Bragi.Ratings.services._report_extractors import extract_bundles
+        _, project = extract_bundles(debt_report=debt_report)
+        assert project.has_blocker_issue is False
+
+    def test_critical_security_finding_still_blocks(self):
+        """Counterpart: critical VULNERABILITIES do trigger the blocker cap."""
+        report = SimpleNamespace(findings=[
+            SimpleNamespace(severity="critical", file_path="s.py", description="RCE")])
+        bundles, project = extract_bundles(security_report=report)
+        assert project.has_blocker_issue is True
+        assert bundles[0].has_blocker_issue is True
+
+    def test_file_splitting_cannot_launder_grade(self):
+        """BLOCKER-5: 400 medium bugs split across 400 files must grade like
+        400 bugs in one file, not like a clean project."""
+        calc = RatingsCalculator()
+
+        def report(n_files):
+            items = [SimpleNamespace(severity="medium", file_path=f"f{i}.py")
+                     for i in range(400)] if n_files == 400 else \
+                    [SimpleNamespace(severity="medium", file_path="one.py")
+                     for _ in range(400)]
+            return SimpleNamespace(
+                total_debt_hours=0.0, total_lines_of_code=500,
+                total_debt_items=400, debt_items=items)
+
+        concentrated = calc.calculate_from_reports(scan_path=".", debt_report=report(1))
+        split = calc.calculate_from_reports(scan_path=".", debt_report=report(400))
+        assert split.composite_grade == concentrated.composite_grade == "E"
+        assert split.composite_score == pytest.approx(concentrated.composite_score, abs=0.05)
+
+    def test_tiny_e_file_does_not_sink_huge_clean_project(self):
+        """MAJOR-6: the footprint spans total LOC including clean code."""
+        calc = RatingsCalculator()
+        debt_report = SimpleNamespace(
+            total_debt_hours=1.0, total_lines_of_code=100000, total_debt_items=40,
+            debt_items=[SimpleNamespace(severity="medium", file_path="bad.py")
+                        for _ in range(40)],
+        )
+        ratings = calc.calculate_from_reports(scan_path=".", debt_report=debt_report)
+        assert ratings.composite_grade != "E"
+        assert ratings.risk_profile.total_loc == 100000
+        assert ratings.risk_profile.estimated is True  # per-file LOC proxied
+
+    def test_risk_profile_counts_clean_loc_as_a(self):
+        engine = CompositeScoreEngine()
+        bad = engine.score_file(FileMetricBundle(
+            file_path="bad.py", loc=100,
+            bug_counts_by_severity={"critical": 50, "high": 100}))
+        profile = engine.risk_profile([bad], total_loc=10000)
+        assert profile.loc_by_grade["A"] == 9900
+        assert profile.loc_by_grade["E"] == 100
+        assert profile.estimated is False
+
+    def test_shapeless_security_report_is_partial_not_measured(self):
+        """MINOR-12: an empty duck-typed report is not evidence of a scan."""
+        calc = RatingsCalculator()
+        dim = calc._calculate_security(SimpleNamespace())
+        assert dim.confidence == MeasurementConfidence.PARTIAL.value
+        assert dim.rating == "A"  # legacy letter preserved
+        shaped = calc._calculate_security(SimpleNamespace(findings=[]))
+        assert shaped.confidence == MeasurementConfidence.MEASURED.value
+
+    def test_composite_grade_never_better_than_score_grade(self):
+        """MINOR-13 reconciliation: grade = worse of footprint and score."""
+        calc = RatingsCalculator()
+        debt_report = SimpleNamespace(
+            total_debt_hours=0.0, total_lines_of_code=500, total_debt_items=200,
+            debt_items=[SimpleNamespace(severity="high", file_path=f"f{i}.py")
+                        for i in range(200)],
+        )
+        ratings = calc.calculate_from_reports(scan_path=".", debt_report=debt_report)
+        from Asgard.Bragi.Ratings.services.composite_score_engine import score_to_grade
+        assert "ABCDE".index(ratings.composite_grade) >= \
+            "ABCDE".index(score_to_grade(ratings.composite_score))

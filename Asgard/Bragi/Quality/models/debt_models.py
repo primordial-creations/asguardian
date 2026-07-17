@@ -71,7 +71,15 @@ class RemediationFunction(BaseModel):
     unit: str = Field("issue", description="Unit the coefficient applies to")
     batchability: float = Field(
         0.5, ge=0.0, le=1.0,
-        description="Geometric discount d: ~0.05 for mechanical debt, ~0.8+ for cognitive debt"
+        description="Geometric discount d: ~0.05 for mechanical debt, ~0.9 for cognitive debt"
+    )
+    discount_floor: float = Field(
+        0.0, ge=0.0, le=1.0,
+        description=(
+            "Minimum per-item cost multiplier. 0 for mechanical debt (fully "
+            "batchable); ~0.25 for cognitive debt so a pile of smells stays "
+            "near-additive instead of being capped by the geometric series."
+        ),
     )
 
 

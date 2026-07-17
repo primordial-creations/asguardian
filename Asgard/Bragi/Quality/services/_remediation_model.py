@@ -53,13 +53,17 @@ DEFAULT_FUNCTIONS: Dict[str, RemediationFunction] = {
         kind="constant", base_minutes=30.0, coefficient_minutes=0.0,
         unit="dependency_audit", batchability=0.20,
     ),
+    # Cognitive debt: each God function / coupling hotspot needs independent
+    # thought, so the discount is weak AND floored at 25% - a pile of smells
+    # stays near-additive rather than being capped by the geometric series
+    # (which would let debt concentration divide the TDR).
     DebtType.CODE.value: RemediationFunction(
         kind="linear_with_offset", base_minutes=10.0, coefficient_minutes=30.0,
-        unit="severity_step", batchability=0.80,
+        unit="severity_step", batchability=0.90, discount_floor=0.25,
     ),
     DebtType.DESIGN.value: RemediationFunction(
         kind="linear_with_offset", base_minutes=30.0, coefficient_minutes=60.0,
-        unit="coupling_hotspot", batchability=0.90,
+        unit="coupling_hotspot", batchability=0.90, discount_floor=0.25,
     ),
 }
 
@@ -94,7 +98,16 @@ class RemediationModel:
         if debt_type == DebtType.DOCUMENTATION.value:
             match = _COUNT_PATTERN.search(item.description or "")
             units = int(match.group(1)) if match else 1
-            return function.base_minutes + function.coefficient_minutes * units
+            # An aggregated count-item ("50 undocumented public functions")
+            # must cost the same as 50 single items: apply the batching
+            # discount to the units INSIDE the item (geometric series), so
+            # both shapes total identically in the aggregator.
+            d = function.batchability
+            if d >= 1.0:
+                series = float(units)
+            else:
+                series = (1.0 - d ** units) / (1.0 - d) if d > 0 else 1.0
+            return function.base_minutes + function.coefficient_minutes * series
 
         severity_minutes = SEVERITY_MINUTES.get(severity, SEVERITY_MINUTES["medium"])
         if function.kind == "constant":

@@ -114,10 +114,20 @@ class FileQualityScore(BaseModel):
 
 
 class RiskProfile(BaseModel):
-    """SIG-style risk-profile footprint: distribution of LOC across grade bands."""
-    total_loc: int = Field(0, ge=0, description="Total LOC across scored files")
+    """SIG-style risk-profile footprint: distribution of LOC across grade bands.
+
+    The footprint spans the WHOLE measured codebase: LOC in files without
+    findings counts in the A band, so one tiny E file cannot sink a large
+    clean project, and spreading issues across files cannot hide them
+    (project density is reconciled separately).
+    """
+    total_loc: int = Field(0, ge=0, description="Total LOC across the measured codebase")
     loc_by_grade: Dict[str, int] = Field(default_factory=dict, description="LOC per letter grade")
     pct_by_grade: Dict[str, float] = Field(default_factory=dict, description="% of LOC per letter grade")
+    estimated: bool = Field(
+        False,
+        description="True when per-file LOC was unavailable and a conservative proxy was used (PARTIAL confidence)"
+    )
 
     @property
     def pct_in(self) -> Dict[str, float]:

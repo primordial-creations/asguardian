@@ -31,6 +31,21 @@ from Asgard.Bragi.Quality.services._remediation_model import RemediationModel
 CentralityProvider = Callable[[str], Optional[float]]
 
 CONTEXT_COST_MINUTES = 30.0
+
+# Green-field development-cost anchor (RESEARCH_01/04).
+DEVELOPMENT_MINUTES_PER_LOC = 30.0
+
+
+def compute_tdr_percent(total_debt_minutes: float, total_loc: int) -> Optional[float]:
+    """
+    Standard Technical Debt Ratio %: debt minutes / (LOC x 30 min/LOC) x 100.
+
+    This is THE production formula (used by TechnicalDebtAnalyzer); golden
+    tests anchor on it directly. Returns None when LOC is unknown.
+    """
+    if total_loc <= 0:
+        return None
+    return total_debt_minutes / (total_loc * DEVELOPMENT_MINUTES_PER_LOC) * 100.0
 EXPOSURE_BETA = 2.0            # percentile 1.0 -> x3 multiplier (CISQ max)
 REWRITE_MINUTES_PER_LOC = 0.5  # configurable fraction of the 30 min/LOC anchor
 INTERVAL_LOW_FACTOR = 0.75
@@ -97,10 +112,13 @@ class DebtAggregator:
         for (file_path, debt_type), group in sorted(groups.items()):
             function = self.model.function_for(group[0])
             d = function.batchability
+            floor = function.discount_floor
             # Deterministic order: costliest first, so the geometric discount
-            # applies to the cheaper repetitions.
+            # applies to the cheaper repetitions. The per-type floor keeps
+            # cognitive debt near-additive: concentrating 100 smells in one
+            # file can never cost less than 25% of the additive sum.
             minutes = sorted((self.model.minutes_for(i) for i in group), reverse=True)
-            batched = sum(m * (d ** idx) for idx, m in enumerate(minutes))
+            batched = sum(m * max(d ** idx, floor) for idx, m in enumerate(minutes))
 
             if debt_type == DebtType.DESIGN.value:
                 batched *= self._exposure_multiplier(file_path)

@@ -25,7 +25,11 @@ from Asgard.Bragi.Quality.models.debt_models import (
     TimeHorizon,
     TimeProjection,
 )
-from Asgard.Bragi.Quality.services._debt_aggregator import CentralityProvider, DebtAggregator
+from Asgard.Bragi.Quality.services._debt_aggregator import (
+    CentralityProvider,
+    DebtAggregator,
+    compute_tdr_percent,
+)
 from Asgard.Bragi.Quality.services._debt_workers import (
     analyze_code_debt,
     analyze_dependency_debt,
@@ -135,9 +139,8 @@ class TechnicalDebtAnalyzer:
             minutes = self.remediation_model.minutes_for(item)
             item.effort_interval = self._item_interval(minutes)
             item.non_remediation_factor = self.remediation_model.non_remediation_factor(item)
-        if report.total_lines_of_code > 0:
-            development_minutes = report.total_lines_of_code * 30.0
-            report.tdr_percent = aggregated.total_minutes / development_minutes * 100.0
+        report.tdr_percent = compute_tdr_percent(
+            aggregated.total_minutes, report.total_lines_of_code)
 
         report.prioritized_items = self._prioritize_debt_items(report.debt_items)
         report.roi_analysis = self._calculate_roi_analysis(report.debt_items)

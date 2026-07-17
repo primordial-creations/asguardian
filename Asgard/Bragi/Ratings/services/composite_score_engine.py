@@ -250,18 +250,52 @@ class CompositeScoreEngine:
 
     # --------------------------------------------------------------- project
 
+    # Conservative LOC proxy cap for files whose real size is unknown.
+    UNKNOWN_FILE_LOC_PROXY_CAP = 500
+
     # Risk-profile ladder thresholds (RESEARCH_05 / SIG-style defaults).
-    def risk_profile(self, file_scores: List[FileQualityScore]) -> RiskProfile:
-        """Distribution of LOC across grade bands (files with unknown LOC weigh 1)."""
+    def risk_profile(
+        self, file_scores: List[FileQualityScore], total_loc: int = 0
+    ) -> RiskProfile:
+        """
+        Distribution of LOC across grade bands over the WHOLE codebase.
+
+        Files with unknown LOC receive a conservative proxy (the remaining
+        project LOC spread across them, capped at 500 per file) and the
+        profile is marked `estimated`. Project LOC not attributed to any
+        finding-bearing file counts as clean (A band).
+        """
         loc_by_grade: Dict[str, int] = {g: 0 for g in "ABCDE"}
-        for fs in file_scores:
-            weight = fs.loc if fs.loc > 0 else 1
-            loc_by_grade[fs.grade] = loc_by_grade.get(fs.grade, 0) + weight
+        known = [fs for fs in file_scores if fs.loc > 0]
+        unknown = [fs for fs in file_scores if fs.loc <= 0]
+        known_loc = sum(fs.loc for fs in known)
+
+        estimated = bool(unknown)
+        remaining = max(total_loc - known_loc, 0)
+        if unknown:
+            proxy = max(remaining // len(unknown) if remaining else 1, 1)
+            proxy = min(proxy, self.UNKNOWN_FILE_LOC_PROXY_CAP)
+        else:
+            proxy = 0
+
+        for fs in known:
+            loc_by_grade[fs.grade] = loc_by_grade.get(fs.grade, 0) + fs.loc
+        for fs in unknown:
+            loc_by_grade[fs.grade] = loc_by_grade.get(fs.grade, 0) + proxy
+
+        attributed = sum(loc_by_grade.values())
+        # Clean remainder: measured code with no findings belongs in A.
+        clean = max(total_loc - attributed, 0)
+        loc_by_grade["A"] = loc_by_grade.get("A", 0) + clean
+
         total = sum(loc_by_grade.values())
         pct_by_grade = {
             g: (100.0 * v / total if total else 0.0) for g, v in loc_by_grade.items()
         }
-        return RiskProfile(total_loc=total, loc_by_grade=loc_by_grade, pct_by_grade=pct_by_grade)
+        return RiskProfile(
+            total_loc=total, loc_by_grade=loc_by_grade,
+            pct_by_grade=pct_by_grade, estimated=estimated,
+        )
 
     @staticmethod
     def profile_to_grade(profile: RiskProfile) -> str:
@@ -290,23 +324,42 @@ class CompositeScoreEngine:
         """
         Aggregate file scores to (composite_score, grade, risk_profile).
 
-        The grade comes from the risk-profile footprint, not a mean. The
-        numeric composite is the LOC-weighted footprint score, capped by any
-        project-level gate from project_bundle (e.g. prohibited licenses).
-        Returns (None, None, empty profile) when there is nothing measured.
+        composite_score = min(LOC-weighted mean of file scores incl. clean
+        LOC, project-level density score) - the project-density leg makes
+        the score invariant to how issues are DISTRIBUTED across files, so
+        splitting 400 bugs into 400 files cannot launder an E into an A.
+
+        composite_grade = the worse of the risk-profile footprint grade and
+        the grade implied by composite_score (this is the documented
+        reconciliation between the two views; they can otherwise diverge
+        because the footprint is a distribution and the score is a mean).
+
+        Project-level gates from project_bundle (blocker, prohibited
+        license) cap the score. Returns (None, None, empty profile) when
+        there is nothing measured.
         """
-        profile = self.risk_profile(file_scores)
+        total_loc = project_bundle.loc if project_bundle is not None else 0
+        profile = self.risk_profile(file_scores, total_loc=total_loc)
         if not file_scores:
             return None, None, profile
         grade = self.profile_to_grade(profile)
 
-        total = sum(fs.loc if fs.loc > 0 else 1 for fs in file_scores) or 1
-        weighted = sum(fs.final_score * (fs.loc if fs.loc > 0 else 1) for fs in file_scores) / total
+        scored_weight = sum(fs.loc if fs.loc > 0 else 1 for fs in file_scores)
+        weighted_sum = sum(fs.final_score * (fs.loc if fs.loc > 0 else 1) for fs in file_scores)
+        clean_loc = max(total_loc - sum(fs.loc for fs in file_scores if fs.loc > 0), 0) \
+            if total_loc else 0
+        # Clean, measured LOC scores 1.0 in the mean.
+        denominator = scored_weight + clean_loc or 1
+        weighted = (weighted_sum + clean_loc * 1.0) / denominator
 
         if project_bundle is not None:
+            # Anti-laundering leg: the same issues scored at project density.
+            density_score = self.score_file(project_bundle).final_score
+            weighted = min(weighted, density_score)
             cap = self._apply_gates(project_bundle)
             if cap.applied:
                 weighted = min(weighted, cap.ceiling)
-                # Worse grade wins (later letter in A..E).
-                grade = max(grade, score_to_grade(weighted), key="ABCDE".index)
+
+        # Worse of footprint grade and score-implied grade (later in A..E).
+        grade = max(grade, score_to_grade(weighted), key="ABCDE".index)
         return weighted, grade, profile

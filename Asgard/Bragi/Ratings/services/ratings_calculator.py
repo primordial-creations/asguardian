@@ -288,13 +288,23 @@ class RatingsCalculator:
         rating = self._severity_to_rating(worst_severity)
         rationale = self._security_rationale(worst_severity, total_findings)
 
+        # A report object that exposes none of the known findings shapes is
+        # not evidence of a clean scan - mark it PARTIAL, never MEASURED.
+        has_shape = any(
+            hasattr(security_report, attr)
+            for attr in ("vulnerability_findings", "vulnerabilities", "findings",
+                         "vulnerability_report", "secrets_report")
+        )
+        if not has_shape:
+            rationale += " (report shape unrecognized; treated as partial evidence)"
+
         return DimensionRating(
             dimension=RatingDimension.SECURITY,
             rating=rating,
             score=float(total_findings),
             rationale=rationale,
             issues_count=total_findings,
-            confidence=MeasurementConfidence.MEASURED,
+            confidence=MeasurementConfidence.MEASURED if has_shape else MeasurementConfidence.PARTIAL,
         )
 
     def _worst_severity(self, current: Optional[str], candidate: str) -> str:

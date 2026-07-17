@@ -118,6 +118,10 @@ class PackageLicense:
     # for OR, the arm that satisfied the policy.
     license_expression_arms: List[str] = field(default_factory=list)
     chosen_expression_arm: Optional[str] = None
+    # Policy verdict ("allowed" / "warn" / "prohibited" / "unknown"). The
+    # legacy booleans above keep their historical semantics (WARN packages
+    # remain is_allowed=True); this field carries the stricter signal.
+    verdict: str = "unknown"
 
     @property
     def display_license(self) -> str:

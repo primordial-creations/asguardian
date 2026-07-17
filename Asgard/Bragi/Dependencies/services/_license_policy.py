@@ -4,11 +4,16 @@ Bragi License Policy Engine (Plan 03 Phase A)
 Replaces bidirectional substring matching (which flagged LGPL-3.0 as
 PROHIBITED because "gpl-3.0" is a substring of "lgpl-3.0") with:
 
-1. Normalization of observed license text to an exact SPDX id.
-2. A minimal SPDX expression evaluator (OR / AND / WITH, parentheses):
-   - OR  -> compliant if ANY arm is allowed (report the chosen arm).
-   - AND -> every arm must pass; the worst verdict wins.
-3. Policy evaluation on exact normalized ids only - never substrings.
+1. Normalization of observed license text to an exact SPDX id using
+   word-boundary-anchored token matching (never bare substrings), with a
+   conservative UNKNOWN fallback for long free text.
+2. A recursive-descent SPDX expression parser (OR / AND / WITH, balanced
+   parentheses, depth-guarded). "X or later" is a version suffix, never an
+   OR expression.
+3. Policy evaluation on exact normalized ids only. OR semantics: the best
+   verdict among *known* arms wins; if every arm is unknown the result is
+   UNKNOWN; a prohibited license can never be laundered through unknown
+   arms. AND semantics: the worst verdict wins.
 """
 
 import re
@@ -27,28 +32,29 @@ class LicenseVerdict(str, Enum):
     UNKNOWN = "unknown"
 
 
-# Ordered longest/most-specific first so e.g. AGPL matches before GPL and
-# LGPL before GPL. Each entry: (regex, SPDX id, category).
+# Ordered most-specific first (AGPL before GPL, LGPL before GPL, versioned
+# before unversioned). Every alternative is word-boundary anchored so that
+# e.g. "permit" can never match MIT and "discretion" can never match ISC.
 LICENSE_PATTERNS: List[Tuple[str, str, LicenseCategory]] = [
-    (r"AGPL[-\s]*v?(3(\.0)?)?|GNU Affero General Public License", "AGPL-3.0", LicenseCategory.STRONG_COPYLEFT),
-    (r"LGPL[-\s]*v?3(\.0)?|GNU Lesser General Public License v?3", "LGPL-3.0", LicenseCategory.WEAK_COPYLEFT),
-    (r"LGPL[-\s]*v?2\.1|GNU Lesser General Public License v?2", "LGPL-2.1", LicenseCategory.WEAK_COPYLEFT),
-    (r"^LGPL$|GNU Lesser General Public License|GNU Library", "LGPL-2.1", LicenseCategory.WEAK_COPYLEFT),
-    (r"GPL[-\s]*v?3(\.0)?|GNU General Public License v?3", "GPL-3.0", LicenseCategory.STRONG_COPYLEFT),
-    (r"GPL[-\s]*v?2(\.0)?|GNU General Public License v?2", "GPL-2.0", LicenseCategory.STRONG_COPYLEFT),
-    (r"^GPL$|GNU General Public License", "GPL-2.0-or-later", LicenseCategory.STRONG_COPYLEFT),
-    (r"SSPL|Server Side Public License", "SSPL-1.0", LicenseCategory.STRONG_COPYLEFT),
-    (r"MPL[-\s]*2(\.0)?|Mozilla Public License", "MPL-2.0", LicenseCategory.WEAK_COPYLEFT),
-    (r"Apache[-\s]*(License)?,?\s*(Version)?\s*2(\.0)?|Apache Software License", "Apache-2.0", LicenseCategory.PERMISSIVE),
-    (r"BSD[-\s]*(3|3-Clause|New|Revised)", "BSD-3-Clause", LicenseCategory.PERMISSIVE),
-    (r"BSD[-\s]*(2|2-Clause|Simplified|FreeBSD)", "BSD-2-Clause", LicenseCategory.PERMISSIVE),
-    (r"^BSD([-\s]?License)?$", "BSD-3-Clause", LicenseCategory.PERMISSIVE),
-    (r"MIT|Expat", "MIT", LicenseCategory.PERMISSIVE),
-    (r"ISC", "ISC", LicenseCategory.PERMISSIVE),
-    (r"PSF|Python Software Foundation", "PSF-2.0", LicenseCategory.PERMISSIVE),
-    (r"Unlicense|Public Domain", "Unlicense", LicenseCategory.PUBLIC_DOMAIN),
-    (r"CC0|Creative Commons Zero", "CC0-1.0", LicenseCategory.PUBLIC_DOMAIN),
-    (r"WTFPL", "WTFPL", LicenseCategory.PUBLIC_DOMAIN),
+    (r"\bAGPL[-\s]*v?(3(\.0)?)?\b|\bGNU Affero General Public License\b", "AGPL-3.0", LicenseCategory.STRONG_COPYLEFT),
+    (r"\bLGPL[-\s]*v?3(\.0)?\b|\bGNU Lesser General Public License v?3\b", "LGPL-3.0", LicenseCategory.WEAK_COPYLEFT),
+    (r"\bLGPL[-\s]*v?2(\.1)?\b|\bGNU Lesser General Public License v?2(\.1)?\b", "LGPL-2.1", LicenseCategory.WEAK_COPYLEFT),
+    (r"\bLGPL\b|\bGNU Lesser General Public License\b|\bGNU Library\b", "LGPL-2.1", LicenseCategory.WEAK_COPYLEFT),
+    (r"\bGPL[-\s]*v?3(\.0)?\b|\bGNU General Public License v?3\b", "GPL-3.0", LicenseCategory.STRONG_COPYLEFT),
+    (r"\bGPL[-\s]*v?2(\.0)?\b|\bGNU General Public License v?2\b", "GPL-2.0", LicenseCategory.STRONG_COPYLEFT),
+    (r"\bGPL\b|\bGNU General Public License\b", "GPL-2.0-or-later", LicenseCategory.STRONG_COPYLEFT),
+    (r"\bSSPL\b|\bServer Side Public License\b", "SSPL-1.0", LicenseCategory.STRONG_COPYLEFT),
+    (r"\bMPL[-\s]*2(\.0)?\b|\bMozilla Public License\b", "MPL-2.0", LicenseCategory.WEAK_COPYLEFT),
+    (r"\bApache[-\s]*(License[,\s]*)?(Version\s*)?2(\.0)?\b|\bApache Software License\b|\bApache\b", "Apache-2.0", LicenseCategory.PERMISSIVE),
+    (r"\bBSD[-\s]*(3([-\s]Clause)?|New|Revised)\b", "BSD-3-Clause", LicenseCategory.PERMISSIVE),
+    (r"\bBSD[-\s]*(2([-\s]Clause)?|Simplified|FreeBSD)\b", "BSD-2-Clause", LicenseCategory.PERMISSIVE),
+    (r"\bBSD\b", "BSD-3-Clause", LicenseCategory.PERMISSIVE),
+    (r"\bMIT\b|\bExpat\b", "MIT", LicenseCategory.PERMISSIVE),
+    (r"\bISC\b", "ISC", LicenseCategory.PERMISSIVE),
+    (r"\bPSF\b|\bPython Software Foundation\b", "PSF-2.0", LicenseCategory.PERMISSIVE),
+    (r"\bUnlicense\b|\bPublic Domain\b", "Unlicense", LicenseCategory.PUBLIC_DOMAIN),
+    (r"\bCC0\b|\bCreative Commons Zero\b", "CC0-1.0", LicenseCategory.PUBLIC_DOMAIN),
+    (r"\bWTFPL\b", "WTFPL", LicenseCategory.PUBLIC_DOMAIN),
 ]
 
 # Aliases mapping policy-config strings and SPDX variants to canonical ids.
@@ -61,12 +67,15 @@ _SPDX_ALIASES = {
     "gnu general public license v3 (gplv3)": "GPL-3.0",
     "gpl-2.0-only": "GPL-2.0",
     "gpl-2.0-or-later": "GPL-2.0",
+    "gplv2": "GPL-2.0",
     "gnu general public license v2": "GPL-2.0",
     "agpl-3.0-only": "AGPL-3.0",
     "agpl-3.0-or-later": "AGPL-3.0",
+    "agplv3": "AGPL-3.0",
     "gnu affero general public license v3": "AGPL-3.0",
     "lgpl-3.0-only": "LGPL-3.0",
     "lgpl-3.0-or-later": "LGPL-3.0",
+    "lgplv3": "LGPL-3.0",
     "gnu lesser general public license v3": "LGPL-3.0",
     "lgpl-2.1-only": "LGPL-2.1",
     "lgpl-2.1-or-later": "LGPL-2.1",
@@ -86,23 +95,36 @@ _CATEGORY_BY_ID = {spdx_id: category for _, spdx_id, category in LICENSE_PATTERN
 _CATEGORY_BY_ID.setdefault("SSPL-1.0", LicenseCategory.STRONG_COPYLEFT)
 _CATEGORY_BY_ID.setdefault("GPL-2.0-or-later", LicenseCategory.STRONG_COPYLEFT)
 
-# A string looks like an SPDX expression if it contains boolean operators.
-_EXPRESSION_TOKEN = re.compile(r"\bOR\b|\bAND\b|\bWITH\b|\(|\)", re.IGNORECASE)
-_KNOWN_SPDX_IDS = {spdx_id.lower() for spdx_id in _CATEGORY_BY_ID}
+_KNOWN_SPDX_IDS = {spdx_id.lower(): spdx_id for spdx_id in _CATEGORY_BY_ID}
+
+# Free text longer than this is never pattern-matched: license *fields* are
+# short; a paragraph of proprietary prose must stay UNKNOWN, not become MIT
+# because the word "MIT" appears somewhere.
+_MAX_MATCHABLE_LENGTH = 100
+
+# Depth guard for the expression parser.
+_MAX_EXPRESSION_DEPTH = 10
+
+# "GPLv3 or later" is a version suffix, not an OR expression.
+_OR_LATER_SUFFIX = re.compile(r"[-\s]+or[-\s]+later\b", re.IGNORECASE)
 
 
 def canonical_spdx_id(text: str) -> Optional[str]:
     """Map a license string/config entry to a canonical SPDX id, or None."""
     if not text:
         return None
-    stripped = text.strip()
-    lowered = stripped.lower()
+    lowered = text.strip().lower()
     if lowered in _SPDX_ALIASES:
         return _SPDX_ALIASES[lowered]
     if lowered in _KNOWN_SPDX_IDS:
-        for spdx_id in _CATEGORY_BY_ID:
-            if spdx_id.lower() == lowered:
-                return spdx_id
+        return _KNOWN_SPDX_IDS[lowered]
+    # "-or-later"/"+" version suffixes reduce to the base id.
+    base = re.sub(r"(-or-later|-only|\+)$", "", lowered)
+    if base != lowered:
+        if base in _SPDX_ALIASES:
+            return _SPDX_ALIASES[base]
+        if base in _KNOWN_SPDX_IDS:
+            return _KNOWN_SPDX_IDS[base]
     return None
 
 
@@ -110,16 +132,20 @@ def normalize_license(text: str) -> Tuple[Optional[str], LicenseCategory]:
     """
     Normalize observed license text to (SPDX id, category).
 
-    Tries exact SPDX id / alias first, then the ordered regex patterns
-    (most specific first, so LGPL never falls through to GPL).
+    Exact SPDX id / alias first; then word-boundary-anchored patterns
+    (most specific first, so LGPL never falls through to GPL). Long free
+    text is conservatively UNKNOWN.
     """
     if not text:
         return None, LicenseCategory.UNKNOWN
-    canonical = canonical_spdx_id(text)
+    collapsed = _OR_LATER_SUFFIX.sub("-or-later", text.strip())
+    canonical = canonical_spdx_id(collapsed)
     if canonical is not None:
         return canonical, _CATEGORY_BY_ID.get(canonical, LicenseCategory.UNKNOWN)
+    if len(collapsed) > _MAX_MATCHABLE_LENGTH:
+        return None, LicenseCategory.UNKNOWN
     for pattern, spdx_id, category in LICENSE_PATTERNS:
-        if re.search(pattern, text, re.IGNORECASE):
+        if re.search(pattern, collapsed, re.IGNORECASE):
             return spdx_id, category
     return None, LicenseCategory.UNKNOWN
 
@@ -136,8 +162,89 @@ class PolicyDecision:
     rationale: str = ""
 
 
+class _ParseError(Exception):
+    """Raised for malformed or too-deep license expressions."""
+
+
+class _ExpressionParser:
+    """Recursive-descent parser for SPDX expressions with balanced parens.
+
+    Grammar:
+        expr     := and_expr (OR and_expr)*
+        and_expr := primary (AND primary)*
+        primary  := '(' expr ')' | license_id (WITH exception_id)?
+    """
+
+    def __init__(self, expression: str):
+        self.tokens = re.findall(r"\(|\)|[^\s()]+", expression)
+        self.pos = 0
+
+    def _peek(self) -> Optional[str]:
+        return self.tokens[self.pos] if self.pos < len(self.tokens) else None
+
+    def _next(self) -> str:
+        token = self.tokens[self.pos]
+        self.pos += 1
+        return token
+
+    def parse(self) -> tuple:
+        node = self._parse_or(0)
+        if self._peek() is not None:
+            raise _ParseError(f"unexpected token '{self._peek()}'")
+        return node
+
+    def _parse_or(self, depth: int) -> tuple:
+        if depth > _MAX_EXPRESSION_DEPTH:
+            raise _ParseError("expression nesting too deep")
+        arms = [self._parse_and(depth)]
+        while self._peek() is not None and self._peek().upper() == "OR":
+            self._next()
+            arms.append(self._parse_and(depth))
+        return arms[0] if len(arms) == 1 else ("OR", arms)
+
+    def _parse_and(self, depth: int) -> tuple:
+        arms = [self._parse_primary(depth)]
+        while self._peek() is not None and self._peek().upper() == "AND":
+            self._next()
+            arms.append(self._parse_primary(depth))
+        return arms[0] if len(arms) == 1 else ("AND", arms)
+
+    def _parse_primary(self, depth: int) -> tuple:
+        token = self._peek()
+        if token is None:
+            raise _ParseError("expected license id or '('")
+        if token == "(":
+            self._next()
+            node = self._parse_or(depth + 1)
+            if self._peek() != ")":
+                raise _ParseError("unbalanced parentheses")
+            self._next()
+            return node
+        if token == ")":
+            raise _ParseError("unbalanced parentheses")
+        # A license id: consecutive non-operator tokens joined by spaces.
+        parts: List[str] = []
+        while (t := self._peek()) is not None and t not in ("(", ")") \
+                and t.upper() not in ("OR", "AND", "WITH"):
+            parts.append(self._next())
+        if not parts:
+            raise _ParseError("empty license id")
+        if (t := self._peek()) is not None and t.upper() == "WITH":
+            self._next()
+            if self._peek() is None or self._peek() in ("(", ")"):
+                raise _ParseError("WITH missing exception id")
+            self._next()  # exception id is recorded but not policy-relevant
+        return ("ID", " ".join(parts))
+
+
 class LicensePolicy:
     """Exact-SPDX-id policy engine with OR/AND expression handling."""
+
+    # Preference order among KNOWN verdicts (OR chooses the leftmost hit).
+    _OR_PREFERENCE = [LicenseVerdict.ALLOWED, LicenseVerdict.WARN, LicenseVerdict.PROHIBITED]
+    # Badness order for AND (rightmost is worst).
+    _AND_ORDER = [LicenseVerdict.ALLOWED, LicenseVerdict.WARN,
+                  LicenseVerdict.UNKNOWN, LicenseVerdict.PROHIBITED]
 
     def __init__(
         self,
@@ -186,88 +293,72 @@ class LicensePolicy:
         if not license_text or not license_text.strip():
             return PolicyDecision(verdict=LicenseVerdict.UNKNOWN, rationale="no license metadata")
 
-        if _EXPRESSION_TOKEN.search(license_text) and re.search(
-            r"\bOR\b|\bAND\b", license_text, re.IGNORECASE
-        ):
-            return self._evaluate_expression(license_text)
+        # "X or later" is a version suffix, never an OR expression.
+        collapsed = _OR_LATER_SUFFIX.sub("-or-later", license_text.strip())
 
-        spdx_id, category = normalize_license(license_text)
+        if re.search(r"\bOR\b|\bAND\b", collapsed, re.IGNORECASE):
+            try:
+                node = _ExpressionParser(collapsed).parse()
+            except _ParseError as error:
+                return PolicyDecision(
+                    verdict=LicenseVerdict.UNKNOWN,
+                    is_expression=True,
+                    rationale=f"malformed license expression '{license_text.strip()}': {error}",
+                )
+            decision = self._evaluate_node(node)
+            decision.is_expression = True
+            decision.rationale = (
+                f"SPDX expression '{license_text.strip()}': "
+                + (f"satisfied via {decision.spdx_id}"
+                   if decision.verdict == LicenseVerdict.ALLOWED and decision.spdx_id
+                   else f"-> {decision.verdict.value}"
+                     + (f" via {decision.spdx_id}" if decision.spdx_id else ""))
+            )
+            return decision
+
+        spdx_id, category = normalize_license(collapsed)
         verdict = self.verdict_for_id(spdx_id)
         return PolicyDecision(
             verdict=verdict, spdx_id=spdx_id, category=category,
             rationale=f"'{license_text.strip()}' normalized to {spdx_id or 'UNKNOWN'}",
         )
 
-    def _evaluate_expression(self, expression: str) -> PolicyDecision:
-        """Top-level OR splits (any arm suffices); AND requires all arms."""
-        or_arms = self._split_top_level(expression, "OR")
-        arm_decisions = [self._evaluate_and_arm(arm) for arm in or_arms]
-        arms = [d.spdx_id or a.strip() for a, d in zip(or_arms, arm_decisions)]
+    def _evaluate_node(self, node: tuple) -> PolicyDecision:
+        kind = node[0]
+        if kind == "ID":
+            spdx_id, category = normalize_license(node[1])
+            return PolicyDecision(
+                verdict=self.verdict_for_id(spdx_id), spdx_id=spdx_id,
+                category=category, arms=[spdx_id or node[1]],
+            )
+        children = [self._evaluate_node(child) for child in node[1]]
+        arms = [arm for child in children for arm in child.arms]
+        if kind == "OR":
+            return self._combine_or(children, arms)
+        return self._combine_and(children, arms)
 
-        order = [LicenseVerdict.ALLOWED, LicenseVerdict.WARN,
-                 LicenseVerdict.UNKNOWN, LicenseVerdict.PROHIBITED]
-        best = min(arm_decisions, key=lambda d: order.index(d.verdict))
+    def _combine_or(self, children: List[PolicyDecision], arms: List[str]) -> PolicyDecision:
+        """
+        OR = best of the KNOWN arms. All-unknown -> UNKNOWN. A PROHIBITED
+        arm with no allowed/warn alternative stays PROHIBITED - unknown
+        arms can never launder it.
+        """
+        known = [c for c in children if c.verdict != LicenseVerdict.UNKNOWN]
+        if not known:
+            return PolicyDecision(verdict=LicenseVerdict.UNKNOWN, arms=arms)
+        best = min(known, key=lambda c: self._OR_PREFERENCE.index(c.verdict))
         return PolicyDecision(
-            verdict=best.verdict,
-            spdx_id=best.spdx_id,
-            category=best.category,
-            is_expression=True,
-            chosen_arm=best.spdx_id if len(or_arms) > 1 else None,
-            arms=arms,
-            rationale=(
-                f"SPDX expression '{expression.strip()}': "
-                + (f"satisfied via {best.spdx_id}" if best.verdict == LicenseVerdict.ALLOWED
-                   else f"best arm {best.spdx_id or 'UNKNOWN'} -> {best.verdict.value}")
-            ),
+            verdict=best.verdict, spdx_id=best.spdx_id, category=best.category,
+            chosen_arm=best.spdx_id, arms=arms,
         )
 
-    def _evaluate_and_arm(self, arm: str) -> PolicyDecision:
-        """AND conjunction: the WORST sub-verdict wins."""
-        parts = self._split_top_level(arm, "AND")
-        order = [LicenseVerdict.ALLOWED, LicenseVerdict.WARN,
-                 LicenseVerdict.UNKNOWN, LicenseVerdict.PROHIBITED]
-        worst: Optional[PolicyDecision] = None
-        for part in parts:
-            cleaned = self._strip_with(part)
-            if re.search(r"\bOR\b|\bAND\b", cleaned, re.IGNORECASE):
-                # Parenthesized sub-expression: recurse instead of pattern-
-                # matching the raw text (which would mis-hit e.g. GPL first).
-                decision = self._evaluate_expression(cleaned)
-            else:
-                spdx_id, category = normalize_license(cleaned)
-                decision = PolicyDecision(
-                    verdict=self.verdict_for_id(spdx_id), spdx_id=spdx_id, category=category)
-            if worst is None or order.index(decision.verdict) > order.index(worst.verdict):
-                worst = decision
-        return worst or PolicyDecision(verdict=LicenseVerdict.UNKNOWN)
-
-    @staticmethod
-    def _strip_with(text: str) -> str:
-        """Drop a WITH exception clause and surrounding parentheses."""
-        cleaned = re.split(r"\bWITH\b", text, flags=re.IGNORECASE)[0]
-        return cleaned.strip().strip("()").strip()
-
-    @staticmethod
-    def _split_top_level(expression: str, operator: str) -> List[str]:
-        """Split on OR/AND at parenthesis depth zero."""
-        tokens = re.split(rf"(\b{operator}\b|\(|\))", expression, flags=re.IGNORECASE)
-        arms: List[str] = []
-        current = ""
-        depth = 0
-        for token in tokens:
-            if token == "(":
-                depth += 1
-                current += token
-            elif token == ")":
-                depth -= 1
-                current += token
-            elif depth == 0 and token.upper() == operator:
-                arms.append(current)
-                current = ""
-            else:
-                current += token
-        arms.append(current)
-        return [a.strip() for a in arms if a.strip()]
+    def _combine_and(self, children: List[PolicyDecision], arms: List[str]) -> PolicyDecision:
+        """AND = the worst arm wins (PROHIBITED > UNKNOWN > WARN > ALLOWED)."""
+        worst = max(children, key=lambda c: self._AND_ORDER.index(c.verdict))
+        return PolicyDecision(
+            verdict=worst.verdict, spdx_id=worst.spdx_id, category=worst.category,
+            arms=arms,
+        )
 
 
 @dataclass

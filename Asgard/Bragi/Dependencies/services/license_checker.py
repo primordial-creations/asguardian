@@ -214,6 +214,7 @@ class LicenseChecker:
             pkg_lic.category = LicenseCategory.UNKNOWN
             pkg_lic.is_allowed = False
             pkg_lic.severity = LicenseSeverity.MODERATE
+            pkg_lic.verdict = LicenseVerdict.UNKNOWN.value
             return pkg_lic
 
         if decision.spdx_id:
@@ -222,13 +223,17 @@ class LicenseChecker:
         pkg_lic.license_expression_arms = list(decision.arms)
         pkg_lic.chosen_expression_arm = decision.chosen_arm
 
+        pkg_lic.verdict = decision.verdict.value
         if decision.verdict == LicenseVerdict.PROHIBITED:
             pkg_lic.is_prohibited = True
             pkg_lic.is_allowed = False
             pkg_lic.severity = LicenseSeverity.CRITICAL
         elif decision.verdict == LicenseVerdict.WARN:
+            # Legacy boolean semantics preserved: WARN packages stay
+            # is_allowed=True (they count as compliant, as before); the
+            # stricter signal lives in the new `verdict` field.
             pkg_lic.is_warning = True
-            pkg_lic.is_allowed = False
+            pkg_lic.is_allowed = True
             pkg_lic.severity = LicenseSeverity.LOW
         elif decision.verdict == LicenseVerdict.ALLOWED:
             pkg_lic.is_allowed = True

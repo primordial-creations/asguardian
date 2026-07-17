@@ -47,11 +47,17 @@ class TestRemediationModel:
         assert SEVERITY_MINUTES["high"] == 60.0
         assert SEVERITY_MINUTES["critical"] == 480.0
 
-    def test_documentation_priced_per_function(self):
+    def test_documentation_priced_per_function_with_batching(self):
+        """Mechanical doc units batch inside an aggregated item: geometric
+        series of 2-min units at d=0.05, matching N single items."""
         model = RemediationModel()
         item = _item(DebtType.DOCUMENTATION, DebtSeverity.LOW,
                      description="50 undocumented public functions")
-        assert model.minutes_for(item) == pytest.approx(100.0)  # 2 min each
+        expected = sum(2.0 * 0.05 ** i for i in range(50))
+        assert model.minutes_for(item) == pytest.approx(expected, abs=0.01)
+        single = _item(DebtType.DOCUMENTATION, DebtSeverity.LOW,
+                       description="1 undocumented public functions")
+        assert model.minutes_for(single) == pytest.approx(2.0)
 
     def test_code_debt_has_context_offset(self):
         model = RemediationModel()
@@ -74,25 +80,54 @@ class TestRemediationModel:
 
 class TestBatchingAggregation:
     def test_mechanical_debt_batches_deepthink_worked_example(self):
-        """50 missing-docstring items with batchability 0.05 must total about
-        context(30) + 2 + tail, i.e. ~32 min - never 50 x 2 + overheads."""
+        """PRODUCTION shape: one aggregated item '50 undocumented public
+        functions' must total ~ context(30) + geometric series of 2-min
+        units, i.e. ~32 min - never 50 x 2 + overheads."""
         aggregator = DebtAggregator()
-        items = [
+        item = _item(DebtType.DOCUMENTATION, DebtSeverity.LOW, "/p/f.py",
+                     description="50 undocumented public functions")
+        result = aggregator.aggregate([item])
+        expected = CONTEXT_COST_MINUTES + sum(2.0 * 0.05 ** i for i in range(50))
+        assert result.total_minutes == pytest.approx(expected, abs=0.1)
+        assert result.total_minutes < 35.0
+
+    def test_aggregated_count_item_equals_n_single_items(self):
+        """MAJOR-8 regression: '50 undocumented functions' as ONE item must
+        cost the same as 50 single-function items."""
+        aggregator = DebtAggregator()
+        aggregated = aggregator.aggregate([
+            _item(DebtType.DOCUMENTATION, DebtSeverity.LOW, "/p/f.py",
+                  description="50 undocumented public functions")])
+        singles = aggregator.aggregate([
             _item(DebtType.DOCUMENTATION, DebtSeverity.LOW, "/p/f.py",
                   description="1 undocumented public functions")
-            for _ in range(50)
-        ]
-        result = aggregator.aggregate(items)
-        assert result.total_minutes == pytest.approx(
-            CONTEXT_COST_MINUTES + sum(2.0 * 0.05 ** i for i in range(50)), abs=0.1)
-        assert result.total_minutes < 35.0
+            for _ in range(50)])
+        assert aggregated.total_minutes == pytest.approx(singles.total_minutes, abs=0.1)
 
     def test_cognitive_debt_barely_discounts(self):
         aggregator = DebtAggregator()
         items = [_item(severity=DebtSeverity.HIGH) for _ in range(3)]
         result = aggregator.aggregate(items)
-        # d=0.8: 70 + 70*0.8 + 70*0.64 = 170.8 (+30 context)
-        assert result.total_minutes == pytest.approx(30.0 + 70.0 * (1 + 0.8 + 0.64), rel=1e-3)
+        # d=0.9: 70 * (1 + 0.9 + 0.81) (+30 context)
+        assert result.total_minutes == pytest.approx(30.0 + 70.0 * (1 + 0.9 + 0.81), rel=1e-3)
+
+    def test_cognitive_pile_stays_near_additive(self):
+        """MAJOR-7 regression: 100 medium smells in one file must never cost
+        less than 25% of the additive sum - concentrating debt cannot
+        divide the TDR by orders of magnitude."""
+        aggregator = DebtAggregator()
+        items = [_item(severity=DebtSeverity.MEDIUM) for _ in range(100)]
+        result = aggregator.aggregate(items)
+        per_item = 10.0 + 30.0  # linear_with_offset CODE, medium
+        additive = 100 * per_item
+        assert result.total_minutes - CONTEXT_COST_MINUTES >= 0.25 * additive
+        # And splitting the same 100 smells across 100 files must not be
+        # CHEAPER to carry than the concentrated pile (context costs make
+        # dispersal strictly more expensive).
+        spread = aggregator.aggregate(
+            [_item(severity=DebtSeverity.MEDIUM, file_path=f"/p/{i}.py")
+             for i in range(100)])
+        assert spread.total_minutes >= result.total_minutes
 
     def test_one_context_cost_per_file_not_per_item(self):
         aggregator = DebtAggregator()
@@ -177,9 +212,17 @@ class TestExposureInterface:
 
 class TestStandardTDR:
     def test_golden_research04_worked_example(self):
-        """63,987 LOC with 122,563 min debt -> TDR 6.38% -> grade B."""
-        tdr = 122563 / (63987 * 30.0) * 100.0
+        """63,987 LOC with 122,563 min debt -> TDR 6.38% -> grade B, computed
+        by the PRODUCTION formula function used by TechnicalDebtAnalyzer."""
+        from Asgard.Bragi.Quality.services._debt_aggregator import compute_tdr_percent
+        from Asgard.Bragi.Ratings.services.ratings_calculator import RatingsCalculator
+        tdr = compute_tdr_percent(122563, 63987)
         assert tdr == pytest.approx(6.38, abs=0.01)
+        assert RatingsCalculator()._debt_ratio_to_rating(tdr) == "B"
+
+    def test_compute_tdr_unknown_loc_is_none(self):
+        from Asgard.Bragi.Quality.services._debt_aggregator import compute_tdr_percent
+        assert compute_tdr_percent(1000, 0) is None
 
     def test_analyzer_populates_tdr_and_intervals(self, tmp_path):
         source = tmp_path / "mod.py"
