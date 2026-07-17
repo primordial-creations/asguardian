@@ -1,0 +1,308 @@
+[
+  {
+    "description": "prefixItems validation",
+    "schema": {"prefixItems": [{"type": "integer"}, {"type": "string"}]},
+    "tests": [
+      {"description": "correct types", "data": [1, "foo"], "valid": true},
+      {"description": "wrong types", "data": ["foo", 1], "valid": false},
+      {"description": "incomplete array of items", "data": [1], "valid": true},
+      {"description": "array with additional items", "data": [1, "foo", true], "valid": true},
+      {"description": "empty array", "data": [], "valid": true},
+      {"description": "ignores non-arrays", "data": {"0": "invalid"}, "valid": true}
+    ]
+  },
+  {
+    "description": "items with prefixItems acts as additional items",
+    "schema": {"prefixItems": [{"type": "integer"}], "items": {"type": "string"}},
+    "tests": [
+      {"description": "prefix and rest valid", "data": [1, "a", "b"], "valid": true},
+      {"description": "rest invalid", "data": [1, "a", 2], "valid": false},
+      {"description": "only prefix", "data": [1], "valid": true}
+    ]
+  },
+  {
+    "description": "items false with prefixItems",
+    "schema": {"prefixItems": [{"type": "integer"}], "items": false},
+    "tests": [
+      {"description": "only prefix items valid", "data": [1], "valid": true},
+      {"description": "extra items invalid", "data": [1, 2], "valid": false},
+      {"description": "empty array valid", "data": [], "valid": true}
+    ]
+  },
+  {
+    "description": "items applies to all items when prefixItems absent",
+    "schema": {"items": {"type": "integer"}},
+    "tests": [
+      {"description": "valid items", "data": [1, 2, 3], "valid": true},
+      {"description": "wrong type of items", "data": [1, "x"], "valid": false}
+    ]
+  },
+  {
+    "description": "dependentRequired",
+    "schema": {"dependentRequired": {"bar": ["foo"]}},
+    "tests": [
+      {"description": "neither present is valid", "data": {}, "valid": true},
+      {"description": "nondependant is valid", "data": {"foo": 1}, "valid": true},
+      {"description": "with dependency is valid", "data": {"foo": 1, "bar": 2}, "valid": true},
+      {"description": "missing dependency is invalid", "data": {"bar": 2}, "valid": false},
+      {"description": "ignores non-objects", "data": "foo", "valid": true}
+    ]
+  },
+  {
+    "description": "dependentSchemas",
+    "schema": {"dependentSchemas": {"bar": {"properties": {"foo": {"type": "integer"}, "bar": {"type": "integer"}}}}},
+    "tests": [
+      {"description": "valid dependent schema", "data": {"foo": 1, "bar": 2}, "valid": true},
+      {"description": "no dependency applies", "data": {"foo": "quux"}, "valid": true},
+      {"description": "wrong type under dependency", "data": {"foo": "quux", "bar": 2}, "valid": false}
+    ]
+  },
+  {
+    "description": "minContains and maxContains",
+    "schema": {"contains": {"const": 1}, "minContains": 2, "maxContains": 3},
+    "tests": [
+      {"description": "too few matches invalid", "data": [1, 2], "valid": false},
+      {"description": "exactly min matches valid", "data": [1, 1, 2], "valid": true},
+      {"description": "between min and max valid", "data": [1, 1, 1], "valid": true},
+      {"description": "too many matches invalid", "data": [1, 1, 1, 1], "valid": false}
+    ]
+  },
+  {
+    "description": "minContains zero makes contains optional",
+    "schema": {"contains": {"const": 1}, "minContains": 0},
+    "tests": [
+      {"description": "empty array valid", "data": [], "valid": true},
+      {"description": "no matches valid", "data": [2, 3], "valid": true}
+    ]
+  },
+  {
+    "description": "unevaluatedProperties false with properties",
+    "schema": {"type": "object", "properties": {"foo": {"type": "string"}}, "unevaluatedProperties": false},
+    "tests": [
+      {"description": "with no unevaluated properties", "data": {"foo": "foo"}, "valid": true},
+      {"description": "with unevaluated properties", "data": {"foo": "foo", "bar": "bar"}, "valid": false},
+      {"description": "empty object valid", "data": {}, "valid": true}
+    ]
+  },
+  {
+    "description": "unevaluatedProperties with allOf-adjacent properties",
+    "schema": {"type": "object", "properties": {"foo": {"type": "string"}}, "allOf": [{"properties": {"bar": {"type": "string"}}}], "unevaluatedProperties": false},
+    "tests": [
+      {"description": "properties seen through allOf are evaluated", "data": {"foo": "a", "bar": "b"}, "valid": true},
+      {"description": "unseen property is unevaluated", "data": {"foo": "a", "baz": "c"}, "valid": false}
+    ]
+  },
+  {
+    "description": "unevaluatedProperties with $ref",
+    "schema": {"$defs": {"base": {"properties": {"foo": {"type": "string"}}}}, "$ref": "#/$defs/base", "properties": {"bar": {"type": "string"}}, "unevaluatedProperties": false},
+    "tests": [
+      {"description": "properties from ref and local are evaluated", "data": {"foo": "a", "bar": "b"}, "valid": true},
+      {"description": "extra property is unevaluated", "data": {"foo": "a", "extra": 1}, "valid": false}
+    ]
+  },
+  {
+    "description": "unevaluatedProperties with anyOf",
+    "schema": {"type": "object", "anyOf": [{"properties": {"foo": {"const": "a"}}, "required": ["foo"]}, {"properties": {"bar": {"type": "integer"}}, "required": ["bar"]}], "unevaluatedProperties": false},
+    "tests": [
+      {"description": "matched branch properties are evaluated", "data": {"foo": "a"}, "valid": true},
+      {"description": "properties of unmatched branch are unevaluated", "data": {"foo": "a", "baz": true}, "valid": false},
+      {"description": "both branches matched evaluates both", "data": {"foo": "a", "bar": 1}, "valid": true}
+    ]
+  },
+  {
+    "description": "unevaluatedProperties as schema",
+    "schema": {"properties": {"foo": {"type": "string"}}, "unevaluatedProperties": {"type": "integer"}},
+    "tests": [
+      {"description": "unevaluated property matching schema valid", "data": {"foo": "a", "extra": 3}, "valid": true},
+      {"description": "unevaluated property not matching schema invalid", "data": {"foo": "a", "extra": "x"}, "valid": false}
+    ]
+  },
+  {
+    "description": "unevaluatedItems false with prefixItems",
+    "schema": {"prefixItems": [{"type": "string"}], "unevaluatedItems": false},
+    "tests": [
+      {"description": "no unevaluated items", "data": ["foo"], "valid": true},
+      {"description": "with unevaluated items", "data": ["foo", "bar"], "valid": false},
+      {"description": "empty array valid", "data": [], "valid": true}
+    ]
+  },
+  {
+    "description": "unevaluatedItems with if/then",
+    "schema": {"prefixItems": [{"const": "a"}], "if": {"prefixItems": [true, {"const": "b"}]}, "unevaluatedItems": false},
+    "tests": [
+      {"description": "items evaluated by if branch when it matches", "data": ["a", "b"], "valid": true},
+      {"description": "item unevaluated when if does not match", "data": ["a", "c"], "valid": false}
+    ]
+  },
+  {
+    "description": "if/then/else 2020-12",
+    "schema": {"if": {"exclusiveMaximum": 0}, "then": {"minimum": -10}, "else": {"multipleOf": 2}},
+    "tests": [
+      {"description": "valid through then", "data": -1, "valid": true},
+      {"description": "invalid through then", "data": -100, "valid": false},
+      {"description": "valid through else", "data": 4, "valid": true},
+      {"description": "invalid through else", "data": 3, "valid": false}
+    ]
+  },
+  {
+    "description": "$defs based ref",
+    "schema": {"$defs": {"positiveInteger": {"type": "integer", "minimum": 1}}, "properties": {"count": {"$ref": "#/$defs/positiveInteger"}}},
+    "tests": [
+      {"description": "valid ref", "data": {"count": 3}, "valid": true},
+      {"description": "invalid ref", "data": {"count": 0}, "valid": false}
+    ]
+  },
+  {
+    "description": "$anchor based ref",
+    "schema": {"$defs": {"anchored": {"$anchor": "myAnchor", "type": "integer"}}, "properties": {"foo": {"$ref": "#myAnchor"}}},
+    "tests": [
+      {"description": "anchor resolves and validates", "data": {"foo": 1}, "valid": true},
+      {"description": "anchor resolves and rejects", "data": {"foo": "x"}, "valid": false}
+    ]
+  },
+  {
+    "description": "$id resolved ref inside $defs",
+    "schema": {"$id": "https://example.com/root.json", "$defs": {"item": {"$id": "https://example.com/item.json", "type": "integer"}}, "properties": {"foo": {"$ref": "https://example.com/item.json"}}},
+    "tests": [
+      {"description": "resolved by absolute $id valid", "data": {"foo": 2}, "valid": true},
+      {"description": "resolved by absolute $id invalid", "data": {"foo": "x"}, "valid": false}
+    ]
+  },
+  {
+    "description": "relative $id resolution",
+    "schema": {"$id": "https://example.com/schemas/root.json", "$defs": {"item": {"$id": "item.json", "type": "string"}}, "properties": {"name": {"$ref": "item.json"}}},
+    "tests": [
+      {"description": "relative $id resolves", "data": {"name": "ok"}, "valid": true},
+      {"description": "relative $id validates", "data": {"name": 3}, "valid": false}
+    ]
+  },
+  {
+    "description": "recursive tree via $defs (cycle safety)",
+    "schema": {"$defs": {"tree": {"type": "object", "properties": {"value": {"type": "integer"}, "children": {"type": "array", "items": {"$ref": "#/$defs/tree"}}}, "required": ["value"]}}, "$ref": "#/$defs/tree"},
+    "tests": [
+      {"description": "leaf valid", "data": {"value": 1, "children": []}, "valid": true},
+      {"description": "deep tree valid", "data": {"value": 1, "children": [{"value": 2, "children": [{"value": 3}]}]}, "valid": true},
+      {"description": "invalid nested node", "data": {"value": 1, "children": [{"children": []}]}, "valid": false}
+    ]
+  },
+  {
+    "description": "$ref with sibling keywords both apply in 2020-12",
+    "schema": {"$defs": {"reffed": {"type": "array"}}, "properties": {"foo": {"$ref": "#/$defs/reffed", "maxItems": 2}}},
+    "tests": [
+      {"description": "ref valid and maxItems valid", "data": {"foo": [1, 2]}, "valid": true},
+      {"description": "ref valid but maxItems invalid", "data": {"foo": [1, 2, 3]}, "valid": false},
+      {"description": "ref invalid", "data": {"foo": "string"}, "valid": false}
+    ]
+  },
+  {
+    "description": "$dynamicRef resolves to nearest dynamic anchor (simple recursion)",
+    "schema": {"$id": "https://example.com/tree", "$dynamicAnchor": "node", "type": "object", "properties": {"data": true, "children": {"type": "array", "items": {"$dynamicRef": "#node"}}}},
+    "tests": [
+      {"description": "recursive tree valid", "data": {"data": 1, "children": [{"data": 2, "children": []}]}, "valid": true},
+      {"description": "non-object child invalid", "data": {"data": 1, "children": ["not-a-node"]}, "valid": false}
+    ]
+  },
+  {
+    "description": "exclusiveMinimum numeric form",
+    "schema": {"exclusiveMinimum": 1.1},
+    "tests": [
+      {"description": "above is valid", "data": 1.2, "valid": true},
+      {"description": "boundary is invalid", "data": 1.1, "valid": false}
+    ]
+  },
+  {
+    "description": "const with numeric equivalence",
+    "schema": {"const": 1},
+    "tests": [
+      {"description": "integer one valid", "data": 1, "valid": true},
+      {"description": "float one valid", "data": 1.0, "valid": true},
+      {"description": "true invalid", "data": true, "valid": false}
+    ]
+  },
+  {
+    "description": "propertyNames with pattern",
+    "schema": {"propertyNames": {"pattern": "^a"}},
+    "tests": [
+      {"description": "matching names valid", "data": {"alpha": 1, "abc": 2}, "valid": true},
+      {"description": "non-matching name invalid", "data": {"beta": 1}, "valid": false}
+    ]
+  },
+  {
+    "description": "type array including null",
+    "schema": {"type": ["string", "null"]},
+    "tests": [
+      {"description": "string valid", "data": "x", "valid": true},
+      {"description": "null valid", "data": null, "valid": true},
+      {"description": "number invalid", "data": 1, "valid": false}
+    ]
+  },
+  {
+    "description": "allOf with base and nested constraints",
+    "schema": {"allOf": [{"multipleOf": 2}], "minimum": 3},
+    "tests": [
+      {"description": "meets both", "data": 4, "valid": true},
+      {"description": "fails allOf", "data": 5, "valid": false},
+      {"description": "fails base", "data": 2, "valid": false}
+    ]
+  },
+  {
+    "description": "oneOf with required discrimination",
+    "schema": {"type": "object", "oneOf": [{"required": ["foo"]}, {"required": ["bar"]}]},
+    "tests": [
+      {"description": "only foo valid", "data": {"foo": 1}, "valid": true},
+      {"description": "only bar valid", "data": {"bar": 1}, "valid": true},
+      {"description": "both present invalid", "data": {"foo": 1, "bar": 2}, "valid": false},
+      {"description": "neither present invalid", "data": {"baz": 1}, "valid": false}
+    ]
+  },
+  {
+    "description": "not with boolean subschemas",
+    "schema": {"not": true},
+    "tests": [
+      {"description": "everything is invalid", "data": "foo", "valid": false}
+    ]
+  },
+  {
+    "description": "uniqueItems with 2020 semantics",
+    "schema": {"uniqueItems": true},
+    "tests": [
+      {"description": "nested arrays compared deeply", "data": [["a"], ["a"]], "valid": false},
+      {"description": "distinct nested arrays valid", "data": [["a"], ["b"]], "valid": true},
+      {"description": "1 and true are unique", "data": [1, true], "valid": true}
+    ]
+  },
+  {
+    "description": "boolean schemas at root",
+    "schema": false,
+    "tests": [
+      {"description": "false schema rejects everything", "data": {}, "valid": false}
+    ]
+  },
+  {
+    "description": "patternProperties with additionalProperties schema",
+    "schema": {"patternProperties": {"^s_": {"type": "string"}}, "additionalProperties": {"type": "integer"}},
+    "tests": [
+      {"description": "pattern match validated by pattern schema", "data": {"s_name": "x"}, "valid": true},
+      {"description": "non-pattern property validated by additionalProperties", "data": {"count": 3}, "valid": true},
+      {"description": "non-pattern property failing additionalProperties", "data": {"count": "three"}, "valid": false},
+      {"description": "pattern property failing pattern schema", "data": {"s_name": 5}, "valid": false}
+    ]
+  },
+  {
+    "description": "nested unevaluatedProperties do not leak across levels",
+    "schema": {"type": "object", "properties": {"inner": {"type": "object", "properties": {"a": true}, "unevaluatedProperties": false}}, "unevaluatedProperties": false},
+    "tests": [
+      {"description": "clean at both levels", "data": {"inner": {"a": 1}}, "valid": true},
+      {"description": "extra at inner level invalid", "data": {"inner": {"a": 1, "b": 2}}, "valid": false},
+      {"description": "extra at outer level invalid", "data": {"inner": {"a": 1}, "other": 2}, "valid": false}
+    ]
+  },
+  {
+    "description": "contains contributes to unevaluatedItems",
+    "schema": {"contains": {"type": "string"}, "unevaluatedItems": {"type": "integer"}},
+    "tests": [
+      {"description": "strings evaluated by contains, numbers by unevaluatedItems", "data": ["a", 1, "b", 2], "valid": true},
+      {"description": "boolean neither matched nor integer", "data": ["a", true], "valid": false}
+    ]
+  }
+]

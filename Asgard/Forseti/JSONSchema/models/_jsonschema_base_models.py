@@ -76,6 +76,10 @@ class JSONSchemaConfig(BaseModel):
         default="http://json-schema.org/draft-07/schema#",
         description="JSON Schema version to use"
     )
+    closed_schemas: bool = Field(
+        default=False,
+        description="Emit additionalProperties: false in inferred object schemas"
+    )
 
 
 class JSONSchemaValidationError(BaseModel):
@@ -126,6 +130,10 @@ class JSONSchemaValidationResult(BaseModel):
     validation_time_ms: float = Field(
         default=0.0,
         description="Time taken for validation in milliseconds"
+    )
+    dialect: Optional[str] = Field(
+        default=None,
+        description="JSON Schema dialect used for validation (e.g. 'draft-07', '2020-12')"
     )
 
     @property
