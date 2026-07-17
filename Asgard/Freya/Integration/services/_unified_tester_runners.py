@@ -53,7 +53,13 @@ async def run_accessibility_tests(url: str) -> List[UnifiedTestResult]:
                 element_selector=violation.element_selector,
                 suggested_fix=violation.suggested_fix,
                 wcag_reference=violation.wcag_criterion,
-                details={"rule": violation.rule_id},
+                details={
+                    "rule": violation.rule_id,
+                    # Plan 02 -> Plan 01 hookup: criticality escalates severity.
+                    "criticality": getattr(
+                        getattr(violation, "criticality", None), "value", None
+                    ),
+                },
             ))
 
         if not wcag_report.violations:

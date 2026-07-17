@@ -1,4 +1,14 @@
 from Asgard.Freya.Accessibility.models.accessibility_models import ViolationSeverity
+from Asgard.Freya.Scoring.services.epistemics import (
+    ACCESSIBILITY_DISCLAIMER,
+    NEEDS_REVIEW_NOTE,
+)
+
+
+def _wrap_disclaimer(text: str, width: int = 66) -> list:
+    """Wrap disclaimer text into indented report lines."""
+    import textwrap
+    return [f"  {line}" for line in textwrap.wrap(text, width)]
 
 
 SEVERITY_MARKERS = {
@@ -23,20 +33,30 @@ def format_accessibility_text(result) -> str:
     lines.append(f"  Score:        {result.score:.1f}%")
     lines.append(f"  Tested At:    {result.tested_at}")
     lines.append("")
+    lines.extend(_wrap_disclaimer(ACCESSIBILITY_DISCLAIMER))
+    lines.append("")
 
     if result.has_violations:
         lines.append("-" * 70)
-        lines.append("  VIOLATIONS")
+        lines.append("  VIOLATIONS - IMPACT INBOX (Axis 2: heuristic usability impact)")
         lines.append("-" * 70)
         lines.append("")
 
         for violation in result.violations:
             marker = SEVERITY_MARKERS.get(violation.severity, "[UNKNOWN]")
-            lines.append(f"  {marker}")
+            impact = getattr(violation, "usability_impact", None)
+            criticality = getattr(violation, "criticality", None)
+            impact_suffix = ""
+            if impact is not None and criticality is not None:
+                impact_suffix = f" (impact: {getattr(impact, 'value', impact)}, context: {getattr(criticality, 'value', criticality)})"
+            lines.append(f"  {marker}{impact_suffix}")
             lines.append(f"    {violation.description}")
             lines.append(f"    WCAG: {violation.wcag_reference}")
             lines.append(f"    Element: {violation.element_selector}")
             lines.append(f"    Fix: {violation.suggested_fix}")
+            framing = getattr(violation, "framing", None)
+            if isinstance(framing, str):
+                lines.append(f"    Note: {framing}")
             lines.append("")
     else:
         lines.append("  No accessibility violations found!")
@@ -52,6 +72,29 @@ def format_accessibility_text(result) -> str:
     lines.append(f"  Moderate:          {result.moderate_count}")
     lines.append(f"  Minor:             {result.minor_count}")
     lines.append("")
+
+    ledger = getattr(result, "conformance_ledger", None)
+    if isinstance(ledger, dict) and ledger:
+        counts = {}
+        for status in ledger.values():
+            counts[status] = counts.get(status, 0) + 1
+        lines.append("-" * 70)
+        lines.append("  CONFORMANCE LEDGER (Axis 1: statutory WCAG 2.1 status)")
+        lines.append("-" * 70)
+        lines.append("")
+        lines.append(
+            f"  Pass: {counts.get('pass', 0)}  Fail: {counts.get('fail', 0)}  "
+            f"Needs Review: {counts.get('needs_review', 0)}  "
+            f"Not Checked: {counts.get('not_checked', 0)}"
+        )
+        failed = sorted(k for k, v in ledger.items() if v == "fail")
+        if failed:
+            lines.append(f"  Failing criteria: {', '.join(failed)}")
+        not_checked = sorted(k for k, v in ledger.items() if v == "not_checked")
+        if not_checked:
+            lines.append(f"  NOT checked by this tool: {', '.join(not_checked)}")
+        lines.append("")
+
     lines.append("=" * 70)
 
     return "\n".join(lines)
@@ -66,6 +109,8 @@ def format_accessibility_markdown(result) -> str:
     lines.append(f"- **WCAG Level:** {result.wcag_level}")
     lines.append(f"- **Score:** {result.score:.1f}%")
     lines.append(f"- **Tested At:** {result.tested_at}")
+    lines.append("")
+    lines.append(f"> {ACCESSIBILITY_DISCLAIMER}")
     lines.append("")
 
     if result.has_violations:
@@ -124,6 +169,7 @@ def format_accessibility_html(result) -> str:
     <div class="score {score_class}">
         Accessibility Score: {result.score:.1f}%
     </div>
+    <p style="font-size: 0.9em; color: #555;"><em>{ACCESSIBILITY_DISCLAIMER}</em></p>
 """
 
     if result.has_violations:
@@ -213,8 +259,21 @@ def format_aria_text(result) -> str:
     lines.append("")
     lines.append(f"  URL:          {result.url}")
     lines.append(f"  Elements:     {result.total_aria_elements}")
-    lines.append(f"  Valid:        {result.valid_count}")
-    lines.append(f"  Invalid:      {result.invalid_count}")
+
+    warning_count = getattr(result, "warning_count", 0)
+    needs_review_count = getattr(result, "needs_review_count", 0)
+    if isinstance(warning_count, int) and isinstance(needs_review_count, int) and (
+        warning_count or needs_review_count
+    ):
+        lines.append(
+            f"  Passed: {result.valid_count}, Failed: {result.invalid_count}, "
+            f"Warnings: {warning_count}, Needs Human Review: {needs_review_count}"
+        )
+        lines.append("")
+        lines.extend(_wrap_disclaimer(NEEDS_REVIEW_NOTE))
+    else:
+        lines.append(f"  Valid:        {result.valid_count}")
+        lines.append(f"  Invalid:      {result.invalid_count}")
     lines.append("")
 
     if result.has_violations:
@@ -222,9 +281,25 @@ def format_aria_text(result) -> str:
         lines.append("  ARIA VIOLATIONS")
         lines.append("-" * 70)
         for violation in result.violations:
-            lines.append(f"\n  Element: {violation.element_selector}")
+            verdict = getattr(violation, "verdict", None)
+            verdict_str = getattr(verdict, "value", None)
+            prefix = f"[{verdict_str.upper()}] " if isinstance(verdict_str, str) else ""
+            lines.append(f"\n  {prefix}Element: {violation.element_selector}")
             lines.append(f"    Issue: {violation.description}")
             lines.append(f"    Fix: {violation.suggested_fix}")
+
+    needs_review = getattr(result, "needs_review", None)
+    if isinstance(needs_review, list) and needs_review:
+        lines.append("")
+        lines.append("-" * 70)
+        lines.append("  NEEDS HUMAN REVIEW (automation cannot decide these)")
+        lines.append("-" * 70)
+        for item in needs_review:
+            lines.append(f"\n  Element: {item.element_selector}")
+            lines.append(f"    Claim: {item.description}")
+            directive = getattr(item, "manual_test_directive", None)
+            if isinstance(directive, str):
+                lines.append(f"    {directive}")
 
     lines.append("")
     lines.append("=" * 70)

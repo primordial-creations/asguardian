@@ -22,6 +22,9 @@ from Asgard.Freya.Integration.services._crawler_checks import (
     run_visual_checks,
 )
 from Asgard.Freya.Integration.services._crawler_report import url_to_filename
+from Asgard.Freya.Scoring.models.scoring_models import UniversalSeverity
+from Asgard.Freya.Scoring.services.grade_calculator import GradeCalculator
+from Asgard.Freya.Scoring.services.severity_mapper import issue_dicts_to_findings
 
 
 async def test_page(
@@ -34,6 +37,7 @@ async def test_page(
     """Run tests on a single page."""
     start_time = time.time()
     issues = []
+    findings = []
     screenshot_path: Optional[str] = None
 
     try:
@@ -54,6 +58,9 @@ async def test_page(
            TestCategory.ACCESSIBILITY in test_categories:
             a11y_issues = await run_accessibility_checks(page)
             issues.extend(a11y_issues)
+            findings.extend(issue_dicts_to_findings(
+                a11y_issues, url=page_info.url, category="accessibility"
+            ))
             if a11y_issues:
                 accessibility_score = max(0, 100 - len(a11y_issues) * 10)
 
@@ -61,6 +68,9 @@ async def test_page(
            TestCategory.VISUAL in test_categories:
             visual_issues = await run_visual_checks(page)
             issues.extend(visual_issues)
+            findings.extend(issue_dicts_to_findings(
+                visual_issues, url=page_info.url, category="visual"
+            ))
             if visual_issues:
                 visual_score = max(0, 100 - len(visual_issues) * 5)
 
@@ -68,12 +78,25 @@ async def test_page(
            TestCategory.RESPONSIVE in test_categories:
             responsive_issues = await run_responsive_checks(page)
             issues.extend(responsive_issues)
+            findings.extend(issue_dicts_to_findings(
+                responsive_issues, url=page_info.url, category="responsive"
+            ))
             if responsive_issues:
                 responsive_score = max(0, 100 - len(responsive_issues) * 5)
 
         await page.close()
 
-        overall_score = (accessibility_score + visual_score + responsive_score) / 3
+        # Capped, non-compensatory page score (DEEPTHINK_04).
+        graded = GradeCalculator().calculate(
+            category_scores={
+                "accessibility": accessibility_score,
+                "visual": visual_score,
+                "responsive": responsive_score,
+            },
+            findings=findings,
+        )
+        overall_score = graded.capped_score
+        blocker_count = sum(1 for f in findings if f.severity == UniversalSeverity.BLOCKER)
 
         critical = sum(1 for i in issues if i.get("severity") == "critical")
         serious = sum(1 for i in issues if i.get("severity") == "serious")
@@ -92,6 +115,9 @@ async def test_page(
             visual_score=visual_score,
             responsive_score=responsive_score,
             overall_score=overall_score,
+            grade=graded.grade.value,
+            cap_reason=graded.cap_reason,
+            blocker_count=blocker_count,
             critical_issues=critical,
             serious_issues=serious,
             moderate_issues=moderate,

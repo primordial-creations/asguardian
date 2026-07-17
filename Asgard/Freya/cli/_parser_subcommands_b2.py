@@ -178,6 +178,15 @@ def add_crawl_parser(subparsers) -> None:
         "--no-discover-items", action="store_true",
         help="Disable auto-discovery of clickable items"
     )
+    crawl_parser.add_argument(
+        "--fail-on", type=str, default="blocker,critical",
+        help="Quality gate: comma-separated universal severities that fail the "
+             "build when present (default: blocker,critical)"
+    )
+    crawl_parser.add_argument(
+        "--min-grade", type=str, default=None, choices=["A", "B", "C", "D"],
+        help="Quality gate: fail when the site grade is below this letter grade"
+    )
     add_performance_flags(crawl_parser)
 
 

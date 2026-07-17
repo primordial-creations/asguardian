@@ -35,6 +35,18 @@ from Asgard.Freya.Accessibility.services._aria_validator_checks_part2 import (
     validate_aria_ids,
     count_aria_elements,
 )
+from Asgard.Freya.Accessibility.services._aria_validator_tiers import (
+    collect_aria_tier_elements,
+    detect_aria_density_smell,
+    detect_needs_review,
+    detect_non_native_interactive,
+    detect_redundant_roles,
+    tag_violation_tier,
+)
+from Asgard.Freya.Accessibility.models._accessibility_enums import (
+    AutomatabilityTier,
+    CheckVerdict,
+)
 
 
 class ARIAValidator:
@@ -65,6 +77,7 @@ class ARIAValidator:
             ARIAReport with all findings
         """
         violations = []
+        needs_review: List[ARIAViolation] = []
         roles_found: Dict[str, int] = {}
         aria_attributes_used: Dict[str, int] = {}
 
@@ -95,21 +108,48 @@ class ARIAValidator:
                 id_violations = await validate_aria_ids(page)
                 violations.extend(id_violations)
 
+                # DEEPTHINK_05 automatability tiers: heuristic warnings and
+                # fundamentally unautomatable claims (NEEDS_REVIEW).
+                tier_data = await collect_aria_tier_elements(page)
+                tier_elements = tier_data.get("elements", [])
+                violations.extend(detect_redundant_roles(tier_elements))
+                violations.extend(detect_non_native_interactive(tier_elements))
+                violations.extend(detect_aria_density_smell(
+                    tier_data.get("aria_attribute_count", 0),
+                    tier_data.get("element_count", 0),
+                ))
+                needs_review = detect_needs_review(tier_elements)
+
             finally:
                 await browser.close()
 
+        for violation in violations:
+            tag_violation_tier(violation)
+
+        failures = [v for v in violations if v.verdict == CheckVerdict.FAIL]
+        warnings = [v for v in violations if v.verdict == CheckVerdict.WARNING]
+
         total_aria = await self._count_aria_elements(page) if not browser.is_connected() else sum(roles_found.values())
-        valid_count = total_aria - len(violations)
+        valid_count = total_aria - len(failures)
+
+        tier_counts: Dict[str, int] = {tier.value: 0 for tier in AutomatabilityTier}
+        for violation in violations + needs_review:
+            if violation.automatability is not None:
+                tier_counts[violation.automatability.value] += 1
 
         return ARIAReport(
             url=url,
             tested_at=datetime.now().isoformat(),
             total_aria_elements=total_aria,
             valid_count=max(0, valid_count),
-            invalid_count=len(violations),
+            invalid_count=len(failures),
             violations=violations,
             roles_found=roles_found,
             aria_attributes_used=aria_attributes_used,
+            needs_review=needs_review,
+            warning_count=len(warnings),
+            needs_review_count=len(needs_review),
+            tier_counts=tier_counts,
         )
 
     async def _validate_roles(self, page: Page) -> tuple[List[ARIAViolation], Dict[str, int]]:

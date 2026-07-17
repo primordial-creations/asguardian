@@ -53,7 +53,12 @@ class PageTestResult(BaseModel):
     accessibility_score: float = Field(default=0.0, description="Accessibility score")
     visual_score: float = Field(default=0.0, description="Visual score")
     responsive_score: float = Field(default=0.0, description="Responsive score")
-    overall_score: float = Field(default=0.0, description="Overall score")
+    overall_score: float = Field(default=0.0, description="Overall score (capped, non-compensatory)")
+
+    # Universal severity / grading (optional)
+    grade: Optional[str] = Field(default=None, description="Capped letter grade (A-F)")
+    cap_reason: Optional[str] = Field(default=None, description="Why the grade is capped")
+    blocker_count: int = Field(default=0, description="Blocker findings (universal scale)")
 
     # Issue counts
     critical_issues: int = Field(default=0, description="Critical issues")
@@ -89,7 +94,16 @@ class SiteCrawlReport(BaseModel):
     average_accessibility_score: float = Field(default=0.0)
     average_visual_score: float = Field(default=0.0)
     average_responsive_score: float = Field(default=0.0)
-    average_overall_score: float = Field(default=0.0)
+    average_overall_score: float = Field(
+        default=0.0,
+        description="Trend indicator only - never the headline judgment"
+    )
+
+    # Site-level worst-link grade (optional): the site grade is capped by the
+    # worst page's capping severity, never an average of grades.
+    site_grade: Optional[str] = Field(default=None, description="Site letter grade (worst-link model)")
+    site_cap_reason: Optional[str] = Field(default=None, description="Why the site grade is capped")
+    total_blockers: int = Field(default=0, description="Total blocker findings (universal scale)")
 
     # Total issues
     total_critical: int = Field(default=0, description="Total critical issues")

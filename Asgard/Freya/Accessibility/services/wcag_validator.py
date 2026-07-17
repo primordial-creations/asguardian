@@ -28,7 +28,41 @@ from Asgard.Freya.Accessibility.services._wcag_checks_part2 import (
     check_language,
     check_links,
 )
-from Asgard.Freya.Accessibility.services._wcag_criteria import WCAG_CRITERIA
+from Asgard.Freya.Accessibility.models._accessibility_report_models import (
+    compliance_debt_framing,
+)
+from Asgard.Freya.Accessibility.services._component_criticality import (
+    classify_selector,
+    derive_impact,
+)
+from Asgard.Freya.Accessibility.services._wcag_criteria import (
+    WCAG_CRITERIA,
+    build_conformance_ledger,
+)
+
+
+def enrich_violations_dual_axis(violations: List[AccessibilityViolation]) -> None:
+    """
+    Apply Axis-2 (usability impact) annotations in place: component
+    criticality (best-effort from selector/HTML), impact lookup, and
+    compliance-debt framing for low-impact strict violations.
+    """
+    for violation in violations:
+        try:
+            if violation.criticality is None:
+                violation.criticality = classify_selector(
+                    violation.element_selector, violation.element_html
+                )
+            if violation.usability_impact is None:
+                violation.usability_impact = derive_impact(
+                    violation.severity, violation.criticality
+                )
+            if violation.framing is None:
+                violation.framing = compliance_debt_framing(
+                    violation.severity, violation.usability_impact
+                )
+        except Exception:
+            continue
 
 
 class WCAGValidator:
@@ -113,6 +147,10 @@ class WCAGValidator:
         violations = self._filter_by_severity(violations)
         violations = self._filter_by_level(violations)
 
+        # Dual-axis annotations (DEEPTHINK_01) and Axis-1 conformance ledger.
+        enrich_violations_dual_axis(violations)
+        conformance_ledger = build_conformance_ledger(violations)
+
         score = self._calculate_score(violations, passed_checks, total_checks)
 
         return AccessibilityReport(
@@ -125,6 +163,7 @@ class WCAGValidator:
             notices=notices,
             passed_checks=passed_checks,
             total_checks=total_checks,
+            conformance_ledger=conformance_ledger,
         )
 
     def _filter_by_severity(self, violations: List[AccessibilityViolation]) -> List[AccessibilityViolation]:

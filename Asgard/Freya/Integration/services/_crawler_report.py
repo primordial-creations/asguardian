@@ -14,6 +14,29 @@ from Asgard.Freya.Integration.models.integration_models import (
     PageTestResult,
     SiteCrawlReport,
 )
+from Asgard.Freya.Scoring.services.epistemics import TREND_INDICATOR_NOTE
+
+_GRADE_RANK = {"F": 0, "D": 1, "C": 2, "B": 3, "A": 4}
+
+
+def _site_grade(page_results: List[PageTestResult]) -> tuple:
+    """
+    Worst-link site grade (DEEPTHINK_04): the site grade is capped by the
+    worst page's grade - never an average of grades.
+    """
+    site_grade = None
+    site_cap_reason = None
+    for result in page_results:
+        grade = result.grade
+        if grade is None or grade not in _GRADE_RANK:
+            continue
+        if site_grade is None or _GRADE_RANK[grade] < _GRADE_RANK[site_grade]:
+            site_grade = grade
+            if result.cap_reason:
+                site_cap_reason = f"{result.cap_reason} (worst page: {result.url})"
+            else:
+                site_cap_reason = None
+    return site_grade, site_cap_reason
 
 
 def generate_report(
@@ -39,6 +62,9 @@ def generate_report(
         avg_overall = sum(r.overall_score for r in page_results) / len(page_results)
     else:
         avg_accessibility = avg_visual = avg_responsive = avg_overall = 0.0
+
+    site_grade, site_cap_reason = _site_grade(page_results)
+    total_blockers = sum(getattr(r, "blocker_count", 0) or 0 for r in page_results)
 
     total_critical = sum(r.critical_issues for r in page_results)
     total_serious = sum(r.serious_issues for r in page_results)
@@ -72,6 +98,9 @@ def generate_report(
         average_visual_score=avg_visual,
         average_responsive_score=avg_responsive,
         average_overall_score=avg_overall,
+        site_grade=site_grade,
+        site_cap_reason=site_cap_reason,
+        total_blockers=total_blockers,
         total_critical=total_critical,
         total_serious=total_serious,
         total_moderate=total_moderate,
@@ -111,6 +140,21 @@ def _score_color(score: float) -> str:
     elif score >= 50:
         return "#f97316"
     return "#ef4444"
+
+
+def _grade_banner_html(report: SiteCrawlReport) -> str:
+    """Site grade banner (worst-link model) for the HTML report."""
+    grade = getattr(report, "site_grade", None)
+    if not grade:
+        return ""
+    color = {"A": "#22c55e", "B": "#84cc16", "C": "#eab308", "D": "#f97316", "F": "#ef4444"}.get(grade, "#94a3b8")
+    reason = getattr(report, "site_cap_reason", None)
+    reason_html = f'<p style="font-size: 13px; color: #94a3b8;">Capped by: {reason}</p>' if reason else ""
+    return (
+        f'<div style="margin-top: 16px;">'
+        f'<span style="font-size: 3rem; font-weight: bold; color: {color};">Grade: {grade}</span>'
+        f"{reason_html}</div>"
+    )
 
 
 def generate_html_report(report: SiteCrawlReport) -> str:
@@ -185,6 +229,9 @@ def generate_html_report(report: SiteCrawlReport) -> str:
             <h1>Freya Site Crawl Report</h1>
             <p>{report.start_url}</p>
             <p style="margin-top: 10px; font-size: 14px;">Generated: {report.crawl_completed} | Duration: {report.total_duration_ms / 1000:.1f}s</p>
+            {_grade_banner_html(report)}
+            <p style="margin-top: 10px; font-size: 12px; color: #94a3b8;">{TREND_INDICATOR_NOTE}</p>
+            <p style="margin-top: 4px; font-size: 12px; color: #94a3b8;">Epistemic status: Lab Data / Synthetic Baseline &mdash; results reflect a single automated run, not real-user field data.</p>
         </div>
         <div class="summary-grid">
             <div class="summary-card"><h3>Pages Discovered</h3><div class="value" style="color: #60a5fa;">{report.pages_discovered}</div></div>
