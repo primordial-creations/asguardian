@@ -166,6 +166,12 @@ def _collect_findings(
             finding.coordinates.file = str(spec_path)
             findings.append(finding)
 
+    # Pair-programmer layer: lexical-inference HINTs are IDE fodder and are
+    # never emitted in ci/pre-commit output (plan 03, DEEPTHINK_06). Severity
+    # stays fixed; only display is filtered.
+    if profile.name in ("ci", "pre-commit"):
+        findings = [f for f in findings if f.severity != Severity.HINT]
+
     core_ids = {r.meta.rule_id for r in registry.all_rules() if r.meta.core}
     suppressions = collect_suppressions(document)
     findings = apply_suppressions(
