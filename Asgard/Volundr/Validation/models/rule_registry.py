@@ -211,6 +211,41 @@ def _build_default_registry() -> RuleRegistry:
             severity=RuleSeverity.HIGH, category=schema,
             remediation="Migrate to the current stable apiVersion (e.g. batch/v1 for CronJob).",
         ),
+        RegisteredRule(
+            id="VOL-K8S-0013", name="image-digest-pinning",
+            description=(
+                "Container image should be pinned to an immutable digest "
+                "(image@sha256:...) — a mutable tag is a completeness gap the "
+                "generator cannot resolve on its own."
+            ),
+            severity=RuleSeverity.MEDIUM, category=bp,
+            remediation=(
+                "Provide `image_digest` (sha256:...) so the image renders as "
+                "`repo@sha256:...`, or suppress with a justified reason."
+            ),
+            framework_mappings={"nsa-cisa": "supply chain / image integrity"},
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0014", name="secret-data-completeness",
+            description=(
+                "Generated Secret has no stringData — the generator cannot know "
+                "secret material and will not fabricate it."
+            ),
+            severity=RuleSeverity.LOW, category=bp,
+            remediation=(
+                "Populate the Secret out-of-band (ExternalSecrets, SealedSecrets, "
+                "CI injection) or pass `secret_string_data` explicitly."
+            ),
+        ),
+        RegisteredRule(
+            id="VOL-K8S-0015", name="pdb-completeness",
+            description=(
+                "PodDisruptionBudget minAvailable strategy was defaulted — the "
+                "generator cannot know the workload's real availability requirement."
+            ),
+            severity=RuleSeverity.INFO, category=rel,
+            remediation="Set `pdb.min_available` or `pdb.max_unavailable` explicitly.",
+        ),
         # --- Compose ---
         RegisteredRule(
             id="VOL-COMPOSE-0001", name="no-obsolete-version-key",
