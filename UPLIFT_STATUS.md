@@ -21,8 +21,8 @@
 | ID | Slice | Plans | Depends | Status |
 |---|---|---|---|---|
 | W1-H | Heimdall taint upgrade (Python-first) + security scoring/normalization | H/04, H/06 | F1 ✓ | agent running (worktree) |
-| W1-Hx | Heimdall general-purpose hygiene: lazy-imports out of default scan (goal-doc mandate violation found on Adrasta run) + report output location | goal doc | — | agent running (worktree) |
-| W1-F | Forseti unified compatibility engine | F/01 | F4 ✓ | **INTERRUPTED at session limit** (resets 5:30pm Brisbane). Partial work preserved as WIP commit 0cce9e4 on branch worktree-agent-af6c2004b36b478eb (new Compatibility/ package, GraphQL/AsyncAPI diff services, CLI handlers — UNTESTED). Resume: relaunch agent in that worktree to finish + test before merging. |
+| W1-Hx | Heimdall general-purpose hygiene: lazy-imports + env-fallbacks behind `--profile gaia`; reports to `.asgard/reports/`; stale artifacts purged | goal doc | — | **MERGED** (bb6bdd8) + verified end-to-end on Adrasta. |
+| W1-F | Forseti unified compatibility engine | F/01 | F4 ✓ | **MERGED** — 75 new tests, tests_Forseti 1077 pass. New `forseti compat check` CLI, GraphQL+AsyncAPI diffing, DEEPTHINK_04 scoring w/ blast-radius receipts. Legacy check-compat kept, augmented with score fields. |
 | W1-Fr | Freya unified severity/grade-capping + a11y dual-axis/ARIA | Fr/01, Fr/02 | — | **MERGED** (a05cd59). ~130 new tests; httpx declared. Known pre-existing bug flagged: `_unified_tester_runners.py` attr access masked by exception handler. |
 | W1-V | Verdandi stats core (HL/Glass Δ, t-digest, CO) + burn-rate pairing fix + p75 CWV | Ve/03A-C, Ve/02.1-4, Ve/01 | — | **MERGED** (da6f0fb) after adversarial review + fixes. 97 new tests; tests_Verdandi 952 pass. Deferred: CLI wiring for new APIs, Ve/02.5-8, 03D-G. Latent burn-rate scale bug also fixed. |
 | W1-Vo-CICD | Volundr zero-trust CI/CD | Vo/04 | F3 ✓ | **MERGED** (219b218). 42 new tests. FLAG: curated SHA pin-map needs release-time verification. Deferred: zizmor self-audit, CICD-Module doc reconciliation. |
