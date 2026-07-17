@@ -21,19 +21,71 @@ The Web module provides Core Web Vitals analysis and web performance metrics usi
 | TTFB | Time to First Byte | <= 800ms | <= 1800ms | > 1800ms |
 | FCP | First Contentful Paint | <= 1800ms | <= 3000ms | > 3000ms |
 
+> **FID is legacy.** INP replaced FID as a Core Web Vital in March 2024. The
+> distribution APIs compute CWV compliance from **{LCP, INP, CLS}** only; FID
+> is reported as `legacy_fid_rating` / a diagnostic, never as a core metric.
+
 **Vitals Rating Enum**:
 ```python
 class VitalsRating(str, Enum):
     GOOD = "good"
     NEEDS_IMPROVEMENT = "needs_improvement"
     POOR = "poor"
+    INSUFFICIENT_DATA = "insufficient_data"  # < 30 samples; never a junk band
 ```
 
-**Score Calculation**:
+**Score Calculation** (single-sample legacy API):
 - GOOD metric = 100/3 points each
 - NEEDS_IMPROVEMENT = 50/3 points each
 - POOR = 20/3 points each
 - Overall score: sum of individual metric scores
+- Note: this composite is retained for backwards compatibility only. Google's
+  compliance model never averages vitals; use the p75 distribution APIs below.
+
+**Distribution-based (p75) assessment — the recommended API**:
+
+Real-user (RUM) samples are rated at the **75th percentile**, matching CrUX:
+
+```python
+calc = CoreWebVitalsCalculator()
+
+# Per-metric: p75 tri-band rating plus threshold-fraction SLIs
+dist = calc.assess_distribution(lcp_samples, "lcp")
+dist.p75            # 75th percentile of the samples
+dist.rating         # tri-band rating of the p75 (or INSUFFICIENT_DATA if n < 30)
+dist.good_fraction  # fraction of samples <= good threshold
+dist.ni_fraction    # needs-improvement band fraction
+dist.poor_fraction  # fraction > poor threshold
+
+# Page/origin: passes CWV iff LCP, INP AND CLS are all GOOD at p75
+assessment = calc.assess_page({"lcp": [...], "inp": [...], "cls": [...]})
+assessment.core_passing     # True / False / None (undecidable)
+assessment.masking_warning  # True when ratings disagree by >= 2 bands
+assessment.legacy_fid_rating
+```
+
+Key semantics:
+- **Minimum-sample guard**: fewer than 30 samples returns
+  `INSUFFICIENT_DATA` instead of a junk band, and must never trip alerts.
+- **Good-fractions merge; p75s do not.** `good_fraction` over concatenated
+  samples equals the traffic-weighted mean of per-window fractions, so it
+  aggregates across pages and time windows. Per-page p75 values must NEVER
+  be averaged into an origin p75 — pool raw samples or merge t-digest
+  sketches (see Analysis module).
+- **Masking warning**: a GOOD LCP + POOR INP page sets
+  `masking_warning=True`; any single composite score would hide that
+  bimodal experience.
+- Recommendations distinguish **tail problems** (GOOD p75 with a high
+  `poor_fraction` — investigate the slow device/network segment) from
+  **systemic problems** (the p75 itself is not GOOD).
+
+**Fleet navigation-timing aggregation**:
+```python
+NavigationTimingCalculator().analyze_batch(list_of_timings)
+# -> {phase: {"p50": ..., "p75": ..., "p95": ..., "count": n}}
+# phases: dns_lookup, tcp_connection, ssl_handshake, ttfb,
+#         content_download, dom_processing, page_load
+```
 
 **Usage**:
 ```python

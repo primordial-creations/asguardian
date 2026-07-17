@@ -156,6 +156,146 @@ def cohens_d(
     return (mean2 - mean1) / pooled_std
 
 
+_PAIRWISE_CAP = 250
+
+
+def _capped_sample(values: Sequence[float], cap: int, seed: int) -> List[float]:
+    """Return values, randomly subsampled to `cap` when larger (deterministic)."""
+    if len(values) <= cap:
+        return list(values)
+    rng = random.Random(seed)
+    return rng.sample(list(values), cap)
+
+
+def hodges_lehmann(
+    baseline: Sequence[float],
+    candidate: Sequence[float],
+    max_pairs_per_side: int = _PAIRWISE_CAP,
+) -> float:
+    """
+    Hodges-Lehmann location-shift estimator: the median of all pairwise
+    differences (candidate - baseline).
+
+    Robust to skew and outliers, unlike a difference of means. For inputs
+    larger than `max_pairs_per_side` per side, a deterministic random
+    subsample caps the O(n*m) pairwise computation at 250x250. Both sides
+    use the SAME seed, so identical inputs select identical subsamples and
+    hodges_lehmann(x, x) is exactly 0 at any size; each subsample is still
+    uniform, so the estimator stays unbiased. Residual subsample error for
+    differing inputs is O(1/sqrt(250)) of the data's spread — negligible
+    against the >10-unit / >5% practical-significance gates, but do not
+    rely on digits beyond that resolution for capped inputs.
+    """
+    if not baseline or not candidate:
+        return 0.0
+
+    base = _capped_sample(baseline, max_pairs_per_side, seed=1)
+    cand = _capped_sample(candidate, max_pairs_per_side, seed=1)
+
+    diffs = [c - b for c in cand for b in base]
+    diffs.sort()
+    n = len(diffs)
+    mid = n // 2
+    if n % 2 == 1:
+        return diffs[mid]
+    return (diffs[mid - 1] + diffs[mid]) / 2.0
+
+
+def pseudo_median(values: Sequence[float], max_points: int = _PAIRWISE_CAP) -> float:
+    """
+    One-sample Hodges-Lehmann pseudo-median: median of Walsh averages
+    (x_i + x_j)/2 for i <= j. Robust location estimate for skewed data.
+    """
+    if not values:
+        return 0.0
+
+    vals = _capped_sample(values, max_points, seed=3)
+    walsh = [
+        (vals[i] + vals[j]) / 2.0
+        for i in range(len(vals))
+        for j in range(i, len(vals))
+    ]
+    walsh.sort()
+    n = len(walsh)
+    mid = n // 2
+    if n % 2 == 1:
+        return walsh[mid]
+    return (walsh[mid - 1] + walsh[mid]) / 2.0
+
+
+def glass_delta(
+    baseline_mean: float,
+    baseline_std: float,
+    candidate_mean: float,
+) -> float:
+    """
+    Glass's delta effect size: (candidate_mean - baseline_mean) / baseline_std.
+
+    Standardizes by the BASELINE standard deviation only, so a canary that
+    inflates variance cannot dilute its own effect size (RESEARCH_15).
+    Returns +/-inf when the baseline has zero variance but the means differ.
+    """
+    diff = candidate_mean - baseline_mean
+    if baseline_std == 0:
+        if diff == 0:
+            return 0.0
+        return math.inf if diff > 0 else -math.inf
+    return diff / baseline_std
+
+
+def mann_whitney_u(
+    baseline: Sequence[float],
+    candidate: Sequence[float],
+) -> Tuple[float, float]:
+    """
+    Mann-Whitney U test (two-sided, tie-corrected normal approximation).
+
+    Offered as an alternative, NOT the default judge: it is sensitive to
+    distribution-shape changes (false positives) and blind to variance
+    collapse (false negatives) - the documented Kayenta failure modes
+    (RESEARCH_15). Prefer Welch's t gated by Hodges-Lehmann / Glass's delta.
+
+    Returns:
+        Tuple of (U statistic for the candidate sample, two-sided p-value)
+    """
+    n1, n2 = len(baseline), len(candidate)
+    if n1 == 0 or n2 == 0:
+        return 0.0, 1.0
+
+    combined = [(v, 0) for v in baseline] + [(v, 1) for v in candidate]
+    combined.sort(key=lambda t: t[0])
+
+    ranks = [0.0] * len(combined)
+    tie_correction = 0.0
+    i = 0
+    while i < len(combined):
+        j = i
+        while j + 1 < len(combined) and combined[j + 1][0] == combined[i][0]:
+            j += 1
+        avg_rank = (i + j) / 2.0 + 1.0
+        for k in range(i, j + 1):
+            ranks[k] = avg_rank
+        t = j - i + 1
+        if t > 1:
+            tie_correction += t ** 3 - t
+        i = j + 1
+
+    rank_sum_candidate = sum(
+        rank for rank, (_, group) in zip(ranks, combined) if group == 1
+    )
+    u_candidate = rank_sum_candidate - n2 * (n2 + 1) / 2.0
+
+    mean_u = n1 * n2 / 2.0
+    n = n1 + n2
+    variance_u = (n1 * n2 / 12.0) * ((n + 1) - tie_correction / (n * (n - 1)))
+    if variance_u <= 0:
+        return u_candidate, 1.0
+
+    z = (u_candidate - mean_u) / math.sqrt(variance_u)
+    p_value = 2.0 * (1.0 - normal_cdf(abs(z)))
+    return u_candidate, min(1.0, max(0.0, p_value))
+
+
 def determine_regression_severity(
     is_regression: bool,
     mean_change: float,

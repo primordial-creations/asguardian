@@ -41,6 +41,13 @@ class PercentileResult(BaseModel):
     p95: float = Field(..., description="95th percentile")
     p99: float = Field(..., description="99th percentile")
     p999: float = Field(..., description="99.9th percentile")
+    quality_flags: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Measurement-quality annotations (e.g. SUSPECT_COORDINATED_OMISSION, "
+            "LITTLES_LAW_VIOLATION, CO_CORRECTED, SKETCH_APPROXIMATION)"
+        ),
+    )
 
     @property
     def range(self) -> float:

@@ -188,6 +188,22 @@ class RegressionResult(BaseModel):
     effect_size: Optional[float] = Field(
         default=None, description="Cohen's d effect size"
     )
+    hl_shift: Optional[float] = Field(
+        default=None,
+        description="Hodges-Lehmann location shift (median of pairwise diffs)",
+    )
+    hl_shift_relative: Optional[float] = Field(
+        default=None,
+        description="HL shift relative to the baseline pseudo-median",
+    )
+    glass_delta: Optional[float] = Field(
+        default=None,
+        description="Glass's delta effect size (baseline-sigma standardized)",
+    )
+    verdict_basis: Optional[str] = Field(
+        default=None,
+        description="Which gates (statistical/practical/magnitude) drove the verdict",
+    )
     description: str = Field(default="", description="Human-readable description")
     recommendations: List[str] = Field(
         default_factory=list, description="Recommendations"

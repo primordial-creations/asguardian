@@ -176,7 +176,11 @@ def _add_anomaly_parser(subparsers) -> None:
         "-t",
         type=float,
         default=10.0,
-        help="Regression threshold percentage (default: 10.0)"
+        help=(
+            "Regression threshold percentage: minimum relative "
+            "Hodges-Lehmann shift for the practical-significance gate "
+            "(default: 10.0)"
+        )
     )
 
     add_performance_flags(anomaly_parser)

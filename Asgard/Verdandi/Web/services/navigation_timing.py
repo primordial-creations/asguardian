@@ -4,7 +4,7 @@ Navigation Timing Calculator
 Calculates page load timing breakdown from Navigation Timing API data.
 """
 
-from typing import List
+from typing import Dict, List, Sequence
 
 from Asgard.Verdandi.Web.models.web_models import (
     NavigationTimingInput,
@@ -76,6 +76,67 @@ class NavigationTimingCalculator:
             bottleneck=bottleneck,
             recommendations=recommendations,
         )
+
+    def analyze_batch(
+        self,
+        inputs: Sequence[NavigationTimingInput],
+    ) -> Dict[str, Dict[str, float]]:
+        """
+        Fleet aggregation: per-phase p50/p75/p95 across many page loads.
+
+        Lets TTFB regressions be attributed to a specific phase
+        (DNS / TCP / TLS / request-response / DOM) instead of a single
+        opaque number.
+
+        Args:
+            inputs: Navigation timing records from many page loads
+
+        Returns:
+            {phase: {"p50": ..., "p75": ..., "p95": ..., "count": n}} for
+            phases dns_lookup, tcp_connection, ssl_handshake, ttfb,
+            content_download, dom_processing, page_load. Empty dict for no
+            input (insufficient data, not zeros).
+        """
+        from Asgard.Verdandi.Analysis.services.percentile_calculator import (
+            PercentileCalculator,
+        )
+
+        if not inputs:
+            return {}
+
+        phases: Dict[str, List[float]] = {
+            "dns_lookup": [],
+            "tcp_connection": [],
+            "ssl_handshake": [],
+            "ttfb": [],
+            "content_download": [],
+            "dom_processing": [],
+            "page_load": [],
+        }
+        for item in inputs:
+            result = self.calculate(item)
+            phases["dns_lookup"].append(result.dns_lookup_ms)
+            phases["tcp_connection"].append(result.tcp_connection_ms)
+            if result.ssl_handshake_ms is not None:
+                phases["ssl_handshake"].append(result.ssl_handshake_ms)
+            phases["ttfb"].append(result.ttfb_ms)
+            phases["content_download"].append(result.content_download_ms)
+            phases["dom_processing"].append(result.dom_processing_ms)
+            phases["page_load"].append(result.page_load_ms)
+
+        calc = PercentileCalculator()
+        aggregated: Dict[str, Dict[str, float]] = {}
+        for phase, values in phases.items():
+            if not values:
+                continue
+            ordered = sorted(values)
+            aggregated[phase] = {
+                "p50": calc.calculate_percentile(ordered, 50, presorted=True),
+                "p75": calc.calculate_percentile(ordered, 75, presorted=True),
+                "p95": calc.calculate_percentile(ordered, 95, presorted=True),
+                "count": float(len(values)),
+            }
+        return aggregated
 
     def _identify_bottleneck(
         self,

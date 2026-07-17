@@ -60,6 +60,57 @@ custom = calculator.calculate_custom_percentiles(data, [10, 25, 50, 75, 90])
 histogram = calculator.calculate_histogram(data)
 ```
 
+**Cross-host aggregation — mergeable quantile sketches**:
+
+Per-host percentiles must NEVER be averaged: the mean of p99s is not the
+p99 of the union. The sanctioned path is one sketch per host, merged:
+
+```python
+from Asgard.Verdandi.Analysis.services.quantile_sketch import TDigest, DDSketch
+
+calc = PercentileCalculator()
+sketches = [calc.create_sketch(host_samples) for host_samples in hosts]
+fleet = calc.merge_sketches(sketches)   # PercentileResult over the union
+fleet.p99                                # ~1% accurate
+fleet.quality_flags                      # ["SKETCH_APPROXIMATION"]
+
+# Sketches serialize for shipping across hosts:
+payload = sketches[0].to_dict()
+restored = TDigest.from_dict(payload)
+```
+
+- `TDigest` (default): merging t-digest, compression 100 (~1% quantile
+  error), high tail resolution.
+- `DDSketch`: geometric buckets with a guaranteed relative error
+  (`relative_accuracy=0.01` -> 1%).
+
+**Coordinated-omission toolkit** (`Analysis.services.coordinated_omission`):
+
+Closed-loop load generators hide queueing behind slow requests, producing
+optimistic percentiles. Detection and correction:
+
+```python
+from Asgard.Verdandi.Analysis.services import coordinated_omission as co
+
+# HDR-style expected-interval backfill (100ms sample @ 1ms interval
+# backfills 99, 98, ..., 1 ms):
+corrected = co.correct_expected_interval(samples_ms, expected_interval_ms=1.0)
+
+# Tene heuristic: suspect CO when avg < max^2 / (2 * duration)
+co.tene_heuristic(avg_ms, max_ms, duration_ms)
+
+# Little's law: throughput x latency must not exceed possible concurrency
+co.littles_law_check(throughput_rps, avg_latency_s, max_concurrency)
+
+# One call, machine-readable quality flags:
+report = co.analyze(samples_ms, duration_ms=60_000,
+                    throughput_rps=1000, max_concurrency=100)
+report.quality_flags  # e.g. ["SUSPECT_COORDINATED_OMISSION"]
+```
+
+Flags attach to `PercentileResult.quality_flags` so downstream consumers
+know when a percentile came from a suspect or corrected dataset.
+
 ---
 
 ### 2. Apdex Calculator
@@ -317,6 +368,9 @@ class PercentileResult(BaseModel):
     p95: float
     p99: float
     p99_9: float
+    quality_flags: list[str]  # e.g. SUSPECT_COORDINATED_OMISSION,
+                              # LITTLES_LAW_VIOLATION, CO_CORRECTED,
+                              # SKETCH_APPROXIMATION
 ```
 
 ### ApdexConfig / ApdexResult

@@ -49,7 +49,13 @@ def run_regression_check(args: argparse.Namespace, output_format: str) -> int:
     before = load_json_or_parse(args.before)
     after = load_json_or_parse(args.after)
 
-    detector = RegressionDetector(regression_threshold_percent=args.threshold)
+    # --threshold (a percent) maps onto the three-gate verdict's relative
+    # Hodges-Lehmann shift gate; it is also passed to the legacy gate so the
+    # operator's intent holds in either verdict mode.
+    detector = RegressionDetector(
+        regression_threshold_percent=args.threshold,
+        hl_relative_threshold=args.threshold / 100.0,
+    )
     result = detector.detect(before, after, metric_name="cli_metric")
 
     if output_format == "json":
