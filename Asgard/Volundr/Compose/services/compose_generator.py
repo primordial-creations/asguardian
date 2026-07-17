@@ -103,8 +103,9 @@ class ComposeProjectGenerator:
         return self.generate(project)
 
     def _build_compose_dict(self, project: ComposeProject) -> Dict[str, Any]:
+        # Compose Specification: the top-level `version:` key is obsolete and
+        # deliberately not emitted (VOL-COMPOSE-0001).
         compose: Dict[str, Any] = {
-            "version": project.version,
             "name": project.name,
         }
 

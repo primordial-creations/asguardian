@@ -175,7 +175,9 @@ def format_volumes(volumes: List[Union[str, Any]]) -> List[str]:
 
 
 def build_override_dict(project: ComposeProject, environment: str) -> Dict[str, Any]:
-    override: Dict[str, Any] = {"version": project.version, "services": {}}
+    # Compose Specification: the top-level `version:` key is obsolete and
+    # deliberately not emitted (VOL-COMPOSE-0001).
+    override: Dict[str, Any] = {"services": {}}
     env_configs = {
         "development": {"replicas": 1, "cpus": "0.5", "memory": "512M"},
         "staging": {"replicas": 2, "cpus": "1", "memory": "1G"},

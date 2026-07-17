@@ -14,9 +14,35 @@ from Asgard.Volundr.Validation.models.validation_models import (
     ValidationRule,
     ValidationContext,
 )
+from Asgard.Volundr.Validation.models.rule_registry import (
+    RegisteredRule,
+    RuleRegistry,
+    RuleSeverity,
+    UnknownValueBehavior,
+    default_registry,
+)
+from Asgard.Volundr.Validation.models.suppression_models import (
+    Suppression,
+    SuppressionSet,
+)
+from Asgard.Volundr.Validation.models.canonical_models import (
+    COMPUTED,
+    TAINTED,
+    is_computed,
+    is_tainted,
+    is_unknown,
+)
 from Asgard.Volundr.Validation.services.kubernetes_validator import KubernetesValidator
 from Asgard.Volundr.Validation.services.terraform_validator import TerraformValidator
 from Asgard.Volundr.Validation.services.dockerfile_validator import DockerfileValidator
+from Asgard.Volundr.Validation.services.suppression_engine import (
+    SuppressionEngine,
+    annotate_k8s_manifest,
+    append_comment_receipts,
+    k8s_receipt_annotations,
+)
+from Asgard.Volundr.Validation.services.validation_engine import ValidationEngine
+from Asgard.Volundr.Validation.services.report_emitters import to_junit_xml, to_sarif
 
 __all__ = [
     "ValidationResult",
@@ -27,4 +53,23 @@ __all__ = [
     "KubernetesValidator",
     "TerraformValidator",
     "DockerfileValidator",
+    "RegisteredRule",
+    "RuleRegistry",
+    "RuleSeverity",
+    "UnknownValueBehavior",
+    "default_registry",
+    "Suppression",
+    "SuppressionSet",
+    "SuppressionEngine",
+    "ValidationEngine",
+    "COMPUTED",
+    "TAINTED",
+    "is_computed",
+    "is_tainted",
+    "is_unknown",
+    "annotate_k8s_manifest",
+    "append_comment_receipts",
+    "k8s_receipt_annotations",
+    "to_sarif",
+    "to_junit_xml",
 ]

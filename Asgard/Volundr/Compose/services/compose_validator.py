@@ -94,6 +94,15 @@ class ComposeValidator:
 
         version = compose.get("version")
         if version:
+            issues.append(FormattedIssue(
+                message=(
+                    f"Top-level 'version: {version}' key is obsolete under the "
+                    "Compose Specification - remove it"
+                ),
+                severity=Severity.WARNING,
+                file_path=file_path,
+                rule_id="VOL-COMPOSE-0001",
+            ))
             try:
                 version_float = float(version)
                 if version_float < 3.0:

@@ -58,7 +58,7 @@ class ArgoCDGenerator:
         repo_url: str,
         path: str,
         target_namespace: str,
-        target_revision: str = "HEAD",
+        target_revision: str = "main",
         project: str = "default",
         automated: bool = True,
         prune: bool = True,
@@ -91,7 +91,7 @@ class ArgoCDGenerator:
         name: str,
         repo_url: str,
         apps_path: str = "apps",
-        target_revision: str = "HEAD",
+        target_revision: str = "main",
         project: str = "default",
     ) -> GeneratedGitOpsConfig:
         app = ArgoApplication(
