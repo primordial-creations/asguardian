@@ -11,6 +11,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Volundr.Validation.models.suppression_models import Suppression
+
 
 class BaseImage(str, Enum):
     """Common base images with security best practices."""
@@ -26,10 +28,43 @@ class BaseImage(str, Enum):
     ALPINE = "alpine:3.19"
 
 
+class SecretMount(BaseModel):
+    """BuildKit secret mount (RESEARCH_10 §3.6) — secrets never enter layers."""
+    id: str = Field(description="Secret ID (docker build --secret id=...)")
+    target: Optional[str] = Field(
+        default=None, description="Mount target path (defaults to /run/secrets/<id>)"
+    )
+    required: bool = Field(default=False, description="Fail the build if missing")
+
+
+class NonRootUser(BaseModel):
+    """Non-root user scaffold (RESEARCH_10 §3.3, hadolint DL3002/DL3046)."""
+    name: str = Field(default="appuser", description="User name")
+    uid: int = Field(default=65532, description="High, fixed UID (nobody-style)")
+    create: bool = Field(
+        default=True,
+        description="Generate the useradd/adduser RUN (off for distroless)",
+    )
+
+
 class BuildStage(BaseModel):
     """Configuration for a Docker build stage."""
     name: str = Field(description="Stage name")
     base_image: str = Field(description="Base image for this stage")
+    base_image_digest: Optional[str] = Field(
+        default=None,
+        description=(
+            "Immutable digest (sha256:...) pinning the base image; pairs "
+            "with Renovate for automated updates (RESEARCH_10 §3.2)"
+        ),
+    )
+    secret_mounts: List[SecretMount] = Field(
+        default_factory=list,
+        description="BuildKit --mount=type=secret mounts applied to this stage's RUNs",
+    )
+    ssh_mount: bool = Field(
+        default=False, description="Apply --mount=type=ssh to this stage's RUNs"
+    )
     workdir: str = Field(default="/app", description="Working directory")
     user: Optional[str] = Field(default=None, description="User to run as")
     copy_from: Optional[str] = Field(default=None, description="Stage to copy from")
@@ -52,6 +87,40 @@ class DockerfileConfig(BaseModel):
     healthcheck: Optional[Dict[str, Any]] = Field(default=None, description="Healthcheck configuration")
     use_non_root: bool = Field(default=True, description="Run as non-root user")
     optimize_layers: bool = Field(default=True, description="Optimize layer caching")
+    syntax_version: str = Field(
+        default="1.7",
+        description="BuildKit `# syntax=docker/dockerfile:<version>` directive",
+    )
+    non_root: Optional[NonRootUser] = Field(
+        default=None,
+        description=(
+            "Non-root user scaffold; when use_non_root is set and the final "
+            "stage names no user, a default scaffold is generated"
+        ),
+    )
+    shell_pipefail: bool = Field(
+        default=True,
+        description="Emit SHELL with -o pipefail before piped RUNs (DL4006)",
+    )
+    emit_dockerignore: bool = Field(
+        default=True,
+        description="Generate .dockerignore content when the whole context is copied",
+    )
+    emit_renovate_config: bool = Field(
+        default=False,
+        description="Emit a renovate.json snippet pairing digest pinning with automation",
+    )
+    emit_scan_workflow: bool = Field(
+        default=False,
+        description=(
+            "Emit a CI snippet running Trivy image scan + CycloneDX SBOM "
+            "(RESEARCH_04 pairing); Volundr does not scan images itself"
+        ),
+    )
+    suppressions: List[Suppression] = Field(
+        default_factory=list,
+        description="Reified rule suppressions — the only sanctioned relaxation path",
+    )
 
 
 class ComposeServiceConfig(BaseModel):
@@ -89,8 +158,19 @@ class VolumeConfig(BaseModel):
 
 
 class ComposeConfig(BaseModel):
-    """Configuration for generating docker-compose.yml."""
-    version: str = Field(default="3.8", description="Compose file version")
+    """Configuration for generating docker-compose.yml.
+
+    DEPRECATED: this legacy Docker-module Compose config is retained for
+    one deprecation cycle; use ``Asgard.Volundr.Compose`` (ComposeProject
+    + ComposeProjectGenerator), the single Compose engine.
+    """
+    version: str = Field(
+        default="3.8",
+        description=(
+            "DEPRECATED and never emitted: the Compose Specification "
+            "obsoletes the top-level version key (VOL-COMPOSE-0001)"
+        ),
+    )
     services: List[ComposeServiceConfig] = Field(description="Services to define")
     networks: List[NetworkConfig] = Field(default_factory=list, description="Networks to define")
     volumes: List[VolumeConfig] = Field(default_factory=list, description="Volumes to define")
@@ -106,6 +186,23 @@ class GeneratedDockerConfig(BaseModel):
     compose_content: Optional[str] = Field(default=None, description="Generated docker-compose.yml content")
     validation_results: List[str] = Field(default_factory=list, description="Validation issues found")
     best_practice_score: float = Field(ge=0, le=100, description="Best practice compliance score")
+    score_report: Optional[Any] = Field(
+        default=None,
+        description="Composite ScoreReport (plan 07): dimensions, grades, veto, receipts",
+    )
+    applied_suppressions: List[str] = Field(
+        default_factory=list,
+        description="Rule IDs annihilated by suppressions (receipts are in the artifact)",
+    )
+    dockerignore_content: Optional[str] = Field(
+        default=None, description="Generated .dockerignore (when whole context copied)"
+    )
+    renovate_snippet: Optional[str] = Field(
+        default=None, description="renovate.json snippet pairing digest pinning"
+    )
+    scan_workflow_content: Optional[str] = Field(
+        default=None, description="Optional Trivy scan + SBOM CI snippet (RESEARCH_04)"
+    )
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
     file_path: Optional[str] = Field(default=None, description="Path where config was saved")
 

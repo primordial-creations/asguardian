@@ -67,7 +67,9 @@ class TestDockerfileGeneratorGenerate:
         assert isinstance(result, GeneratedDockerConfig)
         assert result.dockerfile_content is not None
         assert "FROM python:3.12-slim" in result.dockerfile_content
-        assert "pip install -r requirements.txt" in result.dockerfile_content
+        # Updated for plan 03: the package-hygiene pass injects
+        # --no-cache-dir into pip installs (hadolint DL3042).
+        assert "pip install --no-cache-dir -r requirements.txt" in result.dockerfile_content
 
     def test_generate_multi_stage_dockerfile(self):
         """Test generating multi-stage Dockerfile"""
@@ -255,7 +257,10 @@ class TestDockerfileGeneratorGenerate:
         result = generator.generate(config)
 
         assert "RUN apt-get update && \\" in result.dockerfile_content
-        assert "apt-get install -y curl && \\" in result.dockerfile_content
+        # Updated for plan 03: the package-hygiene pass injects
+        # --no-install-recommends and same-layer apt list cleanup (DL3009).
+        assert "apt-get install --no-install-recommends -y curl" in result.dockerfile_content
+        assert "rm -rf /var/lib/apt/lists/*" in result.dockerfile_content
 
     def test_generate_without_layer_optimization(self):
         """Test generating Dockerfile without layer optimization"""
@@ -387,7 +392,9 @@ class TestDockerfileGeneratorValidation:
         assert any("latest" in issue.lower() for issue in result.validation_results)
 
     def test_validation_non_root_user_missing(self):
-        """Test validation catches missing non-root USER"""
+        """Updated for plan 03: with use_non_root and no explicit user the
+        generator now emits the non-root scaffold by construction
+        (`useradd -l` + USER, RESEARCH_10 §3.3) instead of merely warning."""
         generator = DockerfileGenerator()
         stage = BuildStage(name="app", base_image="python:3.12-slim")
         config = DockerfileConfig(
@@ -398,7 +405,12 @@ class TestDockerfileGeneratorValidation:
 
         result = generator.generate(config)
 
-        assert any("USER" in issue for issue in result.validation_results)
+        assert "RUN useradd -l -u 65532 -m appuser" in result.dockerfile_content
+        assert "USER appuser" in result.dockerfile_content
+        assert not any(
+            "USER" in issue and "DL3002" in issue
+            for issue in result.validation_results
+        )
 
     def test_validation_passes_with_user(self):
         """Test validation passes when USER is specified"""
@@ -446,7 +458,15 @@ class TestDockerfileGeneratorBestPracticeScore:
         )
         result_multi = generator.generate(multi_stage)
 
-        assert result_multi.best_practice_score > result_single.best_practice_score
+        # Updated for plan 07: scores now come from the adversarial
+        # Validation engine's findings on the rendered artifact, not from
+        # structural bonuses — multi-stage is no longer rewarded per se,
+        # but both artifacts must score in the valid range and the
+        # multi-stage build must not be penalized for its extra stage
+        # beyond its own findings.
+        assert 0 <= result_single.best_practice_score <= 100
+        assert 0 <= result_multi.best_practice_score <= 100
+        assert result_multi.score_report is not None
 
     def test_score_with_healthcheck(self):
         """Test score includes healthcheck"""
@@ -504,7 +524,10 @@ class TestDockerfileGeneratorBestPracticeScore:
         )
         result_with = generator.generate(with_labels)
 
-        assert result_with.best_practice_score > result_without.best_practice_score
+        # Updated for plan 07: labels are no longer a scored bonus (that
+        # invited verbosity farming, DEEPTHINK_05 §1D); adding metadata
+        # must simply never lower the score.
+        assert result_with.best_practice_score >= result_without.best_practice_score
 
     def test_score_avoids_latest_tag(self):
         """Test score penalizes :latest tag"""

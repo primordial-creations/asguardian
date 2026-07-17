@@ -246,6 +246,55 @@ def _build_default_registry() -> RuleRegistry:
             severity=RuleSeverity.INFO, category=rel,
             remediation="Set `pdb.min_available` or `pdb.max_unavailable` explicitly.",
         ),
+        # --- Dockerfile (Volundr generation-time rules) ---
+        RegisteredRule(
+            id="VOL-DOCKER-DIGEST", name="base-image-digest-pinning",
+            description=(
+                "FROM should be pinned to an immutable digest "
+                "(image:tag@sha256:...) — a mutable tag is a completeness gap. "
+                "Pair digest pinning with Renovate so updates stay automated."
+            ),
+            severity=RuleSeverity.MEDIUM, category=bp,
+            remediation=(
+                "Set `base_image_digest` (sha256:...) on the build stage, and "
+                "adopt the generated renovate.json so Renovate keeps the digest "
+                "fresh; or suppress with a justified reason."
+            ),
+            framework_mappings={"hadolint": "DL3006/DL3007"},
+        ),
+        RegisteredRule(
+            id="VOL-DOCKER-SECRET-ENV", name="no-plaintext-secret-env",
+            description=(
+                "ENV/ARG values that look like secrets bake credentials into "
+                "image layers. Use BuildKit `--mount=type=secret` instead."
+            ),
+            severity=RuleSeverity.CRITICAL, category=sec,
+            remediation=(
+                "Move the secret to a BuildKit secret mount "
+                "(`RUN --mount=type=secret,id=...`) and drop the ENV/ARG."
+            ),
+            framework_mappings={"cis-docker": "4.10"},
+        ),
+        RegisteredRule(
+            id="VOL-DOCKER-COPY-CONTEXT", name="copy-whole-context",
+            description=(
+                "`COPY . .` copies the whole build context; without a "
+                ".dockerignore this leaks VCS metadata and secrets and "
+                "defeats layer caching."
+            ),
+            severity=RuleSeverity.LOW, category=bp,
+            remediation="Ship the generated .dockerignore next to the Dockerfile.",
+        ),
+        RegisteredRule(
+            id="VOL-DOCKER-UNPINNED-PKG", name="unpinned-package-install",
+            description=(
+                "Package installs without pinned versions are not "
+                "reproducible (hadolint DL3008/DL3013/DL3016/DL3018 family)."
+            ),
+            severity=RuleSeverity.LOW, category=bp,
+            remediation="Pin package versions (pkg=1.2.*, pkg==1.2.3, pkg@1.2.3).",
+            framework_mappings={"hadolint": "DL3008"},
+        ),
         # --- Compose ---
         RegisteredRule(
             id="VOL-COMPOSE-0001", name="no-obsolete-version-key",
@@ -276,6 +325,50 @@ def _build_default_registry() -> RuleRegistry:
             description="Published ports should bind loopback (127.0.0.1) unless external exposure is intended.",
             severity=RuleSeverity.MEDIUM, category=sec,
             remediation="Bind ports as `127.0.0.1:HOST:CONTAINER` unless the service must be reachable externally.",
+        ),
+        RegisteredRule(
+            id="VOL-COMPOSE-EXPOSED", name="datastore-host-port-exposed",
+            description=(
+                "A datastore service publishes a host port on all "
+                "interfaces; datastores should be internal-network-only or "
+                "loopback-bound (RESEARCH_10 §5.4)."
+            ),
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation=(
+                "Remove the published port (use an internal network) or bind "
+                "it as `127.0.0.1:HOST:CONTAINER`."
+            ),
+        ),
+        RegisteredRule(
+            id="VOL-COMPOSE-0006", name="prefer-named-volumes",
+            description="Bind mounts are host-coupled; prefer named volumes for data.",
+            severity=RuleSeverity.LOW, category=bp,
+            remediation="Declare a named volume and mount it instead of a host path.",
+        ),
+        RegisteredRule(
+            id="VOL-COMPOSE-0007", name="volume-permission-bootstrap",
+            description=(
+                "A non-root service mounting a fresh named volume usually "
+                "needs a permission bootstrap (the volume is created "
+                "root-owned)."
+            ),
+            severity=RuleSeverity.INFO, category=rel,
+            remediation=(
+                "chown the mount path in the image, or run a one-shot init "
+                "service/entrypoint to fix ownership before first use."
+            ),
+        ),
+        RegisteredRule(
+            id="VOL-COMPOSE-0008", name="healthcheck-gated-dependency",
+            description=(
+                "depends_on without `condition: service_healthy` only waits "
+                "for container start, not readiness (RESEARCH_10 §5.1)."
+            ),
+            severity=RuleSeverity.LOW, category=rel,
+            remediation=(
+                "Give the dependency a healthcheck and use the long-form "
+                "`depends_on: {svc: {condition: service_healthy}}`."
+            ),
         ),
         # --- CI/CD pipeline YAML (GitHub Actions first) ---
         RegisteredRule(
@@ -410,7 +503,9 @@ def _build_default_registry() -> RuleRegistry:
         "DL3009": "Delete apt lists after install.",
         "DL3011": "Use a valid UNIX port range.",
         "DL3014": "Use apt-get -y.",
+        "DL3013": "Pin versions in pip install.",
         "DL3016": "Pin versions in npm install.",
+        "DL3018": "Pin versions in apk add.",
         "DL3020": "Use COPY instead of ADD.",
         "DL3025": "Use JSON notation for CMD/ENTRYPOINT.",
         "DL3032": "yum clean all after install.",
@@ -420,6 +515,7 @@ def _build_default_registry() -> RuleRegistry:
         "DL3055": "Pin image digests.",
         "DL3059": "Consolidate consecutive RUN instructions.",
         "DL4001": "Do not use both wget and curl.",
+        "DL4006": "Set SHELL -o pipefail before RUNs with pipes.",
         "DL4002": "Use HEALTHCHECK.",
         "DL0001": "Dockerfile parse issue.",
         "DL0002": "Dockerfile structure issue.",
