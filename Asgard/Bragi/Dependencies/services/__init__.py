@@ -12,6 +12,11 @@ from Asgard.Bragi.Dependencies.services.modularity_analyzer import ModularityAna
 from Asgard.Bragi.Dependencies.services.dependency_analyzer import DependencyAnalyzer
 from Asgard.Bragi.Dependencies.services.requirements_checker import RequirementsChecker
 from Asgard.Bragi.Dependencies.services.license_checker import LicenseChecker
+from Asgard.Bragi.Dependencies.services.vulnerability_checker import (
+    VulnerabilityChecker,
+    VulnerabilityFinding,
+    VulnerabilityResult,
+)
 
 __all__ = [
     "CycleDetector",
@@ -22,4 +27,7 @@ __all__ = [
     "LicenseChecker",
     "ModularityAnalyzer",
     "RequirementsChecker",
+    "VulnerabilityChecker",
+    "VulnerabilityFinding",
+    "VulnerabilityResult",
 ]
