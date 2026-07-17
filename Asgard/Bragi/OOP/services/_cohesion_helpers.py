@@ -64,6 +64,57 @@ def calculate_lcom_hs(method_attr_usage: Dict[str, Set[str]], num_attributes: in
     return max(0.0, min(1.0, lcom4))
 
 
+def calculate_true_lcom4(
+    method_attr_usage: Dict[str, Set[str]],
+    method_call_graph: Dict[str, Set[str]],
+) -> int:
+    """Calculate true LCOM4 (Hitz & Montazeri): connected components of the
+    method/field graph, where an edge connects two methods that share a
+    field access OR where one calls the other.
+
+    Per ``_Docs/Planning/Heimdall/05_Cohesion_Coupling.md``: LCOM1/2/3 all
+    have known anomalies (forced zeroing, missed delegation edges); LCOM4 is
+    "the definitive structural proxy for SRP" — LCOM4 = k means the class
+    literally splits into k independent classes.
+
+    ``__init__`` is excluded (constructor-only coupling is not a cohesion
+    signal). Returns 0 for an empty method set, 1 for a single method.
+    """
+    methods = [m for m in method_attr_usage.keys() if m != "__init__"]
+    if len(methods) == 0:
+        return 0
+    if len(methods) == 1:
+        return 1
+
+    adjacency: Dict[str, Set[str]] = {m: set() for m in methods}
+    method_set = set(methods)
+    for i, m1 in enumerate(methods):
+        for m2 in methods[i + 1:]:
+            shared_fields = method_attr_usage.get(m1, set()) & method_attr_usage.get(m2, set())
+            calls_m1 = method_call_graph.get(m1, set()) & method_set
+            calls_m2 = method_call_graph.get(m2, set()) & method_set
+            calls_each_other = (m2 in calls_m1) or (m1 in calls_m2)
+            if shared_fields or calls_each_other:
+                adjacency[m1].add(m2)
+                adjacency[m2].add(m1)
+
+    visited: Set[str] = set()
+    components = 0
+    for m in methods:
+        if m in visited:
+            continue
+        components += 1
+        stack = [m]
+        while stack:
+            cur = stack.pop()
+            if cur in visited:
+                continue
+            visited.add(cur)
+            stack.extend(adjacency[cur] - visited)
+
+    return components
+
+
 def suggest_splits(cls_metrics: ClassCohesionMetrics) -> List[Tuple[str, Set[str]]]:
     """
     Suggest how to split a low-cohesion class.

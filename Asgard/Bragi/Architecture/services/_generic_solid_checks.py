@@ -1,9 +1,18 @@
 """
-Heimdall Architecture - Generic SOLID Checks
+Heimdall Architecture - Generic SOLID Checks (LEGACY regex fallback)
 
 Regex/token heuristic SOLID checks for non-Python languages.
 These checks work on raw source lines and are language-agnostic
 with per-language pattern dictionaries.
+
+LEGACY: per ``_Docs/Planning/Heimdall/02_SOLID_Detection.md`` this module is
+the documented last-resort fallback in the dual-engine chain
+(CIR -> tree-sitter ad-hoc walk -> regex, see
+``Asgard/Bragi/Architecture/services/solid_validator.py::analyze_file_generic``).
+Prefer the CIR pipeline (``Asgard/Bragi/Architecture/cir`` +
+``Asgard/Bragi/Architecture/evaluators``) for new languages/rules; this
+module only runs when tree-sitter is unavailable or a language has no CIR
+builder yet.
 """
 
 import re
