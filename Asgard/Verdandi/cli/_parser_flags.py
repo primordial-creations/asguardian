@@ -82,6 +82,21 @@ def _add_web_parser(subparsers) -> None:
         help="First Contentful Paint in milliseconds"
     )
 
+    cwv_parser = web_subparsers.add_parser(
+        "cwv-assess",
+        help=(
+            "Distribution-based Core Web Vitals assessment: rates the p75 "
+            "of RUM samples per metric (never averaged)"
+        ),
+    )
+    cwv_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file of {metric: [samples...]} raw RUM sample arrays "
+            "(lcp/inp/cls in ms; ttfb/fcp diagnostics)"
+        ),
+    )
+
     add_performance_flags(web_parser)
 
 
@@ -192,6 +207,21 @@ def _add_cache_parser(subparsers) -> None:
         "--miss-latency",
         type=float,
         help="Average miss latency in ms"
+    )
+
+    warmup_parser = cache_subparsers.add_parser(
+        "warmup",
+        help=(
+            "Classify a post-deploy hit-rate trajectory "
+            "(WARMING / FLATLINED / COLLAPSED)"
+        ),
+    )
+    warmup_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: array of {hits, misses} buckets in time order, or "
+            "{buckets: [...], db_load: [...]}"
+        ),
     )
 
     add_performance_flags(cache_parser)
