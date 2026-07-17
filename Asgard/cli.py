@@ -31,8 +31,33 @@ from Asgard._cli_handlers import (
 )
 
 
+#: Module name -> module CLI entry point. Dispatched directly (before
+#: argparse) so module-global flags like `forseti --format sarif ...` pass
+#: through verbatim; argparse's REMAINDER handling rejects a leading
+#: optional-looking token (bpo-17050).
+_MODULE_MAINS = {
+    "heimdall": lambda a: heimdall_main(a),
+    "freya": lambda a: freya_main(a),
+    "forseti": lambda a: forseti_main(a),
+    "verdandi": lambda a: verdandi_main(a),
+    "volundr": lambda a: volundr_main(a),
+}
+
+
 def main(args: Optional[list] = None) -> int:
     """Main entry point for the Asgard CLI."""
+    argv = list(sys.argv[1:] if args is None else args)
+
+    # Direct module passthrough: everything after the module name goes to
+    # the module CLI untouched (including its own global flags).
+    if argv and argv[0] in _MODULE_MAINS:
+        try:
+            result = _MODULE_MAINS[argv[0]](argv[1:])
+        except SystemExit as exc:  # module CLIs may sys.exit()
+            code = exc.code
+            return 0 if code is None else int(code) if isinstance(code, int) else 1
+        return 0 if result is None else cast(int, result)
+
     parser = argparse.ArgumentParser(
         prog="asguardian",
         description="Asgard - Universal Development Tools Suite",
@@ -214,7 +239,7 @@ Examples:
         help="Arguments to pass to volundr",
     )
 
-    parsed_args = parser.parse_args(args)
+    parsed_args = parser.parse_args(argv)
 
     # Handle --help-all before anything else
     if getattr(parsed_args, "help_all", False):
