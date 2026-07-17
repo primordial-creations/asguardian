@@ -9,6 +9,11 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Freya.Performance.models._budget_models import (
+    LAB_DATA_HEADER,
+    BudgetEvaluation,
+    RouteArchetype,
+)
 from Asgard.Freya.Performance.models._performance_timing_models import (
     PageLoadMetrics,
     PerformanceGrade,
@@ -97,8 +102,32 @@ class PerformanceReport(BaseModel):
 
     # Core Web Vitals summary
     lcp_score: Optional[float] = Field(None, description="LCP score 0-100")
-    fid_score: Optional[float] = Field(None, description="FID score 0-100")
+    fid_score: Optional[float] = Field(
+        None,
+        description="DEPRECATED: FID is no longer graded (FID->INP transition); "
+                    "kept for API compatibility, always None from new analyses"
+    )
     cls_score: Optional[float] = Field(None, description="CLS score 0-100")
+
+    # Route archetype & budgets (Plan 03; optional for API compatibility)
+    archetype: Optional[RouteArchetype] = Field(
+        None, description="Route archetype the budgets were evaluated against"
+    )
+    archetype_reason: Optional[str] = Field(
+        None, description="How the archetype was chosen (explicit vs heuristic)"
+    )
+    budget_evaluations: List[BudgetEvaluation] = Field(
+        default_factory=list,
+        description="Per-metric soft/hard budget evaluations (lab proxies)"
+    )
+    lab_data_disclaimer: str = Field(
+        default=LAB_DATA_HEADER,
+        description="Epistemic-status label: these are synthetic lab metrics"
+    )
+    metric_deltas: Dict[str, float] = Field(
+        default_factory=dict,
+        description="Deltas vs the stored previous lab run (the lab's ground truth)"
+    )
 
     # Issues found
     issues: List[PerformanceIssue] = Field(default_factory=list)
@@ -122,10 +151,10 @@ class PerformanceReport(BaseModel):
 
         lcp_grade = self.page_load_metrics.lcp_grade
         cls_grade = self.page_load_metrics.cls_grade
-        fid_grade = self.page_load_metrics.fid_grade
 
-        # Must not be poor on any metric
-        for grade in [lcp_grade, cls_grade, fid_grade]:
+        # Must not be poor on any metric (FID excluded: deprecated,
+        # no longer graded; TBT budgets are the lab interactivity proxy)
+        for grade in [lcp_grade, cls_grade]:
             if grade == PerformanceGrade.POOR:
                 return False
 
@@ -148,6 +177,21 @@ class PerformanceConfig(BaseModel):
     max_total_size_kb: int = Field(5000, description="Max total page size (KB)")
     max_requests: int = Field(100, description="Max number of requests")
     max_render_blocking: int = Field(5, description="Max render-blocking resources")
+
+    # Route archetype & budgets (Plan 03)
+    archetype: Optional[RouteArchetype] = Field(
+        None,
+        description="Explicit route archetype; overrides heuristic detection"
+    )
+    cpu_throttle: float = Field(
+        4.0,
+        description="CDP CPU throttling rate for TBT measurement "
+                    "(Chromium only; silently skipped on other engines)"
+    )
+    baseline_path: Optional[str] = Field(
+        None,
+        description="Path to performance_baseline.json for delta reporting"
+    )
 
     # Analysis options
     analyze_resources: bool = Field(True, description="Analyze resource timing")

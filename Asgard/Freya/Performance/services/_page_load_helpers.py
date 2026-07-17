@@ -4,8 +4,9 @@ Freya Page Load Analyzer helper functions.
 Helper functions extracted from page_load_analyzer.py.
 """
 
-from typing import List, Optional, cast
+from typing import Any, Dict, List, Optional, cast
 
+from Asgard.Freya.Performance.models._budget_models import BudgetEvaluation
 from Asgard.Freya.Performance.models.performance_models import (
     PageLoadMetrics,
     NavigationTiming,
@@ -13,6 +14,32 @@ from Asgard.Freya.Performance.models.performance_models import (
     PerformanceGrade,
     PerformanceIssue,
 )
+
+
+def compute_tbt(
+    long_tasks: List[Dict[str, Any]],
+    fcp: Optional[float] = None,
+    window_end: Optional[float] = None,
+) -> float:
+    """
+    Total Blocking Time from long-task entries:
+    TBT = sum(max(0, duration - 50ms)) over tasks between FCP and the
+    interactive-settle window end.
+
+    Note: the window end is the existing networkidle wait, an
+    approximation of interactive-settle (documented lab proxy).
+    """
+    start = fcp or 0.0
+    total = 0.0
+    for task in long_tasks or []:
+        task_start = float(task.get("start", 0) or 0)
+        duration = float(task.get("duration", 0) or 0)
+        if task_start < start:
+            continue
+        if window_end is not None and task_start > window_end:
+            continue
+        total += max(0.0, duration - 50.0)
+    return total
 
 
 def build_metrics(
@@ -46,6 +73,13 @@ def build_metrics(
         largest_contentful_paint=web_vitals.get("lcp"),
         first_contentful_paint=web_vitals.get("fcp"),
         cumulative_layout_shift=web_vitals.get("cls"),
+        total_blocking_time=(
+            compute_tbt(
+                web_vitals["long_tasks"],
+                fcp=web_vitals.get("fcp"),
+            )
+            if web_vitals.get("long_tasks") is not None else None
+        ),
         navigation_timing=nav_timing,
     )
 
@@ -156,8 +190,21 @@ def identify_issues(metrics: PageLoadMetrics, config: PerformanceConfig) -> List
     return issues
 
 
-def calculate_score(metrics: PageLoadMetrics) -> float:
-    """Calculate overall performance score (0-100)."""
+def calculate_score(
+    metrics: PageLoadMetrics,
+    evaluations: Optional[List[BudgetEvaluation]] = None,
+) -> float:
+    """
+    Calculate overall performance score (0-100).
+
+    When budget evaluations are supplied (Plan 03), the score is the
+    per-archetype normalized budget-headroom score:
+    100 * mean(clamp(1 - (value - soft)/(hard - soft))).
+    Otherwise falls back to the legacy blended linear score.
+    """
+    if evaluations:
+        from Asgard.Freya.Performance.services.budget_evaluator import budget_score
+        return budget_score(evaluations)
     scores = []
 
     ttfb_score = max(0, 100 - (metrics.time_to_first_byte / 10))
