@@ -7,7 +7,20 @@ Calculates DNS resolution performance metrics.
 from typing import Dict, List, Optional
 
 from Asgard.Verdandi.Analysis import PercentileCalculator
-from Asgard.Verdandi.Network.models.network_models import DnsMetrics
+from Asgard.Verdandi.Network.models.network_models import (
+    DnsMetrics,
+    DnsQuotaResult,
+    NetworkOutcome,
+)
+
+#: AWS's silent link-local DNS resolver quota, in queries/sec (RESEARCH_11).
+LINKLOCAL_DNS_QUOTA_PPS = 1024
+
+#: Expected resolution-time bands, in ms, by environment.
+_ENVIRONMENT_BANDS = {
+    "in_vpc": (0.0, 2.0),
+    "public": (0.0, 100.0),
+}
 
 
 class DnsCalculator:
@@ -130,3 +143,79 @@ class DnsCalculator:
             )
 
         return recommendations
+
+    def analyze_quota(
+        self,
+        queries_ps: Optional[float],
+        nxdomain_count: int = 0,
+        servfail_count: int = 0,
+        timeout_count: int = 0,
+        total_queries: Optional[int] = None,
+        environment: str = "public",
+    ) -> DnsQuotaResult:
+        """
+        USE-style quota/error-rate analysis + environment expectation bands.
+
+        Args:
+            queries_ps: Observed DNS query rate (queries/sec)
+            nxdomain_count: NXDOMAIN response count
+            servfail_count: SERVFAIL response count
+            timeout_count: Resolution timeout count
+            total_queries: Total queries observed (for rate denominators)
+            environment: "in_vpc" (< 2 ms expected) or "public" (< 100 ms)
+
+        Returns:
+            DnsQuotaResult; INSUFFICIENT_DATA when queries_ps is None.
+        """
+        if queries_ps is None:
+            return DnsQuotaResult(
+                outcome=NetworkOutcome.INSUFFICIENT_DATA,
+                environment=environment,
+            )
+
+        utilization = round(queries_ps / LINKLOCAL_DNS_QUOTA_PPS * 100, 2)
+        quota_exceeded = queries_ps > LINKLOCAL_DNS_QUOTA_PPS
+
+        total = total_queries if total_queries else None
+        nxdomain_rate = (
+            round(nxdomain_count / total * 100, 3) if total else 0.0
+        )
+        servfail_rate = (
+            round(servfail_count / total * 100, 3) if total else 0.0
+        )
+        timeout_rate = (
+            round(timeout_count / total * 100, 3) if total else 0.0
+        )
+
+        low, high = _ENVIRONMENT_BANDS.get(environment, _ENVIRONMENT_BANDS["public"])
+
+        recommendations: List[str] = []
+        status = "ok"
+        if quota_exceeded:
+            status = "critical"
+            recommendations.append(
+                f"DNS query rate ({queries_ps:.0f} qps) exceeds the "
+                f"{LINKLOCAL_DNS_QUOTA_PPS} PPS link-local quota: deploy a "
+                "node-local DNS cache to absorb repeated lookups."
+            )
+        elif servfail_rate > 1 or timeout_rate > 1:
+            status = "degraded"
+            recommendations.append(
+                "SERVFAIL/timeout rate elevated. Check upstream resolver "
+                "health."
+            )
+
+        return DnsQuotaResult(
+            outcome=NetworkOutcome.OK,
+            environment=environment,
+            queries_ps=queries_ps,
+            linklocal_quota_utilization_percent=utilization,
+            quota_exceeded=quota_exceeded,
+            nxdomain_rate_percent=nxdomain_rate,
+            servfail_rate_percent=servfail_rate,
+            timeout_rate_percent=timeout_rate,
+            expected_band_low_ms=low,
+            expected_band_high_ms=high,
+            status=status,
+            recommendations=recommendations,
+        )
