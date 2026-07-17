@@ -204,13 +204,19 @@ python -m Freya test <url> --skip-accessibility     # Skip specific tests
 
 ## Technology Stack
 
+Freya is deliberately built with **zero heavy dependencies** — no axe-core, Pillow, pixelmatch, BeautifulSoup4, cssutils, or Jinja2. Everything is custom, pure-Python or Playwright-native, keeping the install footprint small and the behaviour auditable.
+
 | Component | Technology |
 |-----------|------------|
 | Browser Automation | Playwright |
-| Screenshot Comparison | Pillow, pixelmatch |
-| Accessibility Testing | axe-core (via playwright-axe) |
-| HTML Parsing | BeautifulSoup4 |
-| CSS Parsing | cssutils |
+| Accessibility Testing | Custom JS-injected heuristic checks run in-page via Playwright |
+| Screenshot Comparison | Pure-Python PNG decode + pixel-diff/SSIM/pHash (`Visual/services/image_ops.py`) |
+| HTML/DOM Inspection | Playwright's own DOM/accessibility-tree APIs (no BeautifulSoup4) |
+| CSS Inspection | Computed-style queries via Playwright (no cssutils) |
+| Reporting | Hand-built HTML reporter (`Integration/services/html_reporter.py`, no Jinja2) |
+| HTTP (headers/links) | `httpx` for security-header scanning and link validation |
+| Config | `pyyaml` for `.freyarc` / `freya.yaml` |
+| Models | `pydantic` for all data/config models |
 
 ---
 
@@ -260,42 +266,42 @@ Asgard/
 
 ## Testing
 
-Freya is tested through the Hercules Testing Framework with comprehensive L0 Quality Assurance tests.
+Freya is tested under `Asgard_Test/tests_Freya/`, organized by test level:
 
 ### Test Location
 
 ```
-Hercules/tests/L0_unit/freya/
-├── __init__.py
-├── test_cli.py                          # CLI parser and commands
-├── accessibility/
-│   ├── __init__.py
-│   └── test_wcag_validator.py           # WCAG validation, severity levels
-├── visual/
-│   ├── __init__.py
-│   └── test_visual_regression.py        # Visual comparison, diff detection
-├── responsive/
-│   ├── __init__.py
-│   └── test_viewport_tester.py          # Viewport testing, issue detection
-└── integration/
-    ├── __init__.py
-    └── test_site_crawler.py             # Site crawling, config, progress
+Asgard_Test/tests_Freya/
+├── L0_Mocked/          # Fast, mocked-boundary unit tests (Playwright Page / httpx.Client mocked)
+│   ├── Accessibility/
+│   ├── Visual/
+│   ├── Responsive/
+│   ├── Integration/
+│   ├── Performance/
+│   ├── Security/
+│   ├── SEO/
+│   ├── Console/
+│   ├── Links/
+│   ├── Config/
+│   └── test_cli.py
+├── L1_Integration/     # Full crawls against a live browser (env-dependent)
+├── L3_Contract/        # Contract tests
+├── L8_Performance/     # Performance/benchmark tests
+└── L14_Industry/       # Industry-scenario tests
 ```
 
 ### Running Freya Tests
 
 ```bash
-# Run all Freya L0 tests
-python -m pytest Hercules/tests/L0_unit/freya -v
+# Fast suite (excludes the browser-dependent L1 tests)
+python3 -m pytest Asgard_Test/tests_Freya -q --ignore=Asgard_Test/tests_Freya/L1_Integration
 
-# Run with freya marker
-python -m pytest -m freya
+# Run a specific module's L0 suite
+python3 -m pytest Asgard_Test/tests_Freya/L0_Mocked/Security -v
+python3 -m pytest Asgard_Test/tests_Freya/L0_Mocked/Config -v
 
-# Run specific module tests
-python -m pytest Hercules/tests/L0_unit/freya/accessibility -v
-python -m pytest Hercules/tests/L0_unit/freya/visual -v
-python -m pytest Hercules/tests/L0_unit/freya/responsive -v
-python -m pytest Hercules/tests/L0_unit/freya/integration -v
+# Full suite including live-browser L1 integration tests
+python3 -m pytest Asgard_Test/tests_Freya -q
 ```
 
 ### Test Markers
