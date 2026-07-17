@@ -12,7 +12,7 @@ Pipeline per scan:
 3. Analyze module body and every function with the taint visitor, with the
    summary index as inter-procedural call resolver (bounded at
    ``config.max_hops``, default 4).
-4. Deduplicate by (file, sink line, CWE), filter by severity and confidence
+4. Deduplicate by (file, sink line, sink column, CWE), filter by severity and confidence
    bucket, sort deterministically.
 
 Route-decorated function parameters (Flask/FastAPI/Django stubs) are seeded
@@ -309,12 +309,13 @@ class TaintAnalyzer:
 
     @staticmethod
     def _dedup(flows: List[TaintFlow]) -> List[TaintFlow]:
-        """Deduplicate by (file, sink line, CWE); keep highest confidence."""
+        """Deduplicate by (file, sink line, sink column, CWE); keep highest confidence."""
         best: Dict[tuple, TaintFlow] = {}
         for flow in flows:
             key = (
                 flow.sink_location.file_path,
                 flow.sink_location.line_number,
+                flow.sink_location.column,
                 flow.cwe_id,
             )
             existing = best.get(key)

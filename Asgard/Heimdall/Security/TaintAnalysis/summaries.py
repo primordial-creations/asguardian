@@ -43,6 +43,7 @@ from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import (
 )
 from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import (
     RESOLVED_HOP_DECAY,
+    ResolvedCall,
     TaintState,
     _FunctionTaintVisitor,
     _get_code_snippet,
@@ -296,11 +297,18 @@ class SummaryIndex:
         chain: str,
         arg_states: List[Optional[TaintState]],
         call_line: int,
-    ) -> Tuple[Optional[TaintState], List[TaintFlow]]:
-        """CallResolver hook: inter-procedural flows + return taint."""
+    ) -> "ResolvedCall":
+        """
+        CallResolver hook: inter-procedural flows + return taint.
+
+        A resolved callee whose summary shows no returned param taint and no
+        fresh-source return has a CLEAN return value (constant, or the param
+        passed through an exact sanitizer) -- expressed as
+        ``ResolvedCall(resolved=True, return_state=None)``.
+        """
         candidates = self._candidates(chain, self._current_file)
         if not candidates:
-            return None, []
+            return ResolvedCall(resolved=False)
         flows: List[TaintFlow] = []
         ret_state: Optional[TaintState] = None
         for summary in candidates:
@@ -344,7 +352,7 @@ class SummaryIndex:
                 )
                 if ret_state is None or candidate.confidence > ret_state.confidence:
                     ret_state = candidate
-        return ret_state, flows
+        return ResolvedCall(resolved=True, return_state=ret_state, flows=flows)
 
     def _reachable_sinks(
         self,

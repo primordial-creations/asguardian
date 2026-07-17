@@ -9,7 +9,7 @@ Run-all-and-merge blows both the latency and dedup budgets; instead:
     Layer 3  lazy taint                              -- only functions that
              appear in the trigger index get taint state built
 
-Findings deduplicate by (file, sink line, CWE) before reporting.
+Findings deduplicate by (file, sink line, sink column, CWE) before reporting.
 
 This engine is a library component: it does not touch CLI wiring. The
 intended integration (StaticSecurityService.scan / cli handlers routing
@@ -282,6 +282,7 @@ class DispatchEngine:
             key = (
                 flow.sink_location.file_path,
                 flow.sink_location.line_number,
+                flow.sink_location.column,
                 flow.cwe_id,
             )
             existing = best.get(key)

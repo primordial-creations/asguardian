@@ -94,13 +94,32 @@ class TaintState:
         )
 
 
+@dataclass
+class ResolvedCall:
+    """Outcome of inter-procedural call resolution.
+
+    ``resolved=True`` means the callee was found in the scanned project and
+    its summary is authoritative: ``returns_clean`` (no param taint returned,
+    no fresh taint) is a taint-DROP, and the x0.5 unknown-call decay must NOT
+    be applied. ``resolved=False`` means genuinely unknown/third-party.
+    """
+    resolved: bool = False
+    return_state: Optional[TaintState] = None
+    flows: List[TaintFlow] = field(default_factory=list)
+
+    @property
+    def returns_clean(self) -> bool:
+        return self.resolved and self.return_state is None
+
+
 # Inter-procedural resolver contract (implemented by summaries.SummaryIndex):
-# resolve_call(resolved_chain, arg_states, call_line) ->
-#     (return_state | None, [TaintFlow, ...])
-CallResolver = Callable[
-    [str, List[Optional[TaintState]], int],
-    Tuple[Optional[TaintState], List[TaintFlow]],
-]
+# resolve_call(resolved_chain, arg_states, call_line) -> ResolvedCall
+CallResolver = Callable[[str, List[Optional[TaintState]], int], ResolvedCall]
+
+# Container mutator methods: a call like x.append(tainted) taints x.
+_CONTAINER_MUTATORS = frozenset({
+    "append", "insert", "extend", "add", "update", "setdefault", "appendleft",
+})
 
 
 def _attr_chain(node: ast.AST) -> str:
@@ -201,10 +220,13 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
     def _resolve(self, node: ast.AST) -> str:
         return resolve_chain(_attr_chain(node), self.alias_map)
 
-    def _make_step(self, line_number: int, step_type: str, variable_name: str) -> TaintFlowStep:
+    def _make_step(
+        self, line_number: int, step_type: str, variable_name: str, column: int = 0
+    ) -> TaintFlowStep:
         return TaintFlowStep(
             file_path=self.file_path,
             line_number=line_number,
+            column=column,
             function_name=self.func_name,
             step_type=step_type,
             code_snippet=_get_code_snippet(self.lines, line_number),
@@ -301,22 +323,15 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         for arg in arg_nodes:
             arg_state = self._union(arg_state, self._eval(arg))
 
-        # 1. Sanitizer?
+        # 1. Exact sanitizer (known-complete neutralizer): taint dropped.
+        #    Heuristic (name-based) matches are held back: if the callee
+        #    resolves to an in-project function, its summary is authoritative
+        #    (a no-op `sanitize_*` wrapper must NOT mute the finding).
         sanitizer = classify_sanitizer(chain, tuple(self.custom_sanitizers))
-        if sanitizer is not None:
-            if arg_state is None or sanitizer.factor == 0.0:
-                return None
-            downgraded = arg_state.decayed(sanitizer.factor)
-            downgraded.sanitizers.append(SanitizerRecord(
-                name=sanitizer.name, kind=sanitizer.kind,
-                factor=sanitizer.factor, line_number=node.lineno,
-            ))
-            downgraded.trace.append(
-                self._make_step(node.lineno, "sanitizer", chain)
-            )
-            return downgraded
+        if sanitizer is not None and sanitizer.factor == 0.0:
+            return None
 
-    # 2. Source call (input(), request.args.get(...), custom sources)?
+        # 2. Source call (input(), request.args.get(...), custom sources)?
         spec = lookup_source(chain, is_call=True, extra_specs=self.extra_source_specs)
         if spec is None:
             for custom in self.custom_sources:
@@ -326,29 +341,57 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         if spec is not None:
             return self._fresh_source_state(spec, node.lineno, chain)
 
-        # 3. Method call on a tainted receiver (s.format(...), s.upper()) --
-        #    string mutation propagator.
-        recv_state = None
+        # 3. Method call on a receiver: container mutators taint the
+        #    receiver (x.append(tainted)); tainted receivers propagate
+        #    through string-mutation methods (s.format(...)).
         if isinstance(node.func, ast.Attribute):
+            if node.func.attr in _CONTAINER_MUTATORS and arg_state is not None:
+                base = node.func.value
+                if isinstance(base, ast.Name):
+                    mutated = arg_state.decayed(1.0)
+                    mutated.trace.append(
+                        self._make_step(node.lineno, "propagation", base.id)
+                    )
+                    self.env[base.id] = self._union(
+                        self.env.get(base.id), mutated
+                    )
             recv_state = self._eval(node.func.value)
-        if recv_state is not None:
-            combined = self._union(recv_state, arg_state) or recv_state
-            return combined.decayed(PROPAGATOR_DECAY)
+            if recv_state is not None:
+                combined = self._union(recv_state, arg_state) or recv_state
+                return combined.decayed(PROPAGATOR_DECAY)
 
         # 4. Inter-procedural: record param-forwarding call edges (used by
         #    summary computation) and consult the resolver when available.
+        #    A RESOLVED callee's summary is authoritative: returns-clean
+        #    drops taint; the x0.5 unknown-call decay never applies.
         positional_states = [self._eval(a) for a in node.args]
         self._record_param_call_edge(chain, positional_states, node.lineno)
         if self.call_resolver is not None:
-            ret_state, flows = self.call_resolver(
-                chain, positional_states, node.lineno
-            )
-            for flow in flows:
+            resolution = self.call_resolver(chain, positional_states, node.lineno)
+            for flow in resolution.flows:
                 self._record_flow(flow)
-            if ret_state is not None:
-                return ret_state
+            if resolution.resolved:
+                return resolution.return_state  # None == returns clean
 
-        # 5. Unknown call with tainted arguments: over-approximate return
+        # 5. Unresolved call: heuristic-named sanitizers downgrade (x0.4)
+        #    but may never push a flow below the visible 'possible' bucket
+        #    (0.25) -- an unverified name must not make a finding vanish.
+        if sanitizer is not None:
+            if arg_state is None:
+                return None
+            downgraded = arg_state.decayed(sanitizer.factor)
+            if downgraded.confidence < 0.25:
+                downgraded.confidence = 0.25
+            downgraded.sanitizers.append(SanitizerRecord(
+                name=sanitizer.name, kind=sanitizer.kind,
+                factor=sanitizer.factor, line_number=node.lineno,
+            ))
+            downgraded.trace.append(
+                self._make_step(node.lineno, "sanitizer", chain)
+            )
+            return downgraded
+
+        # 6. Unknown call with tainted arguments: over-approximate return
         #    taint through a third-party/unresolved call at x0.5.
         if arg_state is not None:
             return arg_state.decayed(UNKNOWN_CALL_DECAY)
@@ -394,6 +437,24 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         if isinstance(target, (ast.Tuple, ast.List)):
             for elt in target.elts:
                 self._assign_target(elt, state, line)
+            return
+        if isinstance(target, (ast.Subscript, ast.Attribute)):
+            # Container laundering: t['x'] = tainted (or obj.field = tainted)
+            # taints the base container. Over-approximation at container
+            # granularity: a clean element store does NOT clear the
+            # container (other elements may still be tainted).
+            base = target
+            while isinstance(base, (ast.Subscript, ast.Attribute)):
+                base = base.value
+            if isinstance(base, ast.Name) and state is not None:
+                stored = replace(
+                    state, trace=list(state.trace),
+                    sanitizers=list(state.sanitizers),
+                )
+                stored.trace.append(
+                    self._make_step(line, "propagation", base.id)
+                )
+                self.env[base.id] = self._union(self.env.get(base.id), stored)
             return
         if not isinstance(target, ast.Name):
             return
@@ -519,12 +580,21 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
             if isinstance(arg, ast.Name) and arg.id.lower().startswith(_MOCK_PREFIXES):
                 context *= MOCK_NAME_FACTOR
             final_conf = state.confidence * spec.confidence * kwarg_factor * context
+            if final_conf > 0.0 and final_conf < 0.25 and any(
+                s.kind == "heuristic" for s in state.sanitizers
+            ):
+                # A heuristic (name-based, unverified) sanitizer downgrade
+                # must never make a finding vanish below the visible
+                # 'possible' bucket.
+                final_conf = 0.25
             if self.is_test_context:
                 final_conf = min(final_conf, TEST_PATH_CONFIDENCE_CAP)
             if final_conf <= 0.0:
                 continue
             final_conf = min(1.0, final_conf)
-            sink_step = self._make_step(node.lineno, "sink", chain)
+            sink_step = self._make_step(
+                node.lineno, "sink", chain, column=node.col_offset
+            )
             var_name = arg.id if isinstance(arg, ast.Name) else ""
             self._record_flow(self._build_flow(
                 state, spec, sink_step, final_conf, var_name

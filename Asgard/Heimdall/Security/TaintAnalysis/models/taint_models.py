@@ -47,6 +47,7 @@ class TaintFlowStep(BaseModel):
     """A single step in a taint propagation flow."""
     file_path: str = Field(..., description="Path to the file where this step occurs")
     line_number: int = Field(..., description="Line number of this step")
+    column: int = Field(0, description="Column offset of this step (0 when unknown)")
     function_name: str = Field(..., description="Name of the enclosing function")
     step_type: str = Field(..., description="Type of step: source, propagation, or sink")
     code_snippet: str = Field("", description="The code snippet at this step")
