@@ -1,0 +1,37 @@
+name: CI deploy
+'on':
+  workflow_run:
+    workflows:
+    - CI
+    types:
+    - completed
+    branches:
+    - main
+permissions: {}
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    timeout-minutes: 30
+    environment: production
+    steps:
+    - name: Download sealed build artifact
+      uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093  # v4.3.0
+      with:
+        run-id: ${{ github.event.workflow_run.id }}
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Harden runner (egress audit)
+      uses: step-security/harden-runner@0634a2670c59f64b4a01f0f96f84700a4088b9f0  # v2.12.0
+      with:
+        egress-policy: audit
+    - name: Configure AWS credentials (OIDC)
+      uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df  # v4.2.1
+      with:
+        role-to-assume: arn:aws:iam::123456789012:role/deploy
+        aws-region: eu-west-1
+    - name: Deploy
+      run: make deploy
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}

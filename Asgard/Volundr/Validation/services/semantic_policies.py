@@ -9,6 +9,7 @@ Policy style (enforced):
   justify, never a silent pass (default-deny).
 """
 
+import re
 from typing import Any, List, Optional
 
 from Asgard.Volundr.Validation.models.canonical_models import (
@@ -232,6 +233,42 @@ class PolicyEngine:
 
     # -- Pipelines ---------------------------------------------------------
 
+    #: ``${{ ... }}`` expressions referencing attacker-controllable contexts
+    #: (event payload fields, head/base ref, workflow inputs).
+    _UNTRUSTED_EXPR_RE = re.compile(
+        r"\$\{\{[^}]*(github\.(event\.|head_ref|base_ref)|inputs\.)[^}]*\}\}"
+    )
+    #: Static long-lived cloud credential secret names (OIDC should be used).
+    _STATIC_SECRET_RE = re.compile(
+        r"\$\{\{\s*secrets\.[A-Za-z0-9_]*"
+        r"(AWS_ACCESS|AWS_SECRET|GCP_|GOOGLE_CREDENTIALS|AZURE_CREDENTIALS|"
+        r"SERVICE_ACCOUNT_KEY)[A-Za-z0-9_]*\s*\}\}"
+    )
+
+    def check_pipeline_workflow(
+        self,
+        jobs: List["CanonicalPipelineJob"],
+        file_path: Optional[str] = None,
+    ) -> List[ValidationResult]:
+        """Workflow-level (cross-job) pipeline checks."""
+        results: List[ValidationResult] = []
+        if not jobs:
+            return results
+        has_attestation = any(
+            isinstance(step.uses, str) and "attest-build-provenance" in step.uses
+            for job in jobs for step in job.steps
+        )
+        if not has_attestation:
+            finding = self._finding(
+                "VOL-CICD-0006",
+                "Workflow does not attest build provenance (SLSA build track)",
+                target=file_path or "workflow",
+                file_path=file_path,
+            )
+            if finding is not None:
+                results.append(finding)
+        return results
+
     def check_pipeline_job(
         self, job: CanonicalPipelineJob, file_path: Optional[str] = None
     ) -> List[ValidationResult]:
@@ -267,6 +304,25 @@ class PolicyEngine:
                         "VOL-CICD-0002",
                         f"Step in job '{target}' uses non-SHA-pinned action: {uses}",
                         target=target, value=uses, file_path=file_path,
+                        resource_name=target,
+                    ))
+            run = step.run
+            if isinstance(run, str) and self._UNTRUSTED_EXPR_RE.search(run):
+                add(self._finding(
+                    "VOL-CICD-0004",
+                    f"Step '{step.name or target}' in job '{target}' inline-"
+                    "interpolates an attacker-controllable expression in run:",
+                    target=target, value=run, file_path=file_path,
+                    resource_name=target,
+                ))
+            static_values = list(step.env.values()) + list(step.with_params.values())
+            for value in static_values:
+                if isinstance(value, str) and self._STATIC_SECRET_RE.search(value):
+                    add(self._finding(
+                        "VOL-CICD-0005",
+                        f"Step '{step.name or target}' in job '{target}' uses a "
+                        f"static cloud credential secret: {value}",
+                        target=target, value=value, file_path=file_path,
                         resource_name=target,
                     ))
         return results

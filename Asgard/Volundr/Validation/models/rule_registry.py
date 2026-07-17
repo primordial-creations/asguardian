@@ -263,6 +263,46 @@ def _build_default_registry() -> RuleRegistry:
             severity=RuleSeverity.LOW, category=rel,
             remediation="Add `timeout-minutes:` to each job.",
         ),
+        RegisteredRule(
+            id="VOL-CICD-0004", name="untrusted-interpolation",
+            description=(
+                "run: scripts must not inline-interpolate ${{ }} expressions "
+                "referencing attacker-controllable contexts (script injection)."
+            ),
+            severity=RuleSeverity.CRITICAL, category=sec,
+            remediation=(
+                "Route the expression through an `env:` variable and reference "
+                "it as \"$VAR\" in the script — never inline `${{ ... }}`."
+            ),
+            framework_mappings={"slsa": "build integrity"},
+        ),
+        RegisteredRule(
+            id="VOL-CICD-0005", name="static-cloud-secret",
+            description=(
+                "Workflows must use OIDC token exchange, not long-lived static "
+                "cloud credentials passed via secrets."
+            ),
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation=(
+                "Replace static cloud keys with OIDC federation "
+                "(e.g. aws-actions/configure-aws-credentials with role-to-assume "
+                "and `permissions: id-token: write`)."
+            ),
+            framework_mappings={"slsa": "secrets hygiene"},
+        ),
+        RegisteredRule(
+            id="VOL-CICD-0006", name="provenance-attestation",
+            description=(
+                "Release pipelines should attest build provenance "
+                "(SLSA build track)."
+            ),
+            severity=RuleSeverity.INFO, category=bp,
+            remediation=(
+                "Add an actions/attest-build-provenance job with "
+                "`permissions: {id-token: write, attestations: write}`."
+            ),
+            framework_mappings={"slsa": "provenance"},
+        ),
         # --- GitOps ---
         RegisteredRule(
             id="VOL-GITOPS-0001", name="pinned-target-revision",

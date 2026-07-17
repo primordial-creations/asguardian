@@ -26,6 +26,8 @@ def normalize_github_workflow(
                 name=str(step.get("name", "")),
                 uses=step.get("uses"),
                 run=step.get("run"),
+                env=step.get("env") if isinstance(step.get("env"), dict) else {},
+                with_params=step.get("with") if isinstance(step.get("with"), dict) else {},
             ))
         jobs.append(CanonicalPipelineJob(
             name=job_name,
