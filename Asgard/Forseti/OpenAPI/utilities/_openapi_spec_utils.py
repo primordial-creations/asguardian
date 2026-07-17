@@ -123,6 +123,81 @@ def resolve_references(
     return cast(dict[str, Any], resolve_refs(spec_data, spec_data))
 
 
+def resolve_pointer(root: dict[str, Any], ref: str) -> Optional[Any]:
+    """
+    Resolve a local JSON pointer ('#/components/...') against a document.
+
+    Returns None for external refs or dangling pointers.
+    """
+    if not isinstance(ref, str) or not ref.startswith("#/"):
+        return None
+    current: Any = root
+    for part in ref[2:].split("/"):
+        part = part.replace("~1", "/").replace("~0", "~")
+        if isinstance(current, dict) and part in current:
+            current = current[part]
+        else:
+            return None
+    return current
+
+
+def iter_refs(spec_data: dict[str, Any]):
+    """Yield (json_path, ref_string) for every $ref in the document."""
+    def walk(obj: Any, path: str):
+        if isinstance(obj, dict):
+            ref = obj.get("$ref")
+            if isinstance(ref, str):
+                yield f"{path}/$ref", ref
+            for key, value in obj.items():
+                if key == "$ref":
+                    continue
+                escaped = str(key).replace("~", "~0").replace("/", "~1")
+                yield from walk(value, f"{path}/{escaped}")
+        elif isinstance(obj, list):
+            for index, item in enumerate(obj):
+                yield from walk(item, f"{path}/{index}")
+
+    yield from walk(spec_data, "")
+
+
+def find_broken_refs(spec_data: dict[str, Any]) -> list[tuple[str, str]]:
+    """
+    Find local $refs that do not resolve. External (non-'#/') refs are
+    skipped: resolving them is NETWORK-cost and profile-gated.
+    """
+    broken: list[tuple[str, str]] = []
+    for json_path, ref in iter_refs(spec_data):
+        if not ref.startswith("#/"):
+            continue
+        if resolve_pointer(spec_data, ref) is None:
+            broken.append((json_path, ref))
+    return broken
+
+
+def deref_node(
+    spec_data: dict[str, Any],
+    node: Any,
+    _seen: Optional[set[str]] = None,
+) -> Any:
+    """
+    Follow $ref chains one node at a time (cycle-safe, non-recursive into
+    children). Returns the final resolved node, or the original node when
+    the ref is external/dangling/cyclic.
+    """
+    seen = _seen if _seen is not None else set()
+    current = node
+    while isinstance(current, dict) and isinstance(current.get("$ref"), str):
+        ref = current["$ref"]
+        if ref in seen:
+            return current
+        seen.add(ref)
+        target = resolve_pointer(spec_data, ref)
+        if target is None:
+            return current
+        current = target
+    return current
+
+
 def merge_specs(
     base_spec: dict[str, Any],
     overlay_spec: dict[str, Any],
