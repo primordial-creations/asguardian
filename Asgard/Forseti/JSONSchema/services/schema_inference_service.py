@@ -185,6 +185,8 @@ class SchemaInferenceService:
 
         if json_type == "object" and "properties" in analysis:
             schema.update(generate_object_schema(analysis["properties"], self._generate_schema))
+            if self.config.closed_schemas:
+                schema["additionalProperties"] = False
         elif json_type == "array" and "items" in analysis:
             schema.update(generate_array_schema(analysis["items"], self._generate_schema))
         elif "value_analysis" in analysis:

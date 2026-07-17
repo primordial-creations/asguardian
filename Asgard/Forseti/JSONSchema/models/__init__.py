@@ -8,6 +8,10 @@ from Asgard.Forseti.JSONSchema.models.jsonschema_models import (
     JSONSchemaValidationResult,
     JSONSchemaValidationError,
     JSONSchemaInferenceResult,
+    DialectConversionResult,
+    LLMCompatibilityIssue,
+    LLMCompatibilityResult,
+    LossRecord,
     SchemaType,
     SchemaFormat,
 )
@@ -18,6 +22,10 @@ __all__ = [
     "JSONSchemaValidationResult",
     "JSONSchemaValidationError",
     "JSONSchemaInferenceResult",
+    "DialectConversionResult",
+    "LLMCompatibilityIssue",
+    "LLMCompatibilityResult",
+    "LossRecord",
     "SchemaType",
     "SchemaFormat",
 ]
