@@ -11,6 +11,28 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Volundr.Validation.models.suppression_models import Suppression
+
+
+class OIDCProvider(str, Enum):
+    """Cloud/OIDC token-exchange providers for keyless authentication."""
+    AWS = "aws"
+    GCP = "gcp"
+    AZURE = "azure"
+    VAULT = "vault"
+
+
+class OIDCConfig(BaseModel):
+    """OIDC federation config — short-lived tokens instead of static secrets."""
+    provider: OIDCProvider = Field(description="OIDC token-exchange provider")
+    role: str = Field(description="Role/identity to assume (ARN, WIF provider, Vault role)")
+    audience: Optional[str] = Field(default=None, description="Custom token audience")
+    region: Optional[str] = Field(default=None, description="Cloud region (AWS)")
+    service_account: Optional[str] = Field(
+        default=None, description="Service account to impersonate (GCP)"
+    )
+    vault_url: Optional[str] = Field(default=None, description="Vault server URL (vault)")
+
 
 class CICDPlatform(str, Enum):
     """Supported CI/CD platforms."""
@@ -62,9 +84,16 @@ class PipelineStage(BaseModel):
     services: Dict[str, Any] = Field(default_factory=dict, description="Service containers")
     strategy: Optional[Dict[str, Any]] = Field(default=None, description="Matrix/parallel strategy")
     if_condition: Optional[str] = Field(default=None, description="Conditional execution")
-    timeout_minutes: int = Field(default=60, description="Job timeout")
+    timeout_minutes: int = Field(default=30, description="Job timeout (bounded execution)")
     continue_on_error: bool = Field(default=False, description="Continue on error")
     environment: Optional[str] = Field(default=None, description="Deployment environment")
+    permissions: Optional[Dict[str, str]] = Field(
+        default=None,
+        description=(
+            "Job-level least-privilege token scopes; None means the "
+            "generator default of {'contents': 'read'}"
+        ),
+    )
 
 
 class TriggerConfig(BaseModel):
@@ -91,6 +120,34 @@ class PipelineConfig(BaseModel):
     )
     docker_registry: Optional[str] = Field(default=None, description="Docker registry URL")
     kubernetes_cluster: Optional[str] = Field(default=None, description="Kubernetes cluster context")
+    permissions: Dict[str, str] = Field(
+        default_factory=dict,
+        description="Workflow-level token permissions; empty dict = permissions: {} (deny all)",
+    )
+    oidc: Optional[OIDCConfig] = Field(
+        default=None,
+        description="OIDC federation config; preferred over static secrets",
+    )
+    provenance: bool = Field(
+        default=False, description="Emit a SLSA provenance attestation job"
+    )
+    sbom: bool = Field(default=False, description="Emit an SBOM generation step")
+    split_trust: bool = Field(
+        default=True,
+        description=(
+            "Split build (untrusted, zero secrets) and deploy (trusted, "
+            "workflow_run-triggered) into separate workflows when a deploy "
+            "stage is present"
+        ),
+    )
+    harden_runner: bool = Field(
+        default=False,
+        description="Prepend a step-security/harden-runner egress-hardening step to each job",
+    )
+    suppressions: List[Suppression] = Field(
+        default_factory=list,
+        description="Reified rule suppressions — the only sanctioned relaxation mechanism",
+    )
 
 
 class GeneratedPipeline(BaseModel):
@@ -98,8 +155,15 @@ class GeneratedPipeline(BaseModel):
     id: str = Field(description="Unique pipeline ID")
     config_hash: str = Field(description="Hash of the configuration")
     platform: CICDPlatform = Field(description="Target platform")
-    pipeline_content: str = Field(description="Generated pipeline content")
-    file_path: str = Field(description="Recommended file path")
+    pipeline_content: str = Field(description="Generated pipeline content (primary file)")
+    file_path: str = Field(description="Recommended file path (primary file)")
+    files: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "All generated files (path -> content); more than one entry "
+            "when split-trust emits a separate deploy workflow"
+        ),
+    )
     validation_results: List[str] = Field(default_factory=list, description="Validation issues found")
     best_practice_score: float = Field(ge=0, le=100, description="Best practice compliance score")
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")

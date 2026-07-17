@@ -132,6 +132,8 @@ class CanonicalPipelineStep(BaseModel):
     name: str = Field(default="")
     uses: Any = Field(default=None)
     run: Any = Field(default=None)
+    env: Dict[str, Any] = Field(default_factory=dict)
+    with_params: Dict[str, Any] = Field(default_factory=dict)
     tainted: bool = Field(default=False)
     line_number: Optional[int] = Field(default=None)
 

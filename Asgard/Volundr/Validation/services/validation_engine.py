@@ -182,8 +182,12 @@ class ValidationEngine:
         for doc in docs:
             if not isinstance(doc, dict) or not looks_like_github_workflow(doc):
                 continue
-            for job in normalize_github_workflow(doc, source):
+            jobs = normalize_github_workflow(doc, source)
+            for job in jobs:
                 results.extend(self.policy_engine.check_pipeline_job(job, source))
+            results.extend(
+                self.policy_engine.check_pipeline_workflow(jobs, source)
+            )
 
         return self._finish("pipeline", [source], results, start)
 
