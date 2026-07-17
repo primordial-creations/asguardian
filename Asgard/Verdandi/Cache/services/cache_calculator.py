@@ -4,9 +4,15 @@ Cache Metrics Calculator
 Calculates cache performance metrics.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional, Sequence
 
-from Asgard.Verdandi.Cache.models.cache_models import CacheMetrics, CacheEfficiency
+from Asgard.Verdandi.Cache.models.cache_models import (
+    CacheEfficiency,
+    CacheMetrics,
+    KeyAnalysisResult,
+    KeyStats,
+    WarmupTrajectory,
+)
 
 
 class CacheMetricsCalculator:
@@ -143,6 +149,92 @@ class CacheMetricsCalculator:
             cost_savings_percent=round(hit_rate * 0.8, 2),
             optimal_size_bytes=None,
             status=status,
+            recommendations=recommendations,
+        )
+
+    def analyze_trend(
+        self,
+        history: Sequence[Dict],
+        db_load_series: Optional[Sequence[float]] = None,
+    ) -> WarmupTrajectory:
+        """
+        Analyze a hit-rate time series with trajectory-aware classification.
+
+        Delegates to WarmupAnalyzer (DEEPTHINK_08): post-deploy dips with a
+        positive recovery slope are WARMING (suppressed); plunge-and-flatline
+        is FLATLINED (critical, bypasses suppression); < 5% is COLLAPSED.
+
+        Args:
+            history: Buckets of {"hits": int, "misses": int} in time order
+                (extra keys such as "timestamp" are ignored)
+            db_load_series: Optional aligned downstream DB load series
+
+        Returns:
+            WarmupTrajectory
+        """
+        from Asgard.Verdandi.Cache.services.warmup_analyzer import WarmupAnalyzer
+
+        return WarmupAnalyzer().analyze(history, db_load_series)
+
+    def analyze_keys(
+        self,
+        key_stats: Sequence[Dict],
+        low_hit_rate_threshold: float = 0.5,
+        churn_threshold: int = 20,
+    ) -> KeyAnalysisResult:
+        """
+        Per-key hit-rate analysis.
+
+        Identifies low-hit keys and low-hit high-churn "do-not-cache"
+        candidates (keys that cost cache memory and eviction pressure while
+        rarely serving a hit — negative caching value).
+
+        Args:
+            key_stats: Items of {"key": str, "hits": int, "misses": int}
+            low_hit_rate_threshold: Hit fraction below which a key is low-hit
+            churn_threshold: Minimum misses for a low-hit key to be a
+                do-not-cache candidate
+
+        Returns:
+            KeyAnalysisResult
+        """
+        keys: List[KeyStats] = []
+        total_hits = 0
+        total_all = 0
+        for item in key_stats:
+            hits = int(item.get("hits", 0))
+            misses = int(item.get("misses", 0))
+            total = hits + misses
+            keys.append(
+                KeyStats(
+                    key=str(item.get("key", "")),
+                    hits=hits,
+                    misses=misses,
+                    total=total,
+                    hit_rate=round(hits / total, 4) if total > 0 else 0.0,
+                )
+            )
+            total_hits += hits
+            total_all += total
+
+        low_hit = [k for k in keys if k.total > 0 and k.hit_rate < low_hit_rate_threshold]
+        do_not_cache = [k for k in low_hit if k.misses >= churn_threshold]
+
+        recommendations = []
+        if do_not_cache:
+            worst = sorted(do_not_cache, key=lambda k: k.hit_rate)[:5]
+            names = ", ".join(k.key for k in worst)
+            recommendations.append(
+                f"{len(do_not_cache)} key(s) have low hit rates with high churn "
+                f"(e.g. {names}): caching them has negative value — consider "
+                "excluding them or reworking their TTL/keying."
+            )
+
+        return KeyAnalysisResult(
+            keys=keys,
+            low_hit_rate_keys=low_hit,
+            do_not_cache_candidates=do_not_cache,
+            overall_hit_rate=round(total_hits / total_all, 4) if total_all else 0.0,
             recommendations=recommendations,
         )
 
