@@ -47,8 +47,8 @@ Wave 2 leftovers to schedule after: Freya testing/packaging (Fr/07).
 ### Wave 2x — CLI wiring
 **MERGED** — asguardian passthrough (SARIF verified end-to-end), heimdall dispatch/--scoring/--include-test-context/gate --diff --tier, verdandi cwv-assess/burn-rate-policy/cache warmup/pool-signature, volundr score/gitops validate/--digest/--secret-mount/--edge-service, ASGARD_NO_CACHE + heimdall --no-cache. 40 new tests; full suite 8,372 pass.
 
-### Wave 3 — P2/P3 (NOT STARTED — quota-blocked)
-All 8 agents were launched but **terminated immediately at the Fable 5 usage limit before writing any code** (verified: 0 commits, 0 uncommitted changes in every worktree — the integrated branch is unaffected). Resume when the model quota resets by relaunching these exact slices (each is independent; run in worktrees, `git merge uplift/asgard-p0` first, verify + adversarial-review high-risk math/security, then merge):
+### Wave 3 — P2/P3 (RELAUNCHED with Sonnet subagents — 8 agents running)
+First attempt died at the Fable 5 limit before writing code; relaunched on Sonnet after model swap. High-risk slices (Heimdall domain scanners) get an adversarial review before merge. Resume when the model quota resets by relaunching these exact slices (each is independent; run in worktrees, `git merge uplift/asgard-p0` first, verify + adversarial-review high-risk math/security, then merge):
 | Slice | Plans | Notes for the implementer |
 |---|---|---|
 | Heimdall SOLID CIR + cohesion/coupling | H/02, H/05 | build on merged tree-sitter substrate; replace regex `_generic_solid_checks.py` behind dual engine |
