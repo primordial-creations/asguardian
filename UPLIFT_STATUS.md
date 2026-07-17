@@ -47,17 +47,18 @@ Wave 2 leftovers to schedule after: Freya testing/packaging (Fr/07).
 ### Wave 2x — CLI wiring
 **MERGED** — asguardian passthrough (SARIF verified end-to-end), heimdall dispatch/--scoring/--include-test-context/gate --diff --tier, verdandi cwv-assess/burn-rate-policy/cache warmup/pool-signature, volundr score/gitops validate/--digest/--secret-mount/--edge-service, ASGARD_NO_CACHE + heimdall --no-cache. 40 new tests; full suite 8,372 pass.
 
-### Wave 3 — P2/P3 (LAUNCHED — 8 agents in worktrees)
-| Slice | Plans | Status |
+### Wave 3 — P2/P3 (NOT STARTED — quota-blocked)
+All 8 agents were launched but **terminated immediately at the Fable 5 usage limit before writing any code** (verified: 0 commits, 0 uncommitted changes in every worktree — the integrated branch is unaffected). Resume when the model quota resets by relaunching these exact slices (each is independent; run in worktrees, `git merge uplift/asgard-p0` first, verify + adversarial-review high-risk math/security, then merge):
+| Slice | Plans | Notes for the implementer |
 |---|---|---|
-| Heimdall SOLID CIR + cohesion/coupling | H/02, H/05 | agent running |
-| Heimdall architecture CSP | H/03 | agent running |
-| Heimdall domain scanners (adversarial review to follow) | H/07 | agent running |
-| Forseti contract testing/mocks + cross-format alignment | F/06, F/07 | agent running |
-| Freya crawler/config/CI + testing/packaging/docs | Fr/06, Fr/07 | agent running |
-| Verdandi network/tracing/Apdex + SLO 02.5-8 + STL 03F | Ve/05, 08, 09, 02.5-8, 03F | agent running |
-| Volundr Terraform + plan-JSON validation | Vo/02 | agent running |
-| Bragi presentation/context + calibration | B/04, B/05 | agent running |
+| Heimdall SOLID CIR + cohesion/coupling | H/02, H/05 | build on merged tree-sitter substrate; replace regex `_generic_solid_checks.py` behind dual engine |
+| Heimdall architecture CSP | H/03 | reuse merged `Bragi/Dependencies/graph_service.py`; upgrade `architecture.yml` schema (back-compat) |
+| Heimdall domain scanners | H/07 | per-domain, independently shippable; **adversarial review required** (SSRF/ReDoS/crypto) |
+| Forseti contract testing/mocks + cross-format alignment | F/06, F/07 | live probing opt-in only; reuse JSONSchema compiler + Compatibility IR |
+| Freya crawler/config/CI + testing/packaging/docs | Fr/06, Fr/07 | includes deferred html_reporter epistemic mirrors + CSP/route Blocker escalation + README version fix |
+| Verdandi network/tracing/Apdex + SLO 02.5-8 + STL 03F | Ve/05, 08, 09, 02.5-8, 03F | build on merged sketches/CO/batch detectors |
+| Volundr Terraform + plan-JSON validation | Vo/02 | route through merged `Validation/` + `scoring_engine.py`; `<computed>` primitives exist |
+| Bragi presentation/context + calibration | B/04, B/05 | share/align context classifier with Heimdall `Security/context/test_context.py`; reuse fingerprint/suppression schema |
 
 Remaining after W3: H/10 evaluation/benchmarking machinery, docs reconciliation sweep (`_Docs/Asgard/` + README), global acceptance run on all reference repos.
 
