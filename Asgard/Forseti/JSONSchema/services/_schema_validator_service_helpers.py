@@ -14,47 +14,59 @@ from Asgard.Forseti.JSONSchema.models.jsonschema_models import (
 
 
 def generate_text_report(result: JSONSchemaValidationResult) -> str:
-    """Generate a text format report."""
-    lines = []
-    lines.append("=" * 60)
-    lines.append("JSON Schema Validation Report")
-    lines.append("=" * 60)
+    """Generate a text format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_text_report,
+    )
+
+    header = []
     if result.schema_path:
-        lines.append(f"Schema: {result.schema_path}")
+        header.append(f"Schema: {result.schema_path}")
     if result.data_path:
-        lines.append(f"Data: {result.data_path}")
-    lines.append(f"Valid: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"Errors: {result.error_count}")
-    lines.append(f"Time: {result.validation_time_ms:.2f}ms")
-    lines.append("-" * 60)
-    if result.errors:
-        lines.append("\nValidation Errors:")
-        for error in result.errors:
-            lines.append(f"  [{error.path}] {error.message}")
-            if error.constraint:
-                lines.append(f"    Constraint: {error.constraint}")
-    lines.append("=" * 60)
-    return "\n".join(lines)
+        header.append(f"Data: {result.data_path}")
+    header.extend([
+        f"Valid: {'Yes' if result.is_valid else 'No'}",
+        f"Errors: {result.error_count}",
+        f"Time: {result.validation_time_ms:.2f}ms",
+    ])
+    items = []
+    for error in result.errors:
+        items.append(f"  [{error.path}] {error.message}")
+        if error.constraint:
+            items.append(f"    Constraint: {error.constraint}")
+    return render_legacy_text_report(
+        "JSON Schema Validation Report",
+        header,
+        [("Validation Errors", items)],
+    )
 
 
 def generate_markdown_report(result: JSONSchemaValidationResult) -> str:
-    """Generate a markdown format report."""
-    lines = []
-    lines.append("# JSON Schema Validation Report\n")
+    """Generate a markdown format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_markdown_report,
+    )
+
+    header = []
     if result.schema_path:
-        lines.append(f"- **Schema**: {result.schema_path}")
+        header.append(f"- **Schema**: {result.schema_path}")
     if result.data_path:
-        lines.append(f"- **Data**: {result.data_path}")
-    lines.append(f"- **Valid**: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"- **Errors**: {result.error_count}\n")
+        header.append(f"- **Data**: {result.data_path}")
+    header.extend([
+        f"- **Valid**: {'Yes' if result.is_valid else 'No'}",
+        f"- **Errors**: {result.error_count}\n",
+    ])
+    items = []
     if result.errors:
-        lines.append("## Validation Errors\n")
-        lines.append("| Path | Message | Constraint |")
-        lines.append("|------|---------|------------|")
+        items.extend(["| Path | Message | Constraint |", "|------|---------|------------|"])
         for error in result.errors:
             constraint = error.constraint or "-"
-            lines.append(f"| `{error.path}` | {error.message} | {constraint} |")
-    return "\n".join(lines)
+            items.append(f"| `{error.path}` | {error.message} | {constraint} |")
+    return render_legacy_markdown_report(
+        "JSON Schema Validation Report",
+        header,
+        [("Validation Errors", items)],
+    )
 
 
 def validate_string(

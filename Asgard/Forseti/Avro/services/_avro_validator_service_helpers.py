@@ -17,67 +17,75 @@ from Asgard.Forseti.Avro.models.avro_models import (
 
 
 def generate_text_report(result: AvroValidationResult) -> str:
-    """Generate a text format report."""
-    lines = []
-    lines.append("=" * 60)
-    lines.append("Avro Schema Validation Report")
-    lines.append("=" * 60)
-    lines.append(f"File: {result.file_path or 'N/A'}")
-    lines.append(f"Type: {result.schema_type or 'Unknown'}")
-    lines.append(f"Valid: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"Errors: {result.error_count}")
-    lines.append(f"Warnings: {result.warning_count}")
-    lines.append(f"Time: {result.validation_time_ms:.2f}ms")
-    lines.append("-" * 60)
+    """Generate a text format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_text_report,
+    )
+
+    extra_blocks = []
     if result.parsed_schema:
-        lines.append(f"Name: {result.parsed_schema.full_name}")
+        block = [f"Name: {result.parsed_schema.full_name}"]
         if result.parsed_schema.fields:
-            lines.append(f"Fields: {result.parsed_schema.field_count}")
+            block.append(f"Fields: {result.parsed_schema.field_count}")
         if result.parsed_schema.symbols:
-            lines.append(f"Symbols: {len(result.parsed_schema.symbols)}")
-        lines.append("-" * 60)
-    if result.errors:
-        lines.append("\nErrors:")
-        for error in result.errors:
-            lines.append(f"  [{error.rule or 'error'}] {error.path}: {error.message}")
-    if result.warnings:
-        lines.append("\nWarnings:")
-        for warning in result.warnings:
-            lines.append(f"  [{warning.rule or 'warning'}] {warning.path}: {warning.message}")
-    lines.append("=" * 60)
-    return "\n".join(lines)
+            block.append(f"Symbols: {len(result.parsed_schema.symbols)}")
+        extra_blocks.append(block)
+    return render_legacy_text_report(
+        "Avro Schema Validation Report",
+        [
+            f"File: {result.file_path or 'N/A'}",
+            f"Type: {result.schema_type or 'Unknown'}",
+            f"Valid: {'Yes' if result.is_valid else 'No'}",
+            f"Errors: {result.error_count}",
+            f"Warnings: {result.warning_count}",
+            f"Time: {result.validation_time_ms:.2f}ms",
+        ],
+        [
+            ("Errors", [f"  [{e.rule or 'error'}] {e.path}: {e.message}"
+                        for e in result.errors]),
+            ("Warnings", [f"  [{w.rule or 'warning'}] {w.path}: {w.message}"
+                          for w in result.warnings]),
+        ],
+        extra_blocks=extra_blocks,
+    )
+
+
+_MD_TABLE_HEADER = ["| Path | Rule | Message |", "|------|------|---------|"]
 
 
 def generate_markdown_report(result: AvroValidationResult) -> str:
-    """Generate a markdown format report."""
-    lines = []
-    lines.append("# Avro Schema Validation Report\n")
-    lines.append(f"- **File**: {result.file_path or 'N/A'}")
-    lines.append(f"- **Type**: {result.schema_type or 'Unknown'}")
-    lines.append(f"- **Valid**: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"- **Errors**: {result.error_count}")
-    lines.append(f"- **Warnings**: {result.warning_count}")
-    lines.append(f"- **Time**: {result.validation_time_ms:.2f}ms\n")
+    """Generate a markdown format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_markdown_report,
+    )
+
+    header = [
+        f"- **File**: {result.file_path or 'N/A'}",
+        f"- **Type**: {result.schema_type or 'Unknown'}",
+        f"- **Valid**: {'Yes' if result.is_valid else 'No'}",
+        f"- **Errors**: {result.error_count}",
+        f"- **Warnings**: {result.warning_count}",
+        f"- **Time**: {result.validation_time_ms:.2f}ms\n",
+    ]
     if result.parsed_schema:
-        lines.append("## Schema Summary\n")
-        lines.append(f"- **Name**: {result.parsed_schema.full_name}")
+        header.append("## Schema Summary\n")
+        header.append(f"- **Name**: {result.parsed_schema.full_name}")
         if result.parsed_schema.fields:
-            lines.append(f"- **Fields**: {result.parsed_schema.field_count}")
+            header.append(f"- **Fields**: {result.parsed_schema.field_count}")
         if result.parsed_schema.symbols:
-            lines.append(f"- **Symbols**: {len(result.parsed_schema.symbols)}\n")
-    if result.errors:
-        lines.append("## Errors\n")
-        lines.append("| Path | Rule | Message |")
-        lines.append("|------|------|---------|")
-        for error in result.errors:
-            lines.append(f"| `{error.path}` | {error.rule or 'error'} | {error.message} |")
-    if result.warnings:
-        lines.append("\n## Warnings\n")
-        lines.append("| Path | Rule | Message |")
-        lines.append("|------|------|---------|")
-        for warning in result.warnings:
-            lines.append(f"| `{warning.path}` | {warning.rule or 'warning'} | {warning.message} |")
-    return "\n".join(lines)
+            header.append(f"- **Symbols**: {len(result.parsed_schema.symbols)}\n")
+    return render_legacy_markdown_report(
+        "Avro Schema Validation Report",
+        header,
+        [
+            ("Errors", _MD_TABLE_HEADER + [
+                f"| `{e.path}` | {e.rule or 'error'} | {e.message} |"
+                for e in result.errors] if result.errors else []),
+            ("Warnings", _MD_TABLE_HEADER + [
+                f"| `{w.path}` | {w.rule or 'warning'} | {w.message} |"
+                for w in result.warnings] if result.warnings else []),
+        ],
+    )
 
 
 def validate_enum_block(

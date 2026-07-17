@@ -143,58 +143,56 @@ def validate_directives(
 
 
 def generate_text_report(result: GraphQLValidationResult) -> str:
-    """Generate a text format report."""
-    lines = []
-    lines.append("=" * 60)
-    lines.append("GraphQL Schema Validation Report")
-    lines.append("=" * 60)
-    lines.append(f"File: {result.schema_path or 'N/A'}")
-    lines.append(f"Valid: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"Types: {result.type_count}")
-    lines.append(f"Fields: {result.field_count}")
-    lines.append(f"Errors: {result.error_count}")
-    lines.append(f"Warnings: {result.warning_count}")
-    lines.append(f"Time: {result.validation_time_ms:.2f}ms")
-    lines.append("-" * 60)
+    """Generate a text format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_text_report,
+    )
 
-    if result.errors:
-        lines.append("\nErrors:")
-        for error in result.errors:
-            loc = f"[{error.location}] " if error.location else ""
-            lines.append(f"  {loc}{error.message}")
+    def _line(item) -> str:
+        loc = f"[{item.location}] " if item.location else ""
+        return f"  {loc}{item.message}"
 
-    if result.warnings:
-        lines.append("\nWarnings:")
-        for warning in result.warnings:
-            loc = f"[{warning.location}] " if warning.location else ""
-            lines.append(f"  {loc}{warning.message}")
-
-    lines.append("=" * 60)
-    return "\n".join(lines)
+    return render_legacy_text_report(
+        "GraphQL Schema Validation Report",
+        [
+            f"File: {result.schema_path or 'N/A'}",
+            f"Valid: {'Yes' if result.is_valid else 'No'}",
+            f"Types: {result.type_count}",
+            f"Fields: {result.field_count}",
+            f"Errors: {result.error_count}",
+            f"Warnings: {result.warning_count}",
+            f"Time: {result.validation_time_ms:.2f}ms",
+        ],
+        [
+            ("Errors", [_line(e) for e in result.errors]),
+            ("Warnings", [_line(w) for w in result.warnings]),
+        ],
+    )
 
 
 def generate_markdown_report(result: GraphQLValidationResult) -> str:
-    """Generate a markdown format report."""
-    lines = []
-    lines.append("# GraphQL Schema Validation Report\n")
-    lines.append(f"- **File**: {result.schema_path or 'N/A'}")
-    lines.append(f"- **Valid**: {'Yes' if result.is_valid else 'No'}")
-    lines.append(f"- **Types**: {result.type_count}")
-    lines.append(f"- **Fields**: {result.field_count}")
-    lines.append(f"- **Errors**: {result.error_count}")
-    lines.append(f"- **Warnings**: {result.warning_count}")
-    lines.append(f"- **Time**: {result.validation_time_ms:.2f}ms\n")
+    """Generate a markdown format report (thin wrapper over the unified renderer)."""
+    from Asgard.Forseti.Reporting.services.legacy_report_service import (
+        render_legacy_markdown_report,
+    )
 
-    if result.errors:
-        lines.append("## Errors\n")
-        for error in result.errors:
-            loc = f"**{error.location}**: " if error.location else ""
-            lines.append(f"- {loc}{error.message}")
+    def _bullet(item) -> str:
+        loc = f"**{item.location}**: " if item.location else ""
+        return f"- {loc}{item.message}"
 
-    if result.warnings:
-        lines.append("\n## Warnings\n")
-        for warning in result.warnings:
-            loc = f"**{warning.location}**: " if warning.location else ""
-            lines.append(f"- {loc}{warning.message}")
-
-    return "\n".join(lines)
+    return render_legacy_markdown_report(
+        "GraphQL Schema Validation Report",
+        [
+            f"- **File**: {result.schema_path or 'N/A'}",
+            f"- **Valid**: {'Yes' if result.is_valid else 'No'}",
+            f"- **Types**: {result.type_count}",
+            f"- **Fields**: {result.field_count}",
+            f"- **Errors**: {result.error_count}",
+            f"- **Warnings**: {result.warning_count}",
+            f"- **Time**: {result.validation_time_ms:.2f}ms\n",
+        ],
+        [
+            ("Errors", [_bullet(e) for e in result.errors]),
+            ("Warnings", [_bullet(w) for w in result.warnings]),
+        ],
+    )
