@@ -20,7 +20,7 @@ from Asgard.Forseti.Rules.models._rule_base_models import SchemaFormat
 FMT = SchemaFormat.GRAPHQL
 
 _TYPE_BODY = re.compile(r'(?:type|interface|input)\s+(\w+)(?:\s+implements\s+[^{]+)?\s*\{([^}]*)\}')
-_FIELD_ARGS = re.compile(r'(\w+)\s*\(([^)]*)\)\s*:')
+_FIELD_ARGS = re.compile(r'(\w+)\s*(?:\(([^)]*)\))?\s*:')
 _ARG = re.compile(r'(\w+)\s*:\s*([\w\[\]!]+)(\s*=\s*[^,)]+)?')
 
 
@@ -33,7 +33,7 @@ def _parse_args(sdl: str) -> dict[str, dict[str, dict[str, tuple[str, bool]]]]:
         type_name, body = tmatch.group(1), tmatch.group(2)
         fields: dict[str, dict[str, tuple[str, bool]]] = {}
         for fmatch in _FIELD_ARGS.finditer(body):
-            field_name, args_src = fmatch.group(1), fmatch.group(2)
+            field_name, args_src = fmatch.group(1), fmatch.group(2) or ""
             args: dict[str, tuple[str, bool]] = {}
             for amatch in _ARG.finditer(args_src):
                 args[amatch.group(1)] = (
