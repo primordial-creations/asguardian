@@ -1,0 +1,179 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: hardened-app
+  namespace: default
+  labels:
+    app: hardened-app
+    version: v1
+    environment: production
+    app.kubernetes.io/name: hardened-app
+    app.kubernetes.io/instance: hardened-app
+    app.kubernetes.io/managed-by: volundr
+automountServiceAccountToken: false
+---
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: hardened-app
+  namespace: default
+  labels: &id001
+    app: hardened-app
+    version: v1
+    environment: production
+    app.kubernetes.io/name: hardened-app
+    app.kubernetes.io/instance: hardened-app
+    app.kubernetes.io/managed-by: volundr
+  annotations:
+    volundr.asgard/suppress-VOL-K8S-0015: 'true'
+    volundr.asgard/suppress-VOL-K8S-0013: 'true'
+    volundr.asgard/rationale: "VOL-K8S-0015: preset:basic \u2014 profile-level acceptance\
+      \ of this completeness gap; VOL-K8S-0013: preset:basic \u2014 profile-level\
+      \ acceptance of this completeness gap"
+spec:
+  selector:
+    matchLabels:
+      app: hardened-app
+  template:
+    metadata:
+      labels: *id001
+      annotations: {}
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: hardened-app
+      containers:
+      - name: hardened-app
+        image: registry.example.com/app:1.2.3
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 3000
+          runAsNonRoot: true
+          readOnlyRootFilesystem: true
+          allowPrivilegeEscalation: false
+          privileged: false
+          capabilities:
+            drop:
+            - ALL
+          seccompProfile:
+            type: RuntimeDefault
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+          successThreshold: 1
+        volumeMounts:
+        - name: volundr-writable-tmp
+          mountPath: /tmp
+      securityContext:
+        runAsNonRoot: true
+        fsGroup: 2000
+        seccompProfile:
+          type: RuntimeDefault
+        fsGroupChangePolicy: OnRootMismatch
+        appArmorProfile:
+          type: RuntimeDefault
+      volumes:
+      - name: volundr-writable-tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hardened-app-service
+  namespace: default
+  labels:
+    app: hardened-app
+    version: v1
+    environment: production
+    app.kubernetes.io/name: hardened-app
+    app.kubernetes.io/instance: hardened-app
+    app.kubernetes.io/managed-by: volundr
+  annotations:
+    volundr.asgard/suppress-VOL-K8S-0015: 'true'
+    volundr.asgard/suppress-VOL-K8S-0013: 'true'
+    volundr.asgard/rationale: "VOL-K8S-0015: preset:basic \u2014 profile-level acceptance\
+      \ of this completeness gap; VOL-K8S-0013: preset:basic \u2014 profile-level\
+      \ acceptance of this completeness gap"
+spec:
+  selector:
+    app: hardened-app
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080
+    protocol: TCP
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: hardened-app-network-policy
+  namespace: default
+  labels:
+    app: hardened-app
+    version: v1
+    environment: production
+    app.kubernetes.io/name: hardened-app
+    app.kubernetes.io/instance: hardened-app
+    app.kubernetes.io/managed-by: volundr
+spec:
+  podSelector:
+    matchLabels:
+      app: hardened-app
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  - ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: hardened-app-pdb
+  namespace: default
+  labels:
+    app: hardened-app
+    version: v1
+    environment: production
+    app.kubernetes.io/name: hardened-app
+    app.kubernetes.io/instance: hardened-app
+    app.kubernetes.io/managed-by: volundr
+spec:
+  selector:
+    matchLabels:
+      app: hardened-app
+  minAvailable: 1
