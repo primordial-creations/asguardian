@@ -76,3 +76,7 @@ scan_results/
 *.bak
 *.tmp
 Asgard-backup/
+
+.asgard/
+heimdall_report_*.html
+_baseline_failures.txt
