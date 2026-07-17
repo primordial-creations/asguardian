@@ -20,7 +20,8 @@
 ### Wave 1 — P0 capabilities (after the foundation each depends on)
 | ID | Slice | Plans | Depends | Status |
 |---|---|---|---|---|
-| W1-H | Heimdall taint upgrade (Python-first) + security scoring/normalization | H/04, H/06 | F1 partial | not started |
+| W1-H | Heimdall taint upgrade (Python-first) + security scoring/normalization | H/04, H/06 | F1 ✓ | agent running (worktree) |
+| W1-Hx | Heimdall general-purpose hygiene: lazy-imports out of default scan (goal-doc mandate violation found on Adrasta run) + report output location | goal doc | — | agent running (worktree) |
 | W1-F | Forseti unified compatibility engine | F/01 | F4 ✓ | **INTERRUPTED at session limit** (resets 5:30pm Brisbane). Partial work preserved as WIP commit 0cce9e4 on branch worktree-agent-af6c2004b36b478eb (new Compatibility/ package, GraphQL/AsyncAPI diff services, CLI handlers — UNTESTED). Resume: relaunch agent in that worktree to finish + test before merging. |
 | W1-Fr | Freya unified severity/grade-capping + a11y dual-axis/ARIA | Fr/01, Fr/02 | — | **MERGED** (a05cd59). ~130 new tests; httpx declared. Known pre-existing bug flagged: `_unified_tester_runners.py` attr access masked by exception handler. |
 | W1-V | Verdandi stats core (HL/Glass Δ, t-digest, CO) + burn-rate pairing fix + p75 CWV | Ve/03A-C, Ve/02.1-4, Ve/01 | — | **MERGED** (da6f0fb) after adversarial review + fixes. 97 new tests; tests_Verdandi 952 pass. Deferred: CLI wiring for new APIs, Ve/02.5-8, 03D-G. Latent burn-rate scale bug also fixed. |
@@ -40,6 +41,11 @@ H/02 SOLID CIR, H/03 architecture CSP, H/07 domain scanners, H/05 cohesion, H/10
 3. GAIA-leak grep audit of default code paths.
 4. Scoring/severity/confidence cross-module consistency check.
 5. Commit on `uplift/asgard-p0` with clear message; update this file.
+
+## Integrated verification (2026-07-17 evening)
+- Full suite on integrated branch: **7,274 passed / 50 failed / 3 errors** — failure set == baseline minus the Verdandi L8 fix. +734 net new passing tests.
+- FLAKY-SUSPECT: `tests_Heimdall/L0_Mocked/Security/test_cryptographic_validation_service.py::test_detect_static_iv` failed once in one full-suite ordering, passed on rerun and in all subset orderings. Watch; per zero-flakiness policy investigate if it recurs.
+- Zero-config CLI on non-GAIA repos: Forseti `openapi validate` on Kairos real spec → actionable rule-id findings, exit 1, SARIF valid (569 results) via `python3 -m Asgard.Forseti`. **GAP:** unified `asguardian` wrapper does not pass through Forseti's new global flags (`--format sarif`, `--profile`) — needs CLI passthrough wiring (Wave 2 item). Heimdall scan of GVA running.
 
 ## Log
 - 2026-07-17: Orientation complete; branch created; planning docs committed. Noted: ASGARD_UPLIFT_GOAL.md/PROMPT.md vanished from disk mid-session (recreated from context); a `Claude Team/.../learnings.md` deletion appeared in git status that this session did not make — another process may be touching the repo.
