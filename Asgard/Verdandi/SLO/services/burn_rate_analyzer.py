@@ -76,7 +76,9 @@ class BurnRateAnalyzer:
 
         total_events = sum(m.total_events for m in window_metrics)
         good_events = sum(m.good_events for m in window_metrics)
-        bad_events = total_events - good_events
+        rejected_events = sum(m.rejected_events for m in window_metrics)
+        # Valid rejections never consume error budget (DEEPTHINK_01).
+        bad_events = max(0, total_events - good_events - rejected_events)
 
         error_budget_fraction = (100.0 - slo.target) / 100.0
         slo_window_hours = slo.window_days * 24

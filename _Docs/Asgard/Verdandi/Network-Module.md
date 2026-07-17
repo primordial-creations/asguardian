@@ -256,6 +256,132 @@ class DnsResult(BaseModel):
 
 ---
 
+---
+
+## Plan 05 Additions (TTFB Phases, Topology Baselines, USE, Anomaly Signatures)
+
+The sections above predate Plan 05 and describe the module's original
+absolute-band design (some of the class/method names above, e.g.
+`LatencyResult`, `analyze_with_loss`, `compare_endpoints`, do not exist in
+the current codebase and are pending a future doc-accuracy pass). The
+sections below document what Plan 05 actually shipped, in
+`Asgard/Verdandi/Network/`, additively: every existing method signature is
+unchanged, and every new analyzer returns a typed `NetworkOutcome` (`OK` /
+`INSUFFICIENT_DATA`) rather than a junk result when it cannot answer.
+
+### 4. Phase Analyzer (`services/phase_analyzer.py`)
+
+**Purpose**: Decomposes TTFB into DNS -> TCP -> TLS -> request -> response
+phases and checks the TLS phase against protocol-specific handshake-RTT
+expectations (RESEARCH_11).
+
+```python
+from Asgard.Verdandi.Network import PhaseAnalyzer
+
+analyzer = PhaseAnalyzer()
+result = analyzer.analyze([
+    {"dns_ms": 5, "tcp_ms": 50, "tls_ms": 300, "request_ms": 2,
+     "response_ms": 40, "tls_version": "1.2"},
+])
+print(result.ttfb_dominant_phase)   # "tls"
+print(result.protocol_flags)        # ["HANDSHAKE_OVERHEAD"]
+```
+
+`HANDSHAKE_OVERHEAD` fires when `tls_ms` exceeds `1.5 x expected_rtts x
+rtt_est`, where `rtt_est` is estimated from `tcp_ms` and `expected_rtts` is
+2 for TLS 1.2, 1 for TLS 1.3, and 0 for a resumed session or QUIC/HTTP-3
+(never flagged). Empty input returns `outcome=INSUFFICIENT_DATA`.
+
+### 5. Topology Baseline Profiles (`LatencyCalculator.analyze_against_profile`)
+
+**Purpose**: Rates latency against named cloud topology baselines instead of
+one-size absolute health bands.
+
+| Profile | Expected RTT | Rated POOR above |
+|---|---|---|
+| `INTRA_AZ` | 0.1-0.6 ms | 1.0 ms |
+| `INTER_AZ` | 1-2 ms | 5.0 ms (sync-replication warning fires above 3 ms) |
+| `SAME_REGION_PUBLIC` | 2-10 ms | 20 ms |
+| `CROSS_REGION` | caller-declared (`cross_region_declared_ms`) | 1.3x declared |
+| `INTERNET_EDGE` | 20-150 ms | 195 ms |
+| `LEGACY_DEFAULT` | reuses the original `GOOD_THRESHOLD`/`ACCEPTABLE_THRESHOLD` bands | -- |
+
+```python
+from Asgard.Verdandi.Network import LatencyCalculator, TopologyProfile
+
+calculator = LatencyCalculator()
+result = calculator.analyze_against_profile(
+    [1.7, 1.8, 1.9], TopologyProfile.INTER_AZ
+)
+print(result.rating)  # TopologyRating.GOOD
+```
+
+Packet-loss baselines are enforced too: backbone profiles expect < 0.01%
+loss; `INTERNET_EDGE` tolerates up to 1%. `CROSS_REGION` without a declared
+baseline, and empty input, both return `INSUFFICIENT_DATA`.
+
+### 6. USE Analyzer (`services/use_analyzer.py`)
+
+**Purpose**: Applies the USE method (Utilization/Saturation/Errors) to a
+cloud NIC, the TCP stack, and the DNS resolver's link-local rate limit.
+Errors trump utilization: any non-zero allowance-exceeded counter is
+CRITICAL regardless of reported utilization.
+
+```python
+from Asgard.Verdandi.Network import UseAnalyzer
+from Asgard.Verdandi.Network.models.network_models import UseCounterSnapshot
+
+analyzer = UseAnalyzer()
+report = analyzer.analyze(UseCounterSnapshot(linklocal_allowance_exceeded=3))
+print(report.dns_resolver.severity)  # "critical"
+```
+
+`nic.errors` covers `pps_allowance_exceeded`, `bw_in_allowance_exceeded`,
+`conntrack_allowance_exceeded`; `dns_resolver` flags the 1,024-PPS AWS
+link-local DNS quota. Retransmit spikes are correlated (Pearson r) against
+an optional utilization series to distinguish link saturation (r > 0.7)
+from uncorrelated path loss. `analyze(None)` returns `INSUFFICIENT_DATA`.
+
+### 7. Signature Classifier (`services/signature_classifier.py`)
+
+**Purpose**: Classifies RTT/ASN/TLS-failure series into named anomaly
+signatures. These are annotations, not alerts (anomalies != alerts).
+
+| Signature | Trigger |
+|---|---|
+| `ROUTE_CHANGE` | A CUSUM step in RTT sustained >= 15 minutes (optionally corroborated by a hop-count delta) |
+| `DNS_HIJACK_SUSPECT` | Resolved-ASN change coincident with a TLS-failure spike |
+| `CONGESTION` | Retransmit spike + growing RTT variance with no genuine location step |
+| `CLOCK_SKEW` | Any negative one-way latency -- a data-quality flag, never a network anomaly; takes priority over every other signature |
+
+```python
+from Asgard.Verdandi.Network import SignatureClassifier
+
+classifier = SignatureClassifier()
+sig = classifier.classify(rtt_series=[20.0] * 20 + [45.0] * 20)
+print(sig.signature)  # NetworkSignatureType.ROUTE_CHANGE
+```
+
+The standalone `detect_clock_skew()` function is also exported from
+`services/signature_classifier.py` for reuse by other analyzers.
+
+### 8. DNS Quota / Environment Bands (`DnsCalculator.analyze_quota`)
+
+**Purpose**: USE-style utilization/error columns for the DNS resolver, plus
+in-VPC (< 2 ms) vs public (< 100 ms) expectation bands.
+
+```python
+from Asgard.Verdandi.Network import DnsCalculator
+
+calculator = DnsCalculator()
+result = calculator.analyze_quota(queries_ps=2000)
+print(result.quota_exceeded)  # True (over the 1,024 PPS link-local quota)
+```
+
+`queries_ps=None` returns `INSUFFICIENT_DATA`.
+
+---
+
 ## Best Practices
 
 ### Latency

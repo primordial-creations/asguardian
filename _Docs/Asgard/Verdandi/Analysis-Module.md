@@ -171,6 +171,54 @@ result = calculator.calculate_with_weights(response_times, weights)
 recommended = ApdexCalculator.get_recommended_threshold(response_times, target_score=0.85)
 ```
 
+**Governance (DEEPTHINK_03)**: a single pooled Apdex score can mask two
+serious failure modes — errors being buried inside "fast" latencies, and a
+bimodal split (e.g. 80% at 50ms / 20% at 5000ms) scoring identically to a
+uniformly mediocre service. The following methods are additive; `calculate()`
+and `calculate_with_weights()` keep their original signatures.
+
+**Error-unified Apdex** — any errored request counts Frustrated regardless
+of speed:
+```python
+result = calculator.calculate_with_errors(
+    response_times, error_flags,
+    is_human=is_human,  # optional; excludes bot/machine traffic
+)
+print(result.machine_traffic_excluded)
+```
+
+**Bimodality warning** — `calculate()` and `calculate_with_errors()` both
+run the Plan 03 bimodality guard (`Anomaly.services._batch_detectors.
+bimodality_guard`) on the raw response times and set
+`ApdexResult.distribution_warning` when the distribution is bimodal. This is
+an **annotation, not an alert** — anomalies are not alerts. A worked example
+(DEEPTHINK_03): 80% @ 50ms / 20% @ 5000ms and 60% @ ~420ms / 40% spread
+across 510-2000ms both score 0.80 at T=500, but only the first is flagged.
+
+**Per-endpoint rollup** — replaces volume-weighted pooling across endpoints
+(a Simpson's-paradox guard: one huge fast endpoint can otherwise hide a slow
+one):
+```python
+endpoint_results = {"/search": search_result, "/checkout": checkout_result}
+rollup = ApdexCalculator.rollup(endpoint_results, target_score=0.85)
+print(rollup.pct_endpoints_meeting_target, rollup.failing_endpoints)
+
+# Pooling across endpoints is refused unless explicitly forced:
+calculator.calculate_pooled(endpoint_response_times, force=True)
+```
+
+**Versioned recalibration** — `ApdexConfig.version` / `.endpoint` stamp
+results so `Apdex_v1_T500` and `Apdex_v2_T1500` can be stored in parallel
+during a shadow period:
+```python
+record = ApdexCalculator.recalibrate(
+    old_version="v1", new_version="v2",
+    old_threshold_ms=500, new_threshold_ms=1500,
+    shadow_period_days=30, endpoint="/checkout",
+)
+print(record.checklist)  # shadow length, dashboard annotation, cutover timing
+```
+
 ---
 
 ### 3. SLA Checker
@@ -378,6 +426,8 @@ class PercentileResult(BaseModel):
 class ApdexConfig(BaseModel):
     threshold_ms: float = 500
     frustration_multiplier: float = 4.0
+    version: Optional[str] = None    # recalibration epoch label
+    endpoint: Optional[str] = None
 
 class ApdexResult(BaseModel):
     score: float
@@ -387,6 +437,32 @@ class ApdexResult(BaseModel):
     tolerating_count: int
     frustrated_count: int
     total_count: int
+    version: Optional[str] = None
+    endpoint: Optional[str] = None
+    distribution_warning: Optional[str] = None  # set when input is bimodal
+    machine_traffic_excluded: int = 0
+```
+
+### MultiEndpointApdexResult / ApdexRecalibrationRecord
+```python
+class MultiEndpointApdexResult(BaseModel):
+    endpoint_results: Dict[str, ApdexResult]
+    target_score: float
+    total_endpoints: int
+    endpoints_meeting_target: int
+    pct_endpoints_meeting_target: float
+    failing_endpoints: List[str]
+
+class ApdexRecalibrationRecord(BaseModel):
+    old_version: str
+    new_version: str
+    old_threshold_ms: float
+    new_threshold_ms: float
+    endpoint: Optional[str]
+    shadow_period_days: int
+    shadow_sufficient: bool       # True when shadow_period_days >= 30
+    recalibrated_at: datetime
+    checklist: List[str]
 ```
 
 ### SLAConfig / SLAResult

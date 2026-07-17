@@ -64,6 +64,15 @@ class SLODefinition(BaseModel):
     percentile: Optional[float] = Field(
         default=None, description="Target percentile for latency SLOs (e.g., 99)"
     )
+    external_sla_target: Optional[float] = Field(
+        default=None,
+        description=(
+            "Contractual external SLA target percentage. Meta-SLO buffer "
+            "policy (RESEARCH_13) requires this internal target to be "
+            "strictly tighter than the external SLA so budget is exhausted "
+            "internally before the SLA is breached."
+        ),
+    )
 
     @property
     def error_budget_percent(self) -> float:
@@ -89,6 +98,14 @@ class SLIMetric(BaseModel):
     value: float = Field(
         default=0.0, description="Direct value (for non-event-based SLIs)"
     )
+    rejected_events: int = Field(
+        default=0,
+        description=(
+            "Valid rejections (e.g. typed INSUFFICIENT_DATA outcomes) within "
+            "total_events. Rejections are not failures: they never consume "
+            "error budget (DEEPTHINK_01)."
+        ),
+    )
     labels: Dict[str, str] = Field(
         default_factory=dict, description="Additional labels/tags"
     )
@@ -104,6 +121,11 @@ class SLIMetric(BaseModel):
     def failure_rate(self) -> float:
         """Calculate failure rate."""
         return 1.0 - self.success_rate
+
+    @property
+    def bad_events(self) -> int:
+        """Events that are neither good nor validly rejected (budget-consuming)."""
+        return max(0, self.total_events - self.good_events - self.rejected_events)
 
 
 class ErrorBudget(BaseModel):

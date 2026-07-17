@@ -9,7 +9,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class SpanKind(str, Enum):
@@ -174,6 +174,69 @@ class ServiceDependency(BaseModel):
     error_count: int = Field(default=0, description="Number of failed calls")
     avg_latency_ms: float = Field(default=0.0, description="Average call latency")
     p99_latency_ms: float = Field(default=0.0, description="99th percentile latency")
+    is_async: bool = Field(
+        default=False,
+        description="Async/messaging edge (rendered dashed), e.g. producer->topic->consumer",
+    )
+    ghost: bool = Field(
+        default=False,
+        description="Edge present in a previous window but absent in the current one",
+    )
+    traffic_share: float = Field(
+        default=0.0,
+        description="Fraction of total call volume this edge represents (set by prune())",
+    )
+
+
+class ServiceIdentity(BaseModel):
+    """
+    Resolved canonical identity for a raw service name (DEEPTHINK_10).
+
+    Composite key ``env:namespace:canonical_name`` when infra resource
+    attributes (k8s namespace, deployment env) exist; otherwise lexical
+    canonicalization only (lowercase, unify ``_``/space/camelCase -> ``-``).
+    Never strips suffixes (``-api``/``-worker``) or version segments.
+    """
+
+    raw_name: str = Field(..., description="Original, unresolved service name")
+    canonical_name: str = Field(..., description="Lexically canonicalized name")
+    composite_key: str = Field(
+        ...,
+        description=(
+            "env:namespace:canonical_name when infra resource attrs are "
+            "available; otherwise equal to canonical_name"
+        ),
+    )
+    env: Optional[str] = Field(default=None, description="Deployment environment, if known")
+    namespace: Optional[str] = Field(default=None, description="k8s namespace, if known")
+
+
+class EdgeStats(BaseModel):
+    """Windowed traffic statistics for a single dependency edge."""
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    calls: int = Field(default=0, description="Call count in this window")
+    errors: int = Field(default=0, description="Error count in this window")
+    is_async: bool = Field(default=False, alias="async", description="Async/messaging edge")
+    ghost: bool = Field(default=False, description="Present in a previous window, absent now")
+
+
+class VirtualNode(BaseModel):
+    """
+    A synthetic node representing a messaging system destination
+    (``[system:destination]``) inferred from PRODUCER/CONSUMER span kinds,
+    e.g. ``kafka:orders``. Generated/high-cardinality destination names
+    (``amq.gen-*``, UUID-like segments) are parameterized to a placeholder
+    to avoid cardinality explosion.
+    """
+
+    key: str = Field(..., description="'system:destination' composite key")
+    system: str = Field(..., description="messaging.system attribute value")
+    destination: str = Field(
+        ..., description="messaging.destination.name (parameterized if generated)"
+    )
+    node_type: str = Field(default="messaging", description="Virtual node category")
 
 
 class ServiceMap(BaseModel):
@@ -197,6 +260,14 @@ class ServiceMap(BaseModel):
     )
     edge_count: int = Field(default=0, description="Total number of dependency edges")
     service_count: int = Field(default=0, description="Total number of services")
+    virtual_nodes: List[VirtualNode] = Field(
+        default_factory=list,
+        description="Synthetic messaging-system nodes, e.g. kafka:orders",
+    )
+    identities: Dict[str, ServiceIdentity] = Field(
+        default_factory=dict,
+        description="raw_name -> resolved ServiceIdentity, when identity resolution was used",
+    )
 
     @property
     def has_cycles(self) -> bool:
