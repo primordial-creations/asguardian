@@ -126,7 +126,26 @@ def _add_contract_parser(subparsers: argparse._SubParsersAction) -> None:
     breaking.add_argument("old_spec", help="Old version specification")
     breaking.add_argument("new_spec", help="New version specification")
     breaking.add_argument("--version", help="Version string for changelog")
+    breaking.add_argument("--current-version", default=None,
+                          help="Current SemVer; emits an algorithmic bump "
+                               "recommendation (0.x downgrades MAJOR to MINOR)")
+    breaking.add_argument("--migration-guide", default=None, metavar="OUT.md",
+                          help="Write a Markdown migration-guide scaffold")
+    breaking.add_argument("--changelog", default=None, metavar="OUT.md",
+                          help="Write a grouped Keep-a-Changelog Markdown file")
     add_performance_flags(breaking)
+
+    audit_deps = contract_sub.add_parser(
+        "audit-deps",
+        help="Consumer-side dependency audit: fail when consumed operations "
+             "sunset within the horizon",
+    )
+    audit_deps.add_argument("config", help="deps.yaml listing consumed specs "
+                                           "and used operations")
+    audit_deps.add_argument("--horizon", type=int, default=30,
+                            help="Days of warning before a sunset fails the "
+                                 "audit (default: 30)")
+    add_performance_flags(audit_deps)
 
 
 def _add_jsonschema_parser(subparsers: argparse._SubParsersAction) -> None:

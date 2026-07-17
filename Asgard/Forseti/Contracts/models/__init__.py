@@ -10,9 +10,15 @@ from Asgard.Forseti.Contracts.models.contract_models import (
     CompatibilityLevel,
     ContractValidationResult,
     ContractValidationError,
+    LifecycleMeta,
+    Bump,
+    VersionRecommendation,
 )
 
 __all__ = [
+    "Bump",
+    "LifecycleMeta",
+    "VersionRecommendation",
     "ContractConfig",
     "CompatibilityResult",
     "BreakingChange",
