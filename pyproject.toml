@@ -81,6 +81,9 @@ Repository = "https://github.com/JakeDruett/asguardian"
 [tool.setuptools.packages.find]
 exclude = ["Asgard_Test", "Asgard_Test.*"]
 
+[tool.setuptools.package-data]
+"Asgard.Heimdall.Security.TaintAnalysis.stubs" = ["*.yml"]
+
 [tool.pytest.ini_options]
 testpaths = ["Asgard_Test"]
 python_files = ["test_*.py"]
