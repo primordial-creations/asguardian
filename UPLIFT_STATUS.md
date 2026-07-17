@@ -2,6 +2,21 @@
 
 **Branch:** `uplift/asgard-p0` | **Started:** 2026-07-17 | **Orchestrator resume point — read this first.**
 
+## Plan completeness audit (2026-07-18, 6 independent read-only verifier agents)
+Answer to "are ALL plans implemented?": **NO.** ~22 of 47 actionable plan files (the 53 files minus 6 overviews) are FULLY implemented; ~24 PARTIAL; 1 NOT_STARTED. **Plan files retained** (not deleted) — each PARTIAL/NOT_STARTED plan still describes unbuilt work and is the resume roadmap.
+
+| Module | FULLY | PARTIAL | NOT_STARTED |
+|---|---|---|---|
+| Heimdall | 03, 08, 09 | 01 (TS phase C/D — no JS/TS/Java AST migration), 02 (CIR only 4/10 langs), 04 (taint Python-only, no P4 multi-lang), 05 (cohesion — CLI/profile wiring unconfirmed), 06 (no SAVD trend metrics §D), 07 (3/12 domains: SSRF/ReDoS/crypto only) | **10** (evaluation/benchmarking — corpus/calibration/Brier harness entirely absent) |
+| Forseti | 01, 02, 03, 04, 05, 08 | 06 (no stateful/proxy mocks, example-first, Arazzo), 07 (no proto/GraphQL/SQL adapters, no `align discover`/CLI) | — |
+| Freya | 01, 02, 03, 06 | 04 (fingerprint report display missing), 05 (CSP-route Blocker made UNCONDITIONAL not route-conditional — design deviation; SRI/mixed-content shipped), 07 (6 module-doc stubs never written) | — |
+| Verdandi | 01, 03, 08 | 02 (no sla check_fraction; portfolio/dynamic-budget CLI absent), 04 (stampede/XFetch 04.4 entirely missing), 05 (lib complete but ZERO CLI surface), 06 (PSI, CFS-throttle, USE↔RED correlator entirely missing), 07 (query_budget + fingerprint segmentation missing), 09 (self-SLO CLI absent) | — |
+| Volundr | 01, 03, 06, 07 | 00/05/06 (5 module docs never written: GitOps/Kustomize/Helm/Validation/Scoring), 02 (`terraform validate --plan` CLI + for_each/lifecycle unwired; plan_reader not consumed), 04 (non-GHA platforms GitLab/Azure not hardened/scored, use legacy scorer), 05 (Helm values.schema.json + hook hygiene missing) | — |
+| Bragi | 01, 03, 06 | 02 (Phase D git-friction/interest + Phase E delta-store missing), 04 (scanner context-stamping NOT wired; TestHealth category absent), 05 (PCA weights computed but not wired into scoring; only 5/11 language profiles; SZZ Stage 2 out) | — |
+
+**Cross-cutting gaps:** CLI wiring for many new library APIs is deferred across Verdandi/Volundr/Bragi/Forseti; `_Docs/Asgard/` module-doc reconciliation is incomplete for Volundr (5 docs) and Freya (6 docs). One design deviation to revisit: Freya CSP→Blocker escalation is unconditional rather than route-tag-conditional (over-escalates).
+
+
 ## Baseline
 - 6,611 tests collected in `Asgard_Test/` (run with `python3 -m pytest Asgard_Test/ -q`; no pytest-timeout plugin — do NOT pass `--timeout`).
 - All prior `worktree-agent-*` branches are merged into main; no prior uplift work existed.
