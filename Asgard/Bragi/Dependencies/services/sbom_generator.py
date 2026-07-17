@@ -21,7 +21,9 @@ from Asgard.Bragi.Dependencies.services._sbom_formatters import (
     to_cyclonedx_json,
     to_spdx_json,
 )
+from Asgard.Bragi.Dependencies.models.sbom_models import VersionResolution
 from Asgard.Bragi.Dependencies.services._sbom_parsers import (
+    get_installed_version,
     get_license_from_metadata,
     make_purl,
     parse_pyproject_toml,
@@ -69,18 +71,34 @@ class SBOMGenerator:
             else:
                 pairs = parse_requirements_txt(str(candidate))
 
-            for name, version in pairs:
-                key = (name.lower(), version)
+            for name, version_spec in pairs:
+                key = (name.lower(), version_spec)
                 if key in seen:
                     continue
                 seen.add(key)
 
                 license_id = get_license_from_metadata(name)
-                purl = make_purl(name, version)
+
+                # Version field carries the RESOLVED installed version when
+                # available - never a raw spec string like ">=1.0" (Plan 03).
+                resolved = get_installed_version(name)
+                if resolved:
+                    version = resolved
+                    resolution = VersionResolution.RESOLVED
+                elif version_spec:
+                    version = version_spec
+                    resolution = VersionResolution.DECLARED_ONLY
+                else:
+                    version = ""
+                    resolution = VersionResolution.UNKNOWN
+
+                purl = make_purl(name, resolved or version_spec)
 
                 component = SBOMComponent(
                     name=name,
                     version=version,
+                    version_spec=version_spec,
+                    version_resolution=resolution,
                     component_type=ComponentType.LIBRARY,
                     license_id=license_id,
                     purl=purl,
@@ -104,7 +122,11 @@ class SBOMGenerator:
             components=components,
             total_components=len(components),
             direct_dependencies=len(components),
+            # Explicit completeness marker: transitive resolution is not yet
+            # performed, and the document says so rather than implying a
+            # complete closure with zero transitive dependencies.
             transitive_dependencies=0,
+            resolution="declared-only",
         )
         return document
 

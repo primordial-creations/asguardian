@@ -114,6 +114,10 @@ class PackageLicense:
     is_allowed: bool = True
     is_prohibited: bool = False
     is_warning: bool = False
+    # SPDX expression support (Plan 03): arms of an OR/AND expression and,
+    # for OR, the arm that satisfied the policy.
+    license_expression_arms: List[str] = field(default_factory=list)
+    chosen_expression_arm: Optional[str] = None
 
     @property
     def display_license(self) -> str:
