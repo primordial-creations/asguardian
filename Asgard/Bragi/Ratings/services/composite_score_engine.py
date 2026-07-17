@@ -49,6 +49,22 @@ EXTREME_COMPLEXITY_CAP = 0.69  # grade D
 PROHIBITED_LICENSE_CAP = 0.69  # grade D
 EXTREME_COMPLEXITY_THRESHOLD = 50.0
 
+# Test-profile complexity threshold (Plan 04 Phase B / DEEPTHINK_12): DAMP,
+# not DRY - cyclomatic-style thresholds relax for setup-heavy test bodies.
+TEST_PROFILE_COMPLEXITY_THRESHOLD = 25.0
+
+# Contexts excluded entirely from maintainability/comprehensibility
+# denominators (Plan 04 Sec.3.2): generated code is a category error in
+# these metrics. Security-relevant findings are untouched by this - the
+# exclusion only applies to the Ratings scoring path.
+GENERATED_CONTEXTS = frozenset({"generated", "suspected_generated"})
+TEST_CONTEXTS = frozenset({"test"})
+
+
+def excluded_from_denominators(context: Optional[str]) -> bool:
+    """True when a file's context excludes it from Ratings scoring entirely."""
+    return (context or "production") in GENERATED_CONTEXTS
+
 
 def score_to_grade(score: float) -> str:
     """Map a final score in [0, 1] to a letter grade."""
@@ -72,7 +88,15 @@ class CompositeScoreEngine:
     # ------------------------------------------------------------------ file
 
     def score_file(self, bundle: FileMetricBundle) -> FileQualityScore:
-        """Score one file (or a project-level bundle) from its metric inputs."""
+        """
+        Score one file (or a project-level bundle) from its metric inputs.
+
+        Context-aware (Plan 04): TEST bundles use the relaxed DAMP
+        complexity threshold and skip the LOC penalty; the caller is
+        responsible for excluding GENERATED bundles from the file list
+        entirely (see `excluded_from_denominators`) - this method does not
+        special-case GENERATED itself so it stays a pure scoring function.
+        """
         utilities = self._build_utilities(bundle)
         category_scores = self._score_categories(utilities)
         base_score = self._geometric_mean(category_scores)
@@ -121,15 +145,17 @@ class CompositeScoreEngine:
                 utility=um.debt_ratio_to_utility(b.debt_ratio_percent), weight=1.0,
                 detail=f"TDR {b.debt_ratio_percent:.2f}%",
             ))
+        is_test = b.context in TEST_CONTEXTS
         if b.max_cognitive_complexity is not None:
+            threshold = TEST_PROFILE_COMPLEXITY_THRESHOLD if is_test else self.complexity_threshold
             utilities.append(MetricUtility(
                 metric_id="complexity", category=ScoreCategory.MAINTAINABILITY,
                 utility=um.complexity_to_utility(
                     b.max_cognitive_complexity, b.mean_cognitive_complexity,
-                    threshold=self.complexity_threshold,
+                    threshold=threshold,
                 ),
                 weight=1.0,
-                detail=f"max CC {b.max_cognitive_complexity:.0f}",
+                detail=f"max CC {b.max_cognitive_complexity:.0f} (threshold {threshold:.0f}{' - test profile' if is_test else ''})",
             ))
         if b.duplication_percent is not None:
             utilities.append(MetricUtility(
@@ -146,7 +172,9 @@ class CompositeScoreEngine:
         # The LOC penalty only participates for oversized files: it is a
         # penalty for God files, not a reward for small ones, and must not
         # drag down an otherwise-unmeasured maintainability category.
-        if b.loc > 600 and b.file_path:
+        # Test profile (Plan 04 Sec.3.2): LOC penalty off - fixture-heavy
+        # test files legitimately run long.
+        if b.loc > 600 and b.file_path and not is_test:
             utilities.append(MetricUtility(
                 metric_id="loc_penalty", category=ScoreCategory.MAINTAINABILITY,
                 utility=um.loc_penalty(b.loc), weight=0.25,

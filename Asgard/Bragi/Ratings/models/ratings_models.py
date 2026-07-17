@@ -75,6 +75,43 @@ class DebtThresholds(BaseModel):
     # Above d_max is rating E
 
 
+class FindingClass(str, Enum):
+    """
+    Fact-vs-inquiry split (Plan 04 Sec.3.3 / DEEPTHINK_02).
+
+    FACT findings are deterministic metric violations ("65 lines; limit
+    50") and render as violations. HEURISTIC findings are pattern-based
+    inquiries (e.g. Feature-Envy-class smells) and render as
+    confidence-graded suggestions, never bare assertions.
+    """
+    FACT = "fact"
+    HEURISTIC = "heuristic"
+
+
+class ChannelProfile(str, Enum):
+    """
+    Precision/recall operating points a rendered rating can target
+    (Plan 04 Sec.3.3 / DEEPTHINK_02). Finding sets are monotonically
+    nested: ci_gate subset-of pr_review subset-of ide subset-of dashboard.
+    """
+    CI_GATE = "ci_gate"        # FACT-class only, deterministic metrics, ~99% precision target
+    PR_REVIEW = "pr_review"    # FACT + HEURISTIC >= medium confidence
+    IDE = "ide"                # unobtrusive full set
+    DASHBOARD = "dashboard"    # max recall, trend deltas
+
+
+class SuppressionStats(BaseModel):
+    """
+    Suppression telemetry (Plan 04 Sec.3.4 "coach vs cop" signal):
+    counts by rule id, so a rule carrying a dominant share of a project's
+    suppressions is flagged as a miscalibration candidate for Plan 05.
+    """
+    total_suppressions: int = Field(0, ge=0, description="Total active suppression directives")
+    by_rule: Dict[str, int] = Field(default_factory=dict, description="Suppression count per rule id")
+    invalid_count: int = Field(0, ge=0, description="Bare/malformed directives (schema violations)")
+    unused_count: int = Field(0, ge=0, description="Directives whose rule no longer fires (stale)")
+
+
 class ProjectRatings(BaseModel):
     """Complete A-E rating results for a project."""
     maintainability: DimensionRating = Field(
@@ -114,6 +151,9 @@ class ProjectRatings(BaseModel):
     )
     roi_actions: List[ROIAction] = Field(
         default_factory=list, description="Ranked marginal-ROI improvement actions"
+    )
+    suppression_stats: Optional["SuppressionStats"] = Field(
+        None, description="Suppression telemetry (Plan 04 Sec.3.4); None when not computed"
     )
 
     class Config:

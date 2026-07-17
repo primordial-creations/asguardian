@@ -15,7 +15,10 @@ from Asgard.Bragi.Ratings.models.ratings_models import (
 )
 from Asgard.Bragi.Ratings.services._report_extractors import extract_bundles
 from Asgard.Bragi.Ratings.services._roi_calculator import compute_roi_actions
-from Asgard.Bragi.Ratings.services.composite_score_engine import CompositeScoreEngine
+from Asgard.Bragi.Ratings.services.composite_score_engine import (
+    CompositeScoreEngine,
+    excluded_from_denominators,
+)
 
 
 class RatingsCalculator:
@@ -79,6 +82,12 @@ class RatingsCalculator:
             quality_report=quality_report,
             security_report=security_report,
         )
+        # Plan 04 Sec.3.2: GENERATED/SUSPECTED_GENERATED files are excluded
+        # from maintainability/comprehensibility denominators entirely -
+        # not scored, not counted, not diluting the risk profile. Bundles
+        # default to context="production" so this is a no-op unless an
+        # upstream extractor stamps context (backward compatible).
+        file_bundles = [b for b in file_bundles if not excluded_from_denominators(b.context)]
         file_scores = [self.engine.score_file(bundle) for bundle in file_bundles]
         for fs in file_scores:
             fs.roi_actions = compute_roi_actions(fs)
