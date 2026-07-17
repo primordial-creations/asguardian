@@ -31,6 +31,29 @@ def _add_openapi_parser(subparsers: argparse._SubParsersAction) -> None:
     diff.add_argument("spec1", help="First specification file")
     diff.add_argument("spec2", help="Second specification file")
 
+    completeness = openapi_sub.add_parser(
+        "completeness",
+        help="Assess spec completeness (4-vector matrix + maturity tier)",
+    )
+    completeness.add_argument("spec_file", help="Path to OpenAPI specification file")
+    completeness.add_argument("--profile", dest="completeness_profile",
+                              choices=["dx", "secops"], default="dx",
+                              help="Assessment profile: dx (default) weighs "
+                                   "descriptions/examples; secops ignores "
+                                   "experiential vectors")
+    completeness.add_argument("--min-tier",
+                              choices=["basic", "standard", "comprehensive"],
+                              default=None,
+                              help="Exit 1 when the assessed tier is below this")
+    add_performance_flags(completeness)
+
+    security = openapi_sub.add_parser(
+        "security",
+        help="Run only the static security (OWASP API Top 10) rules",
+    )
+    security.add_argument("spec_file", help="Path to OpenAPI specification file")
+    add_performance_flags(security)
+
 
 def _add_graphql_parser(subparsers: argparse._SubParsersAction) -> None:
     """Add GraphQL subparser."""
@@ -103,7 +126,26 @@ def _add_contract_parser(subparsers: argparse._SubParsersAction) -> None:
     breaking.add_argument("old_spec", help="Old version specification")
     breaking.add_argument("new_spec", help="New version specification")
     breaking.add_argument("--version", help="Version string for changelog")
+    breaking.add_argument("--current-version", default=None,
+                          help="Current SemVer; emits an algorithmic bump "
+                               "recommendation (0.x downgrades MAJOR to MINOR)")
+    breaking.add_argument("--migration-guide", default=None, metavar="OUT.md",
+                          help="Write a Markdown migration-guide scaffold")
+    breaking.add_argument("--changelog", default=None, metavar="OUT.md",
+                          help="Write a grouped Keep-a-Changelog Markdown file")
     add_performance_flags(breaking)
+
+    audit_deps = contract_sub.add_parser(
+        "audit-deps",
+        help="Consumer-side dependency audit: fail when consumed operations "
+             "sunset within the horizon",
+    )
+    audit_deps.add_argument("config", help="deps.yaml listing consumed specs "
+                                           "and used operations")
+    audit_deps.add_argument("--horizon", type=int, default=30,
+                            help="Days of warning before a sunset fails the "
+                                 "audit (default: 30)")
+    add_performance_flags(audit_deps)
 
 
 def _add_jsonschema_parser(subparsers: argparse._SubParsersAction) -> None:

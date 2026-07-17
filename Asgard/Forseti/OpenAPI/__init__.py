@@ -46,6 +46,7 @@ from Asgard.Forseti.OpenAPI.models import (
 
 # Import services
 from Asgard.Forseti.OpenAPI.services import (
+    CompletenessService,
     SpecValidatorService,
     SpecParserService,
     SpecGeneratorService,
@@ -76,6 +77,7 @@ __all__ = [
     "OpenAPIVersion",
     "ValidationSeverity",
     # Services
+    "CompletenessService",
     "SpecValidatorService",
     "SpecParserService",
     "SpecGeneratorService",

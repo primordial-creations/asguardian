@@ -6,6 +6,7 @@ semantic versioning suggestions, impact analysis, and migration paths.
 """
 
 import re
+from datetime import date
 from pathlib import Path
 from typing import Any, List, Optional, cast
 
@@ -46,6 +47,126 @@ class BreakingChangeDetectorService:
     def detect(self, old_version_path: str | Path, new_version_path: str | Path) -> list[BreakingChange]:
         result = self.compatibility_checker.check(old_version_path, new_version_path)
         return cast(List[Any], result.breaking_changes)
+
+    # ------------------------------------------------------------------
+    # Lifecycle-aware unified pipeline (plan 04, on top of the plan-01
+    # Compatibility engine). All methods are additive; legacy API intact.
+    # ------------------------------------------------------------------
+
+    def detect_unified(
+        self,
+        old_version_path: str | Path,
+        new_version_path: str | Path,
+        *,
+        today: Optional["date"] = None,
+    ):
+        """
+        Diff via the unified Compatibility engine, then apply lifecycle-aware
+        severity adjustment from the old spec's deprecation/sunset metadata.
+
+        Returns a CompatReport whose changes and score reflect lifecycle
+        state: post-sunset removals cost nothing (DEEPTHINK_04 §C).
+        """
+        from Asgard.Forseti.Compatibility.services.compat_engine_service import (
+            CompatEngineService,
+        )
+        from Asgard.Forseti.Compatibility.services._scoring_helpers import (
+            compute_score,
+            compute_status,
+        )
+        from Asgard.Forseti.Contracts.services._lifecycle_helpers import (
+            apply_lifecycle,
+        )
+
+        engine = CompatEngineService()
+        report = engine.check(old_version_path, new_version_path)
+        metas = self.extract_lifecycle(old_version_path)
+        apply_lifecycle(report.changes, metas, today)
+        report.score, report.score_receipt = compute_score(report.changes)
+        report.status = compute_status(report.changes)
+        report.structural_breaks = sum(1 for c in report.changes if c.is_breaking)
+        report.semantic_hazards = sum(1 for c in report.changes if c.is_hazard)
+        return report
+
+    @staticmethod
+    def extract_lifecycle(spec_path: str | Path):
+        """Extract lifecycle metadata from a spec file (format-aware)."""
+        from Asgard.Forseti.Contracts.services import _lifecycle_helpers as helpers
+
+        path = Path(spec_path)
+        suffix = path.suffix.lower()
+        text = path.read_text(encoding="utf-8")
+        if suffix in (".graphql", ".gql"):
+            return helpers.extract_graphql_lifecycle(text)
+        if suffix == ".proto":
+            return helpers.extract_protobuf_lifecycle(text)
+        import json as _json
+
+        import yaml as _yaml
+
+        if suffix == ".avsc":
+            return helpers.extract_avro_lifecycle(_json.loads(text))
+        try:
+            document = _yaml.safe_load(text)
+        except Exception:
+            return {}
+        if not isinstance(document, dict):
+            return {}
+        if "openapi" in document or "swagger" in document \
+                or "asyncapi" in document:
+            return helpers.extract_openapi_lifecycle(document)
+        if isinstance(document.get("fields"), list) or document.get("type") == "record":
+            return helpers.extract_avro_lifecycle(document)
+        return helpers.extract_openapi_lifecycle(document)
+
+    def recommend_version(
+        self,
+        old_version_path: str | Path,
+        new_version_path: str | Path,
+        current_version: Optional[str] = None,
+        *,
+        today: Optional["date"] = None,
+    ):
+        """Algorithmic SemVer bump recommendation (RESEARCH_03 §7)."""
+        from Asgard.Forseti.Contracts.services._versioning_helpers import (
+            recommend_version,
+        )
+
+        report = self.detect_unified(old_version_path, new_version_path, today=today)
+        return recommend_version(report.changes, current_version)
+
+    def generate_migration_guide(
+        self,
+        old_version_path: str | Path,
+        new_version_path: str | Path,
+        version: str = "next",
+        *,
+        today: Optional["date"] = None,
+    ) -> str:
+        """Markdown migration-guide scaffold from the mechanical diff."""
+        from Asgard.Forseti.Contracts.services._versioning_helpers import (
+            generate_migration_guide,
+        )
+
+        report = self.detect_unified(old_version_path, new_version_path, today=today)
+        lifecycle = self.extract_lifecycle(old_version_path)
+        return generate_migration_guide(report.changes, version, lifecycle)
+
+    def generate_structured_changelog(
+        self,
+        old_version_path: str | Path,
+        new_version_path: str | Path,
+        version: str = "next",
+        *,
+        today: Optional["date"] = None,
+    ) -> str:
+        """Keep-a-Changelog-style grouped Markdown changelog."""
+        from Asgard.Forseti.Contracts.services._versioning_helpers import (
+            generate_structured_changelog,
+        )
+
+        report = self.detect_unified(old_version_path, new_version_path, today=today)
+        return generate_structured_changelog(report.changes, version)
 
     def categorize_changes(self, changes: list[BreakingChange]) -> dict[str, list[BreakingChange]]:
         categorized: dict[str, list[BreakingChange]] = {}

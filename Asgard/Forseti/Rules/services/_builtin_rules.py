@@ -225,6 +225,10 @@ _register_meta_only(SchemaFormat.AVRO, "avro", [
     ("naming-convention", Severity.WARNING, RuleCategory.STYLE, _H, False),
 ])
 
+# Expanded OpenAPI lint/security/lifecycle rules (plans 03/04) register
+# themselves into the same default registry on import.
+from Asgard.Forseti.OpenAPI import rules as _openapi_rules  # noqa: E402,F401
+
 _register_meta_only(SchemaFormat.PROTOBUF, "proto", [
     ("file-exists", Severity.ERROR, RuleCategory.STRUCTURE, _D, True),
     ("readable-file", Severity.ERROR, RuleCategory.STRUCTURE, _D, True),
