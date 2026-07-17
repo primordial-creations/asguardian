@@ -20,18 +20,22 @@ from Asgard.Bragi.Quality.models.debt_models import (
     DebtItem,
     DebtReport,
     DebtType,
+    EffortInterval,
     ROIAnalysis,
     TimeHorizon,
     TimeProjection,
 )
+from Asgard.Bragi.Quality.services._debt_aggregator import CentralityProvider, DebtAggregator
 from Asgard.Bragi.Quality.services._debt_workers import (
     analyze_code_debt,
     analyze_dependency_debt,
     analyze_design_debt,
     analyze_documentation_debt,
     analyze_test_debt,
+    count_file_lines,
     count_lines_of_code,
 )
+from Asgard.Bragi.Quality.services._remediation_model import RemediationModel
 from Asgard.Bragi.Quality.services._technical_debt_report import (
     generate_json_report,
     generate_markdown_report,
@@ -67,6 +71,14 @@ class TechnicalDebtAnalyzer:
             config: Configuration for debt analysis. If None, uses defaults.
         """
         self.config = config or DebtConfig()
+        # Centrality feed arrives with Plan 03 Phase B (DependencyGraphService);
+        # until wired, exposure multipliers stay at 1.0.
+        self.centrality_provider: Optional[CentralityProvider] = None
+        self.remediation_model = RemediationModel()
+        self.aggregator = DebtAggregator(
+            remediation_model=self.remediation_model,
+            centrality_provider=self.centrality_provider,
+        )
 
     def analyze(self, path: Path) -> DebtReport:
         """
@@ -108,6 +120,25 @@ class TechnicalDebtAnalyzer:
         if report.total_lines_of_code > 0:
             report.debt_ratio = report.total_debt_hours / report.total_lines_of_code * 1000
 
+        # Plan 02: batched, pessimism-corrected aggregation with effort
+        # intervals, plus the standard TDR (30 min/LOC development-cost
+        # anchor) - the single source of truth for the Maintainability grade.
+        file_loc = {
+            fp: count_file_lines(fp)
+            for fp in {item.file_path for item in report.debt_items}
+        }
+        aggregated = self.aggregator.aggregate(report.debt_items, file_loc=file_loc)
+        report.aggregated_debt_hours = aggregated.total_hours
+        report.effort_interval = aggregated.effort_interval
+        report.file_recommendations = aggregated.recommendations
+        for item in report.debt_items:
+            minutes = self.remediation_model.minutes_for(item)
+            item.effort_interval = self._item_interval(minutes)
+            item.non_remediation_factor = self.remediation_model.non_remediation_factor(item)
+        if report.total_lines_of_code > 0:
+            development_minutes = report.total_lines_of_code * 30.0
+            report.tdr_percent = aggregated.total_minutes / development_minutes * 100.0
+
         report.prioritized_items = self._prioritize_debt_items(report.debt_items)
         report.roi_analysis = self._calculate_roi_analysis(report.debt_items)
         report.time_projection = self._calculate_time_projection(report.debt_items)
@@ -128,6 +159,16 @@ class TechnicalDebtAnalyzer:
             DebtReport with detected debt
         """
         return self.analyze(file_path)
+
+    @staticmethod
+    def _item_interval(minutes: float) -> EffortInterval:
+        """Per-item effort interval from the corrected minute estimate."""
+        return EffortInterval(
+            low_minutes=minutes * 0.75,
+            high_minutes=minutes * 1.5,
+            confidence="medium",
+            width_reason="model-based estimate; no coverage/churn telemetry supplied",
+        )
 
     def _prioritize_debt_items(self, debt_items: List[DebtItem]) -> List[DebtItem]:
         """Prioritize debt items by ROI."""
