@@ -47,18 +47,26 @@ Wave 2 leftovers to schedule after: Freya testing/packaging (Fr/07).
 ### Wave 2x — CLI wiring
 **MERGED** — asguardian passthrough (SARIF verified end-to-end), heimdall dispatch/--scoring/--include-test-context/gate --diff --tier, verdandi cwv-assess/burn-rate-policy/cache warmup/pool-signature, volundr score/gitops validate/--digest/--secret-mount/--edge-service, ASGARD_NO_CACHE + heimdall --no-cache. 40 new tests; full suite 8,372 pass.
 
-### Wave 3 — P2/P3 (RELAUNCHED with Sonnet subagents — 8 agents running)
-First attempt died at the Fable 5 limit before writing code; relaunched on Sonnet after model swap. High-risk slices (Heimdall domain scanners) get an adversarial review before merge. Resume when the model quota resets by relaunching these exact slices (each is independent; run in worktrees, `git merge uplift/asgard-p0` first, verify + adversarial-review high-risk math/security, then merge):
-| Slice | Plans | Notes for the implementer |
+### Wave 3 — P2/P3 (ALL 8 MERGED — Sonnet subagents)
+First attempt died at the Fable 5 limit before writing code; relaunched on Sonnet. Domain scanners got an adversarial review that caught 3 BLOCKERs + 1 MAJOR (real-vulnerability muting: SSRF `.environ`/`.config` laundering, crypto comment/adjacent-call suppression, ReDoS FP on `(a+b)+`) — all fixed before merge.
+| Slice | Plans | Status |
 |---|---|---|
-| Heimdall SOLID CIR + cohesion/coupling | H/02, H/05 | build on merged tree-sitter substrate; replace regex `_generic_solid_checks.py` behind dual engine |
-| Heimdall architecture CSP | H/03 | reuse merged `Bragi/Dependencies/graph_service.py`; upgrade `architecture.yml` schema (back-compat) |
-| Heimdall domain scanners | H/07 | per-domain, independently shippable; **adversarial review required** (SSRF/ReDoS/crypto) |
-| Forseti contract testing/mocks + cross-format alignment | F/06, F/07 | live probing opt-in only; reuse JSONSchema compiler + Compatibility IR |
-| Freya crawler/config/CI + testing/packaging/docs | Fr/06, Fr/07 | includes deferred html_reporter epistemic mirrors + CSP/route Blocker escalation + README version fix |
-| Verdandi network/tracing/Apdex + SLO 02.5-8 + STL 03F | Ve/05, 08, 09, 02.5-8, 03F | build on merged sketches/CO/batch detectors |
-| Volundr Terraform + plan-JSON validation | Vo/02 | route through merged `Validation/` + `scoring_engine.py`; `<computed>` primitives exist |
-| Bragi presentation/context + calibration | B/04, B/05 | share/align context classifier with Heimdall `Security/context/test_context.py`; reuse fingerprint/suppression schema |
+| Heimdall SOLID CIR + cohesion/coupling | H/02, H/05 | **MERGED** — CIR for 4 langs (py/java/js/ts), true LCOM4; +29 tests. Deferred: go/csharp/ruby/php/rust/cpp CIR, OCP HIGH-confidence type-switch branch. |
+| Heimdall architecture CSP | H/03 | **MERGED** — CSP layer inference, drift detection, module SCC, architecture.yml v2 (back-compat); +18 tests. |
+| Heimdall domain scanners | H/07 | **MERGED** (3 of 12 domains: ReDoS Glushkov, SSRF slicing, crypto) after adversarial review + fixes; +48 tests. Deferred: 9 remaining domains (start 7.6 auth/access, 7.5 deserialization). |
+| Forseti contract testing/mocks + cross-format alignment | F/06, F/07 | **MERGED** — opt-in live validator, semantic mocks, alignment IR/type-matrix; +58 tests. Deferred: stateful mocks, proxy mode, proto/graphql/sql adapters, align/contract CLI. |
+| Freya crawler/config/CI + testing/packaging/docs | Fr/06, Fr/07 | **MERGED** — bounded-concurrency crawl, real Config subpackage + CI gate, L0 tests for 4 subpackages, doc/version fix. |
+| Verdandi network/tracing/Apdex + SLO 02.5-8 + STL 03F | Ve/05, 08, 09, 02.5-8, 03F | **MERGED** — +138 tests. Deferred: CLI wiring for new strategies/views. |
+| Volundr Terraform + plan-JSON validation | Vo/02 | **MERGED** — default-deny TF rules, plan-JSON ingestion, render/validate/score; +26 tests. Deferred: `terraform validate --plan` CLI, for_each/lifecycle emission. |
+| Bragi presentation/context + calibration | B/04, B/05 | **MERGED** — shared context classifier (reuses Heimdall), DAMP profile, channel presets, language profile plane, calibrator, PCA weights; +71 tests. Deferred: PCA→scoring hot-path wiring, scanner context-stamping, SZZ Stage 2, calibrate/validate-rules CLI. |
+
+Also fixed: treesitter parser-cache test-isolation leak (`test_parse_source_graceful_when_unavailable`) — was order-failing since the tree-sitter/CIR work cached parsers; commit 16a2112.
+
+### Remaining after Wave 3
+- **H/10 evaluation/benchmarking** machinery (formal corpus, calibration, Brier-score CI gate) — the only unstarted P3 plan.
+- **Deferred CLI wiring** accumulated across W3 (Forseti align/contract, Verdandi strategies, Volundr `terraform validate --plan`, Bragi calibrate/validate-rules, Heimdall remaining) — a consolidation slice like W2x.
+- **Remaining H/07 domains** (9 of 12) and remaining CIR languages.
+- Docs reconciliation sweep + global acceptance run across all reference repos.
 
 Remaining after W3: H/10 evaluation/benchmarking machinery, docs reconciliation sweep (`_Docs/Asgard/` + README), global acceptance run on all reference repos.
 
