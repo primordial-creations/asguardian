@@ -184,6 +184,15 @@ def create_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument("--open-browser", action="store_true", default=False, help="Open the HTML report in the default browser after scanning (default: off)")
     scan_parser.add_argument("--profile", choices=["general", "gaia"], default="general", help="Rule profile: 'general' (default) runs only general-purpose checks; 'gaia' additionally enables GAIA house rules (lazy imports, env-var fallbacks)")
     scan_parser.add_argument("--output", "-o", type=str, default=None, help="Directory to write the HTML report to (default: ./.asgard/reports, or HEIMDALL_REPORT_DIR)")
+    scan_parser.add_argument(
+        "--no-cache",
+        action="store_true",
+        default=False,
+        help=(
+            "Read-only target safety: disable all disk caches that write into "
+            "the scanned path (e.g. .asgard_cache). Equivalent to ASGARD_NO_CACHE=1."
+        ),
+    )
 
     return parser
 
@@ -212,6 +221,11 @@ def main(args=None):
     parser = create_parser()
     args = parser.parse_args(argv)
     verbose = args.verbose if hasattr(args, "verbose") else False
+
+    # Read-only target safety: propagate --no-cache to every cache layer.
+    import os as _os
+    if getattr(args, "no_cache", False):
+        _os.environ["ASGARD_NO_CACHE"] = "1"
 
     if args.command is None:
         parser.print_help()
