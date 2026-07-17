@@ -28,6 +28,12 @@ from Asgard.Freya.Security.services._security_header_analyzers import (
     analyze_xss_protection,
     extract_hsts_details,
 )
+from Asgard.Freya.Security.services._mitigation_framing import (
+    DEFENSE_IN_DEPTH_SCORE_LABEL,
+    EXECUTIVE_DISCLAIMER,
+    SCOPE_MATRIX,
+    apply_mitigation_framing,
+)
 from Asgard.Freya.Security.services.csp_analyzer import CSPAnalyzer
 
 
@@ -138,6 +144,10 @@ class SecurityHeaderScanner:
 
     def _calculate_summary(self, report: SecurityHeaderReport) -> None:
         """Calculate summary statistics for the report."""
+        report.score_label = DEFENSE_IN_DEPTH_SCORE_LABEL
+        report.disclaimer = EXECUTIVE_DISCLAIMER
+        report.scope_matrix = list(SCOPE_MATRIX)
+
         headers = [
             report.content_security_policy,
             report.strict_transport_security,
@@ -156,6 +166,8 @@ class SecurityHeaderScanner:
         for header in headers:
             if header is None:
                 continue
+
+            apply_mitigation_framing(header)
 
             if header.status == SecurityHeaderStatus.PRESENT:
                 report.headers_present += 1

@@ -7,6 +7,11 @@ Includes CSP analysis, HSTS checking, and other security headers.
 
 from Asgard.Freya.Security.models import (
     CSPDirective,
+    MitigationStatus,
+    MixedContentFinding,
+    MixedContentReport,
+    SRIFinding,
+    SRIReport,
     CSPReport,
     SecurityConfig,
     SecurityHeader,
@@ -17,7 +22,9 @@ from Asgard.Freya.Security.models import (
 )
 from Asgard.Freya.Security.services import (
     CSPAnalyzer,
+    MixedContentChecker,
     SecurityHeaderScanner,
+    SRIChecker,
 )
 
 __all__ = [
@@ -30,7 +37,14 @@ __all__ = [
     "SecurityHeaderSeverity",
     "SecurityHeaderStatus",
     "SecurityIssue",
+    "MitigationStatus",
+    "MixedContentFinding",
+    "MixedContentReport",
+    "SRIFinding",
+    "SRIReport",
     # Services
     "CSPAnalyzer",
+    "MixedContentChecker",
     "SecurityHeaderScanner",
+    "SRIChecker",
 ]

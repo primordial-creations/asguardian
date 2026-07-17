@@ -18,8 +18,9 @@ def analyze_issues(report: CSPReport, allow_unsafe_eval: bool) -> None:
     if script_src and script_src.has_unsafe_inline:
         if not report.uses_nonces and not report.uses_hashes:
             report.critical_issues.append(
-                "script-src allows 'unsafe-inline' without nonces or hashes - "
-                "vulnerable to XSS"
+                "Misconfigured Mitigation: script-src allows 'unsafe-inline' "
+                "without nonces or hashes - if an XSS flaw exists, the "
+                "browser will not block the injected script"
             )
             report.recommendations.append(
                 "Use nonces or hashes instead of 'unsafe-inline' for scripts"
@@ -72,7 +73,7 @@ def analyze_issues(report: CSPReport, allow_unsafe_eval: bool) -> None:
             )
 
     if not report.base_uri:
-        report.warnings.append("base-uri not set - vulnerable to base tag injection")
+        report.warnings.append("Missing Mitigation: base-uri - if markup injection exists, a <base> tag can redirect all relative URLs")
         report.recommendations.append("Add base-uri 'self' or 'none' to prevent base tag attacks")
 
     if not report.form_action:

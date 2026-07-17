@@ -29,6 +29,8 @@ from Asgard.Freya.cli._handlers_perf_seo_security import (
     run_seo_robots,
     run_security_headers,
     run_security_csp,
+    run_security_sri,
+    run_security_mixed_content,
     run_console_errors,
     run_links_validate,
 )
@@ -167,6 +169,10 @@ def main(args=None) -> int:
             exit_code = asyncio.run(run_security_headers(args, verbose))
         elif args.security_command == "csp":
             exit_code = asyncio.run(run_security_csp(args, verbose))
+        elif args.security_command == "sri":
+            exit_code = asyncio.run(run_security_sri(args, verbose))
+        elif args.security_command == "mixed-content":
+            exit_code = asyncio.run(run_security_mixed_content(args, verbose))
         else:
             print(f"Unknown security command: {args.security_command}")
             sys.exit(1)

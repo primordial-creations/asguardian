@@ -144,6 +144,30 @@ def add_security_parser(subparsers) -> None:
         "--output", "-o", type=str, help="Output file path"
     )
 
+    sri_parser = security_subparsers.add_parser(
+        "sri",
+        help="Check Subresource Integrity on cross-origin scripts/styles"
+    )
+    sri_parser.add_argument("url", type=str, help="URL to test")
+    sri_parser.add_argument(
+        "--format", "-f", choices=["text", "json"], default="text"
+    )
+    sri_parser.add_argument(
+        "--output", "-o", type=str, help="Output file path"
+    )
+
+    mixed_parser = security_subparsers.add_parser(
+        "mixed-content",
+        help="Detect mixed content (http:// subresources on https pages)"
+    )
+    mixed_parser.add_argument("url", type=str, help="URL to test")
+    mixed_parser.add_argument(
+        "--format", "-f", choices=["text", "json"], default="text"
+    )
+    mixed_parser.add_argument(
+        "--output", "-o", type=str, help="Output file path"
+    )
+
 
 def add_console_parser(subparsers) -> None:
     """Add console command group."""

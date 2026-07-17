@@ -29,6 +29,18 @@ class SecurityHeaderStatus(str, Enum):
     WEAK = "weak"
 
 
+class MitigationStatus(str, Enum):
+    """
+    Threat-mitigation status (DEEPTHINK_06): external observation can
+    prove a defense is absent, almost never that it is effective — so
+    there is deliberately no "secure" value.
+    """
+    PRESENT = "present"
+    PRESENT_NEEDS_VERIFICATION = "present_needs_verification"
+    MISCONFIGURED = "misconfigured"  # present but self-sabotaging
+    MISSING = "missing"
+
+
 class SecurityHeader(BaseModel):
     """A single security header with analysis."""
     name: str = Field(..., description="Header name")
@@ -38,6 +50,26 @@ class SecurityHeader(BaseModel):
     issues: List[str] = Field(default_factory=list, description="Issues found")
     recommendations: List[str] = Field(
         default_factory=list, description="Recommendations"
+    )
+
+    # Threat-mitigation framing (Plan 05; optional for API compatibility)
+    mitigation_status: Optional[MitigationStatus] = Field(
+        default=None, description="Threat-mitigation status"
+    )
+    threat_context: Optional[str] = Field(
+        default=None,
+        description="Assume-breach conditional: what happens if an attack "
+                    "exists and this mitigation is absent"
+    )
+    manual_verification: Optional[str] = Field(
+        default=None,
+        description="'Yes, but…' note: what a pass still requires a human to verify"
+    )
+    observable_signal: Optional[str] = Field(
+        default=None, description="What the tool actually validated (scope-matrix row)"
+    )
+    unverifiable_posture: Optional[str] = Field(
+        default=None, description="What remains unverifiable externally"
     )
 
 
@@ -118,8 +150,24 @@ class SecurityHeaderReport(BaseModel):
     hsts_preload: bool = Field(False)
 
     # Overall assessment
-    security_score: float = Field(0, description="Overall security score 0-100")
-    security_grade: str = Field("F", description="Security grade A-F")
+    security_score: float = Field(
+        0,
+        description="Frontend Defense-in-Depth Score 0-100 (field name kept "
+                    "for API compatibility; see score_label)"
+    )
+    score_label: str = Field(
+        default="Frontend Defense-in-Depth Score",
+        description="Display label: this scores mitigations, not security"
+    )
+    security_grade: str = Field("F", description="Resilience Grade A-F")
+    disclaimer: str = Field(
+        default="",
+        description="Executive disclaimer: observable signals vs actual posture"
+    )
+    scope_matrix: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="What the tool validates vs what requires DAST/manual testing"
+    )
     total_headers_checked: int = Field(0)
     headers_present: int = Field(0)
     headers_missing: int = Field(0)
@@ -178,3 +226,59 @@ class SecurityConfig(BaseModel):
 
     # Output
     output_format: str = Field("text", description="Output format")
+
+
+class SRIFinding(BaseModel):
+    """A single Subresource Integrity finding (observable signal)."""
+    element: str = Field(..., description='"script" or "stylesheet"')
+    url: str = Field(..., description="Resource URL")
+    severity: str = Field(..., description="Native severity (critical/serious/moderate/minor)")
+    issue_type: str = Field(..., description="Finding type identifier")
+    description: str = Field(..., description="Mitigation-framed description")
+    threat_context: Optional[str] = Field(None, description="Assume-breach conditional")
+    manual_verification: Optional[str] = Field(None, description="'Yes, but…' note")
+
+
+class SRIReport(BaseModel):
+    """Subresource Integrity check report (DOM-observable signals only)."""
+    url: str = Field(..., description="Page URL analyzed")
+    analyzed_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    total_cross_origin_scripts: int = Field(0)
+    total_cross_origin_stylesheets: int = Field(0)
+    protected_count: int = Field(0, description="Cross-origin elements with valid SRI")
+    issues: List[SRIFinding] = Field(default_factory=list)
+    dynamic_scripts_detected: bool = Field(
+        False,
+        description="Scripts appeared after load: SRI cannot cover them "
+                    "(observable but incomplete signal)"
+    )
+    disclaimer: str = Field(default="", description="Executive disclaimer")
+
+    @property
+    def has_issues(self) -> bool:
+        return len(self.issues) > 0
+
+
+class MixedContentFinding(BaseModel):
+    """A single mixed-content finding."""
+    url: str = Field(..., description="Insecure (http://) resource URL")
+    resource_type: str = Field(..., description="script/iframe/xhr/img/media/dom_attribute/...")
+    category: str = Field(..., description='"active", "passive", or "static_dom"')
+    severity: str = Field(..., description="Native severity (critical/serious/moderate)")
+    description: str = Field(..., description="Mitigation-framed description")
+
+
+class MixedContentReport(BaseModel):
+    """Mixed-content scan report for an https page."""
+    url: str = Field(..., description="Page URL analyzed")
+    analyzed_at: str = Field(default_factory=lambda: datetime.now().isoformat())
+    page_is_https: bool = Field(True)
+    total_requests: int = Field(0)
+    issues: List[MixedContentFinding] = Field(default_factory=list)
+    active_count: int = Field(0, description="Active mixed content (deterministic MITM exposure)")
+    passive_count: int = Field(0, description="Passive mixed content (img/media)")
+    disclaimer: str = Field(default="", description="Executive disclaimer")
+
+    @property
+    def has_issues(self) -> bool:
+        return len(self.issues) > 0
