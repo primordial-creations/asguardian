@@ -31,6 +31,15 @@ SOURCE_SPECS: Tuple[SourceSpec, ...] = (
     SourceSpec("request.GET", TaintSourceType.HTTP_PARAMETER, 1.0),
     SourceSpec("request.POST", TaintSourceType.HTTP_PARAMETER, 1.0),
     SourceSpec("request.cookies", TaintSourceType.COOKIE, 1.0),
+    # Alias-resolved forms ('from flask import request' canonicalizes the
+    # chain to flask.request.*; same for django.http shortcuts).
+    SourceSpec("flask.request.args", TaintSourceType.HTTP_PARAMETER, 1.0),
+    SourceSpec("flask.request.form", TaintSourceType.HTTP_PARAMETER, 1.0),
+    SourceSpec("flask.request.json", TaintSourceType.HTTP_PARAMETER, 1.0),
+    SourceSpec("flask.request.data", TaintSourceType.HTTP_PARAMETER, 1.0),
+    SourceSpec("flask.request.values", TaintSourceType.HTTP_PARAMETER, 0.8),
+    SourceSpec("flask.request.cookies", TaintSourceType.COOKIE, 1.0),
+    SourceSpec("flask.request.headers", TaintSourceType.HEADER, 0.8),
     SourceSpec("sys.argv", TaintSourceType.COMMAND_LINE_ARG, 1.0),
     SourceSpec("input", TaintSourceType.USER_INPUT, 1.0, is_call=True),
     # Conventional access -> 0.8
