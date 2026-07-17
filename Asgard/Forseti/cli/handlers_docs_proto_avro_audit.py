@@ -85,7 +85,16 @@ def _handle_protobuf(args: argparse.Namespace) -> int:
     elif args.command == "check-compat":
         service = ProtobufCompatibilityService()
         result = service.check(args.old_proto, args.new_proto)
-        print(service.generate_report(result, args.format))
+        if getattr(args, "format", "text") == "json":
+            import json as _json
+
+            from Asgard.Forseti.cli.handlers_compat import engine_score_extras
+
+            payload = _json.loads(service.generate_report(result, "json"))
+            payload.update(engine_score_extras(args.old_proto, args.new_proto, "proto"))
+            print(_json.dumps(payload, indent=2, default=str))
+        else:
+            print(service.generate_report(result, args.format))
         return 0 if result.is_compatible else 1
 
     return 1
@@ -117,7 +126,19 @@ def _handle_avro(args: argparse.Namespace) -> int:
 
         service = AvroCompatibilityService()
         result = service.check(args.old_schema, args.new_schema, mode)
-        print(service.generate_report(result, args.format))
+        if getattr(args, "format", "text") == "json":
+            import json as _json
+
+            from Asgard.Forseti.cli.handlers_compat import engine_score_extras
+
+            payload = _json.loads(service.generate_report(result, "json"))
+            payload.update(engine_score_extras(
+                args.old_schema, args.new_schema, "avro",
+                mode=getattr(args, "mode", "backward"),
+            ))
+            print(_json.dumps(payload, indent=2, default=str))
+        else:
+            print(service.generate_report(result, args.format))
         return 0 if result.is_compatible else 1
 
     return 1

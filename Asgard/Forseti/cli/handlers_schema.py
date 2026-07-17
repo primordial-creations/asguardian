@@ -217,7 +217,14 @@ def _handle_contract(args: argparse.Namespace) -> int:
         service = CompatibilityCheckerService()
         result = service.check(args.old_spec, args.new_spec)
         result = _apply_compat_waivers(result, args)
-        print(service.generate_report(result, args.format))
+        if getattr(args, "format", "text") == "json":
+            from Asgard.Forseti.cli.handlers_compat import engine_score_extras
+
+            payload = json.loads(service.generate_report(result, "json"))
+            payload.update(engine_score_extras(args.old_spec, args.new_spec, "openapi"))
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(service.generate_report(result, args.format))
         return 0 if result.is_compatible else 1
 
     elif args.command == "breaking-changes":

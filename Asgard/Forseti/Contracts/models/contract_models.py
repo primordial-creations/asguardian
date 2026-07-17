@@ -10,6 +10,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Forseti.Compatibility.models.legacy_models import LegacyBreakingChange
+
 
 class BreakingChangeType(str, Enum):
     """Types of breaking changes."""
@@ -113,40 +115,19 @@ class ContractValidationResult(BaseModel):
         return len(self.errors)
 
 
-class BreakingChange(BaseModel):
-    """Represents a breaking change between API versions."""
+class BreakingChange(LegacyBreakingChange):
+    """Represents a breaking change between API versions.
+
+    Deprecated shape: thin subclass of the shared LegacyBreakingChange
+    (plan 01); new code should use Compatibility.UnifiedChange.
+    """
 
     change_type: BreakingChangeType = Field(
         description="Type of breaking change"
     )
-    path: str = Field(
-        description="API path affected"
-    )
     location: str = Field(
         description="Location within the path (e.g., request.body.field)"
     )
-    message: str = Field(
-        description="Human-readable description"
-    )
-    old_value: Optional[str] = Field(
-        default=None,
-        description="Value in old version"
-    )
-    new_value: Optional[str] = Field(
-        default=None,
-        description="Value in new version"
-    )
-    severity: str = Field(
-        default="error",
-        description="Severity level"
-    )
-    mitigation: Optional[str] = Field(
-        default=None,
-        description="Suggested mitigation"
-    )
-
-    class Config:
-        use_enum_values = True
 
 
 class CompatibilityResult(BaseModel):
