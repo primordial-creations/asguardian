@@ -426,8 +426,32 @@ def _leaf_charsets(node: _Node) -> List[Optional[FrozenSet[str]]]:
 
 def _find_nested_unbounded_quantifier(node: _Node, in_unbounded: bool = False) -> Optional[str]:
     """Depth-first search for `(X*|X+)*|+` where an unbounded-repeat
-    subtree sits inside another unbounded-repeat subtree and their leaf
-    character sets overlap (the `(a+)+` / `(\\d+)*` shape)."""
+    subtree sits *directly* (unanchored) inside another unbounded-repeat
+    subtree and their leaf character sets overlap (the `(a+)+` /
+    `(\\d+)*` / `(a|a)*` shape).
+
+    MAJOR-4 fix: this supplementary structural check exists only to catch
+    the cases Glushkov position-collapse misses (nested same-symbol
+    quantifiers fold onto one self-loop position). It must NOT fire when
+    the *inner* unbounded repeat is only one branch of a multi-part
+    ``concat`` alongside a literal/separator -- e.g. ``(a+b)+``,
+    ``(a+,)+``, ``(\\d+\\.)+`` are anchored/linear (the trailing literal
+    forces each outer iteration to consume a distinct, non-overlapping
+    suffix, so there is no ambiguous overlap), and were being wrongly
+    flagged HIGH by propagating the "inside an unbounded repeat" flag
+    straight through the concat to the inner star regardless of its
+    anchoring siblings.
+
+    Fix: the "in_unbounded" flag is only propagated into a `concat`'s
+    children when that concat is the *sole, unwrapped* body of the outer
+    unbounded repeat AND has exactly one child (i.e. no other literal
+    branches share the loop body) -- concretely, once inside any
+    multi-part concat, the flag resets to False, since a concat with more
+    than one part inherently means something other than the bare inner
+    repeat is being consumed each outer iteration (an anchor). Genuine
+    unanchored shapes -- the inner repeat sitting directly as the star's
+    whole body (`(a+)+`), or as one alternation branch with no
+    intervening concat (`(a|a)*`) -- still propagate normally."""
     if node.kind == "star" and node.hi == -1:
         if in_unbounded:
             outer_syms = _leaf_charsets(node)
@@ -437,6 +461,16 @@ def _find_nested_unbounded_quantifier(node: _Node, in_unbounded: bool = False) -
                     return f"repeat of {outer_syms[0]!r}-like symbols nested in another repeat"
         for child in node.children:
             found = _find_nested_unbounded_quantifier(child, in_unbounded=True)
+            if found:
+                return found
+        return None
+    if node.kind == "concat" and len(node.children) > 1:
+        # A literal/other branch shares this loop body alongside any
+        # unbounded repeat here -- that anchors each outer iteration, so
+        # do not treat the repeat below as "nested in an unbounded loop"
+        # even if we arrived here with in_unbounded=True.
+        for child in node.children:
+            found = _find_nested_unbounded_quantifier(child, in_unbounded=False)
             if found:
                 return found
         return None

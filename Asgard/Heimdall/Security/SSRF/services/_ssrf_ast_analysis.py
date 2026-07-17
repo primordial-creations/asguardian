@@ -64,7 +64,6 @@ _ROUTER_DECORATOR_HINTS = (
     "endpoint", "handler", "view",
 )
 
-_TRUSTED_SOURCE_HINTS = ("environ", "config", "settings", "getenv")
 
 
 @dataclass
@@ -120,22 +119,68 @@ def _find_last_assignment(func_body: List[ast.stmt], name: str, before_lineno: i
     return best
 
 
+def _is_os_module_name(node: ast.AST) -> bool:
+    """True only for the literal `os` module Name -- deliberately NOT an
+    attribute-name heuristic (BLOCKER-1 fix), so ``request.environ`` or
+    ``user_obj.config`` can never match: the base object must actually
+    *be* the ``os`` module by identifier."""
+    return isinstance(node, ast.Name) and node.id == "os"
+
+
+def _is_os_environ_attr(node: ast.AST) -> bool:
+    """Matches only `os.environ` (attribute access on the `os` module),
+    not `<anything>.environ`."""
+    return isinstance(node, ast.Attribute) and node.attr == "environ" and _is_os_module_name(node.value)
+
+
+def _is_trusted_process_env_read(node: ast.AST) -> bool:
+    """Step 2 trusted-source recognizer (BLOCKER-1 fix): a genuine
+    process-environment or static-config read, structurally matched --
+    NOT a "does this subtree contain a `.config`/`.environ`/`.settings`
+    attribute anywhere" walk (that was the laundering bug: any object
+    with a `.environ`/`.config` attribute, including attacker-controlled
+    ones like Flask's `request.environ` WSGI dict, would match).
+
+    Recognized shapes only:
+      - ``os.environ.get(...)``
+      - ``os.getenv(...)``
+      - ``os.environ["LITERAL_KEY"]`` (subscript key must be a literal --
+        a non-literal/tainted key, e.g. ``os.environ[request.args["k"]]``,
+        does NOT match and is never suppressed)
+
+    Anything else -- including any object whose attribute merely happens
+    to be named ``environ``/``config``/``settings`` -- is NOT trusted.
+    """
+    if isinstance(node, ast.Call):
+        fn = node.func
+        if isinstance(fn, ast.Attribute) and fn.attr == "get" and _is_os_environ_attr(fn.value):
+            return True
+        if isinstance(fn, ast.Attribute) and fn.attr == "getenv" and _is_os_module_name(fn.value):
+            return True
+        return False
+    if isinstance(node, ast.Subscript) and _is_os_environ_attr(node.value):
+        key = node.slice
+        # Python <3.9 wraps the subscript key in ast.Index; unwrap it.
+        if isinstance(key, ast.Index):  # pragma: no cover - old AST shape
+            key = key.value
+        return isinstance(key, ast.Constant)
+    return False
+
+
 def _source_chain_is_trusted(node: Optional[ast.AST]) -> bool:
-    """Step 2: slice the URL variable back to os.environ/app.config/
-    settings/UPPER_SNAKE_CASE constant."""
+    """Step 2: is the URL variable's value a genuine process-environment
+    read (``os.environ``/``os.getenv``) or a module-level UPPER_SNAKE_CASE
+    constant? Both checks are structural/identity-based, not name-substring
+    matches, so attacker-controlled lookalikes (``request.environ``,
+    ``user_obj.config[...]``) never suppress (BLOCKER-1 fix: this used to
+    walk the whole subtree matching on attribute NAME alone, which
+    laundered exactly those attacker-controlled cases)."""
     if node is None:
         return False
     if isinstance(node, ast.Name) and _is_upper_snake_case(node.id):
         return True
-    for sub in ast.walk(node):
-        if isinstance(sub, ast.Attribute) and sub.attr in _TRUSTED_SOURCE_HINTS:
-            return True
-        if isinstance(sub, ast.Name) and sub.id in ("environ",):
-            return True
-        if isinstance(sub, ast.Call):
-            fn = sub.func
-            if isinstance(fn, ast.Attribute) and fn.attr == "getenv":
-                return True
+    if _is_trusted_process_env_read(node):
+        return True
     return False
 
 

@@ -54,3 +54,30 @@ def test_usedforsecurity_true_is_still_flagged():
         "import hashlib\nh = hashlib.md5(password, usedforsecurity=True).hexdigest()\n",
     )
     assert any(f.algorithm == "MD5" for f in report.findings)
+
+
+# BLOCKER-2 regression (adversarial review): a successful AST parse that
+# finds no `usedforsecurity=False` kwarg used to fall through to a
+# textual regex fallback that matched inside comments.
+def test_usedforsecurity_false_in_comment_is_still_flagged():
+    report = _scan(
+        "import hashlib\nh = hashlib.md5(password)  # usedforsecurity=False\n",
+    )
+    assert any(f.algorithm == "MD5" for f in report.findings), (
+        "a comment is not a kwarg -- must not suppress the real MD5 finding"
+    )
+
+
+# BLOCKER-3 regression (adversarial review): the AST loop used to return
+# True as soon as ANY Call in the parsed window had `usedforsecurity=False`,
+# not necessarily the matched hash call itself.
+def test_usedforsecurity_false_on_unrelated_adjacent_call_is_still_flagged():
+    report = _scan(
+        "import hashlib\n"
+        "h = hashlib.md5(pw).hexdigest()\n"
+        "other_call(y, usedforsecurity=False)\n"
+    )
+    assert any(f.algorithm == "MD5" for f in report.findings), (
+        "usedforsecurity=False on a different, unrelated call must not "
+        "suppress the MD5 finding"
+    )

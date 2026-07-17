@@ -51,6 +51,38 @@ def test_safe_patterns_not_flagged(pattern):
     assert result.verdict == "safe", f"{pattern!r}: expected safe, got {result.verdict} ({result.detail})"
 
 
+# MAJOR-4 regression (adversarial review): the supplementary
+# `_find_nested_unbounded_quantifier` structural heuristic was flagging
+# these anchored/linear patterns as HIGH/eda just because an unbounded
+# repeat sits inside another unbounded repeat, without checking whether a
+# trailing literal/separator anchors each outer iteration. All three are
+# linear in practice and must NOT come back "eda".
+ANCHORED_NOT_EDA = [
+    r"(a+b)+",
+    r"(a+,)+",
+    r"(\d+\.)+",
+]
+
+
+@pytest.mark.parametrize("pattern", ANCHORED_NOT_EDA, ids=ANCHORED_NOT_EDA)
+def test_anchored_nested_repeat_is_not_eda(pattern):
+    result = analyze_pattern(pattern)
+    assert result.verdict != "eda", (
+        f"{pattern!r}: reviewer-flagged false positive -- anchored nested "
+        f"repeat wrongly classified as {result.verdict} ({result.detail})"
+    )
+
+
+def test_genuine_nested_repeat_still_flagged_after_major4_fix():
+    # The MAJOR-4 fix narrows the supplementary heuristic; make sure it
+    # didn't collaterally blind the genuinely catastrophic canonical set.
+    for pattern, expected in VULNERABLE:
+        result = analyze_pattern(pattern)
+        assert result.verdict == expected, (
+            f"{pattern!r}: expected {expected}, got {result.verdict} after MAJOR-4 fix"
+        )
+
+
 def test_backreference_is_unsupported_not_falsely_safe():
     result = analyze_pattern(r"(a)\1+")
     assert result.verdict == "unsupported"

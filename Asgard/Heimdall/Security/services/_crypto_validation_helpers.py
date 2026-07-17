@@ -33,35 +33,100 @@ def is_usedforsecurity_false(
     matched call expression when possible, falling back to a regex check
     on the surrounding text if the file doesn't parse as a whole (e.g. the
     match sits inside an f-string or a non-Python-looking snippet).
+
+    Two adversarial-review fixes (BLOCKER-2 / BLOCKER-3) are load-bearing
+    here:
+
+    * BLOCKER-2 -- when the AST parse *succeeds*, its verdict is
+      authoritative and we return immediately (True or False). We only
+      fall through to the textual regex fallback when ``ast.parse`` itself
+      raised ``SyntaxError`` (the window was truncated mid-expression).
+      Previously, a successful parse that found no matching kwarg still
+      fell through to the regex fallback, which matches inside comments --
+      e.g. ``hashlib.md5(password)  # usedforsecurity=False`` was wrongly
+      suppressed even though there is no such kwarg in the actual code.
+    * BLOCKER-3 -- the AST path only honors ``usedforsecurity=False`` when
+      it is a keyword on the SPECIFIC call whose span contains
+      ``match_start`` -- not any ``ast.Call`` anywhere in the 300-char
+      window. Previously ``hashlib.md5(pw).hexdigest()`` followed by
+      ``other_call(y, usedforsecurity=False)`` on the next line was wrongly
+      suppressed because the walk found the kwarg on the unrelated call.
     """
     if file_path.suffix.lower() != ".py":
         return False
 
     line_start = content.rfind("\n", 0, match_start) + 1
-    line_end = content.find("\n", match_start)
-    if line_end == -1:
-        line_end = len(content)
     # Look a little past the matched call for the closing paren/kwarg,
     # since `usedforsecurity=False` can appear after other args.
     window_end = min(len(content), match_start + 300)
     window = content[line_start:window_end]
+    rel_offset = match_start - line_start
+
+    def _offset_to_linecol(text: str, offset: int):
+        line = text.count("\n", 0, offset) + 1
+        col = offset - (text.rfind("\n", 0, offset) + 1)
+        return line, col
+
+    target_line, target_col = _offset_to_linecol(window, rel_offset)
 
     try:
-        tree = ast.parse(window.strip())
-        for node in ast.walk(tree):
-            if isinstance(node, ast.Call):
-                for kw in node.keywords:
-                    if kw.arg == "usedforsecurity" and isinstance(kw.value, ast.Constant) \
-                            and kw.value.value is False:
-                        return True
+        tree = ast.parse(window)
     except SyntaxError:
-        pass
+        # A window starting mid-block (e.g. an indented line) often fails
+        # to parse purely due to leading indentation; retry with the
+        # leading whitespace stripped, adjusting the target position to
+        # match so BLOCKER-3's span containment check still lines up.
+        lstripped = window.lstrip()
+        stripped_len = len(window) - len(lstripped)
+        try:
+            tree = ast.parse(lstripped)
+            adj_line, adj_col = _offset_to_linecol(lstripped, max(0, rel_offset - stripped_len))
+            target_line, target_col = adj_line, adj_col
+        except SyntaxError:
+            tree = None
 
-    # Fallback: the AST parse of a truncated window often fails (the
-    # call's closing paren may be past `window_end`, or it sits inside a
-    # larger expression) -- a bounded textual check on the same window is
-    # a reasonable, documented approximation for that case.
-    return bool(re.search(r"usedforsecurity\s*=\s*False", window))
+    if tree is not None:
+        # AST parse succeeded: its verdict is authoritative (BLOCKER-2).
+        # Find the specific Call node whose span contains the matched
+        # text's position, and only inspect ITS keywords (BLOCKER-3).
+        best: "ast.Call | None" = None
+        best_span = None
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Call):
+                continue
+            end_lineno = getattr(node, "end_lineno", None)
+            end_col = getattr(node, "end_col_offset", None)
+            if end_lineno is None or end_col is None:
+                continue
+            start = (node.lineno, node.col_offset)
+            end = (end_lineno, end_col)
+            target = (target_line, target_col)
+            if not (start <= target <= end):
+                continue
+            # Prefer the smallest (most specific / innermost) enclosing
+            # call span -- e.g. `hashlib.md5(x).hexdigest()` should match
+            # the `hashlib.md5(x)` call, not the outer `.hexdigest()` call.
+            span = (end_lineno, end_col, node.lineno, -node.col_offset)
+            if best is None or span < best_span:
+                best = node
+                best_span = span
+        if best is not None:
+            for kw in best.keywords:
+                if kw.arg == "usedforsecurity" and isinstance(kw.value, ast.Constant) \
+                        and kw.value.value is False:
+                    return True
+        return False
+
+    # Fallback: the AST parse of a truncated window failed (the call's
+    # closing paren may be past `window_end`, or it sits inside a larger
+    # expression) -- a bounded textual check on the same window is a
+    # reasonable, documented approximation for that case. Comments must be
+    # stripped first so `# usedforsecurity=False` never counts (BLOCKER-2).
+    code_only_lines = []
+    for line in window.splitlines():
+        code_only_lines.append(re.sub(r"#.*$", "", line))
+    code_only = "\n".join(code_only_lines)
+    return bool(re.search(r"usedforsecurity\s*=\s*False", code_only))
 
 
 def is_in_test_context(
