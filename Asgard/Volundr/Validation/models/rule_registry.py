@@ -536,6 +536,112 @@ def _build_default_registry() -> RuleRegistry:
             severity=RuleSeverity.INFO, category=bp,
             remediation="Vendor the base locally or pin and cache it.",
         ),
+        # --- Terraform (plan 02, default-deny over rendered HCL / plan-JSON) ---
+        RegisteredRule(
+            id="VOL-TF-0001", name="s3-public-access-block",
+            description=(
+                "S3 bucket must have an aws_s3_bucket_public_access_block "
+                "resource with all four booleans true — 'the most notorious "
+                "cloud vulnerability' (RESEARCH_01 OWASP IaC)."
+            ),
+            severity=RuleSeverity.CRITICAL, category=sec,
+            remediation=(
+                "Add `aws_s3_bucket_public_access_block` referencing the "
+                "bucket with block_public_acls, block_public_policy, "
+                "ignore_public_acls, restrict_public_buckets all true."
+            ),
+            framework_mappings={"cis": "2.1.5"},
+        ),
+        RegisteredRule(
+            id="VOL-TF-0002", name="s3-encryption",
+            description="S3 bucket must have a server-side encryption configuration.",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation=(
+                "Add `aws_s3_bucket_server_side_encryption_configuration` "
+                "referencing the bucket (SSE-S3 or KMS)."
+            ),
+            framework_mappings={"cis": "2.1.1"},
+        ),
+        RegisteredRule(
+            id="VOL-TF-0003", name="s3-versioning",
+            description="S3 bucket must have a versioning configuration enabled.",
+            severity=RuleSeverity.MEDIUM, category=rel,
+            remediation="Add `aws_s3_bucket_versioning` with status = \"Enabled\".",
+            framework_mappings={"cis": "2.1.2"},
+        ),
+        RegisteredRule(
+            id="VOL-TF-0004", name="rds-storage-encrypted",
+            description="RDS instance must set storage_encrypted = true.",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Set `storage_encrypted = true` on the aws_db_instance.",
+            framework_mappings={"cis": "2.3.1"},
+        ),
+        RegisteredRule(
+            id="VOL-TF-0005", name="sg-no-open-ingress",
+            description=(
+                "Security group ingress must not allow 0.0.0.0/0 without a "
+                "justified suppression."
+            ),
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation=(
+                "Restrict ingress to specific CIDR blocks/security-group "
+                "refs, or suppress with VOL-TF-0005 and a reason."
+            ),
+            framework_mappings={"cis": "5.2"},
+        ),
+        RegisteredRule(
+            id="VOL-TF-0006", name="sg-no-all-ports",
+            description="Security group must not open the full port range (0-65535).",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Restrict from_port/to_port to the required range.",
+        ),
+        RegisteredRule(
+            id="VOL-TF-0007", name="iam-no-wildcard-action",
+            description="IAM policy documents must not use Action: \"*\".",
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation="Enumerate specific IAM actions instead of a wildcard.",
+            framework_mappings={"cis": "1.16"},
+        ),
+        RegisteredRule(
+            id="VOL-TF-0008", name="iam-no-wildcard-resource",
+            description="IAM policy documents must not use Resource: \"*\".",
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Scope IAM resources to specific ARNs.",
+        ),
+        RegisteredRule(
+            id="VOL-TF-0009", name="sensitive-variable-marked",
+            description=(
+                "Variables/outputs whose name looks secret-bearing must set "
+                "sensitive = true."
+            ),
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Add `sensitive = true` to the variable/output.",
+        ),
+        RegisteredRule(
+            id="VOL-TF-0010", name="azure-storage-no-public-nested-items",
+            description=(
+                "Azure storage account must set "
+                "allow_nested_items_to_be_public = false and a modern "
+                "min_tls_version."
+            ),
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation=(
+                "Set `allow_nested_items_to_be_public = false` and "
+                "`min_tls_version = \"TLS1_2\"` on the azurerm_storage_account."
+            ),
+        ),
+        RegisteredRule(
+            id="VOL-TF-0011", name="gcs-uniform-bucket-level-access",
+            description="GCS bucket must set uniform_bucket_level_access = true.",
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Set `uniform_bucket_level_access = true` on the google_storage_bucket.",
+        ),
+        RegisteredRule(
+            id="VOL-TF-0012", name="no-hardcoded-credential",
+            description="Resource attributes must not contain hardcoded credential literals.",
+            severity=RuleSeverity.CRITICAL, category=sec,
+            remediation="Move secrets to variables (sensitive=true) or a secrets manager data source.",
+        ),
     ]
     for rule in defaults:
         registry.register(rule)
