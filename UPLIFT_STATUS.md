@@ -20,7 +20,7 @@
 ### Wave 1 — P0 capabilities (after the foundation each depends on)
 | ID | Slice | Plans | Depends | Status |
 |---|---|---|---|---|
-| W1-H | Heimdall taint upgrade (Python-first) + security scoring/normalization | H/04, H/06 | F1 ✓ | agent running (worktree) |
+| W1-H | Heimdall taint upgrade (Python-first) + security scoring/normalization | H/04, H/06 | F1 ✓ | **MERGED** (8d509be) after adversarial review (2 BLOCKERs: container laundering, sanitize_* muting; 2 MAJORs: resolved-clean FP, same-line dedup) + fixes. +103 new tests; tests_Heimdall 1539 pass. Deferred: H/04 P4 multi-language CST taint, CLI wiring (dispatch engine, --scoring=v2, confidence buckets in reports), SAVD/Bragi gate feed. |
 | W1-Hx | Heimdall general-purpose hygiene: lazy-imports + env-fallbacks behind `--profile gaia`; reports to `.asgard/reports/`; stale artifacts purged | goal doc | — | **MERGED** (bb6bdd8) + verified end-to-end on Adrasta. |
 | W1-F | Forseti unified compatibility engine | F/01 | F4 ✓ | **MERGED** — 75 new tests, tests_Forseti 1077 pass. New `forseti compat check` CLI, GraphQL+AsyncAPI diffing, DEEPTHINK_04 scoring w/ blast-radius receipts. Legacy check-compat kept, augmented with score fields. |
 | W1-Fr | Freya unified severity/grade-capping + a11y dual-axis/ARIA | Fr/01, Fr/02 | — | **MERGED** (a05cd59). ~130 new tests; httpx declared. Known pre-existing bug flagged: `_unified_tester_runners.py` attr access masked by exception handler. |
@@ -29,8 +29,18 @@
 | W1-Vo-K8s | Volundr K8s hardening | Vo/01 | F3 ✓ | **MERGED** — NSA/CISA+CIS matrix, suppression presets, engine delegation, CLI flags. Combined Volundr tests 817 pass. |
 | W1-B | Bragi composite scoring + debt model core + license/purl/SBOM bug fixes | B/01, B/02, B/03-A | — | **MERGED** after adversarial review (5 BLOCKERs + 6 MAJORs) and fix commit 71eb1f9; license repros re-verified by orchestrator. tests_Bragi 1527 pass (+1 pre-existing java fail). |
 
-### Wave 2 — P1 (plan detail at wave start)
-Heimdall hotspots/test-context (H/08); Forseti OpenAPI linting (F/03), lifecycle (F/04), JSON-Schema core (F/05); Freya perf budgets (Fr/03), visual (Fr/04), security framing (Fr/05); Verdandi system/cache/database (Ve/06, 04, 07, 03D-E); Volundr Docker (Vo/03), scoring (Vo/07), GitOps/Kustomize/Helm rest (Vo/05); Bragi SBOM/graph (B/03-B..E), differential gate (B/06 rest).
+### Wave 2 — P1 (LAUNCHED — 7 agents in worktrees)
+| Slice | Plans | Status |
+|---|---|---|
+| Heimdall hotspots/test-context | H/08 | agent running |
+| Forseti OpenAPI linting + lifecycle | F/03, F/04 | agent running |
+| Forseti JSON-Schema core (JSONSchema/ dir only) | F/05 | agent running |
+| Freya perf budgets + visual epistemics + security framing | Fr/03-05 | agent running |
+| Verdandi system/cache/database + small-batch/baselines | Ve/06.1-3, 04.1-3, 07.1-2, 03D-E | agent running |
+| Volundr Docker + composite scoring + GitOps/Kustomize/Helm rest | Vo/03, 07, 05 | agent running |
+| Bragi graph service/SBOM B-E + differential gate remainder | B/03B-E, B/06 rest | agent running |
+
+Wave 2 leftovers to schedule after: cross-module CLI wiring slice (asguardian passthrough of Forseti global flags; Heimdall dispatch/--scoring=v2/confidence buckets; Verdandi new-API CLI; Freya crawler gate flags Fr/06), Freya testing/packaging (Fr/07).
 
 ### Wave 3 — P2/P3
 H/02 SOLID CIR, H/03 architecture CSP, H/07 domain scanners, H/05 cohesion, H/10 eval; F/06 contract testing, F/07 cross-format alignment; Fr/06 crawler/config, Fr/07 testing/packaging; Ve/05 network, Ve/08 tracing/APM, Ve/09 Apdex; Vo/02 Terraform; B/04 presentation/context, B/05 calibration. Docs reconciliation continuous.
