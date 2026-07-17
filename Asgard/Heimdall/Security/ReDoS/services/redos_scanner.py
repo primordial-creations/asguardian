@@ -1,7 +1,19 @@
-"""ReDoS (Regular Expression Denial of Service) vulnerability scanner."""
+"""ReDoS (Regular Expression Denial of Service) vulnerability scanner.
+
+Analysis core is Glushkov-NFA EDA/IDA ambiguity analysis (plan 07.2,
+``_glushkov_analysis.py``) rather than the old "nested quantifier" line
+regex, which DEEPTHINK_09 rates ~40% FP / "unfit". Pattern *extraction*
+(finding the `re.compile(...)`-shaped call and pulling out the literal
+string) still uses per-language regex, since that part is a simple,
+low-FP text match and not where the false positives came from; dynamic
+(non-literal) patterns are silently skipped here per the plan -- a
+constant-folded f-string/concat would need the AST/taint layer and is
+deferred to a separate CWE-400 regex-injection rule, not this scanner.
+"""
 
 import os
 import re
+import time
 from pathlib import Path
 from typing import List, Tuple
 
@@ -11,6 +23,12 @@ from Asgard.Heimdall.Security.ReDoS.models.redos_models import (
     ReDoSScanReport,
     ReDoSSeverity,
 )
+from Asgard.Heimdall.Security.ReDoS.services._glushkov_analysis import analyze_pattern
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
+
+# Wall-clock budget per plan 07.2: ~25ms/regex, ~100ms/file.
+_PER_REGEX_BUDGET_S = 0.025
+_PER_FILE_BUDGET_S = 0.100
 
 _LANG_EXTENSIONS = {".py": "python", ".js": "javascript", ".ts": "javascript",
                     ".jsx": "javascript", ".tsx": "javascript", ".java": "java",
@@ -45,47 +63,53 @@ _LANG_EXTRACTION = {
     ],
 }
 
-# Heuristic indicators of vulnerable regex structure
-_REDOS_INDICATORS: List[Tuple] = [
-    (re.compile(r"\([^)]*[+*][^)]*\)[+*]"), "nested_quantifiers", "CRITICAL",
-     "Nested quantifiers (e.g., (a+)+) cause catastrophic backtracking", "Refactor to avoid nested quantifiers"),
-    (re.compile(r"\([^)]*\|[^)]*\)[+*]"), "overlapping_alternation", "HIGH",
-     "Overlapping alternation with quantifier", "Make alternations mutually exclusive"),
-    (re.compile(r"\.\*.*\.\*|\.\+.*\.\+"), "multiple_wildcards", "MEDIUM",
-     "Multiple wildcards in pattern", "Use atomic groups or possessive quantifiers"),
-    (re.compile(r"\([^)]*\([^)]*[+*][^)]*\)[+*][^)]*\)"), "exponential_pattern", "CRITICAL",
-     "Potentially exponential regex structure", "Simplify nested quantifier structure"),
-]
+# A dominating length guard near the pattern's use-site (`len(x) < N`,
+# slicing) neutralises IDA's polynomial blow-up in practice (plan 07.2
+# step 3). Detecting a *dominating* guard precisely needs the call-site
+# AST; this scanner only sees an extracted string, so it uses a bounded
+# proximity heuristic on the surrounding source instead -- documented as
+# approximate, never used to suppress EDA (which is unconditional).
+_LENGTH_GUARD_RE = re.compile(r"len\([^)]{1,80}\)\s*[<>]=?\s*\d{1,6}|\[:?\d{1,6}\]")
 
 
-def _star_height(pattern: str) -> int:
-    max_h = cur = 0
-    i = 0
-    while i < len(pattern):
-        ch = pattern[i]
-        if ch == "\\":
-            i += 2
-            continue
-        if ch == "(":
-            cur += 1
-        elif ch == ")":
-            if i + 1 < len(pattern) and pattern[i + 1] in "+*?":
-                max_h = max(max_h, cur)
-            cur = max(0, cur - 1)
-        elif ch in "+*":
-            max_h = max(max_h, cur)
-        i += 1
-    return max_h
+def _check_vulnerability(
+    regex_str: str, context_window: str = ""
+) -> List[Tuple[str, str, str, str, float, str]]:
+    """Run the Glushkov-NFA analysis. Returns
+    ``(pattern_type, severity, description, recommendation, confidence, mechanism_id)``
+    tuples -- zero or one per pattern (a pattern is either safe, EDA, or
+    IDA; it cannot be both)."""
+    start = time.monotonic()
+    length_guarded = bool(_LENGTH_GUARD_RE.search(context_window))
+    try:
+        result = analyze_pattern(regex_str, length_guarded=length_guarded)
+    except Exception:  # noqa: BLE001 - analysis must never crash the scan
+        return []
+    if time.monotonic() - start > _PER_REGEX_BUDGET_S * 4:
+        # Analysis overran its budget by a wide margin -- treat as
+        # unsupported rather than trust a possibly-truncated verdict.
+        return []
 
-
-def _check_vulnerability(regex_str: str) -> List[Tuple[str, str, str, str]]:
-    vulns = []
-    for compiled, ptype, severity, desc, rec in _REDOS_INDICATORS:
-        if compiled.search(regex_str):
-            vulns.append((ptype, severity, desc, rec))
-    if _star_height(regex_str) > 1:
-        vulns.append(("high_star_height", "HIGH", "Regex with star height > 1", "Reduce nesting of quantifiers"))
-    return vulns
+    if result.verdict == "eda":
+        return [(
+            "catastrophic_backtracking", "HIGH",
+            f"Exponential (EDA) regex ambiguity: {result.detail}",
+            "Rewrite to remove the nested/overlapping repeat, or use RE2 "
+            "(linear-time engine) or a possessive-quantifier rewrite.",
+            0.9, "redos.eda",
+        )]
+    if result.verdict == "ida":
+        return [(
+            "polynomial_backtracking", "LOW",
+            f"Polynomial (IDA) regex ambiguity: {result.detail}",
+            "Add a bounding length check before matching, rewrite the "
+            "chained repeats to be mutually exclusive, or use RE2/timeouts.",
+            0.6, "redos.ida",
+        )]
+    # "safe" and "unsupported" both report nothing: "unsupported" (back-
+    # references, oversized patterns) is a documented false negative, not
+    # a claim of safety -- see module docstring.
+    return []
 
 
 class ReDoSScanner:
@@ -136,11 +160,16 @@ class ReDoSScanner:
             return []
 
         findings: List[ReDoSFinding] = []
+        file_start = time.monotonic()
+        lines = content.splitlines()
         for extraction_re in _LANG_EXTRACTION[lang]:
             for match in extraction_re.finditer(content):
+                if time.monotonic() - file_start > _PER_FILE_BUDGET_S * 20:
+                    return findings  # generous multiple of the per-file budget; stop pathological files
                 extracted = match.group(1)
                 line_num = content[: match.start()].count("\n") + 1
-                for ptype, severity, desc, rec in _check_vulnerability(extracted):
+                window = "\n".join(lines[max(0, line_num - 3):line_num])
+                for ptype, severity, desc, rec, conf, mech in _check_vulnerability(extracted, window):
                     findings.append(ReDoSFinding(
                         file_path=str(file_path),
                         line_number=line_num,
@@ -149,6 +178,9 @@ class ReDoSScanner:
                         regex_pattern=extracted[:100] + ("..." if len(extracted) > 100 else ""),
                         description=desc,
                         recommendation=rec,
+                        confidence=conf,
+                        confidence_bucket=confidence_bucket(conf),
+                        mechanism_id=mech,
                     ))
 
         return findings

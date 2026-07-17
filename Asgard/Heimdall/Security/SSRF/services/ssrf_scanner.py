@@ -1,10 +1,24 @@
-"""SSRF and XXE vulnerability scanner."""
+"""SSRF and XXE vulnerability scanner.
 
+Regex line scanning (below) remains the ONLY detector for non-Python
+languages and is the dual-engine floor for Python too -- it never gets
+worse than before. For Python files, ``_ssrf_ast_analysis`` re-examines
+each regex-flagged ``ssrf`` finding with the plan 07.1 5-step AST
+pipeline (host-control check, source verification, entry-point tiering,
+allowlist dominator check, redirect metadata) and may suppress it,
+reclassify it as a lower-severity "API Path Injection" advisory, or
+relabel it "Potential SSRF Validation Bypass" -- it never escalates a
+finding the regex layer didn't already raise. See
+``_ssrf_ast_analysis.py`` for documented precision/recall limitations.
+"""
+
+import ast
 import os
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
 from Asgard.Heimdall.Security.SSRF.models.ssrf_models import (
     SSRFFinding,
     SSRFScanConfig,
@@ -12,6 +26,18 @@ from Asgard.Heimdall.Security.SSRF.models.ssrf_models import (
     SSRFSeverity,
     SSRFVulnerabilityType,
 )
+from Asgard.Heimdall.Security.SSRF.services._ssrf_ast_analysis import (
+    extract_url_arg,
+    find_enclosing_function,
+    refine_ssrf_call,
+)
+
+# Call chains the AST refinement pass looks for (mirrors the regex
+# scanner's Python SSRF patterns above, restricted to call *shapes* the
+# 5-step pipeline can reason about).
+_SSRF_CALL_ATTRS = {
+    "get", "post", "put", "delete", "head", "patch", "urlopen", "request",
+}
 
 _LANG_EXTENSIONS = {".py": "python", ".js": "javascript", ".ts": "javascript",
                     ".php": "php", ".java": "java", ".cs": "csharp", ".rb": "ruby", ".go": "go"}
@@ -114,4 +140,62 @@ class SSRFXXEScanner:
                         recommendation=rec,
                     ))
 
+        if lang == "python" and findings:
+            findings = self._refine_python_ssrf(file_path, findings)
+
         return findings
+
+    def _refine_python_ssrf(
+        self, file_path: Path, findings: List[SSRFFinding]
+    ) -> List[SSRFFinding]:
+        """Plan 07.1 AST refinement pass -- see module docstring."""
+        try:
+            source = file_path.read_text(encoding="utf-8", errors="ignore")
+            tree = ast.parse(source, filename=str(file_path))
+        except (OSError, SyntaxError, ValueError):
+            return findings  # keep regex-only findings unchanged
+
+        calls_by_line = {}
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                attr = None
+                if isinstance(node.func, ast.Attribute):
+                    attr = node.func.attr
+                if attr in _SSRF_CALL_ATTRS:
+                    calls_by_line.setdefault(node.lineno, []).append(node)
+
+        refined: List[SSRFFinding] = []
+        for finding in findings:
+            if finding.vulnerability_type != SSRFVulnerabilityType.SSRF:
+                refined.append(finding)
+                continue
+
+            candidates = calls_by_line.get(finding.line_number, [])
+            call = candidates[0] if candidates else None
+            url_arg = extract_url_arg(call) if call is not None else None
+
+            if call is None or url_arg is None:
+                refined.append(finding)  # can't apply the AST pipeline; keep regex verdict
+                continue
+
+            func = find_enclosing_function(tree, finding.line_number)
+            result = refine_ssrf_call(call, url_arg, func)
+
+            if result.suppress:
+                continue  # dropped, not silently downgraded to zero -- see docstring on why this is safe
+
+            severity = SSRFSeverity(result.severity_override) if result.severity_override else finding.severity
+            description = finding.description
+            if result.note:
+                description = f"{finding.description} [{result.note}]"
+
+            refined.append(finding.model_copy(update={
+                "severity": severity,
+                "description": description,
+                "pattern_type": result.reclassify_as or finding.pattern_type,
+                "confidence": result.confidence,
+                "confidence_bucket": confidence_bucket(result.confidence),
+                "mechanism_id": "ssrf.ast_refined",
+            }))
+
+        return refined
