@@ -53,7 +53,7 @@ H/02 SOLID CIR, H/03 architecture CSP, H/07 domain scanners, H/05 cohesion, H/10
 5. Commit on `uplift/asgard-p0` with clear message; update this file.
 
 ## Integrated verification (2026-07-17 evening)
-- Full suite on integrated branch: **7,274 passed / 50 failed / 3 errors** — failure set == baseline minus the Verdandi L8 fix. +734 net new passing tests.
+- Wave 2 gate (2026-07-17 ~20:00): **8,332 passed / 50 failed / 3 errors** — failure set exactly the pre-existing Freya-env + Bragi-java set. +1,792 net new passing tests vs pre-uplift baseline.
 - FLAKY-SUSPECT: `tests_Heimdall/L0_Mocked/Security/test_cryptographic_validation_service.py::test_detect_static_iv` failed once in one full-suite ordering, passed on rerun and in all subset orderings. Watch; per zero-flakiness policy investigate if it recurs.
 - Zero-config CLI on non-GAIA repos: Forseti `openapi validate` on Kairos real spec → actionable rule-id findings, exit 1, SARIF valid (569 results) via `python3 -m Asgard.Forseti`. **GAP:** unified `asguardian` wrapper does not pass through Forseti's new global flags (`--format sarif`, `--profile`) — needs CLI passthrough wiring (Wave 2 item). Heimdall scan of GVA running.
 
