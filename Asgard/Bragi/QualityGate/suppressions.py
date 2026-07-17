@@ -23,7 +23,7 @@ languages with zero configuration.
 import re
 from datetime import date, datetime
 from enum import Enum
-from typing import List, Optional
+from typing import Iterable, List, Optional, Set
 
 from pydantic import BaseModel, Field
 
@@ -169,3 +169,25 @@ def lint_suppressions(
                 "re-review the risk acceptance."
             )
     return violations
+
+
+def find_unused_suppressions(
+    directives: Iterable[SuppressionDirective],
+    active_rule_ids: Set[str],
+    today: Optional[date] = None,
+) -> List[SuppressionDirective]:
+    """
+    Unused-suppression detection (Bragi Plan 04 Sec.3.4 / DEEPTHINK_11's
+    state-based alternative to time-bomb expiry): a directive is stale when
+    its rule no longer fires anywhere the directive would apply, i.e. its
+    ``rule_id`` is absent from ``active_rule_ids`` (the set of rule ids
+    that fired somewhere in the current scan).
+
+    Only active (valid, non-expired) directives are considered - an
+    already-invalid or already-expired directive is reported by
+    `lint_suppressions` instead, not duplicated here.
+    """
+    return [
+        d for d in directives
+        if d.is_active(today) and d.rule_id not in active_rule_ids
+    ]

@@ -167,3 +167,7 @@ class FileMetricBundle(BaseModel):
     # Provenance
     sources_present: List[str] = Field(default_factory=list, description="Report sources that fed this bundle")
     sources_missing: List[str] = Field(default_factory=list, description="Report sources not supplied")
+
+    # Context (Plan 04 Phase A/B): resolved via Bragi.common.context_classifier.
+    # "production" (default) | "test" | "generated" | "suspected_generated" | "script".
+    context: str = Field("production", description="Code context this bundle was scored under")
