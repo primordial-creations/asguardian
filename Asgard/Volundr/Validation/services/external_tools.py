@@ -21,7 +21,10 @@ from Asgard.Volundr.Validation.models.validation_models import (
     ValidationSeverity,
 )
 
-SUPPORTED_TOOLS = ("kubeconform", "hadolint", "checkov", "actionlint", "conftest")
+SUPPORTED_TOOLS = (
+    "kubeconform", "hadolint", "checkov", "actionlint", "conftest",
+    "kustomize", "helm", "pluto",
+)
 
 
 def is_available(tool: str) -> bool:

@@ -15,14 +15,17 @@ from Asgard.Volundr.Kustomize.models.kustomize_models import (
     KustomizeConfig,
 )
 from Asgard.Volundr.Kustomize.services.base_generator_helpers import (
-    calculate_best_practice_score,
+    calculate_best_practice_score,  # noqa: F401  (deprecated, kept for API compat)
     generate_base_kustomization,
     generate_deployment,
     generate_hpa,
     generate_networkpolicy,
     generate_service,
+    kustomization_findings,
     validate_base,
 )
+from Asgard.Volundr.Validation.services.scoring_engine import ScoringEngine
+from Asgard.Volundr.Validation.services.validation_engine import ValidationEngine
 
 
 class BaseGenerator:
@@ -53,14 +56,26 @@ class BaseGenerator:
         files["base/kustomization.yaml"] = generate_base_kustomization(config, files)
 
         validation_results = validate_base(files, config)
-        best_practice_score = calculate_best_practice_score(files, config)
+
+        # Adversarial validation + composite scoring (plan 07) over the
+        # RENDERED files: K8s manifests through the shared engine, the
+        # kustomization through the v5-semantics checks.
+        engine = ValidationEngine()
+        findings = []
+        for path, content in files.items():
+            if path.endswith("kustomization.yaml"):
+                findings.extend(kustomization_findings(content, path))
+            else:
+                findings.extend(engine.validate_kubernetes(content, source=path).results)
+        validation_results.extend(f"{r.rule_id}: {r.message}" for r in findings)
+        score_report = ScoringEngine().score(findings, resources=list(files))
 
         return GeneratedKustomization(
             id=kustomization_id,
             config_hash=config_hash,
             files=files,
             validation_results=validation_results,
-            best_practice_score=best_practice_score,
+            best_practice_score=score_report.composite,
             created_at=datetime.now(),
         )
 

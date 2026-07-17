@@ -43,6 +43,31 @@ from Asgard.Volundr.Validation.services.suppression_engine import (
 )
 from Asgard.Volundr.Validation.services.validation_engine import ValidationEngine
 from Asgard.Volundr.Validation.services.report_emitters import to_junit_xml, to_sarif
+from Asgard.Volundr.Validation.models.score_models import (
+    DimensionScore,
+    PostureIndex,
+    RemediationHint,
+    ResourceScore,
+    ScoreDimension,
+    ScoreReport,
+    SuppressedReceipt,
+    letter_grade,
+)
+from Asgard.Volundr.Validation.services.scoring_engine import (
+    ScoringEngine,
+    score_report_from_validation,
+)
+from Asgard.Volundr.Validation.services.scoring_profiles import (
+    ENVIRONMENT_PROFILES,
+    profile_weights,
+)
+from Asgard.Volundr.Validation.services.posture_index import compute_posture_index
+from Asgard.Volundr.Validation.services.render_pipeline import (
+    render_and_validate,
+    render_helm,
+    render_kustomize,
+    run_pluto,
+)
 
 __all__ = [
     "ValidationResult",
@@ -72,4 +97,21 @@ __all__ = [
     "k8s_receipt_annotations",
     "to_sarif",
     "to_junit_xml",
+    "DimensionScore",
+    "PostureIndex",
+    "RemediationHint",
+    "ResourceScore",
+    "ScoreDimension",
+    "ScoreReport",
+    "SuppressedReceipt",
+    "letter_grade",
+    "ScoringEngine",
+    "score_report_from_validation",
+    "ENVIRONMENT_PROFILES",
+    "profile_weights",
+    "compute_posture_index",
+    "render_and_validate",
+    "render_helm",
+    "render_kustomize",
+    "run_pluto",
 ]

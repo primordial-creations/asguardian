@@ -64,6 +64,43 @@ class SecretGenerator(BaseModel):
     options: Dict[str, Any] = Field(default_factory=dict, description="Generator options")
 
 
+class ReplacementSource(BaseModel):
+    """Source of a Kustomize v5 replacement (never `vars` — RESEARCH_09)."""
+    kind: str = Field(description="Source resource kind")
+    name: str = Field(description="Source resource name")
+    version: Optional[str] = Field(default=None, description="API version")
+    field_path: str = Field(
+        default="metadata.name", description="Dot-path to the source value"
+    )
+
+
+class ReplacementTargetSelect(BaseModel):
+    """Target selector for a replacement."""
+    kind: Optional[str] = Field(default=None, description="Target kind")
+    name: Optional[str] = Field(default=None, description="Target name")
+    group: Optional[str] = Field(default=None, description="Target API group")
+    version: Optional[str] = Field(default=None, description="Target API version")
+
+
+class ReplacementTarget(BaseModel):
+    """A replacement target: where the source value is written.
+
+    Field paths should address arrays by semantic key
+    (``spec.containers.[name=app].image``), never by index (RESEARCH_09).
+    """
+    select: ReplacementTargetSelect = Field(description="Target selector")
+    field_paths: List[str] = Field(description="Field paths to rewrite")
+    options: Dict[str, Any] = Field(
+        default_factory=dict, description="Options (delimiter, index, create)"
+    )
+
+
+class Replacement(BaseModel):
+    """Kustomize v5 replacement (the `vars` successor)."""
+    source: ReplacementSource = Field(description="Value source")
+    targets: List[ReplacementTarget] = Field(description="Write targets")
+
+
 class ImageTransformer(BaseModel):
     """Image transformer configuration."""
     name: str = Field(description="Original image name")
@@ -94,7 +131,32 @@ class KustomizeBase(BaseModel):
     name: str = Field(description="Application name")
     namespace: str = Field(default="default", description="Namespace")
     resources: List[str] = Field(default_factory=list, description="Resource files")
-    common_labels: Dict[str, str] = Field(default_factory=dict, description="Common labels")
+    common_labels: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Labels applied via the v5 `labels` transformer with "
+            "includeSelectors: false (never `commonLabels`, which mutates "
+            "immutable selectors — VOL-KUST-COMMONLABELS)"
+        ),
+    )
+    labels_include_selectors: bool = Field(
+        default=False,
+        description=(
+            "Set includeSelectors on the labels transformer. Selector "
+            "labels are immutable on live workloads; only enable for a "
+            "brand-new base that has never been applied"
+        ),
+    )
+    replacements: List[Replacement] = Field(
+        default_factory=list, description="Kustomize v5 replacements (never vars)"
+    )
+    openapi_path: Optional[str] = Field(
+        default=None,
+        description=(
+            "Path to an OpenAPI schema file (`openapi: {path: ...}`) so CRD "
+            "strategic-merge patches keep their merge keys (RESEARCH_09)"
+        ),
+    )
     common_annotations: Dict[str, str] = Field(default_factory=dict, description="Common annotations")
     name_prefix: str = Field(default="", description="Name prefix")
     name_suffix: str = Field(default="", description="Name suffix")
@@ -114,7 +176,19 @@ class KustomizeOverlay(BaseModel):
     namespace: Optional[str] = Field(default=None, description="Override namespace")
     name_prefix: str = Field(default="", description="Name prefix")
     name_suffix: str = Field(default="", description="Name suffix")
-    common_labels: Dict[str, str] = Field(default_factory=dict, description="Additional labels")
+    common_labels: Dict[str, str] = Field(
+        default_factory=dict,
+        description=(
+            "Labels applied via the v5 `labels` transformer with "
+            "includeSelectors: false (never `commonLabels`)"
+        ),
+    )
+    replacements: List[Replacement] = Field(
+        default_factory=list, description="Kustomize v5 replacements (never vars)"
+    )
+    openapi_path: Optional[str] = Field(
+        default=None, description="OpenAPI schema passthrough (`openapi: {path: ...}`)"
+    )
     common_annotations: Dict[str, str] = Field(default_factory=dict, description="Additional annotations")
     images: List[ImageTransformer] = Field(default_factory=list, description="Image overrides")
     replicas: List[ReplicaTransformer] = Field(default_factory=list, description="Replica overrides")

@@ -142,6 +142,12 @@ def validate_kustomization(ks: FluxKustomization) -> List[str]:
     if not ks.prune:
         issues.append("Pruning is disabled - orphaned resources may remain")
 
+    if not ks.health_checks:
+        issues.append(
+            "VOL-GITOPS-0007: Kustomization declares no healthChecks - "
+            "reconciliation will report Ready without verifying workload health"
+        )
+
     return issues
 
 

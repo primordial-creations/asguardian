@@ -1,221 +1,188 @@
 """
-Docker Compose Generator Service
+DEPRECATED Compose generator shim (plan 03 dedup).
 
-Generates docker-compose.yml files with service orchestration,
-networking, and volume configurations.
+``Asgard.Volundr.Compose`` (ComposeProject + ComposeProjectGenerator) is
+the single Compose engine. This module keeps the legacy
+``Docker.ComposeGenerator`` API importable for one deprecation cycle by
+converting the legacy Docker-module models into Compose-module models and
+delegating generation — there is no longer a second implementation.
+
+Legacy behavior preserved for callers:
+- ``GeneratedDockerConfig`` result shape (compose_content, id containing
+  "compose", validation_results, best_practice_score);
+- compose-spec output (the obsolete top-level ``version:`` key is never
+  emitted, per VOL-COMPOSE-0001).
 """
 
 import hashlib
 import os
+import warnings
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import yaml  # type: ignore[import-untyped]
-
+from Asgard.Volundr.Compose.models.compose_models import (
+    BuildConfig,
+    ComposeNetwork,
+    ComposeProject,
+    ComposeSecret,
+    ComposeConfigEntry,
+    ComposeService,
+    ComposeVolume,
+    DeployConfig,
+    HealthCheckConfig,
+    IpamConfig,
+    LoggingConfig,  # noqa: F401  (re-export parity with the old module)
+    NetworkDriver,
+    RestartPolicy,
+    VolumeDriver,
+)
+from Asgard.Volundr.Compose.services.compose_generator import (
+    ComposeProjectGenerator,
+)
 from Asgard.Volundr.Docker.models.docker_models import (
     ComposeConfig,
+    ComposeServiceConfig,
     GeneratedDockerConfig,
 )
 
+_DEPRECATION_MESSAGE = (
+    "Asgard.Volundr.Docker.ComposeGenerator is deprecated; use "
+    "Asgard.Volundr.Compose.ComposeProjectGenerator (the single Compose "
+    "engine). This shim will be removed after one deprecation cycle."
+)
+
+
+def _filter_kwargs(model_cls: Any, data: Dict[str, Any]) -> Dict[str, Any]:
+    """Keep only keys the target pydantic model knows."""
+    return {k: v for k, v in data.items() if k in model_cls.model_fields}
+
+
+def _convert_service(svc: ComposeServiceConfig) -> ComposeService:
+    healthcheck = None
+    if svc.healthcheck:
+        healthcheck = HealthCheckConfig(
+            **_filter_kwargs(HealthCheckConfig, dict(svc.healthcheck))
+        )
+    deploy = None
+    if svc.deploy:
+        deploy = DeployConfig.model_validate(
+            _filter_kwargs(DeployConfig, dict(svc.deploy))
+        )
+    build = None
+    if svc.build:
+        build = BuildConfig(**_filter_kwargs(BuildConfig, dict(svc.build)))
+    try:
+        restart = RestartPolicy(svc.restart)
+    except ValueError:
+        restart = RestartPolicy.UNLESS_STOPPED
+    return ComposeService(
+        name=svc.name,
+        image=svc.image,
+        build=build,
+        ports=list(svc.ports),
+        environment=dict(svc.environment),
+        env_file=list(svc.env_file),
+        volumes=list(svc.volumes),
+        depends_on=list(svc.depends_on),
+        networks=list(svc.networks),
+        restart=restart,
+        healthcheck=healthcheck,
+        deploy=deploy,
+        labels=dict(svc.labels),
+        command=svc.command,
+    )
+
+
+def _convert_project(config: ComposeConfig) -> ComposeProject:
+    networks = []
+    for net in config.networks:
+        try:
+            driver = NetworkDriver(net.driver)
+        except ValueError:
+            driver = NetworkDriver.BRIDGE
+        ipam = None
+        if net.ipam:
+            ipam = IpamConfig(**_filter_kwargs(IpamConfig, dict(net.ipam)))
+        networks.append(ComposeNetwork(
+            name=net.name, driver=driver, external=net.external, ipam=ipam,
+        ))
+    volumes = []
+    for vol in config.volumes:
+        try:
+            vol_driver = VolumeDriver(vol.driver)
+        except ValueError:
+            vol_driver = VolumeDriver.LOCAL
+        volumes.append(ComposeVolume(
+            name=vol.name, driver=vol_driver,
+            driver_opts=dict(vol.driver_opts), external=vol.external,
+        ))
+    secrets = [
+        ComposeSecret(
+            name=name,
+            file=(value or {}).get("file"),
+            external=bool((value or {}).get("external", False)),
+        )
+        for name, value in config.secrets.items()
+    ]
+    configs = [
+        ComposeConfigEntry(
+            name=name,
+            file=(value or {}).get("file", ""),
+            external=bool((value or {}).get("external", False)),
+        )
+        for name, value in config.configs.items()
+        if (value or {}).get("file") or (value or {}).get("external")
+    ]
+    return ComposeProject(
+        name="compose",
+        services=[_convert_service(s) for s in config.services],
+        networks=networks,
+        volumes=volumes,
+        secrets=secrets,
+        configs=configs,
+        # Legacy Docker-module behavior: no edge/loopback rewriting and no
+        # auto-healthchecks — callers migrate to ComposeProject for those.
+        auto_healthchecks=False,
+    )
+
 
 class ComposeGenerator:
-    """Generates docker-compose.yml from configuration."""
+    """DEPRECATED: delegates to Compose.ComposeProjectGenerator."""
 
     def __init__(self, output_dir: Optional[str] = None):
-        """
-        Initialize the compose generator.
-
-        Args:
-            output_dir: Directory for saving generated compose files
-        """
+        warnings.warn(_DEPRECATION_MESSAGE, DeprecationWarning, stacklevel=2)
         self.output_dir = output_dir or "."
+        self._delegate = ComposeProjectGenerator(output_dir=self.output_dir)
 
     def generate(self, config: ComposeConfig) -> GeneratedDockerConfig:
-        """
-        Generate a docker-compose.yml based on the provided configuration.
-
-        Args:
-            config: Compose configuration
-
-        Returns:
-            GeneratedDockerConfig with generated content
-        """
         config_json = config.model_dump_json()
         config_hash = hashlib.sha256(config_json.encode()).hexdigest()[:16]
-        config_id = f"compose-{config_hash}"
 
-        compose_dict: Dict[str, Any] = {}
-
-        services: Dict[str, Any] = {}
-        for svc in config.services:
-            svc_dict: Dict[str, Any] = {}
-
-            if svc.image:
-                svc_dict["image"] = svc.image
-
-            if svc.build:
-                svc_dict["build"] = svc.build
-
-            if svc.ports:
-                svc_dict["ports"] = svc.ports
-
-            if svc.environment:
-                svc_dict["environment"] = svc.environment
-
-            if svc.env_file:
-                svc_dict["env_file"] = svc.env_file
-
-            if svc.volumes:
-                svc_dict["volumes"] = svc.volumes
-
-            if svc.depends_on:
-                svc_dict["depends_on"] = svc.depends_on
-
-            if svc.networks:
-                svc_dict["networks"] = svc.networks
-
-            if svc.restart:
-                svc_dict["restart"] = svc.restart
-
-            if svc.healthcheck:
-                svc_dict["healthcheck"] = svc.healthcheck
-
-            if svc.deploy:
-                svc_dict["deploy"] = svc.deploy
-
-            if svc.labels:
-                svc_dict["labels"] = svc.labels
-
-            if svc.command:
-                svc_dict["command"] = svc.command
-
-            services[svc.name] = svc_dict
-
-        compose_dict["services"] = services
-
-        if config.networks:
-            networks: Dict[str, Any] = {}
-            for net in config.networks:
-                if net.external:
-                    networks[net.name] = {"external": True}
-                else:
-                    net_dict: Dict[str, Any] = {"driver": net.driver}
-                    if net.ipam:
-                        net_dict["ipam"] = net.ipam
-                    networks[net.name] = net_dict
-            compose_dict["networks"] = networks
-
-        if config.volumes:
-            volumes: Dict[str, Any] = {}
-            for vol in config.volumes:
-                if vol.external:
-                    volumes[vol.name] = {"external": True}
-                else:
-                    vol_dict: Dict[str, Any] = {"driver": vol.driver}
-                    if vol.driver_opts:
-                        vol_dict["driver_opts"] = vol.driver_opts
-                    volumes[vol.name] = vol_dict
-            compose_dict["volumes"] = volumes
-
-        if config.configs:
-            compose_dict["configs"] = config.configs
-
-        if config.secrets:
-            compose_dict["secrets"] = config.secrets
-
-        compose_content = yaml.dump(compose_dict, default_flow_style=False, sort_keys=False, allow_unicode=True)
-
-        validation_results = self._validate_compose(compose_dict, config)
-        best_practice_score = self._calculate_best_practice_score(compose_dict, config)
+        project = _convert_project(config)
+        result = self._delegate.generate(project)
 
         return GeneratedDockerConfig(
-            id=config_id,
+            id=f"compose-{config_hash}",
             config_hash=config_hash,
-            compose_content=compose_content,
-            validation_results=validation_results,
-            best_practice_score=best_practice_score,
+            compose_content=result.compose_content,
+            validation_results=result.validation_results,
+            best_practice_score=result.best_practice_score,
+            score_report=result.score_report,
             created_at=datetime.now(),
         )
 
-    def _validate_compose(self, compose_dict: Dict[str, Any], config: ComposeConfig) -> List[str]:
-        """Validate the generated compose file for common issues."""
-        issues: List[str] = []
-
-        if not compose_dict.get("services"):
-            issues.append("Compose file has no services defined")
-
-        for svc in config.services:
-            svc_config = compose_dict.get("services", {}).get(svc.name, {})
-
-            if not svc_config.get("image") and not svc_config.get("build"):
-                issues.append(f"Service '{svc.name}' has neither image nor build defined")
-
-            if not svc_config.get("restart"):
-                issues.append(f"Service '{svc.name}' has no restart policy")
-
-            for dep in svc.depends_on:
-                if dep not in [s.name for s in config.services]:
-                    issues.append(f"Service '{svc.name}' depends on undefined service '{dep}'")
-
-        return issues
-
-    def _calculate_best_practice_score(self, compose_dict: Dict[str, Any], config: ComposeConfig) -> float:
-        """Calculate a best practice score for the generated compose file."""
-        score = 0.0
-        max_score = 0.0
-
-        services = compose_dict.get("services", {})
-
-        for svc_name, svc_config in services.items():
-            max_score += 20
-            if svc_config.get("restart"):
-                score += 20
-
-            max_score += 15
-            if svc_config.get("healthcheck"):
-                score += 15
-
-            max_score += 15
-            if svc_config.get("deploy", {}).get("resources"):
-                score += 15
-
-            max_score += 10
-            if svc_config.get("labels"):
-                score += 10
-
-        max_score += 20
-        if config.networks:
-            score += 20
-        elif any(svc.networks for svc in config.services):
-            score += 10
-
-        max_score += 20
-        if config.volumes:
-            score += 20
-        elif any(svc.volumes for svc in config.services):
-            score += 10
-
-        return (score / max_score) * 100 if max_score > 0 else 0.0
-
     def save_to_file(
-        self, docker_config: GeneratedDockerConfig, output_dir: Optional[str] = None, filename: str = "docker-compose.yml"
+        self,
+        docker_config: GeneratedDockerConfig,
+        output_dir: Optional[str] = None,
+        filename: str = "docker-compose.yml",
     ) -> str:
-        """
-        Save generated docker-compose.yml to file.
-
-        Args:
-            docker_config: Generated Docker config to save
-            output_dir: Override output directory
-            filename: Compose filename
-
-        Returns:
-            Path to the saved file
-        """
         target_dir = output_dir or self.output_dir
         os.makedirs(target_dir, exist_ok=True)
         file_path = os.path.join(target_dir, filename)
-
         with open(file_path, "w", encoding="utf-8") as f:
             f.write(docker_config.compose_content or "")
-
         return file_path
+
+
+__all__: List[str] = ["ComposeGenerator"]

@@ -50,6 +50,7 @@ from Asgard.Volundr.Validation.services.suppression_engine import (
     annotate_k8s_manifest,
 )
 from Asgard.Volundr.Validation.services.schema_binder import parse_version
+from Asgard.Volundr.Validation.services.scoring_engine import ScoringEngine
 from Asgard.Volundr.Validation.services.validation_engine import ValidationEngine
 
 #: Profile -> rule IDs pre-suppressed by that preset. All presets render the
@@ -210,7 +211,21 @@ class ManifestGenerator:
         errors = sum(1 for r in final_results if r.severity == ValidationSeverity.ERROR)
         warns = sum(1 for r in final_results if r.severity == ValidationSeverity.WARNING)
         infos = sum(1 for r in final_results if r.severity == ValidationSeverity.INFO)
-        score = max(0.0, 100.0 - errors * 10 - warns * 3 - infos * 1)
+
+        # Composite 4-dimension score (plan 07) over the surviving findings
+        # of the rendered artifact — security veto, environment weights,
+        # per-logical-resource defect density.
+        resource_names = [
+            str(m.get("metadata", {}).get("name", key))
+            for key, m in manifests.items()
+        ]
+        score_report = ScoringEngine().score(
+            final_results,
+            resources=resource_names,
+            environment=config.environment.value,
+            suppressed=applied,
+        )
+        score = score_report.composite
 
         report = raw_report.model_copy(update={
             "results": final_results,
@@ -231,6 +246,7 @@ class ManifestGenerator:
             created_at=datetime.now(),
             applied_suppressions=sorted({s.rule for s, _ in applied}),
             validation_report=report,
+            score_report=score_report,
         )
 
     @staticmethod
