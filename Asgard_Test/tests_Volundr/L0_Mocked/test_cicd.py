@@ -330,7 +330,12 @@ class TestPipelineGenerator:
         result = generator.generate(config)
         assert "build:" in result.pipeline_content
         assert "test:" in result.pipeline_content
-        assert "deploy:" in result.pipeline_content
+        # Zero-trust split-trust (plan V/04): the deploy stage is emitted as
+        # a separate workflow_run-triggered workflow, not the build workflow.
+        deploy_files = [c for p, c in result.files.items() if p.endswith("-deploy.yml")]
+        assert len(deploy_files) == 1
+        assert "deploy:" in deploy_files[0]
+        assert "workflow_run:" in deploy_files[0]
 
     def test_generate_with_needs(self, generator):
         """Test generating pipeline with stage dependencies."""
@@ -465,8 +470,11 @@ class TestPipelineGenerator:
             ],
         )
         result = generator.generate(config)
-        assert "uses: actions/checkout@v4" in result.pipeline_content
-        assert "uses: actions/setup-python@v5" in result.pipeline_content
+        # Zero-trust SHA pinning (plan V/04): mutable tags are resolved to
+        # full commit SHAs with the version preserved as a trailing comment.
+        assert "uses: actions/checkout@v4" not in result.pipeline_content
+        assert "uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2" in result.pipeline_content
+        assert "uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065  # v5.6.0" in result.pipeline_content
 
     def test_best_practice_score(self, generator):
         """Test that best practice score is calculated."""

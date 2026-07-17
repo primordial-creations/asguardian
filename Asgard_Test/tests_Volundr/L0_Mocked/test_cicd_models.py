@@ -179,7 +179,7 @@ class TestPipelineStage:
         assert stage.services == {}
         assert stage.strategy is None
         assert stage.if_condition is None
-        assert stage.timeout_minutes == 60
+        assert stage.timeout_minutes == 30  # zero-trust default (was 60)
         assert stage.continue_on_error is False
         assert stage.environment is None
 
