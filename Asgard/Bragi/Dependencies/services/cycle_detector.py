@@ -1,21 +1,27 @@
 """
 Heimdall Cycle Detector Service
 
-Detects circular dependencies in the codebase.
+Detects circular dependencies via SCC condensation (Plan 03 Phase B).
+
+`nx.simple_cycles` over the whole graph is exponential on tangled codebases
+(DEEPTHINK_09); this detector reduces to strongly connected components first,
+enumerates simple cycles only inside small SCCs (display), and reports large
+SCCs as a single component with minimum-weight feedback-edge break
+suggestions. Severity follows the *reach* of the SCC (member LOC + external
+afferent coupling), not cycle length.
 """
 
-import time
 from pathlib import Path
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Optional
 
 from Asgard.Bragi.Dependencies.models.dependency_models import (
     CircularDependency,
     DependencyConfig,
-    DependencySeverity,
 )
-import networkx as nx
-
-from Asgard.Bragi.Dependencies.services.import_analyzer import ImportAnalyzer
+from Asgard.Bragi.Dependencies.services.graph_service import (
+    MAX_SCC_FOR_CYCLE_ENUMERATION,
+    DependencyGraphService,
+)
 
 
 class CycleDetector:
@@ -27,18 +33,28 @@ class CycleDetector:
     - Difficult to understand code flow
     - Testing difficulties
     - Maintenance headaches
+
+    Public API preserved: detect / has_cycles / suggest_breaks /
+    detect_file / get_cycle_graph.
     """
 
-    def __init__(self, config: Optional[DependencyConfig] = None):
-        """Initialize the cycle detector."""
+    def __init__(self, config: Optional[DependencyConfig] = None,
+                 graph_service: Optional[DependencyGraphService] = None):
+        """Initialize the cycle detector (optionally sharing a graph service)."""
         self.config = config or DependencyConfig()
-        self.import_analyzer = ImportAnalyzer(self.config)
+        self.graph_service = graph_service or DependencyGraphService(self.config)
+        # Kept for backward compatibility with callers that reached into it.
+        self.import_analyzer = self.graph_service.import_analyzer
 
     def detect(
         self, scan_path: Optional[Path] = None
     ) -> List[CircularDependency]:
         """
         Detect all circular dependencies in the codebase.
+
+        Small SCCs (<= 12 modules) are expanded into their simple cycles for
+        display; larger SCCs are reported as one component. Severity is the
+        SCC's reach-based severity in both cases.
 
         Args:
             scan_path: Root path to scan
@@ -47,104 +63,25 @@ class CycleDetector:
             List of CircularDependency objects
         """
         path = scan_path or self.config.scan_path
-        modules = self.import_analyzer.analyze(path)
+        graph = self.graph_service.build(path)
+        sccs = self.graph_service.sccs(path)
 
-        # Build dependency graph
-        graph = {m.module_name: m.all_dependencies for m in modules}
-
-        return self._detect_with_networkx(graph)
-
-    def _detect_with_networkx(
-        self, graph: Dict[str, Set[str]]
-    ) -> List[CircularDependency]:
-        """Detect cycles using NetworkX."""
-        nx_graph = nx.DiGraph()
-
-        for module, deps in graph.items():
-            for dep in deps:
-                if dep in graph:  # Only internal dependencies
-                    nx_graph.add_edge(module, dep)
-
-        cycles = []
-
-        # Find simple cycles
-        try:
-            simple_cycles = list(nx.simple_cycles(nx_graph))
-
-            for cycle in simple_cycles:
-                cycles.append(CircularDependency(
-                    cycle=cycle,
-                    severity=self._calculate_severity(len(cycle)),
-                ))
-        except Exception:
-            # Fall back to SCC detection
-            sccs = list(nx.strongly_connected_components(nx_graph))
-            for scc in sccs:
-                if len(scc) > 1:
+        cycles: List[CircularDependency] = []
+        for scc in sccs:
+            if scc.size <= MAX_SCC_FOR_CYCLE_ENUMERATION:
+                enumerated = self.graph_service.enumerate_cycles(graph, scc)
+                for cycle in enumerated:
                     cycles.append(CircularDependency(
-                        cycle=list(scc),
-                        severity=self._calculate_severity(len(scc)),
+                        cycle=cycle,
+                        severity=scc.severity,
                     ))
-
+                if enumerated:
+                    continue
+            cycles.append(CircularDependency(
+                cycle=list(scc.members),
+                severity=scc.severity,
+            ))
         return cycles
-
-    def _detect_with_dfs(
-        self, graph: Dict[str, Set[str]]
-    ) -> List[CircularDependency]:
-        """Detect cycles using DFS (fallback when NetworkX unavailable)."""
-        cycles = []
-        visited = set()
-        rec_stack = set()
-
-        def dfs(node: str, path: List[str]) -> None:
-            if node in rec_stack:
-                # Found a cycle
-                cycle_start = path.index(node)
-                cycle = path[cycle_start:]
-                cycles.append(CircularDependency(
-                    cycle=cycle,
-                    severity=self._calculate_severity(len(cycle)),
-                ))
-                return
-
-            if node in visited:
-                return
-
-            visited.add(node)
-            rec_stack.add(node)
-            path.append(node)
-
-            for neighbor in graph.get(node, set()):
-                if neighbor in graph:  # Only internal deps
-                    dfs(neighbor, path.copy())
-
-            rec_stack.remove(node)
-
-        for node in graph:
-            if node not in visited:
-                dfs(node, [])
-
-        # Deduplicate cycles (same cycle can be found starting from different nodes)
-        unique_cycles = []
-        seen = set()
-
-        for cycle in cycles:
-            # Normalize: rotate to start with smallest element
-            min_idx = cycle.cycle.index(min(cycle.cycle))
-            normalized = tuple(cycle.cycle[min_idx:] + cycle.cycle[:min_idx])
-
-            if normalized not in seen:
-                seen.add(normalized)
-                unique_cycles.append(cycle)
-
-        return unique_cycles
-
-    def _calculate_severity(self, cycle_length: int) -> DependencySeverity:
-        """Calculate severity based on cycle length."""
-        if cycle_length <= 2:
-            return DependencySeverity.HIGH
-        else:
-            return DependencySeverity.CRITICAL
 
     def detect_file(self, file_path: Path) -> List[str]:
         """
@@ -158,7 +95,6 @@ class CycleDetector:
         """
         cycles = self.detect()
 
-        # Get module name for the file
         path = Path(file_path).resolve()
         root = self.config.scan_path
 
@@ -182,7 +118,7 @@ class CycleDetector:
 
     def has_cycles(self, scan_path: Optional[Path] = None) -> bool:
         """
-        Quick check if any cycles exist.
+        Quick check if any cycles exist (SCC pass only — no enumeration).
 
         Args:
             scan_path: Root path to scan
@@ -190,8 +126,7 @@ class CycleDetector:
         Returns:
             True if cycles exist, False otherwise
         """
-        cycles = self.detect(scan_path)
-        return len(cycles) > 0
+        return len(self.graph_service.sccs(scan_path or self.config.scan_path)) > 0
 
     def get_cycle_graph(
         self, scan_path: Optional[Path] = None
@@ -205,21 +140,21 @@ class CycleDetector:
         Returns:
             Dict mapping modules in cycles to their cycle neighbors
         """
-        cycles = self.detect(scan_path)
-
+        path = scan_path or self.config.scan_path
+        graph = self.graph_service.build(path)
         cycle_graph: Dict[str, List[str]] = {}
-
-        for cycle in cycles:
-            for i, module in enumerate(cycle.cycle):
-                if module not in cycle_graph:
-                    cycle_graph[module] = []
-
-                # Add next module in cycle
-                next_idx = (i + 1) % len(cycle.cycle)
-                next_module = cycle.cycle[next_idx]
-                if next_module not in cycle_graph[module]:
-                    cycle_graph[module].append(next_module)
-
+        for scc in self.graph_service.sccs(path):
+            member_set = set(scc.members)
+            for module in scc.members:
+                neighbors = sorted(
+                    dst for dst in graph.graph.get(module, set())
+                    if dst in member_set
+                )
+                if neighbors:
+                    cycle_graph.setdefault(module, [])
+                    for dst in neighbors:
+                        if dst not in cycle_graph[module]:
+                            cycle_graph[module].append(dst)
         return cycle_graph
 
     def suggest_breaks(
@@ -228,42 +163,24 @@ class CycleDetector:
         """
         Suggest edges to remove to break cycles.
 
-        Uses a heuristic: prefer breaking edges where the source
-        has fewer dependencies.
+        Weighted (Plan 03): targets the minimum-weight feedback edge, where
+        edge weight = imported-symbol count x (1 + source afferent coupling) —
+        never the most-used edge just because its source has few dependencies.
 
         Args:
             scan_path: Root path to scan
 
         Returns:
-            List of suggested edge breaks {source, target, reason}
+            List of suggested edge breaks {source, target, reason, cycle}
         """
-        cycles = self.detect(scan_path)
-        modules = self.import_analyzer.analyze(scan_path)
-
-        # Build dependency counts
-        dep_counts = {m.module_name: len(m.all_dependencies) for m in modules}
-
-        suggestions = []
-
-        for cycle in cycles:
-            # Find the edge with the source having fewest dependencies
-            best_edge = None
-            best_score = float("inf")
-
-            for i, source in enumerate(cycle.cycle):
-                target = cycle.cycle[(i + 1) % len(cycle.cycle)]
-                score = dep_counts.get(source, 0)
-
-                if score < best_score:
-                    best_score = score
-                    best_edge = (source, target)
-
-            if best_edge:
+        path = scan_path or self.config.scan_path
+        suggestions: List[Dict[str, str]] = []
+        for scc in self.graph_service.sccs(path):
+            for edge_break in self.graph_service.break_suggestions(scc, path):
                 suggestions.append({
-                    "source": best_edge[0],
-                    "target": best_edge[1],
-                    "reason": f"Source has only {best_score} dependencies",
-                    "cycle": cycle.as_string,
+                    "source": edge_break.source,
+                    "target": edge_break.target,
+                    "reason": edge_break.reason,
+                    "cycle": " -> ".join(scc.members + [scc.members[0]]),
                 })
-
         return suggestions
