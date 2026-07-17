@@ -5,12 +5,15 @@ Standalone utilities for gate evaluation: value comparison, default gate
 construction, metric extraction from report objects.
 """
 
-from typing import Dict, Union
+from typing import Dict, List, Union
 
 from Asgard.Bragi.QualityGate.models.quality_gate_models import (
+    METRIC_DETERMINISM,
     GateCondition,
     GateOperator,
+    MetricDeterminism,
     MetricType,
+    OnMissing,
     QualityGate,
 )
 
@@ -80,6 +83,83 @@ def build_asgard_way_gate() -> QualityGate:
             ),
         ],
     )
+
+
+def build_asgard_main_gate() -> QualityGate:
+    """
+    Tier-2 gate (merge-to-main / nightly): absolute project conditions.
+
+    Alias target of the historical 'Asgard Way' gate.
+    """
+    return build_asgard_way_gate()
+
+
+def build_asgard_pr_gate() -> QualityGate:
+    """
+    Tier-1 blocking PR gate: new-code conditions on FACT-class metrics only.
+
+    Designed to be evaluated over new/changed code; used alongside the
+    fingerprint-based differential engine. Every condition requires its
+    metric to be present (on_missing=fail): a skipped scan fails, it does
+    not silently pass.
+    """
+    return QualityGate(
+        name="asgard-pr",
+        description=(
+            "Tier-1 blocking PR gate: fails only when NEW technical debt or "
+            "NEW high-severity findings are introduced. Deterministic "
+            "(FACT-class) metrics only."
+        ),
+        conditions=[
+            GateCondition(
+                metric=MetricType.NEW_BLOCKER_ISSUES,
+                operator=GateOperator.EQUALS,
+                threshold=0.0,
+                error_on_fail=True,
+                on_missing=OnMissing.FAIL,
+                description="No new blocker (HIGH/CRITICAL) issues in new code",
+            ),
+            GateCondition(
+                metric=MetricType.SCAN_COMPLETENESS,
+                operator=GateOperator.GREATER_THAN_OR_EQUAL,
+                threshold=1.0,
+                error_on_fail=True,
+                on_missing=OnMissing.FAIL,
+                description="All expected scan inputs must be present",
+            ),
+            GateCondition(
+                metric=MetricType.DEBT_DELTA_MINUTES,
+                operator=GateOperator.LESS_THAN_OR_EQUAL,
+                threshold=0.0,
+                error_on_fail=False,
+                on_missing=OnMissing.WARN,
+                description="Waterline ratchet: technical debt may only improve",
+            ),
+        ],
+    )
+
+
+def validate_gate_determinism(gate: QualityGate) -> List[str]:
+    """
+    Warn when a hard-blocking condition is attached to a HEURISTIC metric
+    (DEEPTHINK_02: blocking gates demand ~99% precision — deterministic,
+    mechanically verifiable conditions only).
+
+    Returns a list of human-readable warnings (empty when clean).
+    """
+    warnings: List[str] = []
+    for condition in gate.conditions:
+        metric = condition.metric
+        if isinstance(metric, str):
+            metric = MetricType(metric)
+        determinism = METRIC_DETERMINISM.get(metric, MetricDeterminism.HEURISTIC)
+        if condition.error_on_fail and determinism == MetricDeterminism.HEURISTIC:
+            warnings.append(
+                f"Condition on '{metric.value}' is hard-blocking "
+                f"(error_on_fail=True) but the metric is HEURISTIC; "
+                "heuristic metrics should warn, not block."
+            )
+    return warnings
 
 
 def compare_values(

@@ -16,6 +16,7 @@ from Asgard.Bragi.QualityGate.models.quality_gate_models import (
     GateOperator,
     GateStatus,
     MetricType,
+    OnMissing,
     QualityGate,
     QualityGateResult,
 )
@@ -87,11 +88,24 @@ class QualityGateEvaluator:
             actual_value = metrics_dict.get(metric_key)
 
             if actual_value is None:
+                on_missing = condition.on_missing
+                if isinstance(on_missing, str):
+                    on_missing = OnMissing(on_missing)
+                if on_missing == OnMissing.SKIP:
+                    message = (
+                        f"Metric '{condition.metric}' not provided; "
+                        "condition skipped by policy (on_missing=skip)"
+                    )
+                else:
+                    message = (
+                        f"[NOT_EVALUATED] Metric '{condition.metric}' was not "
+                        "provided; the condition could not be verified"
+                    )
                 result = ConditionResult(
                     condition=condition,
                     actual_value=None,
-                    passed=True,
-                    message=f"Metric '{condition.metric}' not provided; condition skipped",
+                    passed=None,
+                    message=message,
                 )
             else:
                 operator = condition.operator
@@ -110,19 +124,7 @@ class QualityGateEvaluator:
 
             condition_results.append(result)
 
-        has_error_failure = any(
-            not r.passed and r.condition.error_on_fail for r in condition_results
-        )
-        has_warning_failure = any(
-            not r.passed and not r.condition.error_on_fail for r in condition_results
-        )
-
-        if has_error_failure:
-            status = GateStatus.FAILED
-        elif has_warning_failure:
-            status = GateStatus.WARNING
-        else:
-            status = GateStatus.PASSED
+        status = self._compute_status(condition_results)
 
         gate_result = QualityGateResult(
             gate_name=gate.name,
@@ -171,6 +173,101 @@ class QualityGateEvaluator:
         )
         return self.evaluate(gate, metrics, scan_path=scan_path)
 
+    def evaluate_differential(
+        self,
+        findings,
+        *,
+        project_path=None,
+        base_branch: str = "main",
+        sources=None,
+        suppressions=None,
+        flaky_rules=None,
+        break_glass=None,
+        baseline=None,
+    ):
+        """
+        Evaluate the fingerprint-based differential ("clean as you code") gate.
+
+        Only NEW HIGH/CRITICAL findings with Certain/Probable confidence from
+        deterministic rules block; pre-existing baseline findings never do.
+        With no baseline available the result is NOT_EVALUATED — never PASSED.
+
+        Args:
+            findings: scanner findings (any objects coercible to GateFinding)
+            project_path: project root (locates the fingerprint baseline store)
+            base_branch: reference branch whose baseline to diff against
+            sources: optional {file_path: source_text} for AST anchoring
+            suppressions: parsed SuppressionDirective list
+            flaky_rules: rule ids demoted to warn-only (zero-flakiness policy)
+            break_glass: optional BreakGlassRecord for an audited bypass
+            baseline: explicit BranchBaseline (overrides store lookup)
+
+        Returns:
+            DifferentialGateResult
+        """
+        from Asgard.Bragi.QualityGate.baseline_store import FingerprintBaselineStore
+        from Asgard.Bragi.QualityGate.services._differential_engine import (
+            DifferentialGateEngine,
+        )
+
+        if baseline is None and project_path is not None:
+            baseline = FingerprintBaselineStore(project_path).load(base_branch)
+
+        engine = DifferentialGateEngine(flaky_rules=flaky_rules)
+        return engine.evaluate(
+            findings,
+            baseline,
+            sources=sources,
+            suppressions=suppressions,
+            break_glass=break_glass,
+        )
+
+    def _compute_status(self, condition_results: List[ConditionResult]) -> GateStatus:
+        """
+        Compute overall gate status with honest missing-metric semantics.
+
+        - Any real failure of an error_on_fail condition => FAILED.
+        - Any missing metric with on_missing=fail => FAILED.
+        - Missing metrics with on_missing=warn degrade the gate: at best
+          WARNING; if nothing at all was evaluated, NOT_EVALUATED.
+        - on_missing=skip conditions are excluded by explicit policy and do
+          not degrade the status.
+        A missing scan input can never produce a clean PASSED.
+        """
+        def _on_missing(result: ConditionResult) -> OnMissing:
+            value = result.condition.on_missing
+            return OnMissing(value) if isinstance(value, str) else value
+
+        has_error_failure = any(
+            r.passed is False and r.condition.error_on_fail
+            for r in condition_results
+        )
+        has_missing_fail = any(
+            r.passed is None and _on_missing(r) == OnMissing.FAIL
+            for r in condition_results
+        )
+        has_warning_failure = any(
+            r.passed is False and not r.condition.error_on_fail
+            for r in condition_results
+        )
+        has_missing_warn = any(
+            r.passed is None and _on_missing(r) == OnMissing.WARN
+            for r in condition_results
+        )
+        evaluated_any = any(r.passed is not None for r in condition_results)
+        considered = [
+            r for r in condition_results
+            if not (r.passed is None and _on_missing(r) == OnMissing.SKIP)
+        ]
+
+        if has_error_failure or has_missing_fail:
+            return GateStatus.FAILED
+        if not evaluated_any and considered:
+            return GateStatus.NOT_EVALUATED
+        if has_warning_failure or has_missing_warn:
+            return GateStatus.WARNING
+        return GateStatus.PASSED
+
     def _build_condition_message(
         self,
         condition,
@@ -203,16 +300,35 @@ class QualityGateEvaluator:
         passed = result.passed_count
         errors = len(result.error_failures)
         warnings = len(result.warning_failures)
+        not_evaluated = result.not_evaluated_count
+
+        suffix = ""
+        if not_evaluated:
+            names = ", ".join(
+                str(r.condition.metric) for r in result.not_evaluated_conditions
+            )
+            suffix = f"; {not_evaluated} condition(s) NOT EVALUATED ({names})"
 
         if result.status == GateStatus.PASSED:
-            return f"Gate '{result.gate_name}': PASSED ({passed}/{total} conditions met)"
+            return (
+                f"Gate '{result.gate_name}': PASSED "
+                f"({passed}/{total} conditions met){suffix}"
+            )
+        elif result.status == GateStatus.NOT_EVALUATED:
+            return (
+                f"Gate '{result.gate_name}': NOT EVALUATED "
+                f"({not_evaluated}/{total} conditions had no metric supplied; "
+                f"missing scan input is not a pass){suffix}"
+            )
         elif result.status == GateStatus.WARNING:
             return (
                 f"Gate '{result.gate_name}': WARNING "
-                f"({errors} error(s), {warnings} warning(s) out of {total} conditions)"
+                f"({errors} error(s), {warnings} warning(s) out of {total} "
+                f"conditions){suffix}"
             )
         else:
             return (
                 f"Gate '{result.gate_name}': FAILED "
-                f"({errors} error failure(s), {warnings} warning(s) out of {total} conditions)"
+                f"({errors} error failure(s), {warnings} warning(s) out of "
+                f"{total} conditions){suffix}"
             )
