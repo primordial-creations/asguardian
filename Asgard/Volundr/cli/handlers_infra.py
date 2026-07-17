@@ -25,6 +25,7 @@ from Asgard.Volundr.Docker import (
     ComposeServiceConfig,
     BuildStage,
 )
+from Asgard.Volundr.Docker.models.docker_models import SecretMount
 
 
 def _parse_suppressions(raw: list) -> list:
@@ -193,6 +194,23 @@ def run_docker_dockerfile(args: argparse.Namespace) -> int:
             expose_ports=[args.port],
             cmd=["python", "main.py"],
         ))
+
+    secret_mounts = []
+    for spec in getattr(args, "secret_mounts", None) or []:
+        parts = spec.split(":", 1)
+        secret_mounts.append(SecretMount(
+            id=parts[0],
+            target=parts[1] if len(parts) > 1 else None,
+        ))
+
+    digest = getattr(args, "digest", None)
+    if digest:
+        for stage in stages:
+            if stage.base_image == args.base:
+                stage.base_image_digest = digest
+    if secret_mounts:
+        # Build-time secrets belong on the build (first) stage.
+        stages[0].secret_mounts = secret_mounts
 
     config = DockerfileConfig(
         name=args.name,

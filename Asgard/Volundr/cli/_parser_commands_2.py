@@ -97,6 +97,14 @@ def _add_compose_commands(subparsers: argparse._SubParsersAction) -> None:
     generate = compose_subparsers.add_parser("generate", help="Generate docker-compose.yaml")
     generate.add_argument("name", help="Project name")
     generate.add_argument("--service", action="append", dest="services", help="Service definition (name:image:port)")
+    generate.add_argument(
+        "--edge-service", action="append", dest="edge_services", default=[],
+        metavar="NAME",
+        help=(
+            "Service allowed to publish ports on all interfaces (repeatable); "
+            "all other services' published ports are rewritten to bind loopback"
+        ),
+    )
     generate.add_argument("--environment", default="development", help="Target environment")
     generate.add_argument("--output-dir", default=".", help="Output directory")
 
@@ -104,6 +112,55 @@ def _add_compose_commands(subparsers: argparse._SubParsersAction) -> None:
     validate.add_argument("file", help="Compose file to validate")
 
     add_performance_flags(compose_parser)
+
+
+def _add_score_command(subparsers: argparse._SubParsersAction) -> None:
+    """Add the score command."""
+    score = subparsers.add_parser(
+        "score",
+        help=(
+            "Render/validate an artifact (K8s manifest, kustomization, Helm "
+            "chart, compose file, CI pipeline) and compute the composite "
+            "score with letter grade and remediation hints"
+        ),
+    )
+    score.add_argument("path", help="Artifact file or directory to score")
+    score.add_argument(
+        "--environment", default="production",
+        help="Scoring weight profile (default: production)",
+    )
+    score.add_argument(
+        "--threshold", type=float, default=50.0,
+        help="Exit non-zero when the composite is below this (default: 50)",
+    )
+    score.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default: text)",
+    )
+
+
+def _add_gitops_commands(subparsers: argparse._SubParsersAction) -> None:
+    """Add the gitops command group."""
+    gitops_parser = subparsers.add_parser(
+        "gitops", help="GitOps manifest validation"
+    )
+    gitops_subparsers = gitops_parser.add_subparsers(
+        dest="gitops_command", help="GitOps commands"
+    )
+    validate = gitops_subparsers.add_parser(
+        "validate",
+        help=(
+            "Validate ArgoCD Application manifests against the VOL-GITOPS "
+            "rules (revision pinning, AppProject scoping, prune blast radius)"
+        ),
+    )
+    validate.add_argument(
+        "path", help="Application manifest file or directory"
+    )
+    validate.add_argument(
+        "--format", choices=["text", "json"], default="text",
+        help="Output format (default: text)",
+    )
 
 
 def _add_validate_commands(subparsers: argparse._SubParsersAction) -> None:

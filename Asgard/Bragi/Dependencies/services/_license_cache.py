@@ -31,7 +31,11 @@ class LicenseDiskCache:
         self.expiry_days = expiry_days
         self.cache_path = cache_path or (self.scan_path / CACHE_RELATIVE_PATH)
         self._now = now  # injectable clock for tests
-        self._entries: Dict[str, dict] = self._load()
+        # ASGARD_NO_CACHE=1: never read from nor write into the scanned
+        # path (read-only target safety). Lookups miss; save() no-ops.
+        from Asgard.Bragi.Dependencies.services.graph_service import no_cache_env
+        self._disabled = no_cache_env()
+        self._entries: Dict[str, dict] = {} if self._disabled else self._load()
         self._dirty = False
 
     def _current_time(self) -> datetime:
@@ -72,7 +76,7 @@ class LicenseDiskCache:
 
     def save(self) -> None:
         """Persist the cache (best-effort; no-op when nothing changed)."""
-        if not self._dirty:
+        if self._disabled or not self._dirty:
             return
         try:
             self.cache_path.parent.mkdir(parents=True, exist_ok=True)

@@ -22,6 +22,7 @@ uses networkx's deterministic power iteration.
 import ast
 import hashlib
 import json
+import os
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Set, Tuple
 
@@ -50,6 +51,14 @@ MAX_CYCLES_PER_SCC = 50
 
 #: Number of minimum-weight feedback edges suggested per large SCC.
 TOP_BREAK_SUGGESTIONS = 3
+
+
+def no_cache_env() -> bool:
+    """True when ASGARD_NO_CACHE requests that scans write nothing into
+    the scanned path (read-only target safety)."""
+    return os.environ.get("ASGARD_NO_CACHE", "").strip().lower() in (
+        "1", "true", "yes", "on",
+    )
 
 
 def _sha256(text: str) -> str:
@@ -152,7 +161,8 @@ class DependencyGraphService:
     def __init__(self, config: Optional[DependencyConfig] = None,
                  use_disk_cache: bool = True):
         self.config = config or DependencyConfig()
-        self.use_disk_cache = use_disk_cache
+        # ASGARD_NO_CACHE=1 forces the disk cache off (read-only targets).
+        self.use_disk_cache = use_disk_cache and not no_cache_env()
         self.import_analyzer = ImportAnalyzer(self.config)
         self._graphs: Dict[str, DependencyGraph] = {}
         self._derived: Dict[str, dict] = {}
