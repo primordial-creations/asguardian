@@ -40,6 +40,26 @@ def run_oop_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
         return 1
 
 
+def run_arch_explain(args: argparse.Namespace, verbose: bool = False) -> int:
+    """`heimdall architecture layers <path> --explain <file>` (Plan 03)."""
+    from Asgard.Bragi.Architecture.services.hexagonal_analyzer import HexagonalAnalyzer
+
+    scan_path = Path(args.path).resolve()
+    if not scan_path.exists():
+        print(f"Error: Path does not exist: {scan_path}")
+        return 1
+
+    try:
+        analyzer = HexagonalAnalyzer(
+            ArchitectureConfig(scan_path=scan_path),
+        )
+        print(analyzer.explain_file(args.explain, scan_path))
+        return 0
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+
 def run_arch_analysis(args: argparse.Namespace, verbose: bool = False, analysis_type: str = "all") -> int:
     scan_path = Path(args.path).resolve()
 

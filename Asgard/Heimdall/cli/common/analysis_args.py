@@ -183,6 +183,16 @@ def add_arch_args(parser: argparse.ArgumentParser) -> None:
         help="Skip design pattern detection",
     )
     parser.add_argument(
+        "--explain",
+        type=str,
+        default=None,
+        metavar="FILE",
+        help=(
+            "With 'layers': explain one file's inferred architecture level "
+            "and which imports pinned it (Plan 03 layer-inference CSP)"
+        ),
+    )
+    parser.add_argument(
         "--hexagonal",
         action="store_true",
         help="Include hexagonal (ports and adapters) architecture analysis",
