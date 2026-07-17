@@ -24,13 +24,35 @@ _PREFIX_FORMATS: dict[str, set[SchemaFormat]] = {
 }
 
 
+_PREFIX_NAMES: dict[str, str] = {
+    "OAS": "oas",
+    "AVRO": "avro",
+    "PROTO": "proto",
+    "GQL": "graphql",
+    "ASYNC": "asyncapi",
+    "JSON": "jsonschema",
+    "COMPAT": "compat",
+}
+
+
+def registry_rule_id(change_rule_id: str) -> str:
+    """Map a compat change rule id to its dotted registry id.
+
+    'AVRO-FIELD-REMOVED' -> 'avro.compat.field-removed'
+    """
+    prefix, _, rest = change_rule_id.partition("-")
+    name = _PREFIX_NAMES.get(prefix, prefix.lower())
+    return f"{name}.compat.{rest.lower()}"
+
+
 def register_compat_rules() -> None:
     """Idempotently register all compat rules in the default registry."""
-    for rule_id, (violation, structural, semantic, base_severity, desc) in \
+    for change_rule_id, (violation, structural, semantic, base_severity, desc) in \
             COMPAT_RULE_TABLE.items():
+        rule_id = registry_rule_id(change_rule_id)
         if default_registry.get(rule_id) is not None:
             continue
-        prefix = rule_id.split("-", 1)[0]
+        prefix = change_rule_id.split("-", 1)[0]
         formats = _PREFIX_FORMATS.get(prefix, {SchemaFormat.CONTRACT})
         if structural == TierVerdict.FAIL:
             severity = Severity.ERROR
@@ -47,6 +69,7 @@ def register_compat_rules() -> None:
             description=desc,
             rationale=f"Abstract violation: {violation.value}",
             core=structural == TierVerdict.FAIL,
+            legacy_ids={change_rule_id},
         ))
 
 

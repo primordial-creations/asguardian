@@ -10,6 +10,8 @@ from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Forseti.Compatibility.models.legacy_models import LegacyBreakingChange
+
 from Asgard.Forseti.Avro.models._avro_base_models import (
     AvroConfig,
     AvroField,
@@ -152,37 +154,16 @@ class AvroValidationResult(BaseModel):
         return self.error_count + self.warning_count
 
 
-class BreakingChange(BaseModel):
-    """Represents a breaking change between schema versions."""
+class BreakingChange(LegacyBreakingChange):
+    """Represents a breaking change between schema versions.
+
+    Deprecated shape: thin subclass of the shared LegacyBreakingChange
+    (plan 01); new code should use Compatibility.UnifiedChange.
+    """
 
     change_type: BreakingChangeType = Field(
         description="Type of breaking change"
     )
-    path: str = Field(
-        description="Path to the changed element"
-    )
-    message: str = Field(
-        description="Human-readable description of the change"
-    )
-    old_value: Optional[str] = Field(
-        default=None,
-        description="Old value before the change"
-    )
-    new_value: Optional[str] = Field(
-        default=None,
-        description="New value after the change"
-    )
-    severity: str = Field(
-        default="error",
-        description="Severity of the breaking change"
-    )
-    mitigation: Optional[str] = Field(
-        default=None,
-        description="Suggested mitigation for the breaking change"
-    )
-
-    class Config:
-        use_enum_values = True
 
 
 class AvroCompatibilityResult(BaseModel):

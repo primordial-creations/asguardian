@@ -22,10 +22,16 @@ from Asgard.Forseti.Compatibility.models.compat_models import (
     UnifiedChange,
     UsageStats,
 )
-from Asgard.Forseti.Compatibility.services.compat_engine_service import (
-    CompatEngineService,
-    JsonFileTelemetrySource,
-)
+from Asgard.Forseti.Compatibility.models.legacy_models import LegacyBreakingChange
+
+
+def __getattr__(name: str):
+    """Lazily import the engine so format modules can import our models
+    without creating an import cycle."""
+    if name in ("CompatEngineService", "JsonFileTelemetrySource"):
+        from Asgard.Forseti.Compatibility.services import compat_engine_service
+        return getattr(compat_engine_service, name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __all__ = [
     "AbstractViolation",

@@ -145,8 +145,11 @@ class CompatEngineService:
             severity = Severity.ERROR if change.is_breaking else (
                 Severity.WARNING if change.is_hazard else Severity.INFO
             )
+            from Asgard.Forseti.Compatibility.services._rule_registration import (
+                registry_rule_id,
+            )
             findings.append(Finding(
-                rule_id=change.rule_id,
+                rule_id=registry_rule_id(change.rule_id),
                 severity=severity,
                 message=change.message,
                 coordinates=Coordinates(file=report.target, json_path=change.location),
