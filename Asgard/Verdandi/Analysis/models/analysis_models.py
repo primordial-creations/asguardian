@@ -4,6 +4,7 @@ Analysis Models
 Pydantic models for statistical analysis and metrics calculation.
 """
 
+from datetime import datetime
 from enum import Enum
 from typing import Dict, List, Optional
 
@@ -66,6 +67,17 @@ class ApdexConfig(BaseModel):
         default=4.0,
         description="Multiplier for frustration threshold (default 4T)",
     )
+    version: Optional[str] = Field(
+        default=None,
+        description=(
+            "Recalibration epoch label (e.g. 'v1'); results are stamped so "
+            "downstream storage can keep Apdex_v1_T500 and Apdex_v2_T1500 in "
+            "parallel during a shadow period"
+        ),
+    )
+    endpoint: Optional[str] = Field(
+        default=None, description="Endpoint/route this config applies to"
+    )
 
     @property
     def frustration_threshold_ms(self) -> float:
@@ -83,6 +95,24 @@ class ApdexResult(BaseModel):
     total_count: int = Field(..., description="Total response count")
     threshold_ms: float = Field(..., description="Threshold T used")
     rating: str = Field(..., description="Human-readable rating")
+    version: Optional[str] = Field(
+        default=None, description="Config version this result was computed under"
+    )
+    endpoint: Optional[str] = Field(
+        default=None, description="Endpoint/route this result applies to"
+    )
+    distribution_warning: Optional[str] = Field(
+        default=None,
+        description=(
+            "Set when the underlying response-time distribution is bimodal: "
+            "a single Apdex score masks the mode structure (DEEPTHINK_03). "
+            "This is an annotation, not an alert."
+        ),
+    )
+    machine_traffic_excluded: int = Field(
+        default=0,
+        description="Count of non-human requests excluded from this Apdex score",
+    )
 
     @classmethod
     def get_rating(cls, score: float) -> str:
@@ -97,6 +127,60 @@ class ApdexResult(BaseModel):
             return "Poor"
         else:
             return "Unacceptable"
+
+
+class MultiEndpointApdexResult(BaseModel):
+    """
+    Rollup of per-endpoint Apdex results (DEEPTHINK_03 Simpson's-paradox guard).
+
+    Replaces volume-weighted pooling: the headline number is "% of endpoints
+    meeting target", not a single traffic-weighted score that a single huge,
+    fast endpoint can mask a slow one behind.
+    """
+
+    endpoint_results: Dict[str, ApdexResult] = Field(
+        default_factory=dict, description="Apdex result per endpoint"
+    )
+    target_score: float = Field(..., description="Apdex score target used for compliance")
+    total_endpoints: int = Field(..., description="Number of endpoints evaluated")
+    endpoints_meeting_target: int = Field(
+        ..., description="Number of endpoints at/above target_score"
+    )
+    pct_endpoints_meeting_target: float = Field(
+        ..., description="Percentage of endpoints meeting target_score"
+    )
+    failing_endpoints: List[str] = Field(
+        default_factory=list, description="Endpoints below target_score"
+    )
+
+
+class ApdexRecalibrationRecord(BaseModel):
+    """
+    Audit trail for a threshold-T recalibration across versions/releases.
+
+    Per DEEPTHINK_03, recalibration must not silently rewrite history: the
+    old and new configs run in parallel ("shadow") for >= 30 days before
+    cutover, ideally aligned to a quarter boundary.
+    """
+
+    old_version: str = Field(..., description="Previous config version label")
+    new_version: str = Field(..., description="New config version label")
+    old_threshold_ms: float = Field(..., description="Previous threshold T")
+    new_threshold_ms: float = Field(..., description="New threshold T")
+    endpoint: Optional[str] = Field(default=None, description="Endpoint being recalibrated")
+    shadow_period_days: int = Field(
+        ..., description="Requested shadow (parallel-run) period in days"
+    )
+    shadow_sufficient: bool = Field(
+        ..., description="True when shadow_period_days >= 30"
+    )
+    recalibrated_at: datetime = Field(
+        default_factory=datetime.now, description="When this recalibration was recorded"
+    )
+    checklist: List[str] = Field(
+        default_factory=list,
+        description="Epoch-overlap checklist: shadow length, annotation text, cutover timing",
+    )
 
 
 class SLAConfig(BaseModel):
