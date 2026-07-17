@@ -5,6 +5,8 @@ from Asgard.Freya.SEO.services.meta_tag_analyzer import MetaTagAnalyzer
 from Asgard.Freya.SEO.services.structured_data_validator import StructuredDataValidator
 from Asgard.Freya.SEO.services.robots_analyzer import RobotsAnalyzer
 from Asgard.Freya.Security.services.security_header_scanner import SecurityHeaderScanner
+from Asgard.Freya.Security.services.sri_checker import SRIChecker
+from Asgard.Freya.Security.services.mixed_content_checker import MixedContentChecker
 from Asgard.Freya.Console.services.console_capture import ConsoleCapture
 from Asgard.Freya.Console.models.console_models import ConsoleConfig
 from Asgard.Freya.Links.services.link_validator import LinkValidator
@@ -18,6 +20,8 @@ from Asgard.Freya.cli._formatters_seo import (
 from Asgard.Freya.cli._formatters_security_console_links import (
     format_security_text,
     format_csp_text,
+    format_sri_text,
+    format_mixed_content_text,
     format_console_text,
     format_links_text,
 )
@@ -237,3 +241,53 @@ async def run_links_validate(args: argparse.Namespace, verbose: bool = False) ->
     await validator.close()
 
     return 1 if result.has_broken_links else 0
+
+
+async def run_security_sri(args, verbose: bool = False) -> int:
+    """Run Subresource Integrity check."""
+    checker = SRIChecker()
+
+    print(f"\nChecking Subresource Integrity: {args.url}")
+    print("-" * 60)
+
+    result = await checker.check(args.url)
+
+    if args.format == "json":
+        output = result.model_dump_json(indent=2)
+    else:
+        output = format_sri_text(result)
+
+    if hasattr(args, "output") and args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(output)
+        print(f"Report saved to: {args.output}")
+    else:
+        print(output)
+
+    blocking = [i for i in result.issues
+                if i.issue_type in ("sri_missing", "sri_malformed", "sri_missing_crossorigin")]
+    return 1 if blocking else 0
+
+
+async def run_security_mixed_content(args, verbose: bool = False) -> int:
+    """Run mixed-content scan."""
+    checker = MixedContentChecker()
+
+    print(f"\nScanning for mixed content: {args.url}")
+    print("-" * 60)
+
+    result = await checker.check(args.url)
+
+    if args.format == "json":
+        output = result.model_dump_json(indent=2)
+    else:
+        output = format_mixed_content_text(result)
+
+    if hasattr(args, "output") and args.output:
+        with open(args.output, "w", encoding="utf-8") as f:
+            f.write(output)
+        print(f"Report saved to: {args.output}")
+    else:
+        print(output)
+
+    return 1 if result.has_issues else 0

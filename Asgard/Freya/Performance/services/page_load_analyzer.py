@@ -18,6 +18,17 @@ from Asgard.Freya.Performance.models.performance_models import (
     PerformanceIssue,
     PerformanceReport,
 )
+from Asgard.Freya.Performance.models._budget_models import default_budget_for
+from Asgard.Freya.Performance.services._archetype_detector import (
+    PAGE_SIGNALS_JS,
+    detect_archetype,
+)
+from Asgard.Freya.Performance.services.budget_evaluator import (
+    budget_evaluations_to_issues,
+    collect_metric_values,
+    evaluate_budget,
+)
+from Asgard.Freya.Performance.services.performance_delta import apply_delta_snapshot
 from Asgard.Freya.Performance.services._page_load_helpers import (
     build_metrics,
     identify_issues,
@@ -74,6 +85,18 @@ class PlaywrightBrowserProvider:
         self._context = await self._browser.new_context()
         page = await self._context.new_page()
 
+        # CPU throttling for TBT measurement (CDP; Chromium only —
+        # silently skipped on engines without CDP support).
+        if config.cpu_throttle and config.cpu_throttle > 1.0:
+            try:
+                cdp = await self._context.new_cdp_session(page)
+                await cdp.send(
+                    "Emulation.setCPUThrottlingRate",
+                    {"rate": config.cpu_throttle},
+                )
+            except Exception:
+                pass
+
         if config.wait_for_network_idle:
             await page.goto(
                 url,
@@ -121,6 +144,7 @@ class PageLoadAnalyzer:
         self._browser_provider: IBrowserProvider = (
             browser_provider if browser_provider is not None else PlaywrightBrowserProvider()
         )
+        self._last_page_signals: Optional[Dict[str, Any]] = None
 
     async def analyze(self, url: str) -> PageLoadMetrics:
         """
@@ -137,6 +161,7 @@ class PageLoadAnalyzer:
             page = await provider.fetch_page(url, self.config)
             nav_timing = await self._extract_navigation_timing(page)
             web_vitals = await self._extract_web_vitals(page)
+            self._last_page_signals = await self._extract_page_signals(page)
             metrics = build_metrics(url, nav_timing, web_vitals)
             return metrics
         finally:
@@ -155,6 +180,7 @@ class PageLoadAnalyzer:
         """
         nav_timing = await self._extract_navigation_timing(page)
         web_vitals = await self._extract_web_vitals(page)
+        self._last_page_signals = await self._extract_page_signals(page)
         return build_metrics(url, nav_timing, web_vitals)
 
     async def get_performance_report(self, url: str) -> PerformanceReport:
@@ -172,24 +198,66 @@ class PageLoadAnalyzer:
         metrics = await self.analyze(url)
         issues = identify_issues(metrics, self.config)
 
-        score = calculate_score(metrics)
+        # Route archetype: explicit config wins; heuristic fallback.
+        if self.config.archetype is not None:
+            archetype = self.config.archetype
+            archetype_reason = (
+                f"archetype: {archetype.value} (explicit — set in configuration)"
+            )
+        else:
+            archetype, archetype_reason = detect_archetype(
+                self._last_page_signals or {}
+            )
+
+        # Budget evaluation over lab-proxy metrics (Plan 03).
+        budget = default_budget_for(archetype)
+        values = collect_metric_values(metrics=metrics)
+        evaluations = evaluate_budget(values, budget)
+        issues.extend(budget_evaluations_to_issues(evaluations, archetype.value))
+
+        score = calculate_score(metrics, evaluations)
         grade = score_to_grade(score)
 
-        analysis_duration = (datetime.now() - start_time).total_seconds() * 1000
-
-        return PerformanceReport(
+        report = PerformanceReport(
             url=url,
             performance_score=score,
             performance_grade=grade,
             page_load_metrics=metrics,
             lcp_score=calculate_lcp_score(metrics),
-            fid_score=calculate_fid_score(metrics),
+            fid_score=None,  # FID deprecated: no longer graded (FID->INP)
             cls_score=calculate_cls_score(metrics),
+            archetype=archetype,
+            archetype_reason=archetype_reason,
+            budget_evaluations=evaluations,
             issues=issues,
             critical_count=sum(1 for i in issues if i.severity == "critical"),
-            warning_count=sum(1 for i in issues if i.severity == "warning"),
-            analysis_duration_ms=analysis_duration,
+            warning_count=sum(
+                1 for i in issues if i.severity in ("warning", "serious")
+            ),
         )
+
+        if self.config.baseline_path:
+            try:
+                report.metric_deltas = apply_delta_snapshot(
+                    report, self.config.baseline_path
+                )
+            except Exception:
+                report.metric_deltas = {}
+
+        report.analysis_duration_ms = (
+            datetime.now() - start_time
+        ).total_seconds() * 1000
+        return report
+
+    async def _extract_page_signals(self, page: Page) -> Optional[Dict[str, Any]]:
+        """Extract archetype-detection signals from the loaded page."""
+        try:
+            return cast(
+                Optional[Dict[str, Any]],
+                await page.evaluate(PAGE_SIGNALS_JS),
+            )
+        except Exception:
+            return None
 
     async def _extract_navigation_timing(self, page: Page) -> NavigationTiming:
         """Extract navigation timing from the page."""
@@ -251,6 +319,24 @@ class PageLoadAnalyzer:
                             (sum, entry) => sum + (entry.hadRecentInput ? 0 : entry.value),
                             0
                         );
+                    }
+
+                    // Long tasks for TBT (buffered observer; the
+                    // networkidle wait approximates interactive-settle)
+                    try {
+                        const longTasks = [];
+                        const observer = new PerformanceObserver(() => {});
+                        observer.observe({type: 'longtask', buffered: true});
+                        for (const entry of observer.takeRecords()) {
+                            longTasks.push({
+                                start: entry.startTime,
+                                duration: entry.duration,
+                            });
+                        }
+                        observer.disconnect();
+                        vitals.long_tasks = longTasks;
+                    } catch (e) {
+                        // longtask observation unsupported: leave unset
                     }
 
                     return vitals;

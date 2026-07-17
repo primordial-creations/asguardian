@@ -1,15 +1,49 @@
+from Asgard.Freya.Performance.models._budget_models import LAB_DATA_HEADER
+
+_LAB_DATA_BANNER = "  " + LAB_DATA_HEADER
+
+
 def format_performance_text(result) -> str:
     """Format performance report as text."""
     lines = []
     lines.append("")
     lines.append("=" * 70)
-    lines.append("  FREYA PERFORMANCE REPORT")
+    lines.append("  FREYA PERFORMANCE REPORT (Lab Data — Synthetic Baseline)")
     lines.append("=" * 70)
+    lines.append(_LAB_DATA_BANNER)
     lines.append("")
     lines.append(f"  URL:              {result.url}")
     lines.append(f"  Score:            {result.performance_score:.0f}/100")
     lines.append(f"  Grade:            {result.performance_grade.value.upper()}")
+    if getattr(result, "archetype", None) is not None:
+        lines.append(f"  Archetype:        {result.archetype.value}")
+        if getattr(result, "archetype_reason", None):
+            lines.append(f"                    {result.archetype_reason}")
     lines.append("")
+
+    evaluations = getattr(result, "budget_evaluations", None) or []
+    if evaluations:
+        lines.append("-" * 70)
+        lines.append("  BUDGETS (soft = warn, hard = fail; Lab Data)")
+        lines.append("-" * 70)
+        for ev in evaluations:
+            soft = f"{ev.soft:g}" if ev.soft is not None else "-"
+            hard = f"{ev.hard:g}" if ev.hard is not None else "-"
+            note = f" ({ev.note})" if ev.note else ""
+            lines.append(
+                f"    [{ev.status.upper():6}] {ev.metric}: {ev.value:g} "
+                f"(soft {soft} / hard {hard}){note}"
+            )
+        lines.append("")
+
+    deltas = getattr(result, "metric_deltas", None) or {}
+    if deltas:
+        lines.append("-" * 70)
+        lines.append("  DELTAS vs previous lab run (the lab's ground truth)")
+        lines.append("-" * 70)
+        for metric, delta in deltas.items():
+            lines.append(f"    {metric}: {delta:+g}")
+        lines.append("")
 
     if result.page_load_metrics:
         metrics = result.page_load_metrics
@@ -53,8 +87,9 @@ def format_load_time_text(result) -> str:
     lines = []
     lines.append("")
     lines.append("=" * 70)
-    lines.append("  FREYA PAGE LOAD TIMING")
+    lines.append("  FREYA PAGE LOAD TIMING (Lab Data — Synthetic Baseline)")
     lines.append("=" * 70)
+    lines.append(_LAB_DATA_BANNER)
     lines.append("")
     lines.append(f"  URL:              {result.url}")
     lines.append("")
@@ -78,8 +113,9 @@ def format_resources_text(result) -> str:
     lines = []
     lines.append("")
     lines.append("=" * 70)
-    lines.append("  FREYA RESOURCE TIMING REPORT")
+    lines.append("  FREYA RESOURCE TIMING REPORT (Lab Data — Synthetic Baseline)")
     lines.append("=" * 70)
+    lines.append(_LAB_DATA_BANNER)
     lines.append("")
     lines.append(f"  URL:              {result.url}")
     lines.append(f"  Total Resources:  {result.total_resources}")
