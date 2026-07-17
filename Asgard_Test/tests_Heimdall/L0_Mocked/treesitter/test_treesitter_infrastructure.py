@@ -42,7 +42,7 @@ def test_get_supported_languages_returns_set():
 
 
 def test_get_supported_languages_subset_of_known():
-    known = {"python", "javascript", "typescript", "java", "go", "ruby", "php", "csharp", "cpp", "rust"}
+    known = {"python", "javascript", "typescript", "tsx", "java", "go", "ruby", "php", "csharp", "cpp", "rust"}
     langs = get_supported_languages()
     assert langs.issubset(known), f"Unexpected languages: {langs - known}"
 

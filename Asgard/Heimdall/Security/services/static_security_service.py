@@ -99,6 +99,10 @@ class StaticSecurityService:
         if not path.exists():
             raise FileNotFoundError(f"Scan path does not exist: {path}")
 
+        # Optional AST engine: one INFO line per process when unavailable.
+        from Asgard.Heimdall.treesitter import ast_engine  # noqa: PLC0415
+        ast_engine.log_engine_mode()
+
         start_time = time.time()
 
         report = SecurityReport(
