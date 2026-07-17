@@ -62,6 +62,9 @@ First attempt died at the Fable 5 limit before writing code; relaunched on Sonne
 
 Also fixed: treesitter parser-cache test-isolation leak (`test_parse_source_graceful_when_unavailable`) — was order-failing since the tree-sitter/CIR work cached parsers; commit 16a2112.
 
+### Final gate (all waves + Wave 3, 2026-07-18)
+**8,867 passed / 0 failed** excluding the browser-only `tests_Freya/L1_Integration` suite (physically un-runnable headless — needs a live Chromium). The two remaining non-Freya failures from earlier were both fixed this pass: the treesitter parser-cache test-isolation leak (16a2112) and the one genuine pre-existing failure, a `java.xss` detection gap on bare `writer.println(request.getParameter())` (1166114). The tree is now green apart from the browser-gated Freya integration tests. Net from the 6,540-passing pre-uplift baseline: ~+2,300 tests.
+
 ### Remaining after Wave 3
 - **H/10 evaluation/benchmarking** machinery (formal corpus, calibration, Brier-score CI gate) — the only unstarted P3 plan.
 - **Deferred CLI wiring** accumulated across W3 (Forseti align/contract, Verdandi strategies, Volundr `terraform validate --plan`, Bragi calibrate/validate-rules, Heimdall remaining) — a consolidation slice like W2x.
