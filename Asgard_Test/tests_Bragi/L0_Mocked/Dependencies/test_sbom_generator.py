@@ -90,8 +90,12 @@ class TestSBOMGenerator:
             document = generator.generate(tmpdir)
 
             assert isinstance(document, SBOMDocument)
-            assert document.total_components == 3
+            # Transitive closure is now real (Plan 03 Phase C): totals cover
+            # the full installed closure, direct count stays at the roots.
             assert document.direct_dependencies == 3
+            assert document.total_components >= 3
+            direct = [c for c in document.components if not c.is_transitive]
+            assert len(direct) == 3
 
     def test_generate_returns_sbom_document(self):
         """Test that generate() returns an SBOMDocument instance."""
@@ -138,8 +142,9 @@ class TestSBOMGenerator:
             generator = SBOMGenerator()
             document = generator.generate(tmpdir)
 
-            assert len(document.components) == 4
-            assert document.total_components == 4
+            direct = [c for c in document.components if not c.is_transitive]
+            assert len(direct) == 4
+            assert document.direct_dependencies == 4
 
     def test_generate_skips_comments_and_blank_lines(self):
         """Test that comment lines and blank lines are not parsed as dependencies."""
@@ -157,7 +162,7 @@ class TestSBOMGenerator:
             generator = SBOMGenerator()
             document = generator.generate(tmpdir)
 
-            assert document.total_components == 2
+            assert document.direct_dependencies == 2
 
     def test_generate_deduplicates_components(self):
         """Test that duplicate entries are deduplicated based on name and version."""
@@ -229,7 +234,8 @@ class TestSBOMGenerator:
             document = generator.generate(tmpdir)
             spdx = generator.to_spdx_json(document)
 
-            assert len(spdx["packages"]) == 3
+            assert len(spdx["packages"]) == document.total_components
+            assert len(spdx["packages"]) >= 3
 
     def test_to_cyclonedx_json_required_fields(self):
         """Test that CycloneDX JSON output contains all required fields."""
@@ -273,7 +279,8 @@ class TestSBOMGenerator:
             document = generator.generate(tmpdir)
             cdx = generator.to_cyclonedx_json(document)
 
-            assert len(cdx["components"]) == 3
+            assert len(cdx["components"]) == document.total_components
+            assert len(cdx["components"]) >= 3
 
     def test_to_cyclonedx_json_empty_components(self):
         """Test CycloneDX output for a project with no dependencies."""
@@ -317,7 +324,7 @@ class TestSBOMGenerator:
             generator = SBOMGenerator(config)
             document = generator.generate(tmpdir)
 
-            assert document.spec_version == "1.4"
+            assert document.spec_version == "1.5"
 
     def test_generate_with_requirements_dev_txt(self):
         """Test that requirements-dev.txt entries are parsed."""
