@@ -172,6 +172,9 @@ def format_mobile_text(result) -> str:
 
 def format_unified_text(result) -> str:
     """Format unified test result as text."""
+    from Asgard.Freya.Scoring.models.scoring_models import GradedScore
+    from Asgard.Freya.Scoring.services.epistemics import LAB_DATA_DISCLAIMER
+
     lines = []
     lines.append("")
     lines.append("=" * 70)
@@ -180,7 +183,15 @@ def format_unified_text(result) -> str:
     lines.append("")
     lines.append(f"  URL:              {result.url}")
     lines.append(f"  Duration:         {result.duration_ms}ms")
+
+    graded = getattr(result, "graded", None)
+    if isinstance(graded, GradedScore):
+        cap_suffix = f" (capped by: {graded.cap_reason})" if graded.cap_reason else ""
+        lines.append(f"  Grade:            {graded.grade.value}{cap_suffix}")
+
     lines.append(f"  Overall Score:    {result.overall_score:.0f}/100")
+    if isinstance(graded, GradedScore):
+        lines.append(f"  Base Score:       {graded.base_score:.0f}/100 (trend indicator only)")
     lines.append("")
     lines.append("  SCORES")
     lines.append(f"    Accessibility:  {result.accessibility_score:.0f}/100")
@@ -197,6 +208,30 @@ def format_unified_text(result) -> str:
     lines.append(f"    Serious:        {result.serious_count}")
     lines.append(f"    Moderate:       {result.moderate_count}")
     lines.append(f"    Minor:          {result.minor_count}")
+    lines.append("")
+
+    findings = getattr(result, "findings", None)
+    if isinstance(findings, list) and findings and not any(isinstance(f, str) for f in findings):
+        try:
+            ordered = sorted(
+                findings,
+                key=lambda f: (
+                    ["blocker", "critical", "major", "minor"].index(f.severity.value),
+                    f.url or "",
+                    f.selector or "",
+                ),
+            )
+            lines.append("  FINDINGS INBOX (universal severity)")
+            for finding in ordered[:25]:
+                selector = f" @ {finding.selector}" if finding.selector else ""
+                lines.append(f"    [{finding.severity.value.upper()}] {finding.check_id}: {finding.message}{selector}")
+            if len(ordered) > 25:
+                lines.append(f"    ... and {len(ordered) - 25} more")
+            lines.append("")
+        except (AttributeError, TypeError, ValueError):
+            pass
+
+    lines.append(f"  {LAB_DATA_DISCLAIMER}")
     lines.append("")
     lines.append("=" * 70)
 

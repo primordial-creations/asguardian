@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Freya.Scoring.models.scoring_models import Finding, GradedScore
+
 
 class TestCategory(str, Enum):
     """Test categories."""
@@ -141,7 +143,26 @@ class UnifiedTestReport(BaseModel):
     accessibility_score: float = Field(default=0.0, description="Accessibility score")
     visual_score: float = Field(default=0.0, description="Visual score")
     responsive_score: float = Field(default=0.0, description="Responsive score")
-    overall_score: float = Field(default=0.0, description="Overall score")
+    overall_score: float = Field(
+        default=0.0,
+        description=(
+            "Overall score. NOTE: since the unified severity uplift this is the "
+            "CAPPED score (non-compensatory; the worst unresolved finding sets "
+            "the ceiling), no longer an arithmetic mean of category scores."
+        )
+    )
+
+    # Universal severity / grading (optional; populated by UnifiedTester)
+    graded: Optional[GradedScore] = Field(
+        default=None,
+        description="Capped letter grade and radar data (universal scoring)"
+    )
+    findings: List[Finding] = Field(
+        default_factory=list,
+        description="Findings inbox: all failures in the universal severity scale"
+    )
+    blocker_count: int = Field(default=0, description="Blocker findings (universal scale)")
+    major_count: int = Field(default=0, description="Major findings (universal scale)")
 
     # Metadata
     config: UnifiedTestConfig = Field(description="Test configuration")
