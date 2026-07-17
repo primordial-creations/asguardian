@@ -12,7 +12,13 @@ from Asgard.Verdandi.Anomaly.models.anomaly_models import (
     AnomalySeverity,
     AnomalyType,
     BaselineMetrics,
+    BimodalityResult,
+    DriftResult,
+    MethodRecommendation,
+    SensitivityProfile,
+    StepChangeResult,
 )
+from Asgard.Verdandi.Anomaly.services import _batch_detectors
 from Asgard.Verdandi.Anomaly.services._stat_helpers import (
     calculate_baseline_metrics,
     calculate_mean_std,
@@ -51,6 +57,7 @@ class StatisticalDetector:
         z_threshold: float = 3.0,
         iqr_multiplier: float = 1.5,
         min_sample_size: int = 10,
+        profile: Optional[SensitivityProfile] = None,
     ):
         """
         Initialize the statistical detector.
@@ -59,7 +66,13 @@ class StatisticalDetector:
             z_threshold: Z-score threshold for anomaly detection
             iqr_multiplier: IQR multiplier for fence calculation (1.5 = standard, 3.0 = extreme)
             min_sample_size: Minimum samples required for detection
+            profile: Optional sensitivity profile; overrides z_threshold and
+                min_sample_size with metric-class presets (DEEPTHINK_08)
         """
+        self.profile = profile
+        if profile is not None:
+            z_threshold = profile.z_threshold
+            min_sample_size = profile.min_sample_size
         self.z_threshold = z_threshold
         self.iqr_multiplier = iqr_multiplier
         self.min_sample_size = min_sample_size
@@ -291,3 +304,97 @@ class StatisticalDetector:
             List of (index, change_magnitude) tuples
         """
         return find_change_points_in_values(values, window_size, self.z_threshold)
+
+    def check_bimodality(
+        self,
+        values: Sequence[float],
+        valley_threshold: float = 0.5,
+    ) -> BimodalityResult:
+        """
+        Run the bimodality guard before Gaussian methods (DEEPTHINK_02 s4).
+
+        A global z-score anchored to the mean of a bimodal mixture misfires;
+        when this returns ``is_bimodal=True``, skip z-score/IQR and use the
+        reported per-mode statistics instead. This is an annotation, not an
+        alert.
+
+        Args:
+            values: Sequence of metric values
+            valley_threshold: Valley height / smaller peak ratio below which
+                two peaks count as separate modes
+
+        Returns:
+            BimodalityResult with per-mode stats when bimodal
+        """
+        return _batch_detectors.bimodality_guard(values, valley_threshold)
+
+    def detect_step_change(
+        self,
+        values: Sequence[float],
+        method: str = "split_window_mad",
+        k: float = 3.0,
+        h_sigmas: float = 5.0,
+    ) -> StepChangeResult:
+        """
+        Detect a step change in a small batch (50-500 points).
+
+        Args:
+            values: Sequence of metric values in time order
+            method: "split_window_mad" or "cusum"
+            k: MAD multiplier for the split-window method
+            h_sigmas: Alarm threshold in sigmas for CUSUM
+
+        Returns:
+            StepChangeResult (INSUFFICIENT_DATA outcome when starved)
+        """
+        if method == "cusum":
+            return _batch_detectors.cusum(values, h_sigmas=h_sigmas)
+        return _batch_detectors.split_window_mad(values, k=k)
+
+    def detect_drift(
+        self,
+        values: Sequence[float],
+        alpha: float = 0.05,
+        min_relative_drift: float = 0.0,
+    ) -> DriftResult:
+        """
+        Detect gradual drift via a global OLS trend (boiling-frog fix).
+
+        Rolling z-scores absorb slow ramps; the full-batch OLS slope with a
+        t-test on slope != 0 does not.
+
+        Args:
+            values: Sequence of metric values in time order
+            alpha: Significance level for the slope t-test
+            min_relative_drift: Optional practical gate — total drift over the
+                batch must be at least this fraction of the batch median
+
+        Returns:
+            DriftResult (INSUFFICIENT_DATA outcome when starved)
+        """
+        return _batch_detectors.ols_drift(
+            values, alpha=alpha, min_relative_drift=min_relative_drift
+        )
+
+    def recommend_method(
+        self,
+        n: int,
+        cycles_observed: float = 0.0,
+        deployment_marker: bool = False,
+        suspected_scenario: Optional[str] = None,
+    ) -> MethodRecommendation:
+        """
+        Recommend detection methods per DEEPTHINK_02 switching thresholds.
+
+        Args:
+            n: Number of available samples
+            cycles_observed: Full seasonal cycles present in the data
+            deployment_marker: Whether a deployment occurred in the window
+            suspected_scenario: Optional "step_change" or "gradual_drift"
+
+        Returns:
+            MethodRecommendation with recommended/avoid lists and reasons
+        """
+        return _batch_detectors.recommend_method(
+            n, cycles_observed, deployment_marker, suspected_scenario
+        )

@@ -8,6 +8,17 @@ from Asgard.Verdandi.Anomaly.models.anomaly_models import (
     BaselineComparison,
     RegressionResult,
     AnomalyReport,
+    BimodalityResult,
+    StepChangeResult,
+    DriftResult,
+    MethodRecommendation,
+    MetricClass,
+    SensitivityProfile,
+    BaselineStrategy,
+    BaselineStrategyAssessment,
+    DiffInDiffResult,
+    DetectionOutcome,
+    ModeStats,
 )
 
 __all__ = [
@@ -18,4 +29,15 @@ __all__ = [
     "BaselineComparison",
     "RegressionResult",
     "AnomalyReport",
+    "BimodalityResult",
+    "StepChangeResult",
+    "DriftResult",
+    "MethodRecommendation",
+    "MetricClass",
+    "SensitivityProfile",
+    "BaselineStrategy",
+    "BaselineStrategyAssessment",
+    "DiffInDiffResult",
+    "DetectionOutcome",
+    "ModeStats",
 ]
