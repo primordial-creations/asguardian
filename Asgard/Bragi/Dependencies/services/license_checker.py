@@ -1,5 +1,12 @@
-"""Heimdall License Checker - validates package license compliance."""
+"""Heimdall License Checker - validates package license compliance.
 
+Lookup order (Plan 03 Phase D): disk cache -> installed importlib.metadata
+(no `pip show` subprocess) -> PyPI JSON fallback, fetched in parallel with a
+bounded pool. Results are deterministic: packages are resolved and reported
+in sorted name order.
+"""
+
+import importlib.metadata
 import subprocess
 import time
 import json
@@ -18,6 +25,7 @@ from Asgard.Bragi.Dependencies.models.license_models import (
     LicenseSeverity,
     PackageLicense,
 )
+from Asgard.Bragi.Dependencies.services._license_cache import LicenseDiskCache
 from Asgard.Bragi.Dependencies.services._license_policy import (
     LicenseGateInput,
     LicensePolicy,
@@ -34,9 +42,13 @@ from Asgard.Bragi.Dependencies.services._license_reporter import (
 class LicenseChecker:
     """Validates license compliance for Python packages."""
 
+    #: Bounded pool size for parallel PyPI fallback fetches.
+    MAX_FETCH_WORKERS = 8
+
     def __init__(self, config: LicenseConfig):
         self.config = config
         self._cache: Dict[str, PackageLicense] = {}
+        self._disk_cache: Optional[LicenseDiskCache] = None
         # Exact-SPDX-id policy engine (Plan 03 Phase A): substring matching
         # is gone - LGPL-3.0 can never be prohibited by containing "GPL-3.0".
         self.policy = LicensePolicy(
@@ -55,10 +67,14 @@ class LicenseChecker:
 
         packages, req_files = self._parse_requirements(scan_path)
 
-        package_licenses = []
-        for pkg_name in packages:
-            lic_info = self._get_package_license(pkg_name)
-            package_licenses.append(lic_info)
+        if self.config.use_cache:
+            self._disk_cache = LicenseDiskCache(
+                scan_path, expiry_days=self.config.cache_expiry_days)
+
+        package_licenses = self._resolve_packages(sorted(packages))
+
+        if self._disk_cache is not None:
+            self._disk_cache.save()
 
         issues = self._find_issues(package_licenses)
         duration = time.time() - start_time
@@ -110,14 +126,93 @@ class LicenseChecker:
             line = line.split(";")[0]
         return line.strip() or None
 
-    def _get_package_license(self, package_name: str) -> PackageLicense:
-        """Get license information for a package."""
+    def _resolve_packages(self, package_names: List[str]) -> List[PackageLicense]:
+        """
+        Resolve licenses for all packages: disk cache, then local installed
+        metadata, then PyPI in parallel (bounded pool) for the leftovers.
+        Output order is deterministic (sorted by package name).
+        """
+        resolved: Dict[str, PackageLicense] = {}
+        needs_network: List[str] = []
+
+        for pkg_name in package_names:
+            local = self._get_package_license_local(pkg_name)
+            if local is not None:
+                resolved[pkg_name] = local
+            else:
+                needs_network.append(pkg_name)
+
+        if needs_network:
+            from concurrent.futures import ThreadPoolExecutor
+            workers = min(self.MAX_FETCH_WORKERS, len(needs_network))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                fetched = list(pool.map(self._get_license_from_pypi,
+                                        needs_network))
+            for pkg_name, lic_info in zip(needs_network, fetched):
+                if lic_info is None:
+                    lic_info = PackageLicense(
+                        package_name=pkg_name,
+                        category=LicenseCategory.UNKNOWN,
+                        severity=LicenseSeverity.MODERATE,
+                        source="not_found",
+                    )
+                resolved[pkg_name] = self._finish_resolution(pkg_name, lic_info)
+
+        return [resolved[name] for name in package_names]
+
+    def _get_package_license_local(
+        self, package_name: str
+    ) -> Optional[PackageLicense]:
+        """Cache/installed-metadata resolution (no network)."""
         if self.config.use_cache and package_name in self._cache:
             return self._cache[package_name]
 
-        lic_info = self._get_license_from_pip(package_name)
+        if self._disk_cache is not None:
+            record = self._disk_cache.get(package_name)
+            if record is not None:
+                lic_info = PackageLicense(
+                    package_name=package_name,
+                    version=record.get("version"),
+                    license_name=record.get("license_name"),
+                    license_classifier=record.get("license_classifier"),
+                    homepage=record.get("homepage"),
+                    author=record.get("author"),
+                    source=record.get("source", "cache"),
+                )
+                lic_info = self._classify_license(lic_info)
+                if self.config.use_cache:
+                    self._cache[package_name] = lic_info
+                return lic_info
+
+        lic_info = self._get_license_from_installed(package_name)
         if lic_info is None:
-            lic_info = self._get_license_from_pypi(package_name)
+            return None
+        return self._finish_resolution(package_name, lic_info)
+
+    def _finish_resolution(
+        self, package_name: str, lic_info: PackageLicense
+    ) -> PackageLicense:
+        """Classify a freshly fetched record and store it in both caches."""
+        lic_info = self._classify_license(lic_info)
+        if self.config.use_cache:
+            self._cache[package_name] = lic_info
+        if self._disk_cache is not None and lic_info.source != "not_found":
+            self._disk_cache.put(package_name, {
+                "version": lic_info.version,
+                "license_name": lic_info.license_name,
+                "license_classifier": lic_info.license_classifier,
+                "homepage": lic_info.homepage,
+                "author": lic_info.author,
+                "source": lic_info.source,
+            })
+        return lic_info
+
+    def _get_package_license(self, package_name: str) -> PackageLicense:
+        """Get license information for a single package (legacy entry point)."""
+        local = self._get_package_license_local(package_name)
+        if local is not None:
+            return local
+        lic_info = self._get_license_from_pypi(package_name)
         if lic_info is None:
             lic_info = PackageLicense(
                 package_name=package_name,
@@ -125,11 +220,51 @@ class LicenseChecker:
                 severity=LicenseSeverity.MODERATE,
                 source="not_found",
             )
+        return self._finish_resolution(package_name, lic_info)
 
-        lic_info = self._classify_license(lic_info)
-        if self.config.use_cache:
-            self._cache[package_name] = lic_info
-        return lic_info
+    def _get_license_from_installed(
+        self, package_name: str
+    ) -> Optional[PackageLicense]:
+        """License info from installed importlib.metadata (replaces pip show).
+
+        Precedence: PEP 639 License-Expression, then trove classifier, then
+        the legacy License header.
+        """
+        try:
+            meta = importlib.metadata.metadata(package_name)
+        except importlib.metadata.PackageNotFoundError:
+            return None
+        except Exception:
+            return None
+
+        def _get(key: str) -> Optional[str]:
+            try:
+                value = meta.get(key)
+            except Exception:
+                return None
+            value = (value or "").strip()
+            return value or None
+
+        license_classifier = None
+        try:
+            classifiers = meta.get_all("Classifier") or []
+        except Exception:
+            classifiers = []
+        for classifier in classifiers:
+            if classifier.startswith("License ::"):
+                license_classifier = classifier.split(" :: ")[-1].strip()
+                break
+
+        license_name = _get("License-Expression") or _get("License")
+        return PackageLicense(
+            package_name=package_name,
+            version=_get("Version"),
+            license_name=license_name,
+            license_classifier=license_classifier,
+            homepage=_get("Home-page"),
+            author=_get("Author") or _get("Author-email"),
+            source="installed",
+        )
 
     def _get_license_from_pip(self, package_name: str) -> Optional[PackageLicense]:
         """Get license info from pip show."""

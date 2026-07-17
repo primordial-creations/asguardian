@@ -81,13 +81,50 @@ def build_asgard_way_gate() -> QualityGate:
                 error_on_fail=True,
                 description="No critical security vulnerabilities are permitted",
             ),
+            # Tier-2 (asgard-main) conditions — evaluated when the async
+            # project-wide tier supplies them; skipped by explicit policy
+            # otherwise (Plan Bragi-06 §3.3).
+            GateCondition(
+                metric=MetricType.COMPOSITE_SCORE,
+                operator=GateOperator.GREATER_THAN_OR_EQUAL,
+                threshold=0.60,
+                error_on_fail=False,
+                on_missing=OnMissing.SKIP,
+                description="Project composite score should be C (0.60) or better",
+            ),
+            GateCondition(
+                metric=MetricType.RISK_PROFILE_E_LOC_PCT,
+                operator=GateOperator.EQUALS,
+                threshold=0.0,
+                error_on_fail=False,
+                on_missing=OnMissing.SKIP,
+                description="No LOC should sit in E-grade (worst risk) files",
+            ),
+            GateCondition(
+                metric=MetricType.DEPENDENCY_CYCLES,
+                operator=GateOperator.EQUALS,
+                threshold=0.0,
+                error_on_fail=False,
+                on_missing=OnMissing.SKIP,
+                description="The import graph should be free of dependency cycles",
+            ),
+            GateCondition(
+                metric=MetricType.PROHIBITED_LICENSE_COUNT,
+                operator=GateOperator.EQUALS,
+                threshold=0.0,
+                error_on_fail=True,
+                on_missing=OnMissing.SKIP,
+                description="No dependency may carry a prohibited license",
+            ),
         ],
     )
 
 
 def build_asgard_main_gate() -> QualityGate:
     """
-    Tier-2 gate (merge-to-main / nightly): absolute project conditions.
+    Tier-2 gate (merge-to-main / nightly): absolute project conditions plus
+    composite score, risk profile, dependency cycles, and license compliance
+    (skipped by policy when the async tier has not supplied them).
 
     Alias target of the historical 'Asgard Way' gate.
     """

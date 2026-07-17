@@ -75,14 +75,36 @@ class TechnicalDebtAnalyzer:
             config: Configuration for debt analysis. If None, uses defaults.
         """
         self.config = config or DebtConfig()
-        # Centrality feed arrives with Plan 03 Phase B (DependencyGraphService);
-        # until wired, exposure multipliers stay at 1.0.
+        # Centrality feed from Plan 03 Phase B's DependencyGraphService —
+        # wire it via set_centrality_provider() (or use_dependency_graph()).
+        # Unwired, exposure multipliers stay at 1.0.
         self.centrality_provider: Optional[CentralityProvider] = None
         self.remediation_model = RemediationModel()
         self.aggregator = DebtAggregator(
             remediation_model=self.remediation_model,
             centrality_provider=self.centrality_provider,
         )
+
+    def set_centrality_provider(
+        self, provider: Optional[CentralityProvider]
+    ) -> None:
+        """
+        Wire an afferent-percentile centrality provider (Plan 03 Phase B ->
+        Plan 02 Exposure Factor). Pass None to unwire (multiplier 1.0).
+        """
+        self.centrality_provider = provider
+        self.aggregator.centrality_provider = provider
+
+    def use_dependency_graph(self, scan_path) -> None:
+        """
+        Convenience: build the shared dependency graph for `scan_path` and
+        wire its centrality provider into debt exposure multipliers.
+        """
+        from Asgard.Bragi.Dependencies.services.graph_service import (
+            DependencyGraphService,
+        )
+        service = DependencyGraphService()
+        self.set_centrality_provider(service.centrality_provider(scan_path))
 
     def analyze(self, path: Path) -> DebtReport:
         """

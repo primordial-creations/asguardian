@@ -210,9 +210,12 @@ class TestPurlAndSBOM:
         assert by_name["not-a-real-pkg-xyz"].version == "==9.9"
 
     def test_sbom_completeness_marker(self, tmp_path):
+        """A root that cannot be resolved from the environment degrades the
+        SBOM to an explicit declared-only document (Phase C semantics)."""
         from Asgard.Bragi.Dependencies.models.sbom_models import SBOMConfig
         from Asgard.Bragi.Dependencies.services.sbom_generator import SBOMGenerator
-        (tmp_path / "requirements.txt").write_text("requests==2.28.0\n")
+        (tmp_path / "requirements.txt").write_text(
+            "not-a-real-pkg-xyz==9.9\n")
         document = SBOMGenerator(SBOMConfig(scan_path=tmp_path)).generate(str(tmp_path))
         assert document.resolution == "declared-only"
 

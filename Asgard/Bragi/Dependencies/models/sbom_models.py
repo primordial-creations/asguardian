@@ -8,7 +8,7 @@ Supports SPDX 2.3 and CycloneDX 1.4 formats.
 from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import List
+from typing import List, Tuple
 
 from pydantic import BaseModel, Field
 
@@ -53,6 +53,8 @@ class SBOMComponent(BaseModel):
     supplier: str = ""
     author: str = ""
     is_transitive: bool = False
+    # Stable reference for graph edges (CycloneDX bom-ref / SPDX id basis).
+    bom_ref: str = ""
 
     class Config:
         use_enum_values = True
@@ -70,6 +72,9 @@ class SBOMDocument(BaseModel):
     creator_tool: str = "Asgard Heimdall SBOM Generator"
     creator_organization: str = ""
     components: List[SBOMComponent] = Field(default_factory=list)
+    # Dependency edges between components as (dependent bom_ref, dependency
+    # bom_ref) pairs - the SBOM encodes the graph, not just the set (Plan 03).
+    dependencies: List[Tuple[str, str]] = Field(default_factory=list)
     total_components: int = 0
     direct_dependencies: int = 0
     transitive_dependencies: int = 0

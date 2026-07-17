@@ -68,6 +68,23 @@ from Asgard.Bragi.QualityGate.services._differential_engine import (
     coerce_finding,
     verify_scan_determinism,
 )
+from Asgard.Bragi.QualityGate.services._git_diff import (
+    LineRange,
+    git_changed_lines,
+    parse_unified_diff,
+    total_changed_lines,
+)
+from Asgard.Bragi.QualityGate.services._hotspot_ranker import (
+    Hotspot,
+    HotspotRanker,
+    RootCauseGroup,
+    git_churn,
+)
+from Asgard.Bragi.QualityGate.services._project_state_store import (
+    ProjectState,
+    ProjectStateStore,
+    ReadOnlyStateError,
+)
 from Asgard.Bragi.QualityGate.services._quality_gate_helpers import (
     build_asgard_main_gate,
     build_asgard_pr_gate,
@@ -89,6 +106,9 @@ __all__ = [
     "GateFinding",
     "GateOperator",
     "GateStatus",
+    "Hotspot",
+    "HotspotRanker",
+    "LineRange",
     "MetricDeterminism",
     "MetricType",
     "NewCodeDefinition",
@@ -96,7 +116,11 @@ __all__ = [
     "QualityGate",
     "QualityGateConfig",
     "QualityGateEvaluator",
+    "ProjectState",
+    "ProjectStateStore",
     "QualityGateResult",
+    "ReadOnlyStateError",
+    "RootCauseGroup",
     "SuppressionDirective",
     "SuppressionKind",
     "build_asgard_main_gate",
@@ -105,8 +129,12 @@ __all__ = [
     "coerce_finding",
     "compute_fingerprint",
     "fingerprint_with_anchor",
+    "git_changed_lines",
+    "git_churn",
     "lint_suppressions",
     "parse_suppressions",
+    "parse_unified_diff",
+    "total_changed_lines",
     "validate_gate_determinism",
     "verify_scan_determinism",
 ]

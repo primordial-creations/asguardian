@@ -25,10 +25,19 @@ from Asgard.Bragi.Dependencies.models.sbom_models import VersionResolution
 from Asgard.Bragi.Dependencies.services._sbom_parsers import (
     get_installed_version,
     get_license_from_metadata,
+    get_package_meta_fields,
+    get_record_checksum,
+    get_requires,
     make_purl,
     parse_pyproject_toml,
     parse_requirements_txt,
 )
+
+
+def _canonical(name: str) -> str:
+    """PEP 503 canonical package name."""
+    import re
+    return re.sub(r"[-_.]+", "-", name).lower()
 
 
 class SBOMGenerator:
@@ -56,7 +65,7 @@ class SBOMGenerator:
         resolved_path = Path(scan_path).resolve() if scan_path else Path(self._config.scan_path).resolve()
         project_name = self._config.project_name or resolved_path.name
 
-        components: List[SBOMComponent] = []
+        declared: List[tuple] = []
         seen: set = set()
 
         for filename in self._config.requirements_files:
@@ -64,53 +73,71 @@ class SBOMGenerator:
             if not candidate.exists():
                 continue
 
-            if filename in ("requirements.txt", "requirements-dev.txt"):
-                pairs = parse_requirements_txt(str(candidate))
-            elif filename == "pyproject.toml":
+            if filename == "pyproject.toml":
                 pairs = parse_pyproject_toml(str(candidate))
             else:
                 pairs = parse_requirements_txt(str(candidate))
 
             for name, version_spec in pairs:
-                key = (name.lower(), version_spec)
+                key = _canonical(name)
                 if key in seen:
                     continue
                 seen.add(key)
+                declared.append((name, version_spec))
 
-                license_id = get_license_from_metadata(name)
+        components: List[SBOMComponent] = []
+        edges: List[tuple] = []
+        roots_resolved = 0
 
-                # Version field carries the RESOLVED installed version when
-                # available - never a raw spec string like ">=1.0" (Plan 03).
-                resolved = get_installed_version(name)
-                if resolved:
-                    version = resolved
-                    resolution = VersionResolution.RESOLVED
-                elif version_spec:
-                    version = version_spec
-                    resolution = VersionResolution.DECLARED_ONLY
-                else:
-                    version = ""
-                    resolution = VersionResolution.UNKNOWN
+        by_canonical: Dict[str, SBOMComponent] = {}
+        for name, version_spec in declared:
+            component = self._build_component(name, version_spec,
+                                              is_transitive=False)
+            components.append(component)
+            by_canonical[_canonical(name)] = component
+            if component.version_resolution == VersionResolution.RESOLVED.value:
+                roots_resolved += 1
 
-                # purl versions must be concrete: a spec range like ">=4.0,<5"
-                # is never a valid purl version. Unresolved -> version-less
-                # purl, with provenance recorded in version_resolution.
-                purl = make_purl(name, resolved)
+        # Transitive resolution (Plan 03 Phase C): walk Requires-Dist from
+        # the declared roots through installed metadata to the full closure.
+        closure_complete = bool(declared) and roots_resolved == len(declared)
+        if self._config.include_transitive:
+            queue = [name for name, _ in declared]
+            visited = {_canonical(name) for name, _ in declared}
+            while queue:
+                current = queue.pop(0)
+                for requirement in get_requires(current):
+                    canonical = _canonical(requirement)
+                    source = by_canonical.get(_canonical(current))
+                    if canonical not in visited:
+                        visited.add(canonical)
+                        child = self._build_component(requirement, "",
+                                                      is_transitive=True)
+                        if child.version_resolution != VersionResolution.RESOLVED.value:
+                            closure_complete = False
+                        components.append(child)
+                        by_canonical[canonical] = child
+                        queue.append(requirement)
+                    target = by_canonical.get(canonical)
+                    if source is not None and target is not None:
+                        edge = (source.bom_ref, target.bom_ref)
+                        if edge not in edges:
+                            edges.append(edge)
 
-                component = SBOMComponent(
-                    name=name,
-                    version=version,
-                    version_spec=version_spec,
-                    version_resolution=resolution,
-                    component_type=ComponentType.LIBRARY,
-                    license_id=license_id,
-                    purl=purl,
-                    is_transitive=False,
-                )
-                components.append(component)
+        direct_count = len(declared)
+        transitive_count = len(components) - direct_count
+
+        # Explicit completeness marker (DEEPTHINK_14 discipline): the SBOM is
+        # only an "installed-closure" when every declared root resolved from
+        # the environment; otherwise it degrades to an honest declared-only
+        # document rather than silently posing as complete.
+        if self._config.include_transitive and closure_complete:
+            resolution = "installed-closure"
+        else:
+            resolution = "declared-only"
 
         fmt = SBOMFormat(self._config.output_format) if isinstance(self._config.output_format, str) else self._config.output_format
-        spec_version = "2.3" if fmt == SBOMFormat.SPDX else "1.4"
+        spec_version = "2.3" if fmt == SBOMFormat.SPDX else "1.5"
         document_id = str(uuid.uuid4())
         now = datetime.now()
 
@@ -123,15 +150,55 @@ class SBOMGenerator:
             project_version=self._config.project_version,
             created_at=now,
             components=components,
+            dependencies=edges,
             total_components=len(components),
-            direct_dependencies=len(components),
-            # Explicit completeness marker: transitive resolution is not yet
-            # performed, and the document says so rather than implying a
-            # complete closure with zero transitive dependencies.
-            transitive_dependencies=0,
-            resolution="declared-only",
+            direct_dependencies=direct_count,
+            transitive_dependencies=transitive_count,
+            resolution=resolution,
         )
         return document
+
+    def _build_component(
+        self, name: str, version_spec: str, *, is_transitive: bool
+    ) -> SBOMComponent:
+        """Build one component with resolved version, hash, and PEP 639 license."""
+        license_id = get_license_from_metadata(name)
+
+        # Version field carries the RESOLVED installed version when
+        # available - never a raw spec string like ">=1.0" (Plan 03).
+        resolved = get_installed_version(name)
+        if resolved:
+            version = resolved
+            resolution = VersionResolution.RESOLVED
+        elif version_spec:
+            version = version_spec
+            resolution = VersionResolution.DECLARED_ONLY
+        else:
+            version = ""
+            resolution = VersionResolution.UNKNOWN
+
+        # purl versions must be concrete: a spec range like ">=4.0,<5"
+        # is never a valid purl version. Unresolved -> version-less
+        # purl, with provenance recorded in version_resolution.
+        purl = make_purl(name, resolved)
+        meta_fields = get_package_meta_fields(name) if resolved else {}
+
+        return SBOMComponent(
+            name=name,
+            version=version,
+            version_spec=version_spec,
+            version_resolution=resolution,
+            component_type=ComponentType.LIBRARY,
+            license_id=license_id,
+            purl=purl,
+            bom_ref=purl or f"pkg:{name}",
+            checksum_sha256=get_record_checksum(name) if resolved else "",
+            author=meta_fields.get("author", ""),
+            supplier=meta_fields.get("supplier", ""),
+            homepage=meta_fields.get("homepage", ""),
+            description=meta_fields.get("description", ""),
+            is_transitive=is_transitive,
+        )
 
     def to_spdx_json(self, document: SBOMDocument) -> Dict[str, Any]:
         """
