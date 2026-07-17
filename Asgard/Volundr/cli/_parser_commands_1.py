@@ -110,5 +110,35 @@ def _add_cicd_commands(subparsers: argparse._SubParsersAction) -> None:
     generate.add_argument("--branch", default="main", help="Main branch name")
     generate.add_argument("--docker-image", help="Docker image to build/push")
     generate.add_argument("--output-dir", default=".", help="Output directory")
+    generate.add_argument(
+        "--oidc-provider",
+        choices=["aws", "gcp", "azure", "vault"],
+        help="OIDC token-exchange provider (keyless auth instead of static secrets)",
+    )
+    generate.add_argument("--oidc-role", help="OIDC role/identity to assume")
+    generate.add_argument(
+        "--provenance", action="store_true",
+        help="Emit a SLSA provenance attestation job",
+    )
+    generate.add_argument(
+        "--sbom", action="store_true", help="Emit an SBOM generation step"
+    )
+    generate.add_argument(
+        "--split-trust", dest="split_trust", action="store_true", default=True,
+        help="Split build/deploy into separate workflows (default)",
+    )
+    generate.add_argument(
+        "--no-split-trust", dest="split_trust", action="store_false",
+        help="Keep build and deploy in one workflow",
+    )
+    generate.add_argument(
+        "--harden-runner", action="store_true",
+        help="Prepend a step-security/harden-runner egress-hardening step",
+    )
+    generate.add_argument(
+        "--suppress", action="append", default=[],
+        metavar="RULE:TARGET:REASON",
+        help="Reified rule suppression (repeatable): rule:target:reason",
+    )
 
     add_performance_flags(cicd_parser)
