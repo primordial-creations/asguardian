@@ -214,3 +214,13 @@ class TestSingleScanIntegration:
         # the memoized graph is shared by all consumers
         assert analyzer.cycle_detector.graph_service is analyzer.graph_service
         assert analyzer.modularity_analyzer.graph_service is analyzer.graph_service
+
+
+class TestImportFrequencies:
+    def test_counts_import_sites_per_target(self, tmp_path):
+        make_cycle_repo(tmp_path)  # a imported by c and d; b by a; c by b
+        service = DependencyGraphService(DependencyConfig(scan_path=tmp_path))
+        freq = service.import_frequencies(tmp_path)
+        assert freq["a"] == 2
+        assert freq["b"] == 1
+        assert list(freq) == sorted(freq)  # deterministic ordering

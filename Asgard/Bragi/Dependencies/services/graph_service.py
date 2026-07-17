@@ -462,3 +462,21 @@ class DependencyGraphService:
             return by_key.get(resolved)
 
         return provider
+
+    # ------------------------------------------------------- import frequency
+
+    def import_frequencies(
+        self, scan_path: Optional[Path] = None
+    ) -> Dict[str, int]:
+        """
+        Import-site count per imported module across the codebase (Plan 03
+        §3.4): the fact feed for Quality's lazy-import scanner, which needs
+        RESEARCH_18's dual heuristic (import cost x call-site frequency)
+        instead of import cost alone.
+        """
+        graph = self.build(scan_path)
+        frequencies: Dict[str, int] = {}
+        for m in graph.modules:
+            for dep in m.dependency_list:
+                frequencies[dep.target] = frequencies.get(dep.target, 0) + 1
+        return dict(sorted(frequencies.items()))
