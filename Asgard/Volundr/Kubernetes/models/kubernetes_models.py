@@ -208,6 +208,10 @@ class GeneratedManifest(BaseModel):
     validation_report: Optional[Any] = Field(
         default=None, description="Full ValidationReport from the adversarial validation engine"
     )
+    score_report: Optional[Any] = Field(
+        default=None,
+        description="Composite ScoreReport (plan 07): dimensions, grades, veto, receipts",
+    )
 
     @property
     def has_issues(self) -> bool:
@@ -216,5 +220,20 @@ class GeneratedManifest(BaseModel):
 
     @property
     def is_production_ready(self) -> bool:
-        """Check if manifest meets production readiness criteria."""
+        """Production readiness (plan 07): Security grade >= B AND
+        composite >= 80 AND zero un-suppressed CRITICAL findings
+        (no critical security veto). Falls back to the legacy
+        score-and-issues heuristic when no ScoreReport is attached."""
+        if self.score_report is not None:
+            report = self.score_report
+            security = next(
+                (d for d in report.dimensions if d.dimension.value == "security"),
+                None,
+            )
+            security_ok = security is None or security.grade in ("A", "B")
+            return (
+                report.composite >= 80
+                and security_ok
+                and report.veto_applied != "critical"
+            )
         return self.best_practice_score >= 80 and not self.has_issues

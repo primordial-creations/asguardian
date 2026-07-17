@@ -31,6 +31,7 @@ from Asgard.Volundr.Validation.models.suppression_models import SuppressionSet
 from Asgard.Volundr.Validation.services.suppression_engine import (
     append_comment_receipts,
 )
+from Asgard.Volundr.Validation.services.scoring_engine import ScoringEngine
 from Asgard.Volundr.Validation.services.validation_engine import ValidationEngine
 
 
@@ -89,6 +90,7 @@ class PipelineGenerator:
             primary = files[primary_path]
 
         validation_results = validate_pipeline(primary, config)
+        score_report = None
         if config.platform == CICDPlatform.GITHUB_ACTIONS:
             # Adversarial validation of the rendered artifact through the
             # shared engine; suppressions are applied there (warning
@@ -96,14 +98,22 @@ class PipelineGenerator:
             engine = ValidationEngine(
                 suppressions=SuppressionSet(suppressions=list(config.suppressions)),
             )
-            scores: List[float] = []
+            all_findings = []
             for path, content in files.items():
                 report = engine.validate_pipeline(content, source=path)
-                scores.append(report.score)
+                all_findings.extend(report.results)
                 validation_results.extend(
                     f"{r.rule_id}: {r.message}" for r in report.results
                 )
-            best_practice_score = min(scores) if scores else 100.0
+            # Composite 4-dimension score (plan 07) over the rendered
+            # workflows — security veto, per-job defect density. Logical
+            # resources are the workflow files (jobs roll up under them).
+            score_report = ScoringEngine().score(
+                all_findings,
+                resources=list(files.keys()),
+                environment="production",
+            )
+            best_practice_score = score_report.composite
         else:
             best_practice_score = calculate_best_practice_score(config)
 
@@ -116,6 +126,7 @@ class PipelineGenerator:
             files=files,
             validation_results=validation_results,
             best_practice_score=best_practice_score,
+            score_report=score_report,
             created_at=datetime.now(),
         )
 

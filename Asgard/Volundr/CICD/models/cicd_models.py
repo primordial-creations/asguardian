@@ -166,6 +166,10 @@ class GeneratedPipeline(BaseModel):
     )
     validation_results: List[str] = Field(default_factory=list, description="Validation issues found")
     best_practice_score: float = Field(ge=0, le=100, description="Best practice compliance score")
+    score_report: Optional[Any] = Field(
+        default=None,
+        description="Composite ScoreReport (plan 07): dimensions, grades, veto, receipts",
+    )
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
 
     @property
