@@ -36,11 +36,15 @@ def _try_load_all() -> None:
         except Exception:  # ImportError, AttributeError, etc.
             pass
 
-    # TypeScript uses a differently-named function
+    # TypeScript/TSX use differently-named functions in one package
     try:
         import importlib  # noqa: PLC0415
         mod = importlib.import_module("tree_sitter_typescript")
         _AVAILABLE["typescript"] = Language(mod.language_typescript())
+        try:
+            _AVAILABLE["tsx"] = Language(mod.language_tsx())
+        except Exception:
+            pass
     except Exception:
         pass
 
