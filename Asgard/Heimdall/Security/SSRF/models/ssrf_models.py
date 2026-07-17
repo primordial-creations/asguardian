@@ -29,6 +29,12 @@ class SSRFFinding(BaseModel):
     code_snippet: str = ""
     description: str
     recommendation: str
+    # Orthogonal confidence (plan 06/07.1). Defaults preserve legacy
+    # regex-only behaviour ("certain") for non-Python languages, which
+    # have no AST refinement pass.
+    confidence: float = 1.0
+    confidence_bucket: str = "certain"
+    mechanism_id: str = "ssrf.regex_heuristic"
 
 
 class SSRFScanConfig(BaseModel):
