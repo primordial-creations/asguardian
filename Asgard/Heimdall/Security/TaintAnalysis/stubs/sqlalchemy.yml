@@ -1,0 +1,20 @@
+# SQLAlchemy model: text() with bound parameters is the safe path;
+# session.execute of a string built from user input is the sink (covered by
+# the core catalog). bindparam-based construction is a sanitizer.
+framework: sqlalchemy
+route_decorators: []
+sources: []
+sinks:
+  - pattern: sqlalchemy.text
+    type: sql_query
+    severity: critical
+    confidence: 0.8
+  - pattern: text
+    type: sql_query
+    severity: critical
+    confidence: 0.4
+sanitizers:
+  - pattern: sqlalchemy.bindparam
+    kind: exact
+  - pattern: bindparam
+    kind: exact

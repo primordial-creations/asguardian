@@ -1,0 +1,27 @@
+# FastAPI framework model for taint analysis.
+# Route-decorated handler parameters are request data by construction.
+framework: fastapi
+route_decorators:
+  - app.get
+  - app.post
+  - app.put
+  - app.delete
+  - app.patch
+  - app.websocket
+  - router.get
+  - router.post
+  - router.put
+  - router.delete
+  - router.patch
+sources:
+  - pattern: request.query_params
+    type: http_parameter
+    confidence: 1.0
+  - pattern: request.path_params
+    type: path_parameter
+    confidence: 1.0
+  - pattern: websocket.receive_text
+    type: http_parameter
+    confidence: 0.8
+sinks: []
+sanitizers: []

@@ -1,114 +1,205 @@
 """
 Heimdall Taint Analysis Visitor
 
-AST visitor and helper functions for intra-function taint tracking.
+Forward AST traversal with:
+- TaintState carrying a confidence probability and a step trace (not bare
+  set membership).
+- Branch union: both arms of an ``if`` are analyzed against cloned state and
+  the results are unioned (a security tool must over-approximate).
+- Assignment kills: assigning a clean RHS removes taint from the target.
+- Propagator decay: string mutations (f-string, BinOp concat, %, .format,
+  .join) multiply confidence by 0.9 per mutation.
+- Sanitizer taxonomy: exact sanitizers drop the flow (factor 0.0); heuristic
+  clean_*/sanitize_*/re.sub keep it downgraded (x0.4).
+- Sink kwarg semantics: subprocess shell=False drops, shell=True is certain;
+  yaml.load with SafeLoader drops.
+- Import-alias resolution: chains are canonicalized through the module's
+  alias map before matching (``import subprocess as sp`` -> ``sp.run`` is
+  ``subprocess.run``).
+- Optional call resolver hook for inter-procedural summaries (x0.85 per
+  resolved hop); unresolved calls with tainted arguments propagate return
+  taint at x0.5 ("unknown third-party call" decay).
+
+What this engine can and cannot conclude: it is a flow-insensitive-across-
+branches, path-insensitive, alias-lite forward propagation. It
+over-approximates (branch union, unknown-call return taint) and expresses
+the residual uncertainty in the confidence value -- it is a shift-left
+guardrail (~25-40% recall / ~70% precision class), not a deep SAST replacement.
 """
 
 import ast
-from typing import Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass, field, replace
+from typing import Callable, Dict, List, Optional, Sequence, Set, Tuple
 
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
+from Asgard.Heimdall.Security.TaintAnalysis.catalog.sanitizers import (
+    SanitizerMatch,
+    classify_sanitizer,
+)
+from Asgard.Heimdall.Security.TaintAnalysis.catalog.sinks import (
+    SUBPROCESS_NO_SHELL_FACTOR,
+    SinkSpec,
+    lookup_sink,
+)
+from Asgard.Heimdall.Security.TaintAnalysis.catalog.sources import (
+    SourceSpec,
+    lookup_source,
+)
 from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import (
+    SanitizerRecord,
     TaintFlow,
     TaintFlowStep,
     TaintSinkType,
     TaintSourceType,
 )
-from Asgard.Heimdall.Security.TaintAnalysis.services._taint_patterns import (
-    SANITIZER_NAMES,
-    SINK_CWE,
-    SINK_OWASP,
-    SINK_PATTERNS,
-    SINK_TITLES,
-    SOURCE_CALL_NAMES,
-    SOURCE_PATTERNS,
-)
+
+PROPAGATOR_DECAY = 0.9      # per string-mutation step
+RESOLVED_HOP_DECAY = 0.85   # per resolved inter-procedural hop
+UNKNOWN_CALL_DECAY = 0.5    # through an unresolved / third-party call
+MOCK_NAME_FACTOR = 0.3      # variable named mock_/test_/dummy_/fake_
+TEST_PATH_CONFIDENCE_CAP = 0.1
+
+_MOCK_PREFIXES = ("mock_", "test_", "dummy_", "fake_", "sample_", "example_")
+
+# Sink types where only the first positional argument is injectable; the
+# remaining arguments are driver-bound parameters (the parameterized-call
+# sanitizer: execute(sql, params) with a constant sql is safe).
+_FIRST_ARG_SINKS = {
+    TaintSinkType.SQL_QUERY,
+    TaintSinkType.SHELL_COMMAND,
+    TaintSinkType.EVAL_EXEC,
+    TaintSinkType.FILE_PATH,
+    TaintSinkType.TEMPLATE_RENDER,
+    TaintSinkType.REDIRECT,
+}
+
+
+@dataclass
+class TaintState:
+    """Taint of a single value: provenance, confidence, and trace."""
+    source_step: TaintFlowStep
+    source_type: TaintSourceType
+    confidence: float
+    trace: List[TaintFlowStep] = field(default_factory=list)
+    sanitizers: List[SanitizerRecord] = field(default_factory=list)
+    hop_count: int = 0
+    param_index: Optional[int] = None  # set when seeded from a function param
+
+    def decayed(self, factor: float) -> "TaintState":
+        return replace(
+            self,
+            confidence=self.confidence * factor,
+            trace=list(self.trace),
+            sanitizers=list(self.sanitizers),
+        )
+
+
+# Inter-procedural resolver contract (implemented by summaries.SummaryIndex):
+# resolve_call(resolved_chain, arg_states, call_line) ->
+#     (return_state | None, [TaintFlow, ...])
+CallResolver = Callable[
+    [str, List[Optional[TaintState]], int],
+    Tuple[Optional[TaintState], List[TaintFlow]],
+]
 
 
 def _attr_chain(node: ast.AST) -> str:
-    """Flatten an attribute access chain into a dotted string (e.g. 'request.args.get')."""
+    """Flatten an attribute access chain into a dotted string."""
     if isinstance(node, ast.Attribute):
         parent = _attr_chain(node.value)
-        if parent:
-            return f"{parent}.{node.attr}"
-        return node.attr
+        return f"{parent}.{node.attr}" if parent else node.attr
     if isinstance(node, ast.Name):
         return node.id
+    if isinstance(node, ast.Call):
+        return _attr_chain(node.func)
     return ""
 
 
 def _get_code_snippet(lines: List[str], line_number: int) -> str:
-    """Get a code snippet around a given line number (1-indexed)."""
     idx = line_number - 1
     if 0 <= idx < len(lines):
         return lines[idx].strip()
     return ""
 
 
-def _is_sanitizer_call(node: ast.AST, custom_sanitizers: Set[str]) -> bool:
-    """Check if a node represents a call to a known sanitizer function."""
-    if not isinstance(node, ast.Call):
-        return False
-    call_name = _attr_chain(node.func)
-    all_sanitizers = SANITIZER_NAMES | custom_sanitizers
-    return call_name in all_sanitizers or any(s in call_name for s in all_sanitizers)
+def build_alias_map(tree: ast.AST) -> Dict[str, str]:
+    """
+    Resolve import aliases for canonical chain matching.
+
+    ``import subprocess as sp``          -> {"sp": "subprocess"}
+    ``from requests import get as fetch``-> {"fetch": "requests.get"}
+    ``from os import system``            -> {"system": "os.system"}
+    """
+    aliases: Dict[str, str] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for a in node.names:
+                aliases[a.asname or a.name.split(".")[0]] = (
+                    a.name if a.asname else a.name.split(".")[0]
+                )
+        elif isinstance(node, ast.ImportFrom) and node.module and node.level == 0:
+            for a in node.names:
+                if a.name == "*":
+                    continue
+                aliases[a.asname or a.name] = f"{node.module}.{a.name}"
+    return aliases
 
 
-def _get_source_type_for_node(node: ast.AST, custom_sources: Set[str]) -> Optional[TaintSourceType]:
-    """Check if an AST node represents a taint source, return the source type if so."""
-    chain = _attr_chain(node)
-
-    for pattern, source_type in SOURCE_PATTERNS:
-        if chain == pattern or chain.startswith(pattern):
-            return source_type
-
-    if isinstance(node, ast.Call):
-        func_name = _attr_chain(node.func)
-        if func_name in SOURCE_CALL_NAMES:
-            return SOURCE_CALL_NAMES[func_name]
-        for custom in custom_sources:
-            if func_name == custom or func_name.endswith(f".{custom}"):
-                return TaintSourceType.HTTP_PARAMETER
-
-    return None
-
-
-def _get_sink_type_for_call(func_chain: str, custom_sinks: Set[str]) -> Optional[Tuple[TaintSinkType, str]]:
-    """Check if a function call chain is a known taint sink."""
-    for pattern, (sink_type, severity) in SINK_PATTERNS.items():
-        if func_chain == pattern or func_chain.endswith(f".{pattern}") or func_chain.startswith(pattern):
-            return sink_type, severity
-    for custom in custom_sinks:
-        if func_chain == custom or func_chain.endswith(f".{custom}"):
-            return TaintSinkType.SQL_QUERY, "high"
-    return None
+def resolve_chain(chain: str, alias_map: Dict[str, str]) -> str:
+    """Canonicalize the leading segment of a chain through the alias map."""
+    if not chain:
+        return chain
+    head, sep, rest = chain.partition(".")
+    resolved = alias_map.get(head)
+    if resolved is None or resolved == head:
+        return chain
+    return f"{resolved}.{rest}" if sep else resolved
 
 
 class _FunctionTaintVisitor(ast.NodeVisitor):
-    """
-    AST visitor that tracks taint within a single function.
-
-    Builds a taint map: variable_name -> (TaintFlowStep, TaintSourceType)
-    as it walks the function body, and records sink hits.
-    """
+    """Tracks taint within one function (or the module body)."""
 
     def __init__(
         self,
         file_path: str,
         func_name: str,
         lines: List[str],
-        initial_taint: Optional[Dict[str, Tuple[TaintFlowStep, TaintSourceType]]] = None,
+        initial_taint: Optional[Dict[str, TaintState]] = None,
         custom_sources: Optional[Set[str]] = None,
         custom_sinks: Optional[Set[str]] = None,
         custom_sanitizers: Optional[Set[str]] = None,
+        alias_map: Optional[Dict[str, str]] = None,
+        extra_source_specs: Sequence[SourceSpec] = (),
+        extra_sink_specs: Sequence[SinkSpec] = (),
+        call_resolver: Optional[CallResolver] = None,
+        is_test_context: bool = False,
     ):
         self.file_path = file_path
         self.func_name = func_name
         self.lines = lines
-        self.taint_map: Dict[str, Tuple[TaintFlowStep, TaintSourceType]] = dict(initial_taint or {})
-        self.custom_sources: Set[str] = custom_sources or set()
-        self.custom_sinks: Set[str] = custom_sinks or set()
-        self.custom_sanitizers: Set[str] = custom_sanitizers or set()
-        self.found_flows: List[Tuple[TaintFlow, str]] = []
+        self.env: Dict[str, TaintState] = dict(initial_taint or {})
+        self.custom_sources = custom_sources or set()
+        self.custom_sinks = custom_sinks or set()
+        self.custom_sanitizers = custom_sanitizers or set()
+        self.alias_map = alias_map or {}
+        self.extra_source_specs = tuple(extra_source_specs)
+        self.extra_sink_specs = tuple(extra_sink_specs)
+        self.call_resolver = call_resolver
+        self.is_test_context = is_test_context
+        self.found_flows: List[TaintFlow] = []
+        # Sink hits whose taint came from a synthetic parameter seed --
+        # these feed function summaries and are NOT reported as findings.
+        # Entries: (param_index, SinkSpec, sink_line, path_confidence_factor)
+        self.param_sink_hits: List[Tuple[int, SinkSpec, int, float]] = []
+        # Return-taint observations, for function-summary computation.
+        self.return_states: List[TaintState] = []
+        # Call edges with param-tainted args: (resolved_chain, {callee_arg_pos: param_index}, line)
+        self.param_call_edges: List[Tuple[str, Dict[int, int], int]] = []
+
+    # ------------------------------------------------------------------ util
+
+    def _resolve(self, node: ast.AST) -> str:
+        return resolve_chain(_attr_chain(node), self.alias_map)
 
     def _make_step(self, line_number: int, step_type: str, variable_name: str) -> TaintFlowStep:
         return TaintFlowStep(
@@ -120,156 +211,426 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
             variable_name=variable_name,
         )
 
-    def _is_tainted(self, node: ast.AST) -> bool:
-        """Check if an AST node refers to a tainted variable."""
-        if isinstance(node, ast.Name):
-            return node.id in self.taint_map
-        if isinstance(node, ast.Attribute):
-            chain = _attr_chain(node)
-            if chain in self.taint_map:
-                return True
-            if isinstance(node.value, ast.Name) and node.value.id in self.taint_map:
-                return True
-        if isinstance(node, ast.Subscript):
-            return self._is_tainted(node.value)
-        if isinstance(node, ast.Call):
-            return self._is_tainted(node.func)
-        if isinstance(node, ast.JoinedStr):
-            for val in ast.walk(node):
-                if isinstance(val, ast.FormattedValue) and self._is_tainted(val.value):
-                    return True
-        if isinstance(node, ast.BinOp):
-            return self._is_tainted(node.left) or self._is_tainted(node.right)
-        if isinstance(node, ast.IfExp):
-            return self._is_tainted(node.body) or self._is_tainted(node.orelse)
-        return False
+    def _fresh_source_state(
+        self, spec: SourceSpec, line: int, var_name: str
+    ) -> TaintState:
+        step = self._make_step(line, "source", var_name or spec.pattern)
+        return TaintState(
+            source_step=step,
+            source_type=spec.source_type,
+            confidence=spec.confidence,
+        )
 
-    def _get_taint_source(self, node: ast.AST) -> Optional[Tuple[TaintFlowStep, TaintSourceType]]:
-        """Get taint source for a tainted node (first tainted variable found)."""
+    @staticmethod
+    def _union(a: Optional[TaintState], b: Optional[TaintState]) -> Optional[TaintState]:
+        """Union two taint states: keep the higher-confidence provenance."""
+        if a is None:
+            return b
+        if b is None:
+            return a
+        return a if a.confidence >= b.confidence else b
+
+    # ------------------------------------------------------- expression eval
+
+    def _eval(self, node: ast.AST) -> Optional[TaintState]:
+        """Taint state of an expression, with propagator decay applied."""
         if isinstance(node, ast.Name):
-            return self.taint_map.get(node.id)
+            state = self.env.get(node.id)
+            if state is not None:
+                return state
+            return self._match_source_chain(node)
         if isinstance(node, ast.Attribute):
-            chain = _attr_chain(node)
-            if chain in self.taint_map:
-                return self.taint_map[chain]
-            if isinstance(node.value, ast.Name) and node.value.id in self.taint_map:
-                return self.taint_map[node.value.id]
+            src = self._match_source_chain(node)
+            if src is not None:
+                return src
+            return self._eval(node.value)
         if isinstance(node, ast.Subscript):
-            return self._get_taint_source(node.value)
+            return self._eval(node.value)
+        if isinstance(node, ast.Starred):
+            return self._eval(node.value)
         if isinstance(node, ast.Call):
-            return self._get_taint_source(node.func)
+            return self._eval_call(node)
         if isinstance(node, ast.JoinedStr):
-            for val in ast.walk(node):
-                if isinstance(val, ast.FormattedValue):
-                    result = self._get_taint_source(val.value)
-                    if result:
-                        return result
+            state: Optional[TaintState] = None
+            for part in node.values:
+                if isinstance(part, ast.FormattedValue):
+                    state = self._union(state, self._eval(part.value))
+            return state.decayed(PROPAGATOR_DECAY) if state else None
         if isinstance(node, ast.BinOp):
-            left = self._get_taint_source(node.left)
-            if left:
-                return left
-            return self._get_taint_source(node.right)
+            state = self._union(self._eval(node.left), self._eval(node.right))
+            return state.decayed(PROPAGATOR_DECAY) if state else None
+        if isinstance(node, ast.BoolOp):
+            state = None
+            for v in node.values:
+                state = self._union(state, self._eval(v))
+            return state
+        if isinstance(node, ast.IfExp):
+            return self._union(self._eval(node.body), self._eval(node.orelse))
+        if isinstance(node, (ast.Tuple, ast.List, ast.Set)):
+            state = None
+            for elt in node.elts:
+                state = self._union(state, self._eval(elt))
+            return state
+        if isinstance(node, ast.Dict):
+            state = None
+            for v in list(node.keys) + list(node.values):
+                if v is not None:
+                    state = self._union(state, self._eval(v))
+            return state
+        if isinstance(node, ast.NamedExpr):
+            return self._eval(node.value)
+        if isinstance(node, ast.Await):
+            return self._eval(node.value)
         return None
 
-    def _taint_variable(
-        self,
-        var_name: str,
-        line_number: int,
-        source_step: TaintFlowStep,
-        source_type: TaintSourceType,
+    def _match_source_chain(self, node: ast.AST) -> Optional[TaintState]:
+        chain = self._resolve(node)
+        if not chain:
+            return None
+        spec = lookup_source(chain, is_call=False, extra_specs=self.extra_source_specs)
+        if spec is None and chain in self.custom_sources:
+            spec = SourceSpec(chain, TaintSourceType.HTTP_PARAMETER, 0.8)
+        if spec is None:
+            return None
+        return self._fresh_source_state(spec, getattr(node, "lineno", 1), chain)
+
+    def _eval_call(self, node: ast.Call) -> Optional[TaintState]:
+        chain = self._resolve(node.func)
+        arg_nodes = list(node.args) + [kw.value for kw in node.keywords]
+        arg_state: Optional[TaintState] = None
+        for arg in arg_nodes:
+            arg_state = self._union(arg_state, self._eval(arg))
+
+        # 1. Sanitizer?
+        sanitizer = classify_sanitizer(chain, tuple(self.custom_sanitizers))
+        if sanitizer is not None:
+            if arg_state is None or sanitizer.factor == 0.0:
+                return None
+            downgraded = arg_state.decayed(sanitizer.factor)
+            downgraded.sanitizers.append(SanitizerRecord(
+                name=sanitizer.name, kind=sanitizer.kind,
+                factor=sanitizer.factor, line_number=node.lineno,
+            ))
+            downgraded.trace.append(
+                self._make_step(node.lineno, "sanitizer", chain)
+            )
+            return downgraded
+
+    # 2. Source call (input(), request.args.get(...), custom sources)?
+        spec = lookup_source(chain, is_call=True, extra_specs=self.extra_source_specs)
+        if spec is None:
+            for custom in self.custom_sources:
+                if chain == custom or chain.endswith(f".{custom}"):
+                    spec = SourceSpec(chain, TaintSourceType.HTTP_PARAMETER, 0.8)
+                    break
+        if spec is not None:
+            return self._fresh_source_state(spec, node.lineno, chain)
+
+        # 3. Method call on a tainted receiver (s.format(...), s.upper()) --
+        #    string mutation propagator.
+        recv_state = None
+        if isinstance(node.func, ast.Attribute):
+            recv_state = self._eval(node.func.value)
+        if recv_state is not None:
+            combined = self._union(recv_state, arg_state) or recv_state
+            return combined.decayed(PROPAGATOR_DECAY)
+
+        # 4. Inter-procedural: record param-forwarding call edges (used by
+        #    summary computation) and consult the resolver when available.
+        positional_states = [self._eval(a) for a in node.args]
+        self._record_param_call_edge(chain, positional_states, node.lineno)
+        if self.call_resolver is not None:
+            ret_state, flows = self.call_resolver(
+                chain, positional_states, node.lineno
+            )
+            for flow in flows:
+                self._record_flow(flow)
+            if ret_state is not None:
+                return ret_state
+
+        # 5. Unknown call with tainted arguments: over-approximate return
+        #    taint through a third-party/unresolved call at x0.5.
+        if arg_state is not None:
+            return arg_state.decayed(UNKNOWN_CALL_DECAY)
+        return None
+
+    def _record_param_call_edge(
+        self, chain: str, arg_states: List[Optional[TaintState]], line: int
     ) -> None:
-        """Mark a variable as tainted."""
-        self.taint_map[var_name] = (source_step, source_type)
+        mapping = {
+            pos: st.param_index
+            for pos, st in enumerate(arg_states)
+            if st is not None and st.param_index is not None
+        }
+        if mapping:
+            self.param_call_edges.append((chain, mapping, line))
+
+    # ------------------------------------------------------------ statements
 
     def visit_Assign(self, node: ast.Assign) -> None:
-        """Handle assignments: detect sources and propagate taint."""
-        line_number = node.lineno
+        state = self._eval(node.value)
+        for target in node.targets:
+            self._assign_target(target, state, node.lineno)
+        self.generic_visit(node)
 
-        source_type = _get_source_type_for_node(node.value, self.custom_sources)
-        if source_type is not None:
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    source_step_named = self._make_step(line_number, "source", target.id)
-                    self.taint_map[target.id] = (source_step_named, source_type)
-
-        if isinstance(node.value, ast.Call):
-            source_type = _get_source_type_for_node(node.value, self.custom_sources)
-            if source_type is not None:
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        source_step = self._make_step(line_number, "source", target.id)
-                        self.taint_map[target.id] = (source_step, source_type)
-
-        if isinstance(node.value, ast.Call) and _is_sanitizer_call(
-            node.value, self.custom_sanitizers
-        ):
-            for target in node.targets:
-                if isinstance(target, ast.Name):
-                    self.taint_map.pop(target.id, None)
-        elif self._is_tainted(node.value):
-            taint_info = self._get_taint_source(node.value)
-            if taint_info:
-                original_step, src_type = taint_info
-                for target in node.targets:
-                    if isinstance(target, ast.Name):
-                        self._taint_variable(target.id, line_number, original_step, src_type)
-
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        if node.value is not None:
+            self._assign_target(node.target, self._eval(node.value), node.lineno)
         self.generic_visit(node)
 
     def visit_AugAssign(self, node: ast.AugAssign) -> None:
-        """Handle augmented assignments (+=, etc.)."""
-        if self._is_tainted(node.value):
-            taint_info = self._get_taint_source(node.value)
-            if taint_info and isinstance(node.target, ast.Name):
-                original_step, src_type = taint_info
-                self._taint_variable(node.target.id, node.lineno, original_step, src_type)
+        rhs = self._eval(node.value)
+        if isinstance(node.target, ast.Name):
+            existing = self.env.get(node.target.id)
+            combined = self._union(existing, rhs)
+            if combined is not None:
+                combined = combined.decayed(PROPAGATOR_DECAY)
+                self.env[node.target.id] = combined
         self.generic_visit(node)
 
-    def visit_Call(self, node: ast.Call) -> None:
-        """Handle function calls: detect sinks and track cross-function taint."""
-        func_chain = _attr_chain(node.func)
+    def _assign_target(
+        self, target: ast.AST, state: Optional[TaintState], line: int
+    ) -> None:
+        if isinstance(target, (ast.Tuple, ast.List)):
+            for elt in target.elts:
+                self._assign_target(elt, state, line)
+            return
+        if not isinstance(target, ast.Name):
+            return
+        if state is None:
+            # Assignment kills taint when the RHS is clean.
+            self.env.pop(target.id, None)
+            return
+        new_state = replace(
+            state, trace=list(state.trace), sanitizers=list(state.sanitizers)
+        )
+        if new_state.source_step.variable_name in ("", new_state.source_step.code_snippet):
+            new_state.source_step = replace_variable_name(new_state.source_step, target.id)
+        new_state.trace.append(self._make_step(line, "propagation", target.id))
+        self.env[target.id] = new_state
 
-        sink_result = _get_sink_type_for_call(func_chain, self.custom_sinks)
-        if sink_result is not None:
-            sink_type, severity = sink_result
+    def visit_If(self, node: ast.If) -> None:
+        self._eval(node.test)
+        saved = dict(self.env)
+        for stmt in node.body:
+            self.visit(stmt)
+        body_env = self.env
+        self.env = dict(saved)
+        for stmt in node.orelse:
+            self.visit(stmt)
+        else_env = self.env
+        # Branch union: over-approximate by keeping taint from either arm.
+        merged: Dict[str, TaintState] = {}
+        for name in set(body_env) | set(else_env):
+            merged_state = self._union(body_env.get(name), else_env.get(name))
+            if merged_state is not None:
+                merged[name] = merged_state
+        self.env = merged
 
-            all_args = list(node.args) + [kw.value for kw in node.keywords]
-            for arg in all_args:
-                if self._is_tainted(arg):
-                    taint_info = self._get_taint_source(arg)
-                    if taint_info:
-                        original_step, src_type = taint_info
-                        sink_step = self._make_step(node.lineno, "sink", func_chain)
+    def visit_For(self, node: ast.For) -> None:
+        iter_state = self._eval(node.iter)
+        if iter_state is not None:
+            self._assign_target(node.target, iter_state, node.lineno)
+        saved = dict(self.env)
+        for stmt in list(node.body) + list(node.orelse):
+            self.visit(stmt)
+        for name, st in saved.items():
+            if name not in self.env:
+                self.env[name] = st
+            else:
+                self.env[name] = self._union(self.env[name], st)
 
-                        sanitizer_present = any(
-                            _is_sanitizer_call(a, self.custom_sanitizers)
-                            for a in all_args
-                        )
+    def visit_While(self, node: ast.While) -> None:
+        self._eval(node.test)
+        saved = dict(self.env)
+        for stmt in list(node.body) + list(node.orelse):
+            self.visit(stmt)
+        for name, st in saved.items():
+            if name not in self.env:
+                self.env[name] = st
 
-                        flow = TaintFlow(
-                            source_type=src_type,
-                            sink_type=sink_type,
-                            severity=severity,
-                            source_location=original_step,
-                            sink_location=sink_step,
-                            intermediate_steps=[],
-                            title=SINK_TITLES.get(sink_type, "Tainted Data Flow"),
-                            description=(
-                                f"Tainted data from {src_type} source reaches "
-                                f"{sink_type} sink without sanitization."
-                            ),
-                            cwe_id=SINK_CWE.get(sink_type, ""),
-                            owasp_category=SINK_OWASP.get(sink_type, ""),
-                            sanitizers_present=sanitizer_present,
-                        )
-                        var_name = ""
-                        if isinstance(arg, ast.Name):
-                            var_name = arg.id
-                        self.found_flows.append((flow, var_name))
-                        break
-
+    def visit_Expr(self, node: ast.Expr) -> None:
+        self._eval(node.value)
         self.generic_visit(node)
 
     def visit_Return(self, node: ast.Return) -> None:
-        """Track tainted return values (for cross-function propagation)."""
+        if node.value is not None:
+            state = self._eval(node.value)
+            if state is not None:
+                self.return_states.append(state)
+
+    def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        # Nested/child function bodies are analyzed separately by the
+        # analyzer; do not descend (avoids duplicate flows).
+        return
+
+    def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        return
+
+    def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        return
+
+    # ------------------------------------------------------------------ sinks
+
+    def visit_Call(self, node: ast.Call) -> None:
+        self._check_sink(node)
         self.generic_visit(node)
+
+    def _check_sink(self, node: ast.Call) -> None:
+        chain = self._resolve(node.func)
+        spec = lookup_sink(chain, extra_specs=self.extra_sink_specs)
+        custom_hit = False
+        if spec is None:
+            for custom in self.custom_sinks:
+                if chain == custom or chain.endswith(f".{custom}"):
+                    spec = SinkSpec(chain, TaintSinkType.SQL_QUERY, "high", 0.8)
+                    custom_hit = True
+                    break
+        if spec is None:
+            return
+
+        kwarg_factor = self._kwarg_factor(spec, node)
+        if kwarg_factor <= 0.0:
+            return
+
+        sink_type = spec.sink_type
+        if sink_type in _FIRST_ARG_SINKS and not custom_hit:
+            candidate_args = node.args[:1]
+        else:
+            candidate_args = list(node.args) + [kw.value for kw in node.keywords]
+
+        for arg in candidate_args:
+            state = self._eval(arg)
+            if state is None:
+                continue
+            if (
+                state.param_index is not None
+                and state.source_step.step_type == "param"
+            ):
+                # Synthetic parameter seed (summary mode): record the
+                # param->sink reachability, do not report a finding.
+                path_factor = state.confidence * spec.confidence * kwarg_factor
+                if path_factor > 0.0:
+                    self.param_sink_hits.append(
+                        (state.param_index, spec, node.lineno, path_factor)
+                    )
+                continue
+            context = 1.0
+            if isinstance(arg, ast.Name) and arg.id.lower().startswith(_MOCK_PREFIXES):
+                context *= MOCK_NAME_FACTOR
+            final_conf = state.confidence * spec.confidence * kwarg_factor * context
+            if self.is_test_context:
+                final_conf = min(final_conf, TEST_PATH_CONFIDENCE_CAP)
+            if final_conf <= 0.0:
+                continue
+            final_conf = min(1.0, final_conf)
+            sink_step = self._make_step(node.lineno, "sink", chain)
+            var_name = arg.id if isinstance(arg, ast.Name) else ""
+            self._record_flow(self._build_flow(
+                state, spec, sink_step, final_conf, var_name
+            ))
+            break
+
+    @staticmethod
+    def _kwarg_factor(spec: SinkSpec, node: ast.Call) -> float:
+        """Evaluate the sink's keyword-argument semantics."""
+        if spec.kwarg_rule == "subprocess_shell":
+            for kw in node.keywords:
+                if kw.arg == "shell":
+                    if isinstance(kw.value, ast.Constant):
+                        return 1.0 if kw.value.value else 0.0
+                    return 1.0  # dynamic shell= value: over-approximate
+            return SUBPROCESS_NO_SHELL_FACTOR
+        if spec.kwarg_rule == "yaml_safe_loader":
+            for kw in node.keywords:
+                if kw.arg == "Loader" and "Safe" in _attr_chain(kw.value):
+                    return 0.0
+            return 1.0
+        return 1.0
+
+    def _build_flow(
+        self,
+        state: TaintState,
+        spec: SinkSpec,
+        sink_step: TaintFlowStep,
+        confidence: float,
+        var_name: str,
+    ) -> TaintFlow:
+        from Asgard.Heimdall.Security.TaintAnalysis.services._taint_patterns import (
+            SINK_CWE, SINK_OWASP, SINK_TITLES,
+        )
+        sink_type = spec.sink_type
+        sanitizer_note = ""
+        if state.sanitizers:
+            sanitizer_note = (
+                " A heuristic sanitizer was applied along the flow; the "
+                "finding is kept at reduced confidence because its "
+                "effectiveness cannot be verified statically."
+            )
+        return TaintFlow(
+            source_type=state.source_type,
+            sink_type=sink_type,
+            severity=spec.severity,
+            source_location=state.source_step,
+            sink_location=sink_step,
+            intermediate_steps=list(state.trace),
+            title=SINK_TITLES.get(sink_type, "Tainted Data Flow"),
+            description=(
+                f"Tainted data from {state.source_type} source reaches "
+                f"{sink_type} sink." + sanitizer_note
+            ),
+            cwe_id=SINK_CWE.get(sink_type, ""),
+            owasp_category=SINK_OWASP.get(sink_type, ""),
+            sanitizers_present=bool(state.sanitizers),
+            confidence=round(confidence, 4),
+            confidence_bucket=confidence_bucket(confidence),
+            hop_count=state.hop_count,
+            sanitizers_applied=list(state.sanitizers),
+        )
+
+    def _record_flow(self, flow: TaintFlow) -> None:
+        self.found_flows.append(flow)
+
+
+def replace_variable_name(step: TaintFlowStep, var_name: str) -> TaintFlowStep:
+    """Return a copy of a step with the variable name filled in."""
+    data = step.model_dump() if hasattr(step, "model_dump") else step.dict()
+    data["variable_name"] = var_name
+    return TaintFlowStep(**data)
+
+
+# --------------------------------------------------------------------------
+# Legacy helper facade (kept for backwards compatibility with older imports)
+# --------------------------------------------------------------------------
+
+def _is_sanitizer_call(node: ast.AST, custom_sanitizers: Set[str]) -> bool:
+    if not isinstance(node, ast.Call):
+        return False
+    match = classify_sanitizer(_attr_chain(node.func), tuple(custom_sanitizers))
+    return match is not None and match.factor == 0.0
+
+
+def _get_source_type_for_node(node: ast.AST, custom_sources: Set[str]):
+    chain = _attr_chain(node)
+    spec = lookup_source(chain, is_call=isinstance(node, ast.Call))
+    if spec is not None:
+        return spec.source_type
+    if isinstance(node, ast.Call):
+        func_name = _attr_chain(node.func)
+        spec = lookup_source(func_name, is_call=True)
+        if spec is not None:
+            return spec.source_type
+        for custom in custom_sources:
+            if func_name == custom or func_name.endswith(f".{custom}"):
+                return TaintSourceType.HTTP_PARAMETER
+    return None
+
+
+def _get_sink_type_for_call(func_chain: str, custom_sinks: Set[str]):
+    spec = lookup_sink(func_chain)
+    if spec is not None:
+        return spec.sink_type, spec.severity
+    for custom in custom_sinks:
+        if func_chain == custom or func_chain.endswith(f".{custom}"):
+            return TaintSinkType.SQL_QUERY, "high"
+    return None

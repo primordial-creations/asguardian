@@ -3,6 +3,7 @@ Taint Analysis Models
 """
 
 from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import (
+    SanitizerRecord,
     TaintConfig,
     TaintFlow,
     TaintFlowStep,
@@ -12,6 +13,7 @@ from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import (
 )
 
 __all__ = [
+    "SanitizerRecord",
     "TaintConfig",
     "TaintFlow",
     "TaintFlowStep",
