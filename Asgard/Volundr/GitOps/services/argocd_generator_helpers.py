@@ -1,11 +1,45 @@
-from typing import Any, Dict, List, cast
+from fnmatch import fnmatchcase
+from typing import Any, Dict, List, Optional, cast
 
 import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.GitOps.models.gitops_models import (
     ArgoApplication,
+    ArgoAppProject,
     ArgoSource,
+    GitOpsPolicy,
 )
+
+#: First-class ignoreDifferences presets (RESEARCH_02 §9).
+IGNORE_DIFFERENCES_PRESETS: Dict[str, Dict[str, Any]] = {
+    "hpa-replicas": {
+        "group": "apps",
+        "kind": "Deployment",
+        "jsonPointers": ["/spec/replicas"],
+    },
+    "istio-sidecar-injection": {
+        "group": "apps",
+        "kind": "Deployment",
+        "jqPathExpressions": [
+            '.spec.template.spec.containers[] | select(.name == "istio-proxy")',
+            '.spec.template.spec.initContainers[] | select(.name == "istio-init")',
+        ],
+    },
+}
+
+
+def ignore_differences_preset(name: str) -> Dict[str, Any]:
+    """A named ignoreDifferences preset (KeyError for unknown names)."""
+    return dict(IGNORE_DIFFERENCES_PRESETS[name])
+
+
+def _is_exact_chart_version(revision: str) -> bool:
+    """True when a Helm targetRevision is an exact version, not a range."""
+    if not revision:
+        return False
+    return not any(ch in revision for ch in "*^~<>|, ") and not (
+        revision.lower().startswith("x") or ".x" in revision.lower()
+    )
 
 
 def build_source_spec(source: ArgoSource) -> Dict[str, Any]:
@@ -73,8 +107,13 @@ def generate_application_manifest(app: ArgoApplication) -> str:
         manifest["spec"]["destination"]["name"] = app.destination.name
         del manifest["spec"]["destination"]["server"]
 
-    if app.annotations:
-        manifest["metadata"]["annotations"] = app.annotations
+    # Mutating-webhook drift resilience by default (RESEARCH_02/05):
+    # ServerSideDiff avoids false diffs from admission-time mutations.
+    annotations = dict(app.annotations)
+    annotations.setdefault(
+        "argocd.argoproj.io/compare-options", "ServerSideDiff=true"
+    )
+    manifest["metadata"]["annotations"] = annotations
 
     if app.sync_policy:
         sync_policy: Dict[str, Any] = {}
@@ -110,7 +149,35 @@ def generate_application_manifest(app: ArgoApplication) -> str:
     return cast(str, yaml.dump(manifest, default_flow_style=False, sort_keys=False))
 
 
-def validate_application(app: ArgoApplication) -> List[str]:
+def generate_app_project_manifest(project: ArgoAppProject) -> str:
+    """Render an AppProject with repo/destination allowlists."""
+    spec: Dict[str, Any] = {
+        "description": project.description or f"Scoped project {project.name}",
+        "sourceRepos": list(project.source_repos) or [],
+        "destinations": [dict(d) for d in project.destinations],
+        "clusterResourceWhitelist": [
+            dict(w) for w in project.cluster_resource_whitelist
+        ],
+        "namespaceResourceWhitelist": [
+            dict(w) for w in project.namespace_resource_whitelist
+        ],
+    }
+    manifest: Dict[str, Any] = {
+        "apiVersion": "argoproj.io/v1alpha1",
+        "kind": "AppProject",
+        "metadata": {
+            "name": project.name,
+            "namespace": project.namespace,
+            "labels": project.labels,
+        },
+        "spec": spec,
+    }
+    return cast(str, yaml.dump(manifest, default_flow_style=False, sort_keys=False))
+
+
+def validate_application(
+    app: ArgoApplication, policy: Optional[GitOpsPolicy] = None
+) -> List[str]:
     issues: List[str] = []
 
     if not app.name:
@@ -138,6 +205,44 @@ def validate_application(app: ArgoApplication) -> List[str]:
         issues.append(
             "VOL-GITOPS-0002: Application uses the unrestricted 'default' AppProject "
             "- create a scoped AppProject with repo and destination allowlists"
+        )
+
+    # Helm chart revisions must be exact versions, never ranges
+    # (RESEARCH_07 dependency pinning).
+    if app.source.helm is not None and not _is_exact_chart_version(
+        app.source.helm.target_revision
+    ):
+        issues.append(
+            f"VOL-GITOPS-0005: Helm targetRevision "
+            f"'{app.source.helm.target_revision}' is a range - pin an exact "
+            "chart version"
+        )
+
+    # Org allowlists (repoURL hijack defense, RESEARCH_05).
+    if policy is not None:
+        if policy.allowed_repo_patterns and not any(
+            fnmatchcase(app.source.repo_url, pattern)
+            for pattern in policy.allowed_repo_patterns
+        ):
+            issues.append(
+                f"VOL-GITOPS-0003: repoURL '{app.source.repo_url}' is not in the "
+                "GitOpsPolicy repo allowlist"
+            )
+        if policy.allowed_destination_servers and not any(
+            fnmatchcase(app.destination.server, pattern)
+            for pattern in policy.allowed_destination_servers
+        ):
+            issues.append(
+                f"VOL-GITOPS-0004: destination server '{app.destination.server}' "
+                "is not in the GitOpsPolicy destination allowlist"
+            )
+
+    # Prune blast-radius guard (RESEARCH_09 pruning hazards).
+    if app.sync_policy.automated and app.sync_policy.prune:
+        issues.append(
+            "VOL-GITOPS-0006: automated sync with prune enabled - a path "
+            "refactor can cascade into mass deletion; review path changes as "
+            "production changes"
         )
 
     return issues

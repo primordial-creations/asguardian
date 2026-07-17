@@ -62,6 +62,12 @@ from Asgard.Volundr.Validation.services.scoring_profiles import (
     profile_weights,
 )
 from Asgard.Volundr.Validation.services.posture_index import compute_posture_index
+from Asgard.Volundr.Validation.services.render_pipeline import (
+    render_and_validate,
+    render_helm,
+    render_kustomize,
+    run_pluto,
+)
 
 __all__ = [
     "ValidationResult",
@@ -104,4 +110,8 @@ __all__ = [
     "ENVIRONMENT_PROFILES",
     "profile_weights",
     "compute_posture_index",
+    "render_and_validate",
+    "render_helm",
+    "render_kustomize",
+    "run_pluto",
 ]

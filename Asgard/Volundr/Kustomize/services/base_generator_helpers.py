@@ -4,7 +4,50 @@ import yaml  # type: ignore[import-untyped]
 
 from Asgard.Volundr.Kustomize.models.kustomize_models import (
     KustomizeConfig,
+    Replacement,
 )
+
+
+def build_labels_transformer(
+    pairs: Dict[str, str], include_selectors: bool = False
+) -> List[Dict[str, Any]]:
+    """Kustomize v5 `labels` transformer entry (never `commonLabels`,
+    which mutates immutable spec.selector.matchLabels — RESEARCH_09)."""
+    return [{"pairs": dict(pairs), "includeSelectors": include_selectors}]
+
+
+def build_replacements(replacements: List[Replacement]) -> List[Dict[str, Any]]:
+    """Kustomize v5 `replacements` entries (the `vars` successor)."""
+    entries: List[Dict[str, Any]] = []
+    for replacement in replacements:
+        source: Dict[str, Any] = {
+            "kind": replacement.source.kind,
+            "name": replacement.source.name,
+            "fieldPath": replacement.source.field_path,
+        }
+        if replacement.source.version:
+            source["version"] = replacement.source.version
+        targets: List[Dict[str, Any]] = []
+        for target in replacement.targets:
+            select = {
+                key: value
+                for key, value in (
+                    ("kind", target.select.kind),
+                    ("name", target.select.name),
+                    ("group", target.select.group),
+                    ("version", target.select.version),
+                )
+                if value
+            }
+            entry: Dict[str, Any] = {
+                "select": select,
+                "fieldPaths": list(target.field_paths),
+            }
+            if target.options:
+                entry["options"] = dict(target.options)
+            targets.append(entry)
+        entries.append({"source": source, "targets": targets})
+    return entries
 
 
 def generate_deployment(config: KustomizeConfig) -> str:
@@ -177,10 +220,20 @@ def generate_base_kustomization(
         kustomization["namespace"] = config.base.namespace
 
     if config.base.common_labels:
-        kustomization["commonLabels"] = config.base.common_labels
+        # v5 semantics: labels transformer, selectors locked at creation
+        # (VOL-KUST-COMMONLABELS).
+        kustomization["labels"] = build_labels_transformer(
+            config.base.common_labels, config.base.labels_include_selectors
+        )
 
     if config.base.common_annotations:
         kustomization["commonAnnotations"] = config.base.common_annotations
+
+    if config.base.openapi_path:
+        kustomization["openapi"] = {"path": config.base.openapi_path}
+
+    if config.base.replacements:
+        kustomization["replacements"] = build_replacements(config.base.replacements)
 
     if config.base.name_prefix:
         kustomization["namePrefix"] = config.base.name_prefix
@@ -210,6 +263,10 @@ def generate_base_kustomization(
                 cm_entry["literals"] = cm.literals
             if cm.envs:
                 cm_entry["envs"] = cm.envs
+            if cm.options:
+                # Per-generator options: hash suffix stays on by default;
+                # disableNameSuffixHash / immutable are explicit opt-ins.
+                cm_entry["options"] = dict(cm.options)
             kustomization["configMapGenerator"].append(cm_entry)
 
     if config.base.secret_generators:
@@ -222,9 +279,63 @@ def generate_base_kustomization(
                 secret_entry["literals"] = secret.literals
             if secret.envs:
                 secret_entry["envs"] = secret.envs
+            if secret.options:
+                secret_entry["options"] = dict(secret.options)
             kustomization["secretGenerator"].append(secret_entry)
 
     return cast(str, yaml.dump(kustomization, default_flow_style=False, sort_keys=False))
+
+
+def kustomization_findings(content: str, path: str) -> List["Any"]:
+    """v5-semantics findings over a rendered kustomization.yaml
+    (VOL-KUST-COMMONLABELS / VOL-KUST-VARS / VOL-KUST-REMOTE-BASE)."""
+    import re
+
+    from Asgard.Volundr.Validation.models.validation_models import (
+        ValidationCategory,
+        ValidationResult,
+        ValidationSeverity,
+    )
+
+    findings: List[Any] = []
+    if re.search(r"^commonLabels:", content, re.MULTILINE):
+        findings.append(ValidationResult(
+            rule_id="VOL-KUST-COMMONLABELS",
+            message=(
+                f"{path} uses commonLabels — it mutates immutable "
+                "spec.selector.matchLabels on live workloads"
+            ),
+            severity=ValidationSeverity.ERROR,
+            category=ValidationCategory.SCHEMA,
+            file_path=path,
+            context={"target": path},
+        ))
+    if re.search(r"^vars:", content, re.MULTILINE):
+        findings.append(ValidationResult(
+            rule_id="VOL-KUST-VARS",
+            message=f"{path} uses vars — removed in Kustomize v5; use replacements",
+            severity=ValidationSeverity.ERROR,
+            category=ValidationCategory.SCHEMA,
+            file_path=path,
+            context={"target": path},
+        ))
+    try:
+        parsed = yaml.safe_load(content) or {}
+    except yaml.YAMLError:
+        parsed = {}
+    for resource in parsed.get("resources", []) or []:
+        if isinstance(resource, str) and resource.startswith(
+            ("http://", "https://", "git::", "github.com/")
+        ):
+            findings.append(ValidationResult(
+                rule_id="VOL-KUST-REMOTE-BASE",
+                message=f"{path} references remote base '{resource}'",
+                severity=ValidationSeverity.HINT,
+                category=ValidationCategory.BEST_PRACTICE,
+                file_path=path,
+                context={"target": path},
+            ))
+    return findings
 
 
 def validate_base(

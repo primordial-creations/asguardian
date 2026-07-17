@@ -5,6 +5,10 @@ import yaml  # type: ignore[import-untyped]
 from Asgard.Volundr.Kustomize.models.kustomize_models import (
     KustomizeOverlay,
 )
+from Asgard.Volundr.Kustomize.services.base_generator_helpers import (
+    build_labels_transformer,
+    build_replacements,
+)
 
 ENV_DEFAULTS: Dict[str, Dict[str, Any]] = {
     "development": {
@@ -50,10 +54,19 @@ def generate_overlay_kustomization(
         kustomization["nameSuffix"] = overlay.name_suffix
 
     if overlay.common_labels:
-        kustomization["commonLabels"] = overlay.common_labels
+        # v5 semantics: labels transformer with includeSelectors: false —
+        # selector labels are locked at base creation and immutable on
+        # live workloads (VOL-KUST-COMMONLABELS).
+        kustomization["labels"] = build_labels_transformer(overlay.common_labels)
 
     if overlay.common_annotations:
         kustomization["commonAnnotations"] = overlay.common_annotations
+
+    if overlay.openapi_path:
+        kustomization["openapi"] = {"path": overlay.openapi_path}
+
+    if overlay.replacements:
+        kustomization["replacements"] = build_replacements(overlay.replacements)
 
     if overlay.images:
         kustomization["images"] = []

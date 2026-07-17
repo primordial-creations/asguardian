@@ -444,6 +444,98 @@ def _build_default_registry() -> RuleRegistry:
             severity=RuleSeverity.HIGH, category=sec,
             remediation="Create a scoped AppProject with repo/destination allowlists and reference it in `spec.project`.",
         ),
+        RegisteredRule(
+            id="VOL-GITOPS-0003", name="repo-url-allowlist",
+            description=(
+                "Application repoURL is not covered by the GitOpsPolicy "
+                "allowlist — an unreviewed repoURL is a hijack vector "
+                "(RESEARCH_05 App-of-Apps)."
+            ),
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation=(
+                "Add the repository to GitOpsPolicy.allowed_repo_patterns "
+                "(and to the AppProject sourceRepos) or point the app at an "
+                "approved repository."
+            ),
+        ),
+        RegisteredRule(
+            id="VOL-GITOPS-0004", name="destination-allowlist",
+            description=(
+                "Application destination server is not covered by the "
+                "GitOpsPolicy allowlist."
+            ),
+            severity=RuleSeverity.HIGH, category=sec,
+            remediation=(
+                "Add the cluster to GitOpsPolicy.allowed_destination_servers "
+                "or target an approved cluster."
+            ),
+        ),
+        RegisteredRule(
+            id="VOL-GITOPS-0005", name="pinned-chart-version",
+            description=(
+                "Helm source targetRevision must be an exact chart version — "
+                "ranges ('*', '^', '~', 'x') are non-deterministic "
+                "(RESEARCH_07 dependency pinning)."
+            ),
+            severity=RuleSeverity.MEDIUM, category=sec,
+            remediation="Pin the chart to an exact version (e.g. 15.2.3).",
+        ),
+        RegisteredRule(
+            id="VOL-GITOPS-0006", name="prune-blast-radius",
+            description=(
+                "Automated sync with prune enabled deletes anything that "
+                "disappears from the rendered tree — a path refactor can "
+                "cascade into mass deletion (RESEARCH_09 pruning hazards)."
+            ),
+            severity=RuleSeverity.INFO, category=rel,
+            remediation=(
+                "Keep prune, but protect critical apps with "
+                "`Prune=false` sync options per resource or a confirmation "
+                "gate; review path refactors as production changes."
+            ),
+        ),
+        RegisteredRule(
+            id="VOL-GITOPS-0007", name="flux-health-checks",
+            description=(
+                "Flux Kustomization declares no healthChecks — reconciliation "
+                "will report Ready without verifying workload health."
+            ),
+            severity=RuleSeverity.INFO, category=rel,
+            remediation="Add `spec.healthChecks` for the key workloads.",
+        ),
+        # --- Kustomize (v5.x semantics, RESEARCH_09) ---
+        RegisteredRule(
+            id="VOL-KUST-COMMONLABELS", name="no-commonlabels",
+            description=(
+                "commonLabels mutates immutable spec.selector.matchLabels on "
+                "live workloads (API server rejects the update). Use the v5 "
+                "`labels` transformer with includeSelectors: false."
+            ),
+            severity=RuleSeverity.HIGH, category=schema,
+            remediation=(
+                "Replace `commonLabels` with "
+                "`labels: [{pairs: {...}, includeSelectors: false}]`."
+            ),
+        ),
+        RegisteredRule(
+            id="VOL-KUST-VARS", name="no-vars",
+            description=(
+                "`vars` is deprecated/removed in Kustomize v5 — use "
+                "`replacements` with source/target fieldPaths."
+            ),
+            severity=RuleSeverity.HIGH, category=schema,
+            remediation="Migrate `vars` to `replacements`.",
+        ),
+        RegisteredRule(
+            id="VOL-KUST-REMOTE-BASE", name="remote-base-performance",
+            description=(
+                "Remote bases (git/https URLs in resources) are fetched on "
+                "every build — a performance and availability hazard "
+                "(RESEARCH_09 performance section)."
+            ),
+            severity=RuleSeverity.INFO, category=bp,
+            remediation="Vendor the base locally or pin and cache it.",
+        ),
     ]
     for rule in defaults:
         registry.register(rule)
