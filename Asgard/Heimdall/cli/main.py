@@ -153,18 +153,26 @@ def create_parser() -> argparse.ArgumentParser:
             "  heimdall scan ./src --format markdown\n"
             "  heimdall scan ./src --include-tests\n"
             "  heimdall scan ./src --type-check-mode strict\n"
+            "  heimdall scan ./src --profile gaia\n"
+            "  heimdall scan ./src --output ./reports\n"
             "\n"
-            "This runs all Heimdall analyses in sequence:\n"
+            "This runs all general-purpose Heimdall analyses in sequence:\n"
             "  1. File length analysis\n"
             "  2. Complexity analysis\n"
-            "  3. Lazy import detection\n"
-            "  4. Environment variable fallback detection\n"
-            "  5. Static type checking (Pyright/Pylance)\n"
-            "  6. Security vulnerability scan\n"
-            "  7. Performance pattern analysis\n"
-            "  8. OOP metrics (coupling/cohesion)\n"
-            "  9. Architecture analysis (SOLID/layers)\n"
-            "  10. Dependency analysis (circular imports)\n"
+            "  3. Static type checking\n"
+            "  4. Security vulnerability scan\n"
+            "  5. Performance pattern analysis\n"
+            "  6. OOP metrics (coupling/cohesion)\n"
+            "  7. Architecture analysis (SOLID/layers)\n"
+            "  8. Dependency analysis (circular imports)\n"
+            "  9. Test coverage gap analysis\n"
+            "\n"
+            "Organisation house rules (opt-in via --profile gaia):\n"
+            "  - Lazy import detection (all imports must be top-of-file)\n"
+            "  - Environment variable fallback detection (no env/secret defaults)\n"
+            "\n"
+            "The HTML report is written to ./.asgard/reports/ by default;\n"
+            "override with --output <dir> or the HEIMDALL_REPORT_DIR env var.\n"
         ),
     )
     scan_parser.add_argument("path", type=str, nargs="?", default=".", help="Root path to scan (default: current directory)")
@@ -174,6 +182,8 @@ def create_parser() -> argparse.ArgumentParser:
     scan_parser.add_argument("--exclude", "-x", type=str, nargs="+", default=[], help="Glob patterns for paths to exclude")
     scan_parser.add_argument("--type-check-mode", choices=["off", "basic", "standard", "strict", "all"], default="basic", help="Pyright type checking mode (default: basic)")
     scan_parser.add_argument("--open-browser", action="store_true", default=False, help="Open the HTML report in the default browser after scanning (default: off)")
+    scan_parser.add_argument("--profile", choices=["general", "gaia"], default="general", help="Rule profile: 'general' (default) runs only general-purpose checks; 'gaia' additionally enables GAIA house rules (lazy imports, env-var fallbacks)")
+    scan_parser.add_argument("--output", "-o", type=str, default=None, help="Directory to write the HTML report to (default: ./.asgard/reports, or HEIMDALL_REPORT_DIR)")
 
     return parser
 
