@@ -16,6 +16,7 @@ from Asgard.Heimdall.Security.Auth.models.auth_models import (
 from Asgard.Heimdall.Security.Auth.services.jwt_validator import JWTValidator
 from Asgard.Heimdall.Security.Auth.services.password_analyzer import PasswordAnalyzer
 from Asgard.Heimdall.Security.Auth.services.session_analyzer import SessionAnalyzer
+from Asgard.Heimdall.Security.Auth.services.timing_safe_compare import TimingSafeCompareChecker
 from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
 
 
@@ -40,6 +41,7 @@ class AuthAnalyzer:
         self.jwt_validator = JWTValidator(self.config)
         self.session_analyzer = SessionAnalyzer(self.config)
         self.password_analyzer = PasswordAnalyzer(self.config)
+        self.timing_safe_checker = TimingSafeCompareChecker()
 
     def analyze(self, scan_path: Optional[Path] = None) -> AuthReport:
         """
@@ -72,6 +74,9 @@ class AuthAnalyzer:
         if self.config.check_password:
             password_report = self.password_analyzer.scan(path)
             self._merge_reports(combined_report, password_report)
+
+        timing_report = self.timing_safe_checker.scan(path, self.config)
+        self._merge_reports(combined_report, timing_report)
 
         combined_report.scan_duration_seconds = time.time() - start_time
 

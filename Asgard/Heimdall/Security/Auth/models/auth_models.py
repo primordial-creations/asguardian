@@ -30,6 +30,7 @@ class AuthFindingType(str, Enum):
     INSECURE_COOKIE = "insecure_cookie"
     OAUTH_INSECURE_REDIRECT = "oauth_insecure_redirect"
     MISSING_STATE_PARAM = "missing_state_param"
+    TIMING_UNSAFE_COMPARE = "timing_unsafe_compare"
 
 
 class AuthFinding(BaseModel):
@@ -47,6 +48,11 @@ class AuthFinding(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
     remediation: str = Field("", description="Suggested remediation steps")
     references: List[str] = Field(default_factory=list, description="Reference URLs")
+    # Plan 07.6 / plan-06 normalization: stable mechanism id for the
+    # normalization engine. Optional/best-effort -- populated by newer
+    # checks (timing-unsafe compare); pre-existing checks keep passing
+    # their own severity directly and are not required to set this.
+    mechanism_id: Optional[str] = Field(None, description="Plan-06 normalization mechanism id")
 
     class Config:
         use_enum_values = True

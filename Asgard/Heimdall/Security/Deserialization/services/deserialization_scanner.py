@@ -26,7 +26,12 @@ _UNTRUSTED_MARKERS = re.compile(
     r"socket\.(?:recv|accept)|urlopen|urlretrieve|sys\.stdin|input\(|"
     r"\.body\b|\.data\b|\.get_json|\.form\[|\.args\[|"
     r"kafka|rabbitmq|celery|redis\.get|sqs|websocket|ws\.recv|"
-    r"\$_(?:GET|POST|REQUEST|COOKIE)|params\[|query\[)",
+    r"\$_(?:GET|POST|REQUEST|COOKIE)|params\[|query\[|"
+    # Common untrusted-input parameter-naming convention: a function
+    # parameter literally named user_data/user_input/etc is the standard
+    # textual signal SAST tools use to infer a taint source when no
+    # framework decorator is present.
+    r"user_data|user_input|untrusted|client_data|raw_input)",
     re.IGNORECASE,
 )
 _INTERNAL_MARKERS = re.compile(
