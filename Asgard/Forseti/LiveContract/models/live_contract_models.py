@@ -67,6 +67,52 @@ class ProbeResult(BaseModel):
     findings: list[Finding] = Field(default_factory=list)
 
 
+class WorkflowStep(BaseModel):
+    """One Arazzo-lite workflow step (plan 06-C): forward-compatible subset of
+    Arazzo step semantics - `operationId` + optional `parameters`/`body`
+    overrides, `extract` (name -> minimal JSONPath: `$.status`,
+    `$.body.<dotted.path>`), and `expect` (`{status: <int>}`)."""
+
+    operation_id: str = Field(alias="operationId")
+    parameters: dict[str, Any] = Field(default_factory=dict)
+    body: Optional[dict[str, Any]] = Field(default=None)
+    extract: dict[str, str] = Field(default_factory=dict)
+    expect: dict[str, Any] = Field(default_factory=dict)
+
+    class Config:
+        populate_by_name = True
+
+
+class Workflow(BaseModel):
+    """A minimal Arazzo-lite workflow: an ordered list of steps."""
+
+    steps: list[WorkflowStep] = Field(default_factory=list)
+
+
+class WorkflowStepResult(BaseModel):
+    """Outcome of one executed workflow step."""
+
+    operation_id: str
+    status_code: Optional[int] = None
+    error: Optional[str] = None
+    extracted: dict[str, Any] = Field(default_factory=dict)
+    findings: list[Finding] = Field(default_factory=list)
+
+
+class WorkflowReport(BaseModel):
+    """Aggregate result of running a workflow end-to-end."""
+
+    base_url: str
+    steps: list[WorkflowStepResult] = Field(default_factory=list)
+    findings: list[Finding] = Field(default_factory=list)
+
+    @property
+    def has_errors(self) -> bool:
+        from Asgard.Forseti.Rules.models._rule_base_models import Severity
+
+        return any(f.severity == Severity.ERROR for f in self.findings)
+
+
 class DriftReport(BaseModel):
     """Aggregate drift report across a probe run."""
 
