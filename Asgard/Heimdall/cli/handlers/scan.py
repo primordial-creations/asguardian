@@ -106,7 +106,12 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
 
     for category, data in scan_results.items():
         status = data.get("status", "?")
-        status_str = f"{'PASS' if status == 'PASS' else 'FAIL' if status == 'FAIL' else 'ERR '}"
+        status_str = (
+            "PASS" if status == "PASS" else
+            "FAIL" if status == "FAIL" else
+            "N/A " if status == "N/A" else
+            "ERR "
+        )
         label = _SCAN_DISPLAY_NAMES.get(category, category.replace("_", " ").title())
         detail = _detail_str(category, data)
         print(f"  {label:<35} {status_str:<8} {detail}")
@@ -114,9 +119,13 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
     pass_count = sum(1 for d in scan_results.values() if d.get("status") == "PASS")
     fail_count = sum(1 for d in scan_results.values() if d.get("status") == "FAIL")
     error_count = sum(1 for d in scan_results.values() if d.get("status") == "ERROR")
+    na_count = sum(1 for d in scan_results.values() if d.get("status") == "N/A")
 
     print()
-    print(f"  Results: {pass_count} passed, {fail_count} failed, {error_count} errors")
+    print(
+        f"  Results: {pass_count} passed, {fail_count} failed, "
+        f"{error_count} errors, {na_count} not applicable"
+    )
     print(f"  Overall: {'PASSING' if overall_exit == 0 else 'FAILING'}")
     print()
     print("=" * 70)
@@ -132,6 +141,7 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
                 "passed": pass_count,
                 "failed": fail_count,
                 "errors": error_count,
+                "not_applicable": na_count,
             },
         }
         print()
