@@ -11,6 +11,7 @@ Quantifies and prioritizes technical debt across the codebase using multiple met
 Provides ROI analysis, time horizon projections, and business impact weighting.
 """
 
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
@@ -59,6 +60,7 @@ from Asgard.Bragi.Quality.services._git_friction import (
     SEVERITY_DOWNGRADE,
 )
 from Asgard.Bragi.Quality.services._remediation_model import RemediationModel
+from Asgard.Bragi.common.context_classifier import CodeContext, classify
 from Asgard.Bragi.Quality.services._technical_debt_report import (
     generate_json_report,
     generate_markdown_report,
@@ -108,6 +110,9 @@ class TechnicalDebtAnalyzer:
         # deterministic outside a git checkout.
         self._friction_by_file: Dict[str, FileFriction] = {}
         self._use_friction: bool = False
+        # Plan 04 Phase A: absolute paths classified GENERATED/
+        # SUSPECTED_GENERATED during the last analyze() call.
+        self._generated_paths: set = set()
 
     def use_git_friction(self, repo_root: Optional[Path] = None) -> None:
         """
@@ -176,7 +181,15 @@ class TechnicalDebtAnalyzer:
         if DebtType.DEPENDENCIES.value in enabled_types:
             analyze_dependency_debt(path, report, self.config)
 
-        report.total_lines_of_code = count_lines_of_code(path, self.config)
+        # Plan 04 Phase A: stamp context on every item and exclude
+        # GENERATED/SUSPECTED_GENERATED files from the debt report entirely
+        # (a category error in maintainability metrics); test cases are
+        # exempt from documentation debt (Plan 04 Sec.3.2).
+        self._stamp_and_filter_context(report)
+
+        report.total_lines_of_code = count_lines_of_code(
+            path, self.config, exclude_paths=self._generated_paths
+        )
         if report.total_lines_of_code > 0:
             report.debt_ratio = report.total_debt_hours / report.total_lines_of_code * 1000
 
@@ -320,6 +333,50 @@ class TechnicalDebtAnalyzer:
     def _changed_since(path: Path, all_files: List[Path], state) -> List[Path]:
         from Asgard.Bragi.Quality.services._debt_state_store import changed_files as _changed
         return _changed(path, all_files, state)
+
+    def _stamp_and_filter_context(self, report: DebtReport) -> None:
+        """
+        Classify every debt item's file (Plan 04 Phase A) and:
+          - drop items in GENERATED/SUSPECTED_GENERATED files entirely
+            (category error in maintainability metrics);
+          - drop DOCUMENTATION-type items in TEST files (test cases are
+            docstring-exempt; only test infrastructure is doc-mandatory,
+            which the analyzer cannot yet distinguish from a plain test
+            case, so the conservative choice is full exemption).
+        Recomputes total_debt_hours / debt_by_type / debt_by_severity from
+        the filtered item list so aggregates stay consistent.
+        """
+        self._generated_paths = set()
+        kept: List[DebtItem] = []
+        classify_cache: Dict[str, str] = {}
+        for item in report.debt_items:
+            file_path = item.file_path
+            if file_path not in classify_cache:
+                try:
+                    context = classify(file_path).value
+                except Exception:
+                    context = CodeContext.PRODUCTION.value
+                classify_cache[file_path] = context
+            item.context = classify_cache[file_path]
+
+            if item.context in (CodeContext.GENERATED.value, CodeContext.SUSPECTED_GENERATED.value):
+                self._generated_paths.add(os.path.abspath(file_path))
+                continue
+            debt_type = item.debt_type if isinstance(item.debt_type, str) else item.debt_type.value
+            if item.context == CodeContext.TEST.value and debt_type == DebtType.DOCUMENTATION.value:
+                continue
+            kept.append(item)
+
+        report.debt_items = kept
+        report.total_debt_hours = 0.0
+        report.debt_by_type = {}
+        report.debt_by_severity = {}
+        for item in kept:
+            report.total_debt_hours += item.effort_hours
+            debt_type = item.debt_type if isinstance(item.debt_type, str) else item.debt_type.value
+            report.debt_by_type[debt_type] = report.debt_by_type.get(debt_type, 0.0) + item.effort_hours
+            severity = item.severity if isinstance(item.severity, str) else item.severity.value
+            report.debt_by_severity[severity] = report.debt_by_severity.get(severity, 0) + 1
 
     @staticmethod
     def _item_interval(minutes: float) -> EffortInterval:

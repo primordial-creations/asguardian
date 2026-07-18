@@ -132,6 +132,15 @@ class DebtItem(BaseModel):
     recommendation: DebtRecommendation = Field(
         DebtRecommendation.FIX, description="Recommended handling for this item"
     )
+    context: str = Field(
+        "production",
+        description=(
+            "Code context this item's file was classified under (Plan 04 "
+            "Phase A): production | test | generated | suspected_generated | "
+            "script. Stamped automatically by the analyzer via "
+            "Bragi.common.context_classifier."
+        ),
+    )
     priority_score_override: Optional[float] = Field(
         None,
         description=(
