@@ -141,25 +141,62 @@ def scan_pii_log_sinks(tree: ast.AST, source_lines: List[str]) -> List[PiiLogSin
         if not isinstance(func_node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Module)):
             continue
 
+        # Adversarial-review fix (MAJOR-7): this used to be a single pass
+        # over assignments, so only a ONE-hop rename was resolved
+        # (`ssn = user.ssn` -> alias_terms["ssn"] = "ssn"). A second
+        # rename (`x = user.ssn; y = x; logger.info(y)`) was invisible:
+        # by the time `y = x` was considered, `x` may not yet have been
+        # in `alias_terms` (dict ordering aside, a single pass can't
+        # chase `y -> x -> lexicon-term` transitively at all if the
+        # simple-Name-to-Name case wasn't even collected). Iterate the
+        # assignment scan to a fixed point (bounded at 5 hops so a
+        # pathological/cyclic rename chain can't hang the scan) so
+        # `y = x; z = y; logger.info(z)`-style multi-hop renames still
+        # resolve to the underlying lexicon term.
+        assign_stmts = [
+            stmt for stmt in ast.walk(func_node)
+            if isinstance(stmt, ast.Assign)
+            and len(stmt.targets) == 1
+            and isinstance(stmt.targets[0], ast.Name)
+        ]
+
         alias_terms: dict = {}
-        for stmt in ast.walk(func_node):
-            if isinstance(stmt, ast.Assign) and len(stmt.targets) == 1 and isinstance(stmt.targets[0], ast.Name):
+        for _hop in range(5):
+            changed = False
+            for stmt in assign_stmts:
                 target_name = stmt.targets[0].id
+                if target_name in alias_terms:
+                    continue
+
                 term = _matches_lexicon(target_name)
                 if term:
                     alias_terms[target_name] = term
+                    changed = True
                     continue
+
                 # value-side hint: user.ssn / record["ssn"]
                 if isinstance(stmt.value, ast.Attribute):
                     value_term = _matches_lexicon(stmt.value.attr)
                     if value_term:
                         alias_terms[target_name] = value_term
+                        changed = True
+                        continue
                 elif isinstance(stmt.value, ast.Subscript):
                     key = stmt.value.slice
                     if isinstance(key, ast.Constant) and isinstance(key.value, str):
                         value_term = _matches_lexicon(key.value)
                         if value_term:
                             alias_terms[target_name] = value_term
+                            changed = True
+                            continue
+                # multi-hop rename: y = x, where x already resolved
+                elif isinstance(stmt.value, ast.Name) and stmt.value.id in alias_terms:
+                    alias_terms[target_name] = alias_terms[stmt.value.id]
+                    changed = True
+                    continue
+
+            if not changed:
+                break
 
         for call_node in ast.walk(func_node):
             if not isinstance(call_node, ast.Call):

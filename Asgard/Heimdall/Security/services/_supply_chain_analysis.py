@@ -175,15 +175,21 @@ def detect_private_index(manifest_paths: List[Path]) -> bool:
     return False
 
 
+# Adversarial-review fix (MAJOR-4): a naive `"test" in name` substring
+# check matches "requirements-LATEST.txt" (contains "test" inside
+# "latest"), mislabeling a PRODUCTION manifest as dev/test-only and
+# discounting real findings in it (e.g. a typosquat). Match "dev"/"test"
+# only as a whole token bounded by start/end or a separator
+# (-, _, .), e.g. "requirements-dev.txt", "dev-requirements.txt",
+# "test-requirements.txt" -- not "latest.txt" or "contest.txt".
+_DEV_TEST_TOKEN_RE = re.compile(r"(?:^|[-_.])(?:dev|test)(?:[-_.]|$)")
+
+
 def is_dev_dependency_file(file_path: Path) -> bool:
     """Filename heuristic for dev/test-only dependency manifests (plan
     07.10 DEEPTHINK_11 severity discount). Static, no execution."""
     name = file_path.name.lower()
-    return (
-        "dev" in name
-        or "test" in name
-        or name in ("requirements-dev.txt", "dev-requirements.txt", "test-requirements.txt")
-    )
+    return bool(_DEV_TEST_TOKEN_RE.search(name))
 
 
 def parse_pyproject_dev_dependencies(file_path: Path) -> Dict[str, str]:

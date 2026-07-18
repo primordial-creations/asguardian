@@ -77,6 +77,9 @@ _MAPPING: Dict[str, Tuple[str, Optional[str], Optional[str]]] = {
     ContainerFindingType.WRITABLE_ROOT_FS.value: (
         "container.writable_root_fs", "CIS-Docker-5.12", "NIST-800-190-4.3.3",
     ),
+    ContainerFindingType.ADD_REMOTE_URL.value: (
+        "container.add_remote_url", "CIS-Docker-4.9", "NIST-800-190-4.1.3",
+    ),
 }
 
 

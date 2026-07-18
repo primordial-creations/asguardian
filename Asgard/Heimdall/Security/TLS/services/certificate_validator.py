@@ -127,21 +127,24 @@ class CertificateValidator:
 
                 code_snippet = extract_code_snippet(lines, line_number)
 
-                # Plan 07.9 max-precision posture: apps behind a
-                # TLS-terminating proxy legitimately disable verification
-                # for internal-only calls, so a code-level verify=False /
-                # CERT_NONE signal is demoted to a hotspot (LOW, not
-                # blocking) rather than a confirmed CRITICAL/HIGH finding
-                # -- config-file evidence (nginx/HAProxy/Terraform) is the
-                # higher-precision signal, see _tls_config_analyzer.py.
-                is_hotspot = pattern.finding_type in (
-                    TLSFindingType.DISABLED_VERIFICATION,
-                    TLSFindingType.CERT_NONE,
-                    TLSFindingType.NO_CERT_VALIDATION,
-                    TLSFindingType.DISABLED_HOSTNAME_CHECK,
-                )
-                severity = "LOW" if is_hotspot else pattern.severity
-                confidence = min(pattern.confidence, 0.5) if is_hotspot else pattern.confidence
+                # Adversarial-review correction (was: blanket hotspot
+                # downgrade to LOW for verify=False / CERT_NONE code
+                # patterns, on the theory that a TLS-terminating proxy
+                # protects the connection). That reasoning only applies to
+                # INBOUND server-side TLS termination. These patterns
+                # (requests.get(..., verify=False), ssl.CERT_NONE, etc.)
+                # are OUTBOUND client-side certificate verification being
+                # disabled -- a TLS-terminating proxy sitting in front of
+                # *this* service does nothing to protect an outbound call
+                # *this* service makes to somewhere else. Disabling client
+                # cert verification is an unconditional real vulnerability
+                # (MITM-exploitable) and must not be downgraded to LOW.
+                # Config-file evidence (nginx/HAProxy/Terraform, see
+                # _tls_config_analyzer.py) remains a separate, additional
+                # signal -- it does not soften this one.
+                is_hotspot = False
+                severity = pattern.severity
+                confidence = pattern.confidence
 
                 finding = TLSFinding(
                     file_path=str(file_path.relative_to(root_path)),

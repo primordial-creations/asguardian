@@ -14,6 +14,7 @@ from Asgard.Heimdall.Security.Container.services._dockerfile_patterns import (
 )
 from Asgard.Heimdall.Security.Container.services._dockerfile_structural_checks import (
     check_add_instead_of_copy,
+    check_add_remote_url,
     check_exposed_ports,
     check_latest_tag,
     check_missing_healthcheck,
@@ -73,6 +74,7 @@ __all__ = [
     "check_secrets_in_env",
     "check_exposed_ports",
     "check_add_instead_of_copy",
+    "check_add_remote_url",
     "check_missing_healthcheck",
     "check_run_patterns",
 ]

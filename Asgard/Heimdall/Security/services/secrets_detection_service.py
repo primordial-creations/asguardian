@@ -22,6 +22,7 @@ from Asgard.Heimdall.Security.services._secret_patterns import (
 )
 from Asgard.Heimdall.Security.services._secrets_detection_helpers import (
     calculate_confidence,
+    has_env_or_example_proximity,
     is_false_positive,
     sanitize_line,
     severity_meets_threshold,
@@ -169,6 +170,15 @@ class SecretsDetectionService:
                 if is_false_positive(secret_value, matched_text, content, match.start()):
                     continue
 
+                # BLOCKER-3 fix: proximity of an unrelated env-var read
+                # call or "example"/"sample" wording is a soft signal --
+                # it downgrades confidence below, it does not drop the
+                # finding. Only a placeholder VALUE (checked above and
+                # via is_example_or_placeholder) justifies a full drop.
+                soft_fp_context = has_env_or_example_proximity(
+                    content, match.start(), len(matched_text)
+                )
+
                 entropy = None
                 if pattern.min_entropy > 0:
                     entropy = calculate_entropy(secret_value)
@@ -178,8 +188,25 @@ class SecretsDetectionService:
                 line_content = lines[line_number - 1] if line_number <= len(lines) else ""
 
                 base_confidence = calculate_confidence(pattern, secret_value, entropy)
-                sem = semantic_score(line_content, max(0, column), context)
+                # Adversarial-review fix (BLOCKER-2): semantic_score needs
+                # the position of the VALUE within the line so
+                # _identifier_before_match can see the identifier text
+                # preceding it (e.g. "aws_secret_access_key = "). Passing
+                # match.start() (the start of the whole match, which
+                # BEGINS AT the identifier token itself for patterns like
+                # `identifier\s*[=:]\s*['"]?(value)`) truncates the prefix
+                # before the identifier is even in it, so
+                # _identifier_before_match always returned "" and the
+                # high/low-signal identifier paths never fired.
+                value_start = match.start(1) if match.lastindex and match.lastindex >= 1 else match.start()
+                _, value_column = find_line_column(content, value_start)
+                sem = semantic_score(line_content, max(0, value_column - 1), context)
                 folded_confidence = fold_semantic_score(base_confidence, sem)
+
+                if soft_fp_context:
+                    # Downgrade (floor), never drop -- "never disappears,
+                    # floor keeps it visible" per this module's contract.
+                    folded_confidence = min(folded_confidence, 0.35)
 
                 finding = SecretFinding(
                     file_path=str(file_path.relative_to(root_path)),
