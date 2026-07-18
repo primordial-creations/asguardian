@@ -52,6 +52,28 @@ def add_security_args(parser: argparse.ArgumentParser) -> None:
             ".heimdall.yml test_context_enabled filtering for display."
         ),
     )
+    parser.add_argument(
+        "--online",
+        action="store_true",
+        default=False,
+        help=(
+            "STRICT OPT-IN. Cost: NETWORK. Additionally query OSV.dev (and, "
+            "with --nvd-fallback, NVD) for live dependency-vulnerability data "
+            "during 'dependencies'/'scan' analysis, merged with the bundled "
+            "local vulnerability database. Off by default -- no scan makes a "
+            "network call unless this flag is passed explicitly."
+        ),
+    )
+    parser.add_argument(
+        "--nvd-fallback",
+        action="store_true",
+        default=False,
+        help=(
+            "With --online, also query NVD's keyword-search API for packages "
+            "OSV had zero hits for. No effect without --online. Optional "
+            "NVD_API_KEY env var raises NVD's rate limit; never required."
+        ),
+    )
 
 
 def add_taint_args(parser: argparse.ArgumentParser) -> None:

@@ -16,6 +16,7 @@ from Asgard.Bragi.Dependencies.services.vulnerability_checker import (
     VulnerabilityChecker,
     VulnerabilityFinding,
     VulnerabilityResult,
+    merge_findings,
 )
 
 __all__ = [
@@ -30,4 +31,5 @@ __all__ = [
     "VulnerabilityChecker",
     "VulnerabilityFinding",
     "VulnerabilityResult",
+    "merge_findings",
 ]
