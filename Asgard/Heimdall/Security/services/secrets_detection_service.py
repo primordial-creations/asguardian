@@ -27,6 +27,11 @@ from Asgard.Heimdall.Security.services._secrets_detection_helpers import (
     severity_meets_threshold,
     severity_order,
 )
+from Asgard.Heimdall.Security.services._secrets_semantic_context import (
+    fold_semantic_score,
+    semantic_score,
+)
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
 from Asgard.Heimdall.Security.utilities.security_utils import (
     calculate_entropy,
     extract_code_snippet,
@@ -172,6 +177,10 @@ class SecretsDetectionService:
 
                 line_content = lines[line_number - 1] if line_number <= len(lines) else ""
 
+                base_confidence = calculate_confidence(pattern, secret_value, entropy)
+                sem = semantic_score(line_content, max(0, column), context)
+                folded_confidence = fold_semantic_score(base_confidence, sem)
+
                 finding = SecretFinding(
                     file_path=str(file_path.relative_to(root_path)),
                     line_number=line_number,
@@ -182,7 +191,10 @@ class SecretsDetectionService:
                     pattern_name=pattern.name,
                     masked_value=mask_secret(secret_value),
                     line_content=sanitize_line(line_content, secret_value),
-                    confidence=calculate_confidence(pattern, secret_value, entropy),
+                    confidence=folded_confidence,
+                    confidence_bucket=confidence_bucket(folded_confidence),
+                    semantic_score=sem,
+                    mechanism_id=f"secret.{pattern.secret_type.value.lower()}",
                     remediation=pattern.remediation or f"Remove hardcoded {pattern.description.lower()} from source code.",
                 )
 

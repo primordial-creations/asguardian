@@ -43,6 +43,18 @@ _ESSENTIAL_GITIGNORE = [
 class GitSecurityScanner:
     """Scans git repositories for secrets in history, current files, and config issues."""
 
+    def __init__(self, full_history: bool = False) -> None:
+        """
+        ``full_history=True`` (plan 07.3, RESEARCH_12) extends the default
+        ``--all`` refs sweep with dangling/orphaned commits (``git fsck
+        --unreachable``) and the reflog -- history a plain ``--all``
+        traversal misses (e.g. a secret pushed then force-pushed away, or
+        committed on a branch that was later deleted, still lives as an
+        unreachable object until GC). Opt-in because ``git fsck`` is
+        O(objects) and can be slow on very large repos.
+        """
+        self.full_history = full_history
+
     def scan(self, repo_path: Path) -> GitScanReport:
         if not (repo_path / ".git").exists():
             return GitScanReport(repo_path=str(repo_path))
@@ -50,6 +62,8 @@ class GitSecurityScanner:
         self._repo = repo_path
         findings: List[GitFinding] = []
         findings.extend(self._check_sensitive_files_in_history())
+        if self.full_history:
+            findings.extend(self._check_dangling_and_reflog_history())
         findings.extend(self._check_secrets_in_current_files())
         findings.extend(self._check_gitignore())
         findings.extend(self._check_branch_protection())
@@ -96,6 +110,58 @@ class GitSecurityScanner:
                         recommendation="Clean git history with git-filter-repo or BFG",
                         details="Still in repo" if exists_now else "In history only",
                     ))
+        return findings
+
+    def _check_dangling_and_reflog_history(self) -> List[GitFinding]:
+        """
+        Plan 07.3 full-history mode: sweep dangling/unreachable commits
+        (``git fsck --unreachable --no-reflog``) and the reflog for
+        sensitive filenames, beyond what ``log --all`` reaches.
+
+        Documented limitation ("phantom secret" -- RESEARCH_12): a secret
+        found only in unreachable history is NOT remediated by deleting
+        the file from the working tree or even by history rewriting alone
+        -- if the repo was ever pushed/cloned/forked, the object may
+        already exist outside this checkout. History rewrite is a
+        compliance/hygiene step; the only real fix is credential
+        rotation. This scanner surfaces that guidance in the finding
+        text rather than implying "removed from history" == "safe now".
+        """
+        findings: List[GitFinding] = []
+        fsck_output = self._git(["fsck", "--unreachable", "--no-reflog"])
+        dangling_commits = [
+            line.split()[-1] for line in fsck_output.strip().splitlines()
+            if line.startswith("unreachable commit")
+        ]
+        seen: set = set()
+        for commit in dangling_commits[:200]:  # bound worst-case fsck fanout
+            names = self._git(["show", "--pretty=format:", "--name-only", commit])
+            for file_path in names.strip().splitlines():
+                if not file_path or file_path in seen:
+                    continue
+                for pattern, severity, issue_type, desc in _SENSITIVE_FILES:
+                    if re.search(pattern, file_path, re.IGNORECASE):
+                        seen.add(file_path)
+                        findings.append(GitFinding(
+                            file_path=file_path,
+                            commit=commit,
+                            severity=GitSeverity(severity),
+                            issue_type=f"dangling_{issue_type}",
+                            description=(
+                                f"{desc} found in an unreachable/dangling commit "
+                                f"({commit[:12]}) -- not visible to a plain "
+                                "'git log --all' but still present as a git object"
+                            ),
+                            recommendation=(
+                                "Do not assume deletion or history rewrite alone is "
+                                "sufficient: if this repo was ever pushed, cloned, or "
+                                "forked before the object became dangling, treat any "
+                                "credential found here as compromised and rotate it. "
+                                "History rewrite (git-filter-repo/BFG) plus `git gc "
+                                "--prune=now` is a hygiene step, not the remediation."
+                            ),
+                            details="Reachable only via git fsck --unreachable (phantom secret)",
+                        ))
         return findings
 
     def _check_secrets_in_current_files(self) -> List[GitFinding]:

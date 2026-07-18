@@ -86,6 +86,25 @@ class SecretFinding(BaseModel):
         False,
         description="Always False for secrets by policy; present for schema uniformity.",
     )
+    mechanism_id: str = Field(
+        "secret.generic",
+        description="Normalization-engine mechanism id (plan 06).",
+    )
+    confidence_bucket: str = Field(
+        "probable",
+        description="Qualitative confidence bucket (plan 06 priority.confidence_bucket).",
+    )
+    semantic_score: float = Field(
+        0.5,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Plan 07.3 semantic context score: identifier-name and "
+            "behavioral-proof signal, independent of pattern-match "
+            "confidence. Folded into `confidence` but reported separately "
+            "for explainability."
+        ),
+    )
 
     class Config:
         use_enum_values = True
