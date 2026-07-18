@@ -1,0 +1,18 @@
+# Java language profile (Plan 05 Sec.3.1).
+#
+# Statically compiled, verbose-by-convention OOP language - RESEARCH_02's
+# Shatnawi WMC/CBO anchors were derived from Java corpora, so this profile
+# uses them directly rather than adjusting for an idiom mismatch.
+language: java
+provenance: "corpus P90/P95 estimate, top OSS Java repos, 2025 snapshot; RESEARCH_02 (Shatnawi WMC/CBO anchors)"
+thresholds:
+  cognitive_complexity: {warn: 15, fail: 50}
+  cyclomatic_complexity: {warn: 10, fail: 20}
+scalar_thresholds:
+  wmc: 20
+  cbo: 9
+  max_efferent: 10
+  method_ast_mass_p90: 120
+  loc_file_critical: 600
+severity_confidence:
+  global_dead_code: HIGH   # statically compiled: dead code is provable, not heuristic

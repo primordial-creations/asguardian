@@ -40,6 +40,44 @@ class TestFallbackChain:
         py_cc = service.threshold("python", "cyclomatic_complexity")
         assert go_cc.warn > py_cc.warn
 
+    @pytest.mark.parametrize(
+        "language", ["java", "csharp", "cpp", "ruby", "php", "rust", "shell"]
+    )
+    def test_new_language_profile_loads_and_resolves(self, language):
+        service = LanguageProfileService()
+        profile = service.resolve(language)
+        assert profile.language == language
+        assert "cyclomatic_complexity" in profile.thresholds
+        assert "cognitive_complexity" in profile.thresholds
+        assert profile.scalar_thresholds.get("wmc") is not None
+        assert profile.provenance  # never blank - always carries provenance
+
+    def test_rust_has_wider_thresholds_than_generic_like_go(self):
+        service = LanguageProfileService()
+        rust_cc = service.threshold("rust", "cyclomatic_complexity")
+        py_cc = service.threshold("python", "cyclomatic_complexity")
+        assert rust_cc.warn > py_cc.warn
+
+    def test_shell_has_tighter_thresholds_than_generic(self):
+        service = LanguageProfileService()
+        shell_cc = service.threshold("shell", "cyclomatic_complexity")
+        py_cc = service.threshold("python", "cyclomatic_complexity")
+        assert shell_cc.warn < py_cc.warn
+
+    def test_java_and_csharp_statically_compiled_dead_code_confidence_is_high(self):
+        service = LanguageProfileService()
+        java_profile = service.resolve("java")
+        csharp_profile = service.resolve("csharp")
+        assert java_profile.severity_confidence["global_dead_code"] == "HIGH"
+        assert csharp_profile.severity_confidence["global_dead_code"] == "HIGH"
+
+    def test_ruby_and_php_dynamic_dead_code_confidence_is_low(self):
+        service = LanguageProfileService()
+        ruby_profile = service.resolve("ruby")
+        php_profile = service.resolve("php")
+        assert ruby_profile.severity_confidence["global_dead_code"] == "LOW"
+        assert php_profile.severity_confidence["global_dead_code"] == "LOW"
+
 
 class TestLocalOverride:
     def test_local_profile_overrides_language_profile(self, tmp_path):
