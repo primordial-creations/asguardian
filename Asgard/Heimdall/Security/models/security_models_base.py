@@ -157,6 +157,32 @@ class DependencyVulnerability(BaseModel):
     published_date: Optional[datetime] = Field(None, description="When the vulnerability was published")
     references: List[str] = Field(default_factory=list, description="Reference URLs")
     ecosystem: str = Field("pypi", description="Package ecosystem (pypi, npm, etc.)")
+    mechanism_id: str = Field("", description="Normalization-engine mechanism id (plan 06).")
+    confidence_bucket: str = Field("probable", description="Qualitative confidence bucket (plan 06).")
+    confidence: float = Field(0.7, ge=0.0, le=1.0, description="Confidence score")
+    is_dev_dependency: bool = Field(
+        False,
+        description=(
+            "Plan 07.10 DEEPTHINK_11: dev/test-only dependencies (declared in "
+            "a dev-extras group, requirements-dev.txt, etc.) get a severity "
+            "discount rather than suppression -- a vulnerable dev tool is "
+            "still a supply-chain risk (CI/CD compromise) but does not ship "
+            "to production."
+        ),
+    )
+    finding_kind: str = Field(
+        "known_vulnerability",
+        description=(
+            "'known_vulnerability' (OSV/NVD/local DB match), 'typosquat' "
+            "(manifest entry similar to a popular package name), or "
+            "'dependency_confusion' (internal-looking name resolvable on a "
+            "public index) -- plan 07.10."
+        ),
+    )
+    source_db: str = Field(
+        "local",
+        description="Provenance of the vulnerability data: 'osv', 'nvd', or 'local' (bundled offline DB).",
+    )
 
     class Config:
         use_enum_values = True
