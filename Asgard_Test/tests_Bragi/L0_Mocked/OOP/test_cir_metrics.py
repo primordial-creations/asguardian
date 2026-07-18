@@ -50,7 +50,7 @@ class TestCIRMetricsPython:
         assert "UserRepository" in metrics[0].coupled_types
 
     def test_unsupported_language_returns_empty(self):
-        assert analyze_file("f.rb", "class Foo; end", "ruby") == []
+        assert analyze_file("f.kt", "class Foo", "kotlin") == []
 
     def test_explain_is_actionable(self):
         src = "class Solo:\n    def a(self):\n        self.x = 1\n"

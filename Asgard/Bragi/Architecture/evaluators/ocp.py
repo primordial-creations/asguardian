@@ -29,10 +29,13 @@ def evaluate(file_info: FileInfo, cls: ClassInfo) -> List[SOLIDViolation]:
         hits = method.all_identifiers & _TYPE_CHECK_NAMES
         if hits and method.type_switches >= MIN_BRANCHES:
             violations.append(_violation(cls, method, method.type_switches))
-        elif hits and method.type_switches == 0:
-            # Extraction couldn't count branches; still report at LOW
-            # confidence since the type-check call itself is unambiguous.
-            violations.append(_violation(cls, method, 1, confidence=Confidence.LOW))
+        elif hits:
+            # Extraction counted fewer than MIN_BRANCHES type-check
+            # conditions (or couldn't count branches at all); still report
+            # at LOW confidence since the type-check call itself is
+            # unambiguous evidence of type-dispatch, just not proven to
+            # meet the HIGH-confidence cascade-length bar.
+            violations.append(_violation(cls, method, max(method.type_switches, 1), confidence=Confidence.LOW))
     return violations
 
 

@@ -27,7 +27,7 @@ class TestCIRBuilderPython:
         assert cls.method_names() == {"bar", "baz"}
 
     def test_unsupported_language_returns_none(self):
-        assert build_file_cir("f.rb", "class Foo; end", "ruby") is None
+        assert build_file_cir("f.kt", "class Foo", "kotlin") is None
 
     def test_field_and_method_call_edges_tracked(self):
         src = (
@@ -252,3 +252,162 @@ class TestCrossLanguageConsistency:
         py_srp = [v for v in evaluate_file(py_fi) if v.principle == SOLIDPrinciple.SRP]
         java_srp = [v for v in evaluate_file(java_fi) if v.principle == SOLIDPrinciple.SRP]
         assert py_srp and java_srp
+
+
+class TestExtendedLanguageHandlers:
+    """Plan 02 gap: extend ``_LANG_HANDLERS`` beyond python/java/js/ts to
+    go, csharp, ruby, php, rust, cpp."""
+
+    def test_go_struct_and_receiver_methods(self):
+        if not is_available("go"):
+            pytest.skip("tree-sitter go grammar unavailable")
+        src = (
+            "package main\n"
+            "type Dog struct { Name string }\n"
+            "func (d *Dog) Speak() string { return d.Name }\n"
+            "func (d *Dog) Empty() {}\n"
+        )
+        fi = build_file_cir("dog.go", src, "go")
+        assert fi is not None
+        cls = next(c for c in fi.classes if c.name == "Dog")
+        assert cls.fields == {"Name"}
+        assert cls.method_names() == {"Speak", "Empty"}
+        speak = next(m for m in cls.methods if m.name == "Speak")
+        assert speak.field_accesses == {"Name"}
+        empty = next(m for m in cls.methods if m.name == "Empty")
+        assert empty.is_empty
+
+    def test_csharp_class_with_base_list(self):
+        if not is_available("csharp"):
+            pytest.skip("tree-sitter csharp grammar unavailable")
+        src = (
+            "public class Dog : Animal {\n"
+            "    private string name;\n"
+            "    public string Speak() { return this.name; }\n"
+            "    public void Empty() {}\n"
+            "}\n"
+        )
+        fi = build_file_cir("Dog.cs", src, "csharp")
+        assert fi is not None
+        cls = fi.classes[0]
+        assert cls.name == "Dog"
+        assert cls.implements == {"Animal"}
+        assert cls.method_names() == {"Speak", "Empty"}
+
+    def test_ruby_class_with_instance_variables(self):
+        if not is_available("ruby"):
+            pytest.skip("tree-sitter ruby grammar unavailable")
+        src = "class Dog < Animal\n  def speak\n    @name\n  end\n  def empty_method\n  end\nend\n"
+        fi = build_file_cir("dog.rb", src, "ruby")
+        assert fi is not None
+        cls = next(c for c in fi.classes if c.name == "Dog")
+        assert cls.fields == {"name"}
+        assert cls.implements == {"Animal"}
+
+    def test_php_class_with_implements(self):
+        if not is_available("php"):
+            pytest.skip("tree-sitter php grammar unavailable")
+        src = (
+            "<?php\n"
+            "class Dog extends Animal implements Speakable {\n"
+            "    private $name;\n"
+            "    public function speak() { return $this->name; }\n"
+            "    public function emptyMethod() {}\n"
+            "}\n"
+        )
+        fi = build_file_cir("Dog.php", src, "php")
+        assert fi is not None
+        cls = fi.classes[0]
+        assert cls.name == "Dog"
+        assert cls.implements == {"Animal", "Speakable"}
+        assert cls.fields == {"name"}
+
+    def test_rust_struct_with_impl_block(self):
+        if not is_available("rust"):
+            pytest.skip("tree-sitter rust grammar unavailable")
+        src = (
+            "struct Dog { name: String }\n"
+            "impl Dog {\n"
+            "    fn speak(&self) -> String { self.name.clone() }\n"
+            "    fn empty_method(&self) {}\n"
+            "}\n"
+        )
+        fi = build_file_cir("dog.rs", src, "rust")
+        assert fi is not None
+        cls = next(c for c in fi.classes if c.name == "Dog")
+        assert cls.fields == {"name"}
+        assert cls.method_names() == {"speak", "empty_method"}
+
+    def test_cpp_class_with_base_clause(self):
+        if not is_available("cpp"):
+            pytest.skip("tree-sitter cpp grammar unavailable")
+        src = (
+            "class Dog : public Animal {\n"
+            "public:\n"
+            "    std::string name;\n"
+            "    std::string speak() { return this->name; }\n"
+            "    void empty_method() {}\n"
+            "};\n"
+        )
+        fi = build_file_cir("dog.cpp", src, "cpp")
+        assert fi is not None
+        cls = fi.classes[0]
+        assert cls.name == "Dog"
+        assert cls.implements == {"Animal"}
+        assert cls.method_names() == {"speak", "empty_method"}
+
+    def test_all_six_new_languages_are_registered(self):
+        from Asgard.Bragi.Architecture.cir.builder import _LANG_HANDLERS
+        for lang in ("go", "csharp", "ruby", "php", "rust", "cpp"):
+            assert lang in _LANG_HANDLERS
+
+
+class TestTypeSwitchCounting:
+    """Plan 02 gap: OCP HIGH-confidence path requires ``type_switches`` to
+    be populated by the builder, not left at the zero default."""
+
+    def test_python_elif_isinstance_chain_counted(self):
+        src = (
+            "class Renderer:\n"
+            "    def render(self, shape):\n"
+            "        if isinstance(shape, Circle):\n"
+            "            pass\n"
+            "        elif isinstance(shape, Square):\n"
+            "            pass\n"
+            "        elif isinstance(shape, Triangle):\n"
+            "            pass\n"
+        )
+        fi = build_file_cir("shapes.py", src, "python")
+        method = fi.classes[0].methods[0]
+        assert method.type_switches == 3
+
+    def test_java_switch_on_typeof_style_counted(self):
+        if not is_available("java"):
+            pytest.skip("tree-sitter java grammar unavailable")
+        src = (
+            "class Renderer {\n"
+            "    void render(Object shape) {\n"
+            "        if (shape instanceof Circle) {}\n"
+            "        else if (shape instanceof Square) {}\n"
+            "        else if (shape instanceof Triangle) {}\n"
+            "    }\n"
+            "}\n"
+        )
+        fi = build_file_cir("Renderer.java", src, "java")
+        method = fi.classes[0].methods[0]
+        assert method.type_switches == 3
+
+    def test_ocp_high_confidence_on_3plus_branches(self):
+        src = (
+            "class Renderer:\n"
+            "    def render(self, shape):\n"
+            "        if isinstance(shape, Circle):\n"
+            "            pass\n"
+            "        elif isinstance(shape, Square):\n"
+            "            pass\n"
+            "        elif isinstance(shape, Triangle):\n"
+            "            pass\n"
+        )
+        fi = build_file_cir("shapes.py", src, "python")
+        violations = [v for v in evaluate_file(fi) if v.principle == SOLIDPrinciple.OCP]
+        assert violations and violations[0].confidence == Confidence.HIGH
