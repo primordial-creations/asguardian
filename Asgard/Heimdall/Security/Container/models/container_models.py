@@ -53,6 +53,14 @@ class ContainerFinding(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
     remediation: str = Field("", description="Suggested remediation steps")
     references: List[str] = Field(default_factory=list, description="Reference URLs")
+    mechanism_id: str = Field("", description="Normalization-engine mechanism id (plan 06).")
+    confidence_bucket: str = Field("probable", description="Qualitative confidence bucket (plan 06).")
+    cis_docker_benchmark: Optional[str] = Field(
+        None, description="CIS Docker Benchmark control id (plan 07.8)."
+    )
+    nist_800_190: Optional[str] = Field(
+        None, description="NIST SP 800-190 control reference (plan 07.8)."
+    )
 
     class Config:
         use_enum_values = True

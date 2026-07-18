@@ -18,6 +18,9 @@ from Asgard.Heimdall.Security.Container.utilities.dockerfile_parser import (
     parse_dockerfile,
     parse_stages,
 )
+from Asgard.Heimdall.Security.Container.services._compliance_mapping import (
+    apply_compliance_mapping,
+)
 from Asgard.Heimdall.Security.Container.services._dockerfile_checks import (
     DOCKERFILE_PATTERNS,
     DockerfilePattern,
@@ -91,6 +94,8 @@ class DockerfileAnalyzer:
                     report.dockerfile_issues += 1
 
         report.scan_duration_seconds = time.time() - start_time
+
+        apply_compliance_mapping(report.findings)
 
         report.findings.sort(
             key=lambda f: (
