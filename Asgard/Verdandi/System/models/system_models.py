@@ -4,6 +4,7 @@ System Performance Models
 Pydantic models for system performance metrics.
 """
 
+from enum import Enum
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
@@ -108,6 +109,115 @@ class IoMetrics(BaseModel):
     )
     status: str = Field(..., description="Status (healthy, warning, critical)")
     recommendations: List[str] = Field(default_factory=list)
+
+
+class PsiResource(str, Enum):
+    """Pressure Stall Information resource kind."""
+
+    CPU = "cpu"
+    MEMORY = "memory"
+    IO = "io"
+
+
+class PsiSnapshot(BaseModel):
+    """A single /proc/pressure/{resource} reading."""
+
+    resource: PsiResource = Field(...)
+    some_avg10: float = Field(default=0.0)
+    some_avg60: float = Field(default=0.0)
+    some_avg300: float = Field(default=0.0)
+    full_avg10: float = Field(default=0.0)
+    full_avg60: float = Field(default=0.0)
+    full_avg300: float = Field(default=0.0)
+    total_us: int = Field(default=0, description="Cumulative stalled microseconds")
+    cgroup_id: Optional[str] = Field(default=None)
+    timestamp: Optional[float] = Field(default=None)
+
+
+class PsiReport(BaseModel):
+    """PSI severity/trajectory analysis, optionally across multiple resources."""
+
+    resource: Optional[PsiResource] = Field(default=None)
+    severity: str = Field(
+        default="healthy",
+        description="healthy | warning | severe | critical (full_avg10 > 0)",
+    )
+    trajectory: Optional[str] = Field(
+        default=None, description="'fresh_spike' | 'sustained_bottleneck' | None"
+    )
+    micro_burst_detected: bool = Field(
+        default=False,
+        description="Delta total_us between snapshots >> avg10 implies sub-10s "
+        "stalls smoothed out of the rolling averages",
+    )
+    cross_resource_diagnosis: Optional[str] = Field(
+        default=None,
+        description="Diagnosis string when multiple resources are supplied "
+        "(pure disk bottleneck | thrashing | run-queue contention)",
+    )
+    notes: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+
+
+class CgroupCpuStats(BaseModel):
+    """Raw CFS bandwidth-control counters for a cgroup."""
+
+    cpu_quota_us: Optional[int] = Field(default=None, description="-1 or None means unlimited")
+    cpu_period_us: int = Field(default=100_000)
+    nr_periods: int = Field(default=0)
+    nr_throttled: int = Field(default=0)
+    throttled_time_ns: int = Field(default=0)
+    usage_ns: Optional[int] = Field(default=None)
+    limit_cores: Optional[float] = Field(default=None)
+    request_cores: Optional[float] = Field(default=None)
+    idle_cores_available: Optional[bool] = Field(
+        default=None, description="Whether the node has idle cores despite throttling"
+    )
+
+
+class ThrottleReport(BaseModel):
+    """CFS throttling analysis (RESEARCH_12 sec 2.3)."""
+
+    throttle_ratio: Optional[float] = Field(
+        default=None, description="nr_throttled / nr_periods"
+    )
+    avg_stall_ms: Optional[float] = Field(
+        default=None, description="throttled_time_ns / nr_throttled / 1e6"
+    )
+    max_injected_latency_ms: Optional[float] = Field(
+        default=None, description="Worst-case per-period stall: period - quota"
+    )
+    verdict: str = Field(
+        default="healthy", description="healthy | warning | critical"
+    )
+    limit_induced_latency: bool = Field(
+        default=False,
+        description="Throttling observed while the node has idle cores: "
+        "the limit itself, not real contention, causes the latency",
+    )
+    notes: List[str] = Field(default_factory=list)
+    recommendations: List[str] = Field(default_factory=list)
+
+
+class UseRedCorrelation(BaseModel):
+    """USE (saturation) <-> RED (p99 duration) causal correlation."""
+
+    best_lag: Optional[int] = Field(
+        default=None, description="Lag (buckets) at which saturation leads p99 duration"
+    )
+    best_correlation: Optional[float] = Field(
+        default=None, description="Pearson r at best_lag"
+    )
+    correlations_by_lag: Dict[int, float] = Field(default_factory=dict)
+    verdict: str = Field(
+        default="insufficient_data",
+        description="capacity_bound | regression_suspected | insufficient_data",
+    )
+    ordering_confirmed: bool = Field(
+        default=False,
+        description="Rate up -> Saturation up -> p99 up -> Errors up observed in order",
+    )
+    notes: List[str] = Field(default_factory=list)
 
 
 class ResourceUtilization(BaseModel):
