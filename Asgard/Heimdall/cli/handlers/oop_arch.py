@@ -14,6 +14,9 @@ def run_oop_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
         print(f"Error: Path does not exist: {scan_path}")
         return 1
 
+    if getattr(args, "explain", None):
+        return run_oop_explain(args, verbose)
+
     exclude_patterns = list(args.exclude) if args.exclude else []
 
     config = OOPConfig(
@@ -38,6 +41,33 @@ def run_oop_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
     except Exception as e:
         print(f"Error: {e}")
         return 1
+
+
+def run_oop_explain(args: argparse.Namespace, verbose: bool = False) -> int:
+    """`heimdall oop cohesion <path> --explain <ClassName>`.
+
+    Explains the LCOM4/CBO composition for a single class using
+    Bragi's CIR metrics engine (component partition / coupling detail).
+    """
+    from Asgard.Bragi.OOP.services.cir_metrics import explain_class
+
+    scan_path = Path(args.path).resolve()
+    if not scan_path.exists():
+        print(f"Error: Path does not exist: {scan_path}")
+        return 1
+
+    try:
+        explanation = explain_class(scan_path, args.explain)
+    except Exception as e:
+        print(f"Error: {e}")
+        return 1
+
+    if explanation is None:
+        print(f"Error: Class not found: {args.explain}")
+        return 1
+
+    print(explanation)
+    return 0
 
 
 def run_arch_explain(args: argparse.Namespace, verbose: bool = False) -> int:

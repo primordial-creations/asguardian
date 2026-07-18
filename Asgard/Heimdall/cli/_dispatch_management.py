@@ -21,6 +21,9 @@ from Asgard.Heimdall.cli.handlers import (
     run_mcp_server,
     run_dashboard,
     run_full_scan,
+    run_calibrate,
+    run_validate_rules,
+    run_eval,
 )
 
 
@@ -97,6 +100,33 @@ def dispatch_management(args, verbose: bool) -> None:
 
     elif args.command == "scan":
         sys.exit(run_full_scan(args, verbose))
+
+    elif args.command == "calibrate":
+        if not hasattr(args, "calibrate_command") or args.calibrate_command is None:
+            print("Error: Please specify a calibrate subcommand. Available subcommands:")
+            print("  run  Calibrate a local per-language profile from sampled metric distributions")
+            print("\nUse 'heimdall calibrate <subcommand> -h' for help on a specific subcommand.")
+            sys.exit(1)
+        if args.calibrate_command == "run":
+            sys.exit(run_calibrate(args, verbose))
+        else:
+            print(f"Unknown calibrate command: {args.calibrate_command}")
+            sys.exit(1)
+
+    elif args.command == "validate-rules":
+        sys.exit(run_validate_rules(args, verbose))
+
+    elif args.command == "eval":
+        if not hasattr(args, "eval_command") or args.eval_command is None:
+            print("Error: Please specify an eval subcommand. Available subcommands:")
+            print("  run  Compute corpus precision/recall/F-scores against ground truth")
+            print("\nUse 'heimdall eval <subcommand> -h' for help on a specific subcommand.")
+            sys.exit(1)
+        if args.eval_command == "run":
+            sys.exit(run_eval(args, verbose))
+        else:
+            print(f"Unknown eval command: {args.eval_command}")
+            sys.exit(1)
 
     else:
         print(f"Unknown command: {args.command}")

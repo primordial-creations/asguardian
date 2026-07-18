@@ -119,6 +119,11 @@ from Asgard.Heimdall.cli.handlers.scan_steps import (
     _run_scan_steps_7_to_11,
 )
 from Asgard.Heimdall.cli.handlers.scan import run_full_scan
+from Asgard.Heimdall.cli.handlers.calibration import (
+    run_calibrate,
+    run_validate_rules,
+)
+from Asgard.Heimdall.cli.handlers.evaluation import run_eval
 
 __all__ = [
     "_TeeStream",
@@ -206,4 +211,7 @@ __all__ = [
     "_run_scan_steps_1_to_6",
     "_run_scan_steps_7_to_11",
     "run_full_scan",
+    "run_calibrate",
+    "run_validate_rules",
+    "run_eval",
 ]
