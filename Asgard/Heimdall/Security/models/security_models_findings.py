@@ -118,6 +118,19 @@ class DependencyReport(BaseModel):
     vulnerabilities: List[DependencyVulnerability] = Field(default_factory=list, description="List of vulnerabilities")
     scan_duration_seconds: float = Field(0.0, description="Duration of the scan")
     scanned_at: datetime = Field(default_factory=datetime.now, description="When the scan was performed")
+    network_checked: bool = Field(
+        False,
+        description=(
+            "Whether the opt-in live OSV/NVD lookup ran and succeeded "
+            "(enable_network=True and no network error). False when "
+            "network lookup was disabled OR when it was attempted but "
+            "failed -- see network_reason to distinguish the two."
+        ),
+    )
+    network_reason: str = Field(
+        "",
+        description="Why network_checked is False, or a status note when True.",
+    )
 
     class Config:
         use_enum_values = True
