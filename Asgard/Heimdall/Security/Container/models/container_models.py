@@ -9,9 +9,10 @@ from enum import Enum
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket as _confidence_bucket
 
 
 class ContainerFindingType(str, Enum):
@@ -34,6 +35,7 @@ class ContainerFindingType(str, Enum):
     UNRESTRICTED_VOLUME = "unrestricted_volume"
     NO_SECURITY_OPT = "no_security_opt"
     WRITABLE_ROOT_FS = "writable_root_fs"
+    ADD_REMOTE_URL = "add_remote_url"
 
 
 class ContainerFinding(BaseModel):
@@ -53,9 +55,33 @@ class ContainerFinding(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
     remediation: str = Field("", description="Suggested remediation steps")
     references: List[str] = Field(default_factory=list, description="Reference URLs")
+    mechanism_id: str = Field("", description="Normalization-engine mechanism id (plan 06).")
+    confidence_bucket: str = Field("probable", description="Qualitative confidence bucket (plan 06).")
+    cis_docker_benchmark: Optional[str] = Field(
+        None, description="CIS Docker Benchmark control id (plan 07.8)."
+    )
+    nist_800_190: Optional[str] = Field(
+        None, description="NIST SP 800-190 control reference (plan 07.8)."
+    )
 
     class Config:
         use_enum_values = True
+
+    @model_validator(mode="after")
+    def _compute_confidence_bucket(self) -> "ContainerFinding":
+        """
+        Adversarial-review fix (MAJOR-5): confidence_bucket previously
+        just took its Field default ("probable") and was never actually
+        computed from `confidence` at any Container analyzer call site
+        (unlike the Headers domain, which computes it explicitly per
+        finding). A CRITICAL finding with confidence=0.95 was reporting
+        "probable" instead of "certain", and a low-confidence 0.2 finding
+        was also reporting "probable" instead of "unlikely" -- silently
+        wrong triage signal. Recompute it here unconditionally so every
+        construction path (present and future) stays correct.
+        """
+        self.confidence_bucket = _confidence_bucket(self.confidence)
+        return self
 
 
 class ContainerConfig(BaseModel):

@@ -1,5 +1,6 @@
 """Input validation vulnerability scanner."""
 
+import ast
 import os
 import re
 from pathlib import Path
@@ -11,6 +12,11 @@ from Asgard.Heimdall.Security.InputValidation.models.input_validation_models imp
     InputValidationScanReport,
     InputValidationSeverity,
 )
+from Asgard.Heimdall.Security.InputValidation.services._validation_barrier_analysis import (
+    scan_validation_barriers,
+)
+from Asgard.Heimdall.Security.context.test_context import is_test_context
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
 
 _VALIDATION_PATTERNS: dict = {
     "type_coercion": [
@@ -98,15 +104,19 @@ class InputValidationScanner:
         if file_path.suffix.lower() not in {".py", ".js", ".ts", ".jsx", ".tsx", ".php", ".java", ".rb", ".go", ".cs"}:
             return []
         try:
-            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            content = file_path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             return []
+
+        lines = content.splitlines()
+        in_test_context = is_test_context(str(file_path))
 
         findings: List[InputValidationFinding] = []
         for line_num, line in enumerate(lines, 1):
             for category, patterns in self._compiled.items():
                 for regex, sev, ptype, desc, rec in patterns:
                     if regex.search(line):
+                        confidence = 0.3 if in_test_context else 0.6
                         findings.append(InputValidationFinding(
                             file_path=str(file_path),
                             line_number=line_num,
@@ -116,7 +126,49 @@ class InputValidationScanner:
                             code_snippet=line.strip()[:150],
                             description=desc,
                             recommendation=rec,
+                            mechanism_id=f"input_validation.{category}.{ptype}",
+                            confidence=confidence,
+                            confidence_bucket=confidence_bucket(confidence),
                         ))
                         break
 
+        if file_path.suffix == ".py":
+            findings.extend(self._scan_validation_barriers(file_path, content, lines, in_test_context))
+
+        return findings
+
+    def _scan_validation_barriers(
+        self, file_path: Path, content: str, lines: List[str], in_test_context: bool,
+    ) -> List[InputValidationFinding]:
+        try:
+            tree = ast.parse(content)
+        except SyntaxError:
+            return []
+
+        findings: List[InputValidationFinding] = []
+        for barrier_finding in scan_validation_barriers(tree, lines):
+            confidence = barrier_finding.confidence
+            severity = barrier_finding.severity
+            if in_test_context and not barrier_finding.is_advisory:
+                # Plan 07.12/08: honor test-context by downgrading, never
+                # suppressing -- test fixtures can still exercise a real
+                # bypassable code path that ships to production.
+                confidence = min(confidence, 0.2)
+                severity = "LOW"
+
+            findings.append(InputValidationFinding(
+                file_path=str(file_path),
+                line_number=barrier_finding.line_number,
+                severity=InputValidationSeverity(severity),
+                category="validation_barrier",
+                issue_type=barrier_finding.issue_type,
+                code_snippet=barrier_finding.snippet,
+                description=barrier_finding.description,
+                recommendation=barrier_finding.recommendation,
+                mechanism_id=barrier_finding.mechanism_id,
+                confidence=confidence,
+                confidence_bucket=confidence_bucket(confidence),
+                is_advisory=barrier_finding.is_advisory,
+                cwe_id=barrier_finding.cwe_id,
+            ))
         return findings

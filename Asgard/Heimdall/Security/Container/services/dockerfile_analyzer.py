@@ -18,10 +18,14 @@ from Asgard.Heimdall.Security.Container.utilities.dockerfile_parser import (
     parse_dockerfile,
     parse_stages,
 )
+from Asgard.Heimdall.Security.Container.services._compliance_mapping import (
+    apply_compliance_mapping,
+)
 from Asgard.Heimdall.Security.Container.services._dockerfile_checks import (
     DOCKERFILE_PATTERNS,
     DockerfilePattern,
     check_add_instead_of_copy,
+    check_add_remote_url,
     check_exposed_ports,
     check_latest_tag,
     check_missing_healthcheck,
@@ -91,6 +95,8 @@ class DockerfileAnalyzer:
                     report.dockerfile_issues += 1
 
         report.scan_duration_seconds = time.time() - start_time
+
+        apply_compliance_mapping(report.findings)
 
         report.findings.sort(
             key=lambda f: (
@@ -180,6 +186,7 @@ class DockerfileAnalyzer:
             self.config.check_ports, self.config.sensitive_ports,
         ))
         findings.extend(check_add_instead_of_copy(instructions, lines, relative_path))
+        findings.extend(check_add_remote_url(instructions, lines, relative_path))
         findings.extend(check_missing_healthcheck(instructions, lines, relative_path))
         findings.extend(check_run_patterns(instructions, lines, relative_path, self.patterns))
 

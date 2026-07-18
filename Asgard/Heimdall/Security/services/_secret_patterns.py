@@ -205,7 +205,7 @@ DEFAULT_SECRET_PATTERNS: List[SecretPattern] = [
 ]
 
 FALSE_POSITIVE_PATTERNS: List[Pattern] = [
-    re.compile(r"example|sample|test|dummy|fake|placeholder|your[_-]?key", re.IGNORECASE),
+    re.compile(r"example|sample|test|dummy|fake|mock|placeholder|your[_-]?key", re.IGNORECASE),
     re.compile(r"xxx+|000+|111+|aaa+", re.IGNORECASE),
     re.compile(r"<[^>]+>"),
     re.compile(r"\$\{[^}]+\}"),

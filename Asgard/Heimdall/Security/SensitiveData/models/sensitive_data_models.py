@@ -23,6 +23,23 @@ class SensitiveDataFinding(BaseModel):
     masked_value: str = ""
     description: str
     recommendation: str
+    mechanism_id: str = Field("", description="Normalization-engine mechanism id (plan 06).")
+    confidence: float = Field(0.7, ge=0.0, le=1.0, description="Confidence score")
+    confidence_bucket: str = Field("probable", description="Qualitative confidence bucket (plan 06).")
+    compliance_tags: List[str] = Field(
+        default_factory=list,
+        description="Plan 07.11: GDPR/PCI/HIPAA tags for compliance reporting.",
+    )
+    is_hotspot: bool = Field(
+        False,
+        description=(
+            "Plan 07.11: PII-to-log-sink findings where the identifier name "
+            "matches the PII lexicon but the value's actual provenance "
+            "cannot be confirmed statically are reported as a hotspot "
+            "(LOW, capped confidence) rather than a confirmed finding -- "
+            "unresolved origin is never treated as safe."
+        ),
+    )
 
 
 class SensitiveDataScanConfig(BaseModel):
