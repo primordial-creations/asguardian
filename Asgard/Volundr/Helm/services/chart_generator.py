@@ -31,8 +31,46 @@ from Asgard.Volundr.Helm.services.chart_generator_helpers import (
     generate_test_template,
     generate_helmignore,
     validate_chart,
-    calculate_best_practice_score,
+    calculate_best_practice_score,  # noqa: F401  (deprecated, kept for API compat)
 )
+from Asgard.Volundr.Validation.models.rule_registry import default_registry
+from Asgard.Volundr.Validation.models.validation_models import (
+    ValidationCategory,
+    ValidationResult,
+    ValidationSeverity,
+)
+from Asgard.Volundr.Validation.services.scoring_engine import ScoringEngine
+
+
+def _issues_to_findings(issues: List[str], target: str) -> List[ValidationResult]:
+    """Convert 'RULE-ID: message' issue strings into scoreable findings
+    (mirrors GitOps.services.argocd_generator._issues_to_findings)."""
+    registry = default_registry()
+    findings: List[ValidationResult] = []
+    for issue in issues:
+        rule_id, sep, message = issue.partition(":")
+        rule_id = rule_id.strip()
+        rule = registry.get(rule_id) if sep else None
+        if rule is not None:
+            findings.append(ValidationResult(
+                rule_id=rule_id,
+                message=message.strip(),
+                severity=rule.severity.to_validation_severity(),
+                category=rule.category,
+                resource_name=target,
+                suggestion=rule.remediation or None,
+                context={"target": target},
+            ))
+        else:
+            findings.append(ValidationResult(
+                rule_id="helm-check",
+                message=issue,
+                severity=ValidationSeverity.WARNING,
+                category=ValidationCategory.BEST_PRACTICE,
+                resource_name=target,
+                context={"target": target},
+            ))
+    return findings
 
 
 class ChartGenerator:
@@ -48,8 +86,12 @@ class ChartGenerator:
 
         chart_files: Dict[str, str] = {}
 
+        values_data = self._build_values_data(config)
         chart_files["Chart.yaml"] = self._generate_chart_yaml(config)
-        chart_files["values.yaml"] = self._generate_values_yaml(config)
+        chart_files["values.yaml"] = cast(
+            str, yaml.dump(values_data, default_flow_style=False, sort_keys=False)
+        )
+        chart_files["values.schema.json"] = self._generate_values_schema(values_data)
         chart_files["templates/deployment.yaml"] = generate_deployment_template(config)
         chart_files["templates/service.yaml"] = generate_service_template(config)
 
@@ -86,7 +128,12 @@ class ChartGenerator:
         chart_files[".helmignore"] = generate_helmignore()
 
         validation_results = validate_chart(chart_files, config)
-        best_practice_score = calculate_best_practice_score(chart_files, config)
+        # Never grade the generator's own intent (plan 07): route the
+        # structural findings through the shared composite scorer instead
+        # of the legacy fixed-weight percentage.
+        findings = _issues_to_findings(validation_results, config.chart.name)
+        score_report = ScoringEngine().score(findings, resources=[config.chart.name])
+        best_practice_score = score_report.composite
 
         return GeneratedHelmChart(
             id=chart_id,
@@ -150,8 +197,12 @@ class ChartGenerator:
         return cast(str, yaml.dump(chart_data, default_flow_style=False, sort_keys=False))
 
     def _generate_values_yaml(self, config: HelmConfig) -> str:
+        values_data = self._build_values_data(config)
+        return cast(str, yaml.dump(values_data, default_flow_style=False, sort_keys=False))
+
+    def _build_values_data(self, config: HelmConfig) -> Dict[str, object]:
         values = config.values
-        values_data = {
+        values_data: Dict[str, object] = {
             "replicaCount": values.replica_count,
             "image": {
                 "repository": values.image_repository,
@@ -230,7 +281,48 @@ class ChartGenerator:
         if values.extra_config:
             values_data.update(values.extra_config)
 
-        return cast(str, yaml.dump(values_data, default_flow_style=False, sort_keys=False))
+        return values_data
+
+    def _generate_values_schema(self, values_data: Dict[str, object]) -> str:
+        """Generate a draft-07 ``values.schema.json`` from the rendered
+        ``values.yaml`` structure (plan 05: `helm lint`/`helm install
+        --dry-run` catch malformed values before they reach the cluster).
+
+        Types/required-ness are inferred from the generator's own output
+        rather than hand-maintained, so the schema never drifts from the
+        values it is meant to validate.
+        """
+        import json as _json
+
+        def _schema_for(value: object) -> Dict[str, object]:
+            if isinstance(value, bool):
+                return {"type": "boolean"}
+            if isinstance(value, int):
+                return {"type": "integer"}
+            if isinstance(value, float):
+                return {"type": "number"}
+            if isinstance(value, str):
+                return {"type": "string"}
+            if isinstance(value, list):
+                item_schema = _schema_for(value[0]) if value else {}
+                return {"type": "array", "items": item_schema}
+            if isinstance(value, dict):
+                properties = {k: _schema_for(v) for k, v in value.items()}
+                return {
+                    "type": "object",
+                    "properties": properties,
+                    "additionalProperties": True,
+                }
+            return {}
+
+        schema: Dict[str, object] = {
+            "$schema": "https://json-schema.org/draft-07/schema#",
+            "title": "Values",
+            "type": "object",
+            "properties": {k: _schema_for(v) for k, v in values_data.items()},
+            "additionalProperties": True,
+        }
+        return _json.dumps(schema, indent=2) + "\n"
 
     def save_to_directory(self, chart: GeneratedHelmChart, output_dir: Optional[str] = None) -> str:
         target_dir = output_dir or self.output_dir

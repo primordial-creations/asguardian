@@ -216,6 +216,10 @@ metadata:
     {{{{- include "{name}.labels" . | nindent 4 }}}}
   annotations:
     "helm.sh/hook": test
+    # Hook hygiene (plan 05): a stale test pod from a previous release
+    # must not block a re-install; delete it before the next hook run and
+    # after this one succeeds rather than accumulating forever.
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
 spec:
   containers:
     - name: wget
