@@ -24,6 +24,7 @@ from Asgard.Freya.Integration.models.integration_models import (
 )
 from Asgard.Freya.Integration.services._crawler_discovery import crawl_site
 from Asgard.Freya.Integration.services._crawler_page_tester import test_page
+from Asgard.Freya.Integration.services._crawler_politeness import HostRateLimiter
 from Asgard.Freya.Integration.services._crawler_report import (
     generate_report,
     save_report,
@@ -178,7 +179,7 @@ class SiteCrawler:
             await page.close()
 
     async def _test_all_pages(self, context: BrowserContext):
-        """Run tests on all discovered pages."""
+        """Run tests on all discovered pages with bounded concurrency."""
         pages_to_test = [
             p for p in self.discovered_pages.values()
             if p.status == PageStatus.TESTED
@@ -187,18 +188,35 @@ class SiteCrawler:
         total = len(pages_to_test)
         self._report_progress(f"Testing {total} pages...")
 
-        for i, page_info in enumerate(pages_to_test, 1):
-            self._report_progress(f"Testing: {page_info.url}", i, total)
-            result = await test_page(
-                context,
-                page_info,
-                self.output_dir,
-                self.config.capture_screenshots,
-                self.config.test_categories,
-            )
-            self.tested_pages[page_info.url] = result
+        # min_request_interval_ms supersedes the legacy delay_between_requests
+        # flat sleep; fall back to it if a caller only set the old field.
+        min_interval_ms = getattr(self.config, "min_request_interval_ms", None)
+        if not min_interval_ms:
+            min_interval_ms = int(self.config.delay_between_requests * 1000)
+        rate_limiter = HostRateLimiter(min_interval_ms)
 
-            if self.config.delay_between_requests > 0:
-                await asyncio.sleep(self.config.delay_between_requests)
+        concurrency = max(1, getattr(self.config, "concurrency", 1) or 1)
+        semaphore = asyncio.Semaphore(concurrency)
+
+        progress_lock = asyncio.Lock()
+        completed = 0
+
+        async def _worker(page_info: CrawledPage) -> None:
+            nonlocal completed
+            async with semaphore:
+                await rate_limiter.wait_for_turn(page_info.url)
+                result = await test_page(
+                    context,
+                    page_info,
+                    self.output_dir,
+                    self.config.capture_screenshots,
+                    self.config.test_categories,
+                )
+            self.tested_pages[page_info.url] = result
+            async with progress_lock:
+                completed += 1
+                self._report_progress(f"Testing: {page_info.url}", completed, total)
+
+        await asyncio.gather(*(_worker(p) for p in pages_to_test))
 
         self._report_progress(f"Testing complete: {total} pages tested", total, total)

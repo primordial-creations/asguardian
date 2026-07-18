@@ -125,6 +125,56 @@ class CircularDependency:
 
 
 @dataclass
+class CentralityInfo:
+    """Centrality metrics for one module (Plan 03 §3.1).
+
+    `afferent_percentile` is the documented input for Plan 02's Exposure
+    multiplier and Plan 01's Maintainability cycle input: the fraction of
+    modules with strictly lower afferent coupling, in [0, 1].
+    """
+    module: str
+    afferent: int = 0                 # Ca — modules that depend on this
+    efferent: int = 0                 # Ce — modules this depends on
+    instability: float = 0.0          # I = Ce / (Ca + Ce)
+    pagerank: float = 0.0
+    afferent_percentile: float = 0.0  # rank of Ca among all modules, [0, 1]
+
+
+@dataclass
+class SCC:
+    """A strongly connected component of the import graph (size >= 2).
+
+    Severity follows the *reach* of the SCC (member LOC and total afferent
+    coupling from outside the component), not its length (DEEPTHINK_09,
+    RESEARCH_15).
+    """
+    members: List[str]
+    size: int = 0
+    member_loc: int = 0               # total LOC of member modules
+    external_afferent: int = 0        # imports into the SCC from outside it
+    internal_edges: int = 0
+    severity: DependencySeverity = DependencySeverity.HIGH
+
+    def __post_init__(self):
+        self.size = len(self.members)
+
+    @property
+    def reach(self) -> int:
+        """Blast-radius proxy: member LOC + external afferent coupling."""
+        return self.member_loc + self.external_afferent
+
+
+@dataclass
+class EdgeBreak:
+    """A suggested edge removal to break a dependency cycle."""
+    source: str
+    target: str
+    weight: float                     # imported symbols x source afferent factor
+    symbol_count: int = 0             # number of imported symbols on this edge
+    reason: str = ""
+
+
+@dataclass
 class ModularityMetrics:
     """Metrics about module boundaries and organization."""
     total_modules: int = 0
@@ -172,6 +222,9 @@ class DependencyReport:
     # Modules with issues
     high_coupling_modules: List[ModuleDependencies] = field(default_factory=list)
 
+    # Centrality export (Plan 03 §3.1) — Ca/Ce/instability/pagerank/percentile
+    centrality: Dict[str, CentralityInfo] = field(default_factory=dict)
+
     @property
     def has_cycles(self) -> bool:
         """Check if any circular dependencies exist."""
@@ -195,11 +248,12 @@ class DependencyReport:
         self.total_cycles = len(self.circular_dependencies)
 
     def get_module(self, name: str) -> Optional[ModuleDependencies]:
-        """Get a module by name."""
-        for m in self.modules:
-            if m.module_name == name:
-                return m
-        return None
+        """Get a module by name (O(1) via a lazily maintained index)."""
+        index = getattr(self, "_module_index", None)
+        if index is None or len(index) != len(self.modules):
+            index = {m.module_name: m for m in self.modules}
+            object.__setattr__(self, "_module_index", index)
+        return index.get(name)
 
     def get_dependents(self, module_name: str) -> List[str]:
         """Get modules that depend on the given module."""

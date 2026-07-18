@@ -5,7 +5,10 @@ Data models for dependency analysis.
 """
 
 from Asgard.Bragi.Dependencies.models.dependency_models import (
+    SCC,
+    CentralityInfo,
     DependencyConfig,
+    EdgeBreak,
     DependencyInfo,
     DependencyReport,
     DependencySeverity,
@@ -32,7 +35,10 @@ from Asgard.Bragi.Dependencies.models.license_models import (
 )
 
 __all__ = [
+    "SCC",
+    "CentralityInfo",
     "DependencyConfig",
+    "EdgeBreak",
     "DependencyInfo",
     "DependencyReport",
     "DependencySeverity",

@@ -35,7 +35,10 @@ __version__ = "1.0.0"
 __author__ = "Asgard Contributors"
 
 from Asgard.Bragi.Dependencies.models.dependency_models import (
+    SCC,
+    CentralityInfo,
     CircularDependency,
+    EdgeBreak,
     DependencyConfig,
     DependencyInfo,
     DependencyReport,
@@ -53,6 +56,7 @@ from Asgard.Bragi.Dependencies.models.sbom_models import (
 )
 from Asgard.Bragi.Dependencies.services.import_analyzer import ImportAnalyzer
 from Asgard.Bragi.Dependencies.services.graph_builder import GraphBuilder
+from Asgard.Bragi.Dependencies.services.graph_service import DependencyGraphService
 from Asgard.Bragi.Dependencies.services.cycle_detector import CycleDetector
 from Asgard.Bragi.Dependencies.services.modularity_analyzer import ModularityAnalyzer
 from Asgard.Bragi.Dependencies.services.dependency_analyzer import DependencyAnalyzer
@@ -60,7 +64,10 @@ from Asgard.Bragi.Dependencies.services.sbom_generator import SBOMGenerator
 
 __all__ = [
     # Models
+    "SCC",
+    "CentralityInfo",
     "CircularDependency",
+    "EdgeBreak",
     "DependencyConfig",
     "DependencyInfo",
     "DependencyReport",
@@ -77,6 +84,7 @@ __all__ = [
     # Services
     "CycleDetector",
     "DependencyAnalyzer",
+    "DependencyGraphService",
     "GraphBuilder",
     "ImportAnalyzer",
     "ModularityAnalyzer",

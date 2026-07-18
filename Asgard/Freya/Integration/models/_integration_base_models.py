@@ -10,6 +10,8 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
+from Asgard.Freya.Scoring.models.scoring_models import Finding, GradedScore
+
 
 class TestCategory(str, Enum):
     """Test categories."""
@@ -141,7 +143,26 @@ class UnifiedTestReport(BaseModel):
     accessibility_score: float = Field(default=0.0, description="Accessibility score")
     visual_score: float = Field(default=0.0, description="Visual score")
     responsive_score: float = Field(default=0.0, description="Responsive score")
-    overall_score: float = Field(default=0.0, description="Overall score")
+    overall_score: float = Field(
+        default=0.0,
+        description=(
+            "Overall score. NOTE: since the unified severity uplift this is the "
+            "CAPPED score (non-compensatory; the worst unresolved finding sets "
+            "the ceiling), no longer an arithmetic mean of category scores."
+        )
+    )
+
+    # Universal severity / grading (optional; populated by UnifiedTester)
+    graded: Optional[GradedScore] = Field(
+        default=None,
+        description="Capped letter grade and radar data (universal scoring)"
+    )
+    findings: List[Finding] = Field(
+        default_factory=list,
+        description="Findings inbox: all failures in the universal severity scale"
+    )
+    blocker_count: int = Field(default=0, description="Blocker findings (universal scale)")
+    major_count: int = Field(default=0, description="Major findings (universal scale)")
 
     # Metadata
     config: UnifiedTestConfig = Field(description="Test configuration")
@@ -158,6 +179,33 @@ class ReportConfig(BaseModel):
     title: str = Field(default="Freya Test Report", description="Report title")
 
 
+class EnvironmentFingerprint(BaseModel):
+    """
+    Environment fingerprint recorded with a visual baseline (DEEPTHINK_03).
+
+    A baseline is only valid as a controlled delta: same environment on
+    both sides. Cross-environment pixel comparison measures the
+    environment (font rasterization, DPR scaling), not your code.
+    """
+    os_name: str = Field(default="", description="platform.system()")
+    os_release: str = Field(default="", description="platform.release()")
+    browser_name: str = Field(default="", description='Browser engine, e.g. "chromium"')
+    browser_version: str = Field(default="", description="Browser version string")
+    playwright_version: str = Field(default="", description="Playwright package version")
+    viewport: str = Field(default="", description='Viewport, e.g. "1920x1080"')
+    device_scale_factor: float = Field(default=1.0, description="Device pixel ratio")
+    color_scheme: Optional[str] = Field(
+        default=None, description="Emulated prefers-color-scheme"
+    )
+    reduced_motion: Optional[str] = Field(
+        default=None, description="Emulated prefers-reduced-motion"
+    )
+    font_stack_hash: Optional[str] = Field(
+        default=None,
+        description="sha256 of the sorted document.fonts list (family+weight)"
+    )
+
+
 class BaselineEntry(BaseModel):
     """A baseline entry for visual comparison."""
     url: str = Field(description="Page URL")
@@ -169,6 +217,11 @@ class BaselineEntry(BaseModel):
     viewport_height: int = Field(description="Viewport height")
     device: Optional[str] = Field(default=None, description="Device name")
     hash: str = Field(description="Image hash for quick comparison")
+    fingerprint: Optional[EnvironmentFingerprint] = Field(
+        default=None,
+        description="Environment fingerprint captured with the baseline "
+                    "(None for legacy baselines: environment unverified)"
+    )
     metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional metadata")
 
 
@@ -193,6 +246,11 @@ class BaselineConfig(BaseModel):
     diff_threshold: float = Field(
         default=0.1,
         description="Difference threshold for comparison"
+    )
+    allow_env_mismatch: bool = Field(
+        default=False,
+        description="Allow comparison despite a hard environment mismatch "
+                    "(result is flagged and capped at WARNING severity)"
     )
 
 
@@ -233,6 +291,22 @@ class CrawlConfig(BaseModel):
     delay_between_requests: float = Field(
         default=0.5,
         description="Delay between page loads (seconds)"
+    )
+    concurrency: int = Field(
+        default=4,
+        description="Bounded worker concurrency for the test phase "
+                    "(PROVISIONAL pending RESEARCH_06)"
+    )
+    concurrency_discovery: int = Field(
+        default=2,
+        description="Bounded sibling-fetch concurrency during BFS discovery "
+                    "(PROVISIONAL pending RESEARCH_06)"
+    )
+    min_request_interval_ms: int = Field(
+        default=500,
+        description="Minimum interval between requests to the same host, "
+                    "enforced across workers (same effective default as the "
+                    "legacy delay_between_requests; PROVISIONAL pending RESEARCH_06)"
     )
     auth_config: Optional[Dict[str, Any]] = Field(
         default=None,

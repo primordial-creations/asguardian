@@ -1,6 +1,12 @@
-"""Heimdall License Checker - validates package license compliance."""
+"""Heimdall License Checker - validates package license compliance.
 
-import re
+Lookup order (Plan 03 Phase D): disk cache -> installed importlib.metadata
+(no `pip show` subprocess) -> PyPI JSON fallback, fetched in parallel with a
+bounded pool. Results are deterministic: packages are resolved and reported
+in sorted name order.
+"""
+
+import importlib.metadata
 import subprocess
 import time
 import json
@@ -19,6 +25,13 @@ from Asgard.Bragi.Dependencies.models.license_models import (
     LicenseSeverity,
     PackageLicense,
 )
+from Asgard.Bragi.Dependencies.services._license_cache import LicenseDiskCache
+from Asgard.Bragi.Dependencies.services._license_policy import (
+    LicenseGateInput,
+    LicensePolicy,
+    LicenseVerdict,
+    normalize_license,
+)
 from Asgard.Bragi.Dependencies.services._license_reporter import (
     generate_json_report,
     generate_markdown_report,
@@ -26,33 +39,23 @@ from Asgard.Bragi.Dependencies.services._license_reporter import (
 )
 
 
-LICENSE_PATTERNS = {
-    r"MIT|Expat": ("MIT", LicenseCategory.PERMISSIVE),
-    r"Apache.*(2|2\.0)|Apache License,? Version 2|Apache Software License": ("Apache-2.0", LicenseCategory.PERMISSIVE),
-    r"BSD.*(3|3-Clause|New|Revised)|BSD 3-Clause": ("BSD-3-Clause", LicenseCategory.PERMISSIVE),
-    r"BSD.*(2|2-Clause|Simplified|FreeBSD)|BSD 2-Clause": ("BSD-2-Clause", LicenseCategory.PERMISSIVE),
-    r"^BSD$|BSD License|^BSD-": ("BSD", LicenseCategory.PERMISSIVE),
-    r"ISC": ("ISC", LicenseCategory.PERMISSIVE),
-    r"PSF|Python Software Foundation": ("PSF-2.0", LicenseCategory.PERMISSIVE),
-    r"Unlicense|Public Domain": ("Unlicense", LicenseCategory.PUBLIC_DOMAIN),
-    r"CC0|Creative Commons Zero": ("CC0-1.0", LicenseCategory.PUBLIC_DOMAIN),
-    r"WTFPL": ("WTFPL", LicenseCategory.PUBLIC_DOMAIN),
-    r"LGPL.*(3|3\.0)": ("LGPL-3.0", LicenseCategory.WEAK_COPYLEFT),
-    r"LGPL.*(2\.1|2)": ("LGPL-2.1", LicenseCategory.WEAK_COPYLEFT),
-    r"MPL.*(2|2\.0)|Mozilla Public License": ("MPL-2.0", LicenseCategory.WEAK_COPYLEFT),
-    r"AGPL.*(3|3\.0)": ("AGPL-3.0", LicenseCategory.STRONG_COPYLEFT),
-    r"GPL.*(3|3\.0)": ("GPL-3.0", LicenseCategory.STRONG_COPYLEFT),
-    r"GPL.*(2|2\.0)": ("GPL-2.0", LicenseCategory.STRONG_COPYLEFT),
-    r"^GPL$|General Public License": ("GPL", LicenseCategory.STRONG_COPYLEFT),
-}
-
-
 class LicenseChecker:
     """Validates license compliance for Python packages."""
+
+    #: Bounded pool size for parallel PyPI fallback fetches.
+    MAX_FETCH_WORKERS = 8
 
     def __init__(self, config: LicenseConfig):
         self.config = config
         self._cache: Dict[str, PackageLicense] = {}
+        self._disk_cache: Optional[LicenseDiskCache] = None
+        # Exact-SPDX-id policy engine (Plan 03 Phase A): substring matching
+        # is gone - LGPL-3.0 can never be prohibited by containing "GPL-3.0".
+        self.policy = LicensePolicy(
+            allowed=config.allowed_licenses,
+            prohibited=config.prohibited_licenses,
+            warn=config.warn_licenses,
+        )
 
     def analyze(self) -> LicenseResult:
         """Run license analysis on packages in requirements."""
@@ -64,10 +67,14 @@ class LicenseChecker:
 
         packages, req_files = self._parse_requirements(scan_path)
 
-        package_licenses = []
-        for pkg_name in packages:
-            lic_info = self._get_package_license(pkg_name)
-            package_licenses.append(lic_info)
+        if self.config.use_cache:
+            self._disk_cache = LicenseDiskCache(
+                scan_path, expiry_days=self.config.cache_expiry_days)
+
+        package_licenses = self._resolve_packages(sorted(packages))
+
+        if self._disk_cache is not None:
+            self._disk_cache.save()
 
         issues = self._find_issues(package_licenses)
         duration = time.time() - start_time
@@ -119,14 +126,93 @@ class LicenseChecker:
             line = line.split(";")[0]
         return line.strip() or None
 
-    def _get_package_license(self, package_name: str) -> PackageLicense:
-        """Get license information for a package."""
+    def _resolve_packages(self, package_names: List[str]) -> List[PackageLicense]:
+        """
+        Resolve licenses for all packages: disk cache, then local installed
+        metadata, then PyPI in parallel (bounded pool) for the leftovers.
+        Output order is deterministic (sorted by package name).
+        """
+        resolved: Dict[str, PackageLicense] = {}
+        needs_network: List[str] = []
+
+        for pkg_name in package_names:
+            local = self._get_package_license_local(pkg_name)
+            if local is not None:
+                resolved[pkg_name] = local
+            else:
+                needs_network.append(pkg_name)
+
+        if needs_network:
+            from concurrent.futures import ThreadPoolExecutor
+            workers = min(self.MAX_FETCH_WORKERS, len(needs_network))
+            with ThreadPoolExecutor(max_workers=workers) as pool:
+                fetched = list(pool.map(self._get_license_from_pypi,
+                                        needs_network))
+            for pkg_name, lic_info in zip(needs_network, fetched):
+                if lic_info is None:
+                    lic_info = PackageLicense(
+                        package_name=pkg_name,
+                        category=LicenseCategory.UNKNOWN,
+                        severity=LicenseSeverity.MODERATE,
+                        source="not_found",
+                    )
+                resolved[pkg_name] = self._finish_resolution(pkg_name, lic_info)
+
+        return [resolved[name] for name in package_names]
+
+    def _get_package_license_local(
+        self, package_name: str
+    ) -> Optional[PackageLicense]:
+        """Cache/installed-metadata resolution (no network)."""
         if self.config.use_cache and package_name in self._cache:
             return self._cache[package_name]
 
-        lic_info = self._get_license_from_pip(package_name)
+        if self._disk_cache is not None:
+            record = self._disk_cache.get(package_name)
+            if record is not None:
+                lic_info = PackageLicense(
+                    package_name=package_name,
+                    version=record.get("version"),
+                    license_name=record.get("license_name"),
+                    license_classifier=record.get("license_classifier"),
+                    homepage=record.get("homepage"),
+                    author=record.get("author"),
+                    source=record.get("source", "cache"),
+                )
+                lic_info = self._classify_license(lic_info)
+                if self.config.use_cache:
+                    self._cache[package_name] = lic_info
+                return lic_info
+
+        lic_info = self._get_license_from_installed(package_name)
         if lic_info is None:
-            lic_info = self._get_license_from_pypi(package_name)
+            return None
+        return self._finish_resolution(package_name, lic_info)
+
+    def _finish_resolution(
+        self, package_name: str, lic_info: PackageLicense
+    ) -> PackageLicense:
+        """Classify a freshly fetched record and store it in both caches."""
+        lic_info = self._classify_license(lic_info)
+        if self.config.use_cache:
+            self._cache[package_name] = lic_info
+        if self._disk_cache is not None and lic_info.source != "not_found":
+            self._disk_cache.put(package_name, {
+                "version": lic_info.version,
+                "license_name": lic_info.license_name,
+                "license_classifier": lic_info.license_classifier,
+                "homepage": lic_info.homepage,
+                "author": lic_info.author,
+                "source": lic_info.source,
+            })
+        return lic_info
+
+    def _get_package_license(self, package_name: str) -> PackageLicense:
+        """Get license information for a single package (legacy entry point)."""
+        local = self._get_package_license_local(package_name)
+        if local is not None:
+            return local
+        lic_info = self._get_license_from_pypi(package_name)
         if lic_info is None:
             lic_info = PackageLicense(
                 package_name=package_name,
@@ -134,11 +220,51 @@ class LicenseChecker:
                 severity=LicenseSeverity.MODERATE,
                 source="not_found",
             )
+        return self._finish_resolution(package_name, lic_info)
 
-        lic_info = self._classify_license(lic_info)
-        if self.config.use_cache:
-            self._cache[package_name] = lic_info
-        return lic_info
+    def _get_license_from_installed(
+        self, package_name: str
+    ) -> Optional[PackageLicense]:
+        """License info from installed importlib.metadata (replaces pip show).
+
+        Precedence: PEP 639 License-Expression, then trove classifier, then
+        the legacy License header.
+        """
+        try:
+            meta = importlib.metadata.metadata(package_name)
+        except importlib.metadata.PackageNotFoundError:
+            return None
+        except Exception:
+            return None
+
+        def _get(key: str) -> Optional[str]:
+            try:
+                value = meta.get(key)
+            except Exception:
+                return None
+            value = (value or "").strip()
+            return value or None
+
+        license_classifier = None
+        try:
+            classifiers = meta.get_all("Classifier") or []
+        except Exception:
+            classifiers = []
+        for classifier in classifiers:
+            if classifier.startswith("License ::"):
+                license_classifier = classifier.split(" :: ")[-1].strip()
+                break
+
+        license_name = _get("License-Expression") or _get("License")
+        return PackageLicense(
+            package_name=package_name,
+            version=_get("Version"),
+            license_name=license_name,
+            license_classifier=license_classifier,
+            homepage=_get("Home-page"),
+            author=_get("Author") or _get("Author-email"),
+            source="installed",
+        )
 
     def _get_license_from_pip(self, package_name: str) -> Optional[PackageLicense]:
         """Get license info from pip show."""
@@ -191,73 +317,98 @@ class LicenseChecker:
             return None
 
     def _classify_license(self, pkg_lic: PackageLicense) -> PackageLicense:
-        """Classify and validate the license."""
-        license_text = ""
-        normalized_name = None
-        category = LicenseCategory.UNKNOWN
+        """
+        Classify and validate the license via the exact-SPDX-id policy engine.
 
+        Handles SPDX expressions: 'MIT OR GPL-3.0' is compliant via the MIT
+        arm (recorded on the package as a MULTIPLE candidate).
+        """
+        candidates = []
         if pkg_lic.license_classifier:
-            normalized_name, category = self._normalize_license(pkg_lic.license_classifier)
-            if category != LicenseCategory.UNKNOWN:
-                license_text = pkg_lic.license_classifier
-
-        if category == LicenseCategory.UNKNOWN and pkg_lic.license_name:
+            candidates.append(pkg_lic.license_classifier)
+        if pkg_lic.license_name:
             name_text = pkg_lic.license_name
             if len(name_text) > 100:
                 first_line = name_text.split("\n")[0].strip()
                 name_text = first_line if first_line and len(first_line) < 100 else ""
             if name_text:
-                normalized_name, category = self._normalize_license(name_text)
-                if category != LicenseCategory.UNKNOWN:
-                    license_text = name_text
+                candidates.append(name_text)
 
-        if normalized_name:
-            pkg_lic.license_name = normalized_name
-        pkg_lic.category = category
+        decision = None
+        for candidate in candidates:
+            evaluated = self.policy.evaluate(candidate)
+            if decision is None or (
+                decision.category == LicenseCategory.UNKNOWN
+                and evaluated.category != LicenseCategory.UNKNOWN
+            ):
+                decision = evaluated
+            if decision.category != LicenseCategory.UNKNOWN:
+                break
 
-        license_lower = license_text.lower().strip()
-        if license_lower:
-            for prohibited in self.config.prohibited_licenses:
-                prohibited_lower = prohibited.lower()
-                if prohibited_lower in license_lower or license_lower in prohibited_lower:
-                    pkg_lic.is_prohibited = True
-                    pkg_lic.is_allowed = False
-                    pkg_lic.severity = LicenseSeverity.CRITICAL
-                    break
-            if not pkg_lic.is_prohibited:
-                for warn in self.config.warn_licenses:
-                    warn_lower = warn.lower()
-                    if warn_lower in license_lower or license_lower in warn_lower:
-                        pkg_lic.is_warning = True
-                        pkg_lic.severity = LicenseSeverity.LOW
-                        break
-            if not pkg_lic.is_prohibited:
-                for allowed in self.config.allowed_licenses:
-                    allowed_lower = allowed.lower()
-                    if allowed_lower in license_lower or license_lower in allowed_lower:
-                        pkg_lic.is_allowed = True
-                        pkg_lic.severity = LicenseSeverity.OK
-                        break
+        if decision is None or (decision.spdx_id is None and not decision.is_expression):
+            pkg_lic.category = LicenseCategory.UNKNOWN
+            pkg_lic.is_allowed = False
+            pkg_lic.severity = LicenseSeverity.MODERATE
+            pkg_lic.verdict = LicenseVerdict.UNKNOWN.value
+            return pkg_lic
 
-        if not license_text or category == LicenseCategory.UNKNOWN:
+        if decision.spdx_id:
+            pkg_lic.license_name = decision.spdx_id
+        pkg_lic.category = decision.category
+        pkg_lic.license_expression_arms = list(decision.arms)
+        pkg_lic.chosen_expression_arm = decision.chosen_arm
+
+        pkg_lic.verdict = decision.verdict.value
+        if decision.verdict == LicenseVerdict.PROHIBITED:
+            pkg_lic.is_prohibited = True
+            pkg_lic.is_allowed = False
+            pkg_lic.severity = LicenseSeverity.CRITICAL
+        elif decision.verdict == LicenseVerdict.WARN:
+            # Legacy boolean semantics preserved: WARN packages stay
+            # is_allowed=True (they count as compliant, as before); the
+            # stricter signal lives in the new `verdict` field.
+            pkg_lic.is_warning = True
+            pkg_lic.is_allowed = True
+            pkg_lic.severity = LicenseSeverity.LOW
+        elif decision.verdict == LicenseVerdict.ALLOWED:
+            pkg_lic.is_allowed = True
+            pkg_lic.severity = LicenseSeverity.OK
+        else:
             pkg_lic.is_allowed = False
             pkg_lic.severity = LicenseSeverity.MODERATE
 
         return pkg_lic
 
     def _normalize_license(self, license_text: str) -> tuple[Optional[str], LicenseCategory]:
-        """Normalize license name and determine category."""
-        if not license_text:
-            return None, LicenseCategory.UNKNOWN
-        for pattern, (name, category) in LICENSE_PATTERNS.items():
-            if re.search(pattern, license_text, re.IGNORECASE):
-                return name, category
-        return None, LicenseCategory.UNKNOWN
+        """Normalize license name and determine category (exact-id engine)."""
+        return normalize_license(license_text)
+
+    def gate_input(self, result: LicenseResult) -> LicenseGateInput:
+        """Summary for Plan 01's non-compensatory license gate."""
+        return LicenseGateInput(
+            prohibited_count=result.prohibited_packages,
+            unknown_count=result.unknown_packages,
+        )
 
     def _find_issues(self, packages: List[PackageLicense]) -> List[LicenseIssue]:
         """Find license compliance issues."""
         issues = []
         for pkg in packages:
+            if len(pkg.license_expression_arms) > 1:
+                issues.append(LicenseIssue(
+                    issue_type=LicenseIssueType.MULTIPLE,
+                    severity=LicenseSeverity.OK if pkg.is_allowed else LicenseSeverity.LOW,
+                    package_name=pkg.package_name,
+                    license_name=pkg.display_license,
+                    message=(
+                        f"Package '{pkg.package_name}' is multi-licensed "
+                        f"({' / '.join(pkg.license_expression_arms)})"
+                        + (f"; compliant via {pkg.chosen_expression_arm}"
+                           if pkg.chosen_expression_arm and pkg.is_allowed else "")
+                    ),
+                    details={"arms": pkg.license_expression_arms,
+                             "chosen_arm": pkg.chosen_expression_arm},
+                ))
             if pkg.is_prohibited:
                 issues.append(LicenseIssue(
                     issue_type=LicenseIssueType.PROHIBITED,

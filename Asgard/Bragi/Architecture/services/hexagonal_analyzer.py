@@ -40,6 +40,8 @@ from Asgard.Bragi.Architecture.services._hexagonal_validators import (
     detect_ports as _detect_ports_fn,
     detect_adapters as _detect_adapters_fn,
 )
+from Asgard.Bragi.Architecture.graph.service import ArchGraphService
+from Asgard.Bragi.Dependencies.models.dependency_models import DependencyConfig
 
 
 # Framework imports that should never appear in the domain core
@@ -158,8 +160,102 @@ class HexagonalAnalyzer:
         for v in cross_violations:
             report.add_violation(v)
 
+        # Step 7: Import-graph layer inference (Plan 03) — only when the
+        # active architecture.yml (or the zero-config default) declares
+        # `level:` on at least one layer; otherwise stays glob-only.
+        if self.layer_config.has_level_inference:
+            for v in self._analyze_inferred_layers(path):
+                report.add_violation(v)
+
         report.scan_duration_seconds = time.time() - start_time
         return report
+
+    # ------------------------------------------------------------------
+    # Import-graph layer inference (Plan 03): CSP level propagation,
+    # drift-paradox detection, module-granularity cycles, fan-out.
+    # ------------------------------------------------------------------
+
+    def _arch_graph_service(self, root_path: Path) -> ArchGraphService:
+        return ArchGraphService(
+            config=self.layer_config,
+            dep_config=DependencyConfig(scan_path=root_path),
+        )
+
+    def _analyze_inferred_layers(self, root_path: Path) -> List[HexagonalViolation]:
+        """Layer + drift + module-cycle + fan-out violations from the
+        import-graph CSP, expressed as `HexagonalViolation` so they slot
+        into the existing report/reporter pipeline without new models."""
+        violations: List[HexagonalViolation] = []
+        service = self._arch_graph_service(root_path)
+
+        bounds = service.infer(root_path)
+        assigned = {m: b.assigned_level for m, b in bounds.items()}
+        graph = service.graph_service.build(root_path)
+
+        # Local layer-direction violations: edge A->B requires
+        # assigned_level(A) >= assigned_level(B).
+        for src, deps in graph.graph.items():
+            src_level = assigned.get(src)
+            if src_level is None:
+                continue
+            for dst in deps:
+                dst_level = assigned.get(dst)
+                if dst_level is None:
+                    continue
+                if src_level < dst_level:
+                    violations.append(HexagonalViolation(
+                        file_path=src,
+                        line_number=0,
+                        source_zone=HexagonalZone.UNASSIGNED,
+                        target_zone=HexagonalZone.UNASSIGNED,
+                        class_name="",
+                        message=(
+                            f"Layer violation: '{src}' (level {src_level}) imports "
+                            f"'{dst}' (level {dst_level}) — dependencies must point "
+                            f"inward/laterally (Level(A) >= Level(B))."
+                        ),
+                    ))
+
+        for drift in service.drift_violations(root_path):
+            violations.append(HexagonalViolation(
+                file_path=drift.module,
+                line_number=0,
+                source_zone=HexagonalZone.UNASSIGNED,
+                target_zone=HexagonalZone.UNASSIGNED,
+                class_name="",
+                message=f"Architecture drift: {drift.message}",
+            ))
+
+        for cycle in service.module_cycles(root_path):
+            violations.append(HexagonalViolation(
+                file_path=cycle.members[0],
+                line_number=0,
+                source_zone=HexagonalZone.UNASSIGNED,
+                target_zone=HexagonalZone.UNASSIGNED,
+                class_name="",
+                message=f"Module-level cycle: {' -> '.join(cycle.members + [cycle.members[0]])}",
+            ))
+
+        for fan_out in service.fan_out_violations(root_path):
+            violations.append(HexagonalViolation(
+                file_path=fan_out.module,
+                line_number=0,
+                source_zone=HexagonalZone.UNASSIGNED,
+                target_zone=HexagonalZone.UNASSIGNED,
+                class_name="",
+                message=(
+                    f"Module '{fan_out.module}' fans out to {fan_out.fan_out} modules "
+                    f"(limit {fan_out.limit}): {', '.join(fan_out.targets)}"
+                ),
+            ))
+
+        return violations
+
+    def explain_file(self, file_path: str, scan_path: Optional[Path] = None) -> str:
+        """`heimdall arch layers <path> --explain <file>`: prints a file's
+        inferred bounds and which imports pinned them."""
+        path = Path(scan_path or self.config.scan_path).resolve()
+        return self._arch_graph_service(path).explain(file_path, path)
 
     def _assign_zones(self, root_path: Path) -> Dict[str, str]:
         """Assign files to hexagonal zones based on path patterns."""

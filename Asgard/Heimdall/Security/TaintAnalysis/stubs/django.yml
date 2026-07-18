@@ -1,0 +1,44 @@
+# Django framework model for taint analysis.
+framework: django
+route_decorators:
+  - api_view
+  - require_http_methods
+  - csrf_exempt
+sources:
+  - pattern: request.GET
+    type: http_parameter
+    confidence: 1.0
+  - pattern: request.POST
+    type: http_parameter
+    confidence: 1.0
+  - pattern: request.body
+    type: http_parameter
+    confidence: 0.8
+  - pattern: request.META
+    type: header
+    confidence: 0.8
+  - pattern: request.FILES
+    type: http_parameter
+    confidence: 0.8
+sinks:
+  - pattern: RawSQL
+    type: sql_query
+    severity: critical
+    confidence: 1.0
+  - pattern: objects.raw
+    type: sql_query
+    severity: critical
+    confidence: 1.0
+  - pattern: objects.extra
+    type: sql_query
+    severity: critical
+    confidence: 0.8
+  - pattern: mark_safe
+    type: html_output
+    severity: medium
+    confidence: 0.8
+sanitizers:
+  - pattern: django.utils.html.escape
+    kind: exact
+  - pattern: conditional_escape
+    kind: exact

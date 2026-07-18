@@ -31,6 +31,29 @@ def _add_openapi_parser(subparsers: argparse._SubParsersAction) -> None:
     diff.add_argument("spec1", help="First specification file")
     diff.add_argument("spec2", help="Second specification file")
 
+    completeness = openapi_sub.add_parser(
+        "completeness",
+        help="Assess spec completeness (4-vector matrix + maturity tier)",
+    )
+    completeness.add_argument("spec_file", help="Path to OpenAPI specification file")
+    completeness.add_argument("--profile", dest="completeness_profile",
+                              choices=["dx", "secops"], default="dx",
+                              help="Assessment profile: dx (default) weighs "
+                                   "descriptions/examples; secops ignores "
+                                   "experiential vectors")
+    completeness.add_argument("--min-tier",
+                              choices=["basic", "standard", "comprehensive"],
+                              default=None,
+                              help="Exit 1 when the assessed tier is below this")
+    add_performance_flags(completeness)
+
+    security = openapi_sub.add_parser(
+        "security",
+        help="Run only the static security (OWASP API Top 10) rules",
+    )
+    security.add_argument("spec_file", help="Path to OpenAPI specification file")
+    add_performance_flags(security)
+
 
 def _add_graphql_parser(subparsers: argparse._SubParsersAction) -> None:
     """Add GraphQL subparser."""
@@ -95,13 +118,34 @@ def _add_contract_parser(subparsers: argparse._SubParsersAction) -> None:
     compat = contract_sub.add_parser("check-compat", help="Check backward compatibility")
     compat.add_argument("old_spec", help="Old version specification")
     compat.add_argument("new_spec", help="New version specification")
+    compat.add_argument("--waivers", default=None,
+                        help="Path to .forseti-waivers.yaml (epoch waivers for compat breaks)")
     add_performance_flags(compat)
 
     breaking = contract_sub.add_parser("breaking-changes", help="Detect breaking changes")
     breaking.add_argument("old_spec", help="Old version specification")
     breaking.add_argument("new_spec", help="New version specification")
     breaking.add_argument("--version", help="Version string for changelog")
+    breaking.add_argument("--current-version", default=None,
+                          help="Current SemVer; emits an algorithmic bump "
+                               "recommendation (0.x downgrades MAJOR to MINOR)")
+    breaking.add_argument("--migration-guide", default=None, metavar="OUT.md",
+                          help="Write a Markdown migration-guide scaffold")
+    breaking.add_argument("--changelog", default=None, metavar="OUT.md",
+                          help="Write a grouped Keep-a-Changelog Markdown file")
     add_performance_flags(breaking)
+
+    audit_deps = contract_sub.add_parser(
+        "audit-deps",
+        help="Consumer-side dependency audit: fail when consumed operations "
+             "sunset within the horizon",
+    )
+    audit_deps.add_argument("config", help="deps.yaml listing consumed specs "
+                                           "and used operations")
+    audit_deps.add_argument("--horizon", type=int, default=30,
+                            help="Days of warning before a sunset fails the "
+                                 "audit (default: 30)")
+    add_performance_flags(audit_deps)
 
 
 def _add_jsonschema_parser(subparsers: argparse._SubParsersAction) -> None:
@@ -260,6 +304,39 @@ def _add_avro_parser(subparsers: argparse._SubParsersAction) -> None:
     add_performance_flags(compat)
 
 
+def _add_rules_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Add rules subparser (rule catalog surface)."""
+    rules = subparsers.add_parser(
+        "rules",
+        help="Rule registry tools",
+    )
+    rules_sub = rules.add_subparsers(dest="command")
+
+    list_cmd = rules_sub.add_parser("list", help="List registered rules with metadata")
+    list_cmd.add_argument("--rule-format", choices=["openapi", "asyncapi", "graphql",
+                                                    "jsonschema", "avro", "protobuf",
+                                                    "sql", "contract"],
+                          default=None, help="Filter by schema format")
+
+
+def _add_baseline_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Add baseline subparser."""
+    baseline = subparsers.add_parser(
+        "baseline",
+        help="Finding baseline management",
+    )
+    baseline_sub = baseline.add_subparsers(dest="command")
+
+    update = baseline_sub.add_parser("update", help="Accept current findings as baseline")
+    update.add_argument("spec_file", help="Specification file to baseline")
+    update.add_argument("--baseline", "-B", default=None,
+                        help="Baseline file path (default: .forseti-baseline.json)")
+
+    show = baseline_sub.add_parser("show", help="Show baseline contents")
+    show.add_argument("--baseline", "-B", default=None,
+                      help="Baseline file path (default: .forseti-baseline.json)")
+
+
 def _add_audit_parser(subparsers: argparse._SubParsersAction) -> None:
     """Add audit subparser."""
     audit = subparsers.add_parser(
@@ -269,3 +346,34 @@ def _add_audit_parser(subparsers: argparse._SubParsersAction) -> None:
     audit.add_argument("path", help="Path to audit")
     audit.add_argument("--output", "-o", help="Output report path")
     add_performance_flags(audit)
+
+
+def _add_compat_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Add compat subparser (unified compatibility engine, plan 01)."""
+    compat = subparsers.add_parser(
+        "compat",
+        help="Unified cross-format compatibility engine",
+    )
+    compat_sub = compat.add_subparsers(dest="command")
+
+    check = compat_sub.add_parser(
+        "check",
+        help="Check compatibility between schema versions (any format)",
+    )
+    check.add_argument("specs", nargs="+",
+                       help="Schema files, oldest first (two or more)")
+    check.add_argument("--format-hint",
+                       choices=["auto", "openapi", "asyncapi", "avro",
+                                "proto", "protobuf", "graphql", "jsonschema"],
+                       default="auto", help="Schema format (default: auto-detect)")
+    check.add_argument("--mode",
+                       choices=["backward", "forward", "full",
+                                "backward-transitive", "forward-transitive",
+                                "full-transitive"],
+                       default="backward", help="Compatibility mode (default: backward)")
+    check.add_argument("--min-score", type=int, default=None,
+                       help="Fail (exit 1) when the compatibility score is below N")
+    check.add_argument("--usage-report", default=None,
+                       help="JSON usage telemetry file; unused elements downgrade "
+                            "FAILED to CONDITIONALLY_PASSED")
+    add_performance_flags(check)

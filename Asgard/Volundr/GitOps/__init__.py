@@ -9,8 +9,10 @@ Provides template-based generation of GitOps configurations including:
 
 from Asgard.Volundr.GitOps.models.gitops_models import (
     ArgoApplication,
+    ArgoAppProject,
     ArgoSource,
     ArgoDestination,
+    GitOpsPolicy,
     FluxKustomization,
     FluxGitRepository,
     GitOpsConfig,
@@ -23,6 +25,8 @@ from Asgard.Volundr.GitOps.services.flux_generator import FluxGenerator
 
 __all__ = [
     "ArgoApplication",
+    "ArgoAppProject",
+    "GitOpsPolicy",
     "ArgoSource",
     "ArgoDestination",
     "FluxKustomization",

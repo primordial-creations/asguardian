@@ -8,6 +8,10 @@ import math
 from typing import List, Optional, Sequence, Union
 
 from Asgard.Verdandi.Analysis.models.analysis_models import PercentileResult
+from Asgard.Verdandi.Analysis.services.quantile_sketch import TDigest
+
+#: Quality flag: statistics derived from a mergeable sketch (approximate).
+SKETCH_APPROXIMATION = "SKETCH_APPROXIMATION"
 
 
 class PercentileCalculator:
@@ -17,11 +21,92 @@ class PercentileCalculator:
     Provides methods to calculate common percentiles (P50, P75, P90, P95, P99, P99.9)
     as well as custom percentile values for any dataset.
 
+    Cross-host / cross-window aggregation: NEVER average per-host percentiles
+    (the mean of p99s is not the p99 of the union — RESEARCH_15). Build a
+    sketch per host with create_sketch() and combine with merge_sketches().
+
     Example:
         calc = PercentileCalculator()
         result = calc.calculate([100, 150, 200, 250, 300])
         print(f"P95: {result.p95}")
+
+        # Correct cross-host aggregation:
+        sketches = [calc.create_sketch(host_samples) for host_samples in hosts]
+        fleet = calc.merge_sketches(sketches)
+        print(f"Fleet P99: {fleet.p99}")
     """
+
+    def create_sketch(
+        self,
+        values: Sequence[Union[int, float]],
+        compression: float = 100.0,
+    ) -> TDigest:
+        """
+        Build a mergeable t-digest sketch from raw samples.
+
+        Args:
+            values: Sequence of numeric values
+            compression: t-digest compression (higher = more accurate)
+
+        Returns:
+            TDigest sketch (serializable via to_dict()/from_dict())
+        """
+        digest = TDigest(compression=compression)
+        digest.add_batch(float(v) for v in values)
+        return digest
+
+    def merge_sketches(self, sketches: Sequence[TDigest]) -> PercentileResult:
+        """
+        Merge per-source sketches and compute fleet-level percentiles.
+
+        This is the sanctioned cross-host aggregation path. Averaging
+        per-host percentiles is statistically invalid and is deliberately
+        not offered by this API.
+
+        Args:
+            sketches: t-digest sketches, one per host/page/window
+
+        Returns:
+            PercentileResult over the merged distribution, flagged
+            SKETCH_APPROXIMATION (values are approximate, error ~1%)
+
+        Raises:
+            ValueError: If no sketches or all sketches are empty
+        """
+        if not sketches:
+            raise ValueError("Cannot merge an empty list of sketches")
+
+        merged = TDigest(compression=max(s.compression for s in sketches))
+        for sketch in sketches:
+            merged.merge(sketch)
+
+        if merged.count <= 0:
+            raise ValueError("Cannot compute percentiles from empty sketches")
+
+        merged._compress()
+        total = merged.count
+        mean = sum(m * w for m, w in merged._centroids) / total
+        # Between-centroid variance only: within-centroid spread is lost by
+        # the sketch, so std_dev slightly UNDERESTIMATES the true standard
+        # deviation (mean is exact; the bias shrinks as compression grows).
+        variance = sum(w * (m - mean) ** 2 for m, w in merged._centroids) / total
+        std_dev = math.sqrt(variance)
+
+        return PercentileResult(
+            sample_count=int(total),
+            min_value=merged.min_value,
+            max_value=merged.max_value,
+            mean=mean,
+            median=merged.quantile(0.50),
+            std_dev=std_dev,
+            p50=merged.quantile(0.50),
+            p75=merged.quantile(0.75),
+            p90=merged.quantile(0.90),
+            p95=merged.quantile(0.95),
+            p99=merged.quantile(0.99),
+            p999=merged.quantile(0.999),
+            quality_flags=[SKETCH_APPROXIMATION],
+        )
 
     def calculate(
         self,

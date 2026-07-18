@@ -4,9 +4,65 @@ All return values contain only plain Python primitives — no Node objects leak
 out of this module.  This satisfies the memory rule described in
 ``_parser_pool``.
 """
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from Asgard.Heimdall.treesitter._language_loader import get_language_object
+
+# Compiled-query cache: {(language, query_text): Query | None}.
+# Query compilation is the expensive step; queries are reused across every
+# file in a scan.  ``None`` is cached for invalid queries so a bad query
+# string is only compiled (and rejected) once.
+_QUERY_CACHE: Dict[Tuple[str, str], Any] = {}
+
+
+def _get_compiled_query(language: str, query_str: str):
+    """Return a cached compiled ``Query`` for (*language*, *query_str*).
+
+    Returns ``None`` when tree-sitter/language is unavailable or the query
+    is invalid.  Never raises.
+    """
+    key = (language, query_str)
+    if key in _QUERY_CACHE:
+        return _QUERY_CACHE[key]
+
+    lang_obj = get_language_object(language)
+    if lang_obj is None:
+        return None  # do not cache: language may load later in tests
+
+    try:
+        from tree_sitter import Query  # noqa: PLC0415
+        query = Query(lang_obj, query_str)
+    except Exception:
+        query = None
+    _QUERY_CACHE[key] = query
+    return query
+
+
+def clear_query_cache() -> None:
+    """Test helper: drop all compiled queries."""
+    _QUERY_CACHE.clear()
+
+
+def _query_captures(query, root_node):
+    """Run ``captures`` across tree-sitter API generations.
+
+    tree-sitter ≥ 0.24 moved execution onto ``QueryCursor``; older releases
+    expose ``Query.captures`` directly.
+    """
+    try:
+        from tree_sitter import QueryCursor  # noqa: PLC0415
+        return QueryCursor(query).captures(root_node)
+    except ImportError:
+        return query.captures(root_node)
+
+
+def _query_matches(query, root_node):
+    """Run ``matches`` across tree-sitter API generations (see above)."""
+    try:
+        from tree_sitter import QueryCursor  # noqa: PLC0415
+        return QueryCursor(query).matches(root_node)
+    except ImportError:
+        return query.matches(root_node)
 
 
 def node_text(node, source_bytes: bytes) -> str:
@@ -77,14 +133,12 @@ def run_query(root_node, query_str: str, source_bytes: bytes, language: str) -> 
     if root_node is None:
         return []
 
-    lang_obj = get_language_object(language)
-    if lang_obj is None:
+    query = _get_compiled_query(language, query_str)
+    if query is None:
         return []
 
     try:
-        from tree_sitter import Query  # noqa: PLC0415
-        query = Query(lang_obj, query_str)
-        captures = query.captures(root_node)
+        captures = _query_captures(query, root_node)
         return _extract_captures(captures, source_bytes)
     except Exception:
         return []
@@ -99,23 +153,20 @@ def run_query_all(root_node, query_str: str, source_bytes: bytes, language: str)
     if root_node is None:
         return []
 
-    lang_obj = get_language_object(language)
-    if lang_obj is None:
+    query = _get_compiled_query(language, query_str)
+    if query is None:
         return []
 
     try:
-        from tree_sitter import Query  # noqa: PLC0415
-        query = Query(lang_obj, query_str)
-
         results: List[Dict[str, Any]] = []
         try:
-            matches = query.matches(root_node)
+            matches = _query_matches(query, root_node)
             for _pattern_index, captures_dict in matches:
                 extracted = _extract_captures(captures_dict, source_bytes)
                 results.extend(extracted)
         except AttributeError:
             # Fallback for older tree-sitter versions without .matches()
-            captures = query.captures(root_node)
+            captures = _query_captures(query, root_node)
             results = _extract_captures(captures, source_bytes)
 
         return results

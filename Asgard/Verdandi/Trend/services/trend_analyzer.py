@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Sequence, Tuple
 
 from Asgard.Verdandi.Trend.models.trend_models import (
+    DecompositionMode,
+    DecompositionOutcome,
     TrendAnalysis,
     TrendData,
     TrendDirection,
@@ -22,6 +24,7 @@ from Asgard.Verdandi.Trend.services._trend_helpers import (
     generate_trend_description,
     linear_regression,
 )
+from Asgard.Verdandi.Trend.services.seasonal_decomposer import SeasonalDecomposer
 
 
 class TrendAnalyzer:
@@ -59,6 +62,7 @@ class TrendAnalyzer:
         self.min_data_points = min_data_points
         self.significance_threshold = significance_threshold
         self.r_squared_threshold = r_squared_threshold
+        self._decomposer = SeasonalDecomposer()
 
     def analyze(
         self,
@@ -276,3 +280,67 @@ class TrendAnalyzer:
             overall_health=overall_health,
             recommendations=recommendations,
         )
+
+    def analyze_deseasonalized(
+        self,
+        values: Sequence[float],
+        period: int,
+        mode: DecompositionMode = DecompositionMode.ADDITIVE,
+        metric_name: str = "metric",
+        start_time: Optional[datetime] = None,
+        interval_seconds: float = 60,
+    ) -> TrendAnalysis:
+        """
+        Robust STL-lite deseasonalize (Plan 03F), then run the normal trend
+        analysis on the seasonality-removed series (trend + residual).
+
+        This is the additive `analyze(deseasonalized=True)` option: it never
+        changes the signature of `analyze()`/`analyze_values()`, it is a new
+        entry point that delegates to them once seasonality is stripped out.
+
+        Args:
+            values: Raw time series (assumed uniformly sampled)
+            period: Seasonal period length in points
+            mode: ADDITIVE or MULTIPLICATIVE decomposition
+            metric_name: Name of the metric
+            start_time: Start timestamp (default: now minus duration)
+            interval_seconds: Interval between data points
+
+        Returns:
+            TrendAnalysis over the deseasonalized series. When fewer than 3
+            full periods are available, falls back to `analyze_values()` on
+            the raw series and notes that seasonality was not removed.
+        """
+        decomposition = self._decomposer.decompose(values, period=period, mode=mode)
+
+        if decomposition.outcome == DecompositionOutcome.INSUFFICIENT_DATA:
+            result = self.analyze_values(
+                values, metric_name, start_time, interval_seconds
+            )
+            note = (
+                "Seasonal decomposition skipped (insufficient cycles): "
+                + "; ".join(decomposition.notes)
+            )
+            result.description = (
+                f"{result.description} {note}".strip()
+                if result.description
+                else note
+            )
+            return result
+
+        if mode == DecompositionMode.MULTIPLICATIVE:
+            deseasonalized = [
+                decomposition.trend[i] * decomposition.residual[i]
+                for i in range(len(values))
+            ]
+        else:
+            deseasonalized = [
+                decomposition.trend[i] + decomposition.residual[i]
+                for i in range(len(values))
+            ]
+
+        result = self.analyze_values(
+            deseasonalized, metric_name, start_time, interval_seconds
+        )
+        result.seasonality_detected = True
+        return result

@@ -1,0 +1,41 @@
+# Flask framework model for taint analysis.
+framework: flask
+route_decorators:
+  - app.route
+  - app.get
+  - app.post
+  - app.put
+  - app.delete
+  - app.patch
+  - blueprint.route
+  - bp.route
+sources:
+  - pattern: flask.request.args
+    type: http_parameter
+    confidence: 1.0
+  - pattern: flask.request.form
+    type: http_parameter
+    confidence: 1.0
+  - pattern: flask.request.json
+    type: http_parameter
+    confidence: 1.0
+  - pattern: flask.request.cookies
+    type: cookie
+    confidence: 1.0
+  - pattern: flask.request.headers
+    type: header
+    confidence: 0.8
+sinks:
+  - pattern: flask.render_template_string
+    type: template_render
+    severity: high
+    confidence: 1.0
+  - pattern: render_template_string
+    type: template_render
+    severity: high
+    confidence: 0.8
+sanitizers:
+  - pattern: flask.escape
+    kind: exact
+  - pattern: markupsafe.escape
+    kind: exact

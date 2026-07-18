@@ -119,7 +119,62 @@ def _add_slo_parser(subparsers) -> None:
         help="Analysis window in hours (default: 1.0)"
     )
 
+    policy_parser = slo_subparsers.add_parser(
+        "burn-rate-policy",
+        help=(
+            "Evaluate the three-tier multi-window burn-rate alert policy "
+            "(page_fast / page_slow / ticket)"
+        ),
+    )
+    policy_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {slo: {name, type, target}, metrics: "
+            "[{timestamp, good_events, total_events}, ...]}"
+        ),
+    )
+    policy_parser.add_argument(
+        "--target",
+        "-t",
+        type=float,
+        default=None,
+        help="Override the SLO target percentage from the file",
+    )
+    policy_parser.add_argument(
+        "--at",
+        type=str,
+        default=None,
+        help="Evaluate as of this ISO timestamp (default: now)",
+    )
+
     add_performance_flags(slo_parser)
+
+
+def _add_db_parser(subparsers) -> None:
+    """Add database performance commands."""
+    db_parser = subparsers.add_parser(
+        "db",
+        help="Database performance analysis",
+    )
+    db_subparsers = db_parser.add_subparsers(
+        dest="db_command",
+        help="Database commands",
+    )
+
+    signature_parser = db_subparsers.add_parser(
+        "pool-signature",
+        help=(
+            "Classify a bimodal latency distribution: pool exhaustion vs "
+            "cache-aside pattern"
+        ),
+    )
+    signature_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: array of latencies in ms, or {latencies_ms: [...], "
+            "acquisition_waits_ms: [...]}"
+        ),
+    )
 
 
 def _add_anomaly_parser(subparsers) -> None:
@@ -176,7 +231,11 @@ def _add_anomaly_parser(subparsers) -> None:
         "-t",
         type=float,
         default=10.0,
-        help="Regression threshold percentage (default: 10.0)"
+        help=(
+            "Regression threshold percentage: minimum relative "
+            "Hodges-Lehmann shift for the practical-significance gate "
+            "(default: 10.0)"
+        )
     )
 
     add_performance_flags(anomaly_parser)

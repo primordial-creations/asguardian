@@ -6,6 +6,9 @@ from Asgard.Verdandi.Trend.models.trend_models import (
     TrendAnalysis,
     ForecastResult,
     TrendReport,
+    DecompositionMode,
+    DecompositionOutcome,
+    SeasonalDecomposition,
 )
 
 __all__ = [
@@ -14,4 +17,7 @@ __all__ = [
     "TrendAnalysis",
     "ForecastResult",
     "TrendReport",
+    "DecompositionMode",
+    "DecompositionOutcome",
+    "SeasonalDecomposition",
 ]

@@ -85,7 +85,16 @@ def _handle_protobuf(args: argparse.Namespace) -> int:
     elif args.command == "check-compat":
         service = ProtobufCompatibilityService()
         result = service.check(args.old_proto, args.new_proto)
-        print(service.generate_report(result, args.format))
+        if getattr(args, "format", "text") == "json":
+            import json as _json
+
+            from Asgard.Forseti.cli.handlers_compat import engine_score_extras
+
+            payload = _json.loads(service.generate_report(result, "json"))
+            payload.update(engine_score_extras(args.old_proto, args.new_proto, "proto"))
+            print(_json.dumps(payload, indent=2, default=str))
+        else:
+            print(service.generate_report(result, args.format))
         return 0 if result.is_compatible else 1
 
     return 1
@@ -117,7 +126,19 @@ def _handle_avro(args: argparse.Namespace) -> int:
 
         service = AvroCompatibilityService()
         result = service.check(args.old_schema, args.new_schema, mode)
-        print(service.generate_report(result, args.format))
+        if getattr(args, "format", "text") == "json":
+            import json as _json
+
+            from Asgard.Forseti.cli.handlers_compat import engine_score_extras
+
+            payload = _json.loads(service.generate_report(result, "json"))
+            payload.update(engine_score_extras(
+                args.old_schema, args.new_schema, "avro",
+                mode=getattr(args, "mode", "backward"),
+            ))
+            print(_json.dumps(payload, indent=2, default=str))
+        else:
+            print(service.generate_report(result, args.format))
         return 0 if result.is_compatible else 1
 
     return 1
@@ -137,12 +158,22 @@ def _handle_audit(args: argparse.Namespace) -> int:
         if _looks_like_openapi(spec_file):
             service = SpecValidatorService()
             result = service.validate(str(spec_file))
-            results.append({
+            entry = {
                 "file": str(spec_file),
                 "type": "openapi",
                 "valid": result.is_valid,
                 "errors": result.error_count,
-            })
+            }
+            try:
+                from Asgard.Forseti.OpenAPI.services.completeness_service import (
+                    CompletenessService,
+                )
+                completeness = CompletenessService().assess(str(spec_file))
+                entry["completeness_tier"] = completeness.tier.value
+                entry["completeness"] = completeness.vector.model_dump()
+            except Exception:
+                pass
+            results.append(entry)
 
     for schema_file in path.rglob("*.schema.json"):
         try:
@@ -216,7 +247,9 @@ def _handle_audit(args: argparse.Namespace) -> int:
     else:
         for result in results:
             status = "PASS" if result["valid"] else "FAIL"
-            print(f"[{status}] {result['file']} ({result['type']})")
+            tier = result.get("completeness_tier")
+            suffix = f" [completeness: {tier}]" if tier else ""
+            print(f"[{status}] {result['file']} ({result['type']}){suffix}")
 
     print("=" * 60)
 

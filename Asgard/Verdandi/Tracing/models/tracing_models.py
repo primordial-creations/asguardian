@@ -64,6 +64,15 @@ class TraceSpan(BaseModel):
     instrumentation_scope: Optional[str] = Field(
         default=None, description="Name of instrumentation library"
     )
+    effective_end_ns: Optional[int] = Field(
+        default=None,
+        description=(
+            "Causally-normalized end timestamp (Unix nanoseconds), set by the "
+            "async-truncation pass in causal_normalizer.py. min(span.end, "
+            "parent.effective_end). None until normalization has run; falls "
+            "back to end_time_unix_nano when unset."
+        ),
+    )
 
     @property
     def start_time(self) -> datetime:
@@ -84,6 +93,15 @@ class TraceSpan(BaseModel):
     def has_error(self) -> bool:
         """Check if span has error status."""
         return self.status_code == "ERROR"
+
+    @property
+    def effective_end_time_unix_nano(self) -> int:
+        """Effective end (post async-truncation), falling back to raw end."""
+        return (
+            self.effective_end_ns
+            if self.effective_end_ns is not None
+            else self.end_time_unix_nano
+        )
 
 
 class DistributedTrace(BaseModel):
@@ -110,6 +128,36 @@ class DistributedTrace(BaseModel):
     def has_errors(self) -> bool:
         """Check if trace has any errors."""
         return self.error_count > 0
+
+
+class ConfidenceFlag(str, Enum):
+    """
+    Confidence annotations emitted by causal normalization and the
+    sweep-line critical path analyzer.
+
+    These are epistemic annotations, not alert severities (anomalies are
+    not alerts): they tell a reader how much to trust a specific result,
+    they never trigger paging/alerting on their own.
+    """
+
+    ORPHANED_SUBTREE_RECOVERED = "orphaned_subtree_recovered"
+    HEAVY_CLOCK_SKEW_ADJUSTED = "heavy_clock_skew_adjusted"
+    SEVERE_ASYNC_TRUNCATION = "severe_async_truncation"
+    HIGH_UNATTRIBUTED_TIME = "high_unattributed_time"
+
+
+class AnalysisOutcome(str, Enum):
+    """
+    Typed outcome of an analysis attempt.
+
+    INSUFFICIENT_DATA is a *success* outcome (DEEPTHINK_01): the analyzer is
+    reporting honestly that it cannot produce a sound result (no spans, no
+    determinable root, degenerate/zero-length trace), and it must never
+    trip alerts.
+    """
+
+    OK = "ok"
+    INSUFFICIENT_DATA = "insufficient_data"
 
 
 class CriticalPathSegment(BaseModel):
@@ -149,6 +197,33 @@ class CriticalPathResult(BaseModel):
     )
     recommendations: List[str] = Field(
         default_factory=list, description="Optimization recommendations"
+    )
+    strategy: str = Field(
+        default="legacy",
+        description=(
+            "Algorithm used: 'legacy' (naive longest-path + self-time "
+            "subtraction) or 'sweepline' (causal-normalized latest-finisher "
+            "sweep-line critical path)."
+        ),
+    )
+    flags: List[ConfidenceFlag] = Field(
+        default_factory=list,
+        description=(
+            "Confidence/anomaly annotations (not alerts) raised while "
+            "computing this result, e.g. clock-skew corrections or "
+            "unattributed self-time above the 30% threshold."
+        ),
+    )
+    assumptions: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Human-readable assumptions this result relies on (populated "
+            "for strategy='sweepline'), e.g. symmetric network latency."
+        ),
+    )
+    outcome: AnalysisOutcome = Field(
+        default=AnalysisOutcome.OK,
+        description="Typed outcome; INSUFFICIENT_DATA is a success signal, not a failure.",
     )
 
 

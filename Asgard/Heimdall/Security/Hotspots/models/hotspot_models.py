@@ -3,9 +3,16 @@ Heimdall Security Hotspot Models
 
 Pydantic models for security hotspot detection.
 
-Security hotspots are security-sensitive code patterns that need manual
-review. They are not confirmed vulnerabilities but areas requiring developer
-attention according to OWASP and CWE guidelines.
+Hotspot discipline (plan 08 Part A, DEEPTHINK_10): a hotspot is
+*syntactically flawless code whose safety depends on extrinsic context*
+(intent, provenance, topology) — never a "failed finding". Reclassifying
+weak taint findings as hotspots to inflate precision is forbidden: if the
+scanner lacks proof, it emits a Finding via taint or stays silent.
+
+Exactly six pattern families qualify. Review statuses are TO_REVIEW,
+SAFE_IN_CONTEXT (mandatory justification, audit-logged) and FIXED — there
+is deliberately NO "Acknowledged Risk" status: risk acceptance belongs in
+a GRC/ticket system, not a scanner UI (discoverable-negligence liability).
 """
 
 from datetime import datetime
@@ -17,17 +24,23 @@ from pydantic import BaseModel, Field
 
 
 class HotspotCategory(str, Enum):
-    """Category of security hotspot."""
-    COOKIE_CONFIG = "cookie_config"
-    CRYPTO_USAGE = "crypto_usage"
-    DYNAMIC_EXECUTION = "dynamic_execution"
-    REGEX_DOS = "regex_dos"
-    XXE = "xxe"
-    INSECURE_DESERIALIZATION = "insecure_deserialization"
-    SSRF = "ssrf"
-    INSECURE_RANDOM = "insecure_random"
-    PERMISSION_CHECK = "permission_check"
-    TLS_VERIFICATION = "tls_verification"
+    """
+    The six defensible hotspot families (DEEPTHINK_10 s5).
+
+    Each is a question only a human with extrinsic context can answer:
+      WEAK_HASHING            - md5/sha1: is this a security context? (business domain)
+      STANDARD_PRNG           - random.*: security sink or simulation? (intent)
+      DISABLED_TLS            - verify=False etc.: internal topology? (network)
+      PERMISSIVE_BINDING      - 0.0.0.0 / CORS *: deployment surface? (topology)
+      OPAQUE_DESERIALIZATION  - pickle/yaml.load on non-taint-proven data (provenance)
+      HAZMAT_CRYPTO           - cryptography.hazmat.*: mathematically sound? (review)
+    """
+    WEAK_HASHING = "weak_hashing"
+    STANDARD_PRNG = "standard_prng"
+    DISABLED_TLS = "disabled_tls"
+    PERMISSIVE_BINDING = "permissive_binding"
+    OPAQUE_DESERIALIZATION = "opaque_deserialization"
+    HAZMAT_CRYPTO = "hazmat_crypto"
 
 
 class ReviewPriority(str, Enum):
@@ -38,10 +51,22 @@ class ReviewPriority(str, Enum):
 
 
 class ReviewStatus(str, Enum):
-    """Current review status of a hotspot."""
+    """
+    Review status of a hotspot.
+
+    SAFE_IN_CONTEXT requires mandatory justification text (enforced by
+    ``review_hotspot``) and is persisted to the Shared/Issues audit log.
+    There is no "acknowledged risk" status by design.
+    """
     TO_REVIEW = "to_review"
-    REVIEWED_SAFE = "reviewed_safe"
-    REVIEWED_FIXED = "reviewed_fixed"
+    SAFE_IN_CONTEXT = "safe_in_context"
+    FIXED = "fixed"
+
+
+# Volume guard: above this many hotspots on one PR, collapse to a single
+# summary comment (>5 is where bulk "Mark as Safe" malicious compliance
+# begins — DEEPTHINK_10).
+PR_HOTSPOT_CAP = 5
 
 
 class SecurityHotspot(BaseModel):
@@ -55,6 +80,17 @@ class SecurityHotspot(BaseModel):
     code_snippet: str = Field("", description="The code snippet flagged as a hotspot")
     review_guidance: str = Field("", description="Guidance on what to check during review")
     review_status: ReviewStatus = Field(ReviewStatus.TO_REVIEW, description="Current review status")
+    justification: str = Field(
+        "", description="Reviewer justification (mandatory for SAFE_IN_CONTEXT transitions)"
+    )
+    context_tag: str = Field(
+        "production",
+        description="Test-context tag from the context engine (plan 08 Part B)"
+    )
+    suppressed_by_context: bool = Field(
+        False,
+        description="True when the test-context severity matrix suppressed this hotspot"
+    )
     owasp_category: Optional[str] = Field(None, description="OWASP Top 10 category if applicable")
     cwe_id: Optional[str] = Field(None, description="CWE identifier if applicable")
 
@@ -90,6 +126,18 @@ class HotspotConfig(BaseModel):
         description="File extensions to include"
     )
     include_tests: bool = Field(True, description="Include test files in analysis")
+    test_context_enabled: bool = Field(
+        True,
+        description="Route hotspots through the test-context severity matrix (plan 08 Part B)"
+    )
+    include_test_context: bool = Field(
+        False,
+        description="Include context-suppressed hotspots in the report (--include-test-context)"
+    )
+    strict_scan_paths: List[str] = Field(
+        default_factory=list,
+        description="Regexes for paths where the test-context engine is bypassed entirely"
+    )
     output_format: str = Field("text", description="Output format: text, json, markdown")
     verbose: bool = Field(False, description="Verbose output")
 
@@ -110,6 +158,9 @@ class HotspotReport(BaseModel):
     hotspots: List[SecurityHotspot] = Field(
         default_factory=list,
         description="All detected hotspots"
+    )
+    suppressed_by_context_count: int = Field(
+        0, description="Hotspots suppressed by the test-context engine (retained, not scored)"
     )
 
     # Metadata

@@ -62,11 +62,31 @@ def _strip_ansi(text: str) -> str:
     return _ANSI_ESCAPE.sub("", text)
 
 
-def _report_file_path(suffix: str = ".html") -> Path:
-    return Path.cwd() / f"heimdall_report_{uuid.uuid4().hex[:8]}{suffix}"
+DEFAULT_REPORT_DIR_NAME = os.path.join(".asgard", "reports")
 
 
-def _save_html_report(content: str, title: str = "Heimdall Report") -> Path:
+def _report_dir(output_dir=None) -> Path:
+    """Resolve the directory that HTML reports are written to.
+
+    Precedence: explicit output_dir argument > HEIMDALL_REPORT_DIR env var >
+    default of ./.asgard/reports under the current working directory.
+    Reports are no longer dropped directly into the CWD.
+    """
+    if output_dir:
+        directory = Path(output_dir)
+    elif os.environ.get("HEIMDALL_REPORT_DIR"):
+        directory = Path(os.environ["HEIMDALL_REPORT_DIR"])
+    else:
+        directory = Path.cwd() / DEFAULT_REPORT_DIR_NAME
+    directory.mkdir(parents=True, exist_ok=True)
+    return directory
+
+
+def _report_file_path(suffix: str = ".html", output_dir=None) -> Path:
+    return _report_dir(output_dir) / f"heimdall_report_{uuid.uuid4().hex[:8]}{suffix}"
+
+
+def _save_html_report(content: str, title: str = "Heimdall Report", output_dir=None) -> Path:
     is_html = content.lstrip().startswith(("<!DOCTYPE", "<html", "<!doctype"))
     if is_html:
         html = content
@@ -113,7 +133,7 @@ def _save_html_report(content: str, title: str = "Heimdall Report") -> Path:
 </body>
 </html>"""
 
-    report_path = _report_file_path()
+    report_path = _report_file_path(output_dir=output_dir)
     report_path.write_text(html, encoding="utf-8")
     return report_path
 

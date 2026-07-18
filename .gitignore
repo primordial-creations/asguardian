@@ -76,3 +76,10 @@ scan_results/
 *.bak
 *.tmp
 Asgard-backup/
+
+.asgard/
+heimdall_report_*.html
+_baseline_failures.txt
+
+# Local project instructions — contains live credentials, never commit
+CLAUDE.md

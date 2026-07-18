@@ -27,9 +27,11 @@ __author__ = "Asgard Contributors"
 
 from Asgard.Verdandi.Analysis.models.analysis_models import (
     ApdexConfig,
+    ApdexRecalibrationRecord,
     ApdexResult,
     AggregationConfig,
     AggregationResult,
+    MultiEndpointApdexResult,
     PercentileResult,
     SLAConfig,
     SLAResult,
@@ -46,7 +48,9 @@ from Asgard.Verdandi.Analysis.services.trend_analyzer import TrendAnalyzer
 __all__ = [
     "ApdexCalculator",
     "ApdexConfig",
+    "ApdexRecalibrationRecord",
     "ApdexResult",
+    "MultiEndpointApdexResult",
     "AggregationConfig",
     "AggregationResult",
     "AggregationService",

@@ -119,11 +119,31 @@ def make_purl(name: str, version: str, ecosystem: str = "pypi") -> str:
     Returns:
         A purl string such as "pkg:pypi/requests@2.28.0".
     """
-    normalized = name.lower().replace("-", "_")
+    # purl spec for pkg:pypi: lowercase and normalize runs of ., _, - to a
+    # single hyphen (PEP 503). The old code did the OPPOSITE ("-" -> "_"),
+    # emitting spec-invalid purls for every hyphenated package.
+    if ecosystem == "pypi":
+        normalized = re.sub(r"[-_.]+", "-", name).lower()
+    else:
+        normalized = name.lower()
     if version:
         clean_version = re.sub(r"^[><=!~]+\s*", "", version).strip()
         return f"pkg:{ecosystem}/{normalized}@{clean_version}"
     return f"pkg:{ecosystem}/{normalized}"
+
+
+def get_installed_version(package_name: str) -> str:
+    """
+    Resolved installed version for a package via importlib.metadata.
+
+    Returns '' when the package is not installed in the current environment.
+    """
+    try:
+        return importlib.metadata.version(package_name) or ""
+    except importlib.metadata.PackageNotFoundError:
+        return ""
+    except Exception:
+        return ""
 
 
 def get_license_from_metadata(package_name: str) -> str:
@@ -135,17 +155,140 @@ def get_license_from_metadata(package_name: str) -> str:
 
     Returns:
         SPDX license identifier string, or empty string if not available.
+
+    Precedence (Plan 03): PEP 639 License-Expression, then trove license
+    classifier, then the legacy License header.
     """
     try:
         meta = importlib.metadata.metadata(package_name)
-        try:
-            license_value = meta["License"]
-        except KeyError:
-            license_value = ""
-        if license_value:
-            return license_value.strip()
     except importlib.metadata.PackageNotFoundError:
-        pass
+        return ""
     except Exception:
-        pass
-    return ""
+        return ""
+
+    try:
+        expression = meta.get("License-Expression", "")  # type: ignore[attr-defined]
+    except Exception:
+        expression = ""
+    if expression:
+        return expression.strip()
+
+    try:
+        classifiers = meta.get_all("Classifier") or []
+    except Exception:
+        classifiers = []
+    for classifier in classifiers:
+        if classifier.startswith("License ::"):
+            return classifier.split(" :: ")[-1].strip()
+
+    try:
+        license_value = meta.get("License", "") or ""
+    except Exception:
+        license_value = ""
+    return license_value.strip()
+
+
+def parse_requires_dist(requires: str) -> str:
+    """
+    Extract the bare package name from a Requires-Dist entry.
+
+    Returns '' for extra-gated requirements (``; extra == "..."``) so the
+    closure walk follows the default (non-extra) dependency set only.
+    """
+    if not requires:
+        return ""
+    if ";" in requires:
+        marker_text = requires.split(";", 1)[1].strip()
+        if "extra" in marker_text:
+            return ""
+        # Evaluate environment markers so platform/version-gated
+        # requirements absent from THIS environment do not count against
+        # closure completeness (e.g. tomli on Python >= 3.11).
+        try:
+            from packaging.markers import Marker
+            if not Marker(marker_text).evaluate():
+                return ""
+        except Exception:
+            pass  # unevaluable marker: keep the requirement conservatively
+    head = requires.split(";")[0].strip()
+    match = re.match(r"^([A-Za-z0-9_\-\.]+)", head)
+    return match.group(1) if match else ""
+
+
+def get_requires(package_name: str) -> List[str]:
+    """
+    Names of a package's default (non-extra) requirements, from installed
+    metadata. Empty when the package is not installed.
+    """
+    try:
+        meta = importlib.metadata.metadata(package_name)
+    except importlib.metadata.PackageNotFoundError:
+        return []
+    except Exception:
+        return []
+    try:
+        entries = meta.get_all("Requires-Dist") or []
+    except Exception:
+        entries = []
+    names = []
+    for entry in entries:
+        name = parse_requires_dist(entry)
+        if name and name.lower() not in {n.lower() for n in names}:
+            names.append(name)
+    return names
+
+
+def get_record_checksum(package_name: str) -> str:
+    """
+    Deterministic sha256 over the package's installed RECORD file-hash lines.
+
+    Per-file wheel hashes live in dist-info/RECORD; a package-level checksum
+    is derived as sha256 of the sorted "path,hash" lines, so an identical
+    installation always yields the same value. '' when unavailable.
+    """
+    import hashlib
+
+    try:
+        dist = importlib.metadata.distribution(package_name)
+    except importlib.metadata.PackageNotFoundError:
+        return ""
+    except Exception:
+        return ""
+    try:
+        record = dist.read_text("RECORD")
+    except Exception:
+        record = None
+    if not record:
+        return ""
+    lines = []
+    for line in record.splitlines():
+        parts = line.split(",")
+        if len(parts) >= 2 and parts[1].strip():
+            lines.append(f"{parts[0]},{parts[1]}")
+    if not lines:
+        return ""
+    payload = "\n".join(sorted(lines))
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()
+
+
+def get_package_meta_fields(package_name: str) -> dict:
+    """Supplier/author/homepage/summary from installed metadata ('' absent)."""
+    try:
+        meta = importlib.metadata.metadata(package_name)
+    except importlib.metadata.PackageNotFoundError:
+        return {}
+    except Exception:
+        return {}
+
+    def _get(key: str) -> str:
+        try:
+            return (meta.get(key) or "").strip()
+        except Exception:
+            return ""
+
+    return {
+        "author": _get("Author") or _get("Author-email"),
+        "supplier": _get("Author") or _get("Maintainer") or _get("Author-email"),
+        "homepage": _get("Home-page"),
+        "description": _get("Summary"),
+    }

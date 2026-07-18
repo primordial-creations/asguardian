@@ -4,8 +4,9 @@ Regression Detector Service
 Detects performance regressions between two datasets.
 """
 
+import math
 from datetime import datetime
-from typing import Dict, List, Sequence
+from typing import Dict, List, Sequence, Tuple
 
 from Asgard.Verdandi.Anomaly.models.anomaly_models import (
     AnomalySeverity,
@@ -20,7 +21,11 @@ from Asgard.Verdandi.Anomaly.services._regression_statistics import (
     determine_regression_severity,
     generate_regression_description,
     generate_regression_recommendations,
+    glass_delta as _glass_delta,
+    hodges_lehmann,
+    mann_whitney_u as _mann_whitney_u,
     percentile,
+    pseudo_median,
     welch_t_test,
 )
 
@@ -41,26 +46,54 @@ class RegressionDetector:
             print(f"Regression detected: {result.mean_change_percent}%")
     """
 
+    #: Default verdict mode: Welch's t gated by Hodges-Lehmann shift and
+    #: Glass's delta (RESEARCH_15 three-gate verdict).
+    VERDICT_THREE_GATE = "three_gate"
+    #: Pre-effect-size-gating behavior (Cohen's d + mean %-change gates).
+    #: Retained for one release for callers that pinned the old semantics.
+    VERDICT_LEGACY = "legacy"
+
     def __init__(
         self,
         significance_level: float = 0.05,
         min_effect_size: float = 0.2,
         regression_threshold_percent: float = 10.0,
         critical_threshold_percent: float = 50.0,
+        verdict_mode: str = VERDICT_THREE_GATE,
+        hl_absolute_threshold: float = 10.0,
+        hl_relative_threshold: float = 0.05,
+        glass_delta_threshold: float = 0.5,
     ):
         """
         Initialize the regression detector.
 
         Args:
             significance_level: P-value threshold for statistical significance
-            min_effect_size: Minimum Cohen's d effect size to consider
+            min_effect_size: Minimum Cohen's d effect size (legacy mode only)
             regression_threshold_percent: Percent change to flag as regression
+                (legacy mode only)
             critical_threshold_percent: Percent change for critical severity
+            verdict_mode: "three_gate" (default) requires ALL of
+                statistical (Welch p < alpha), practical (HL shift >
+                hl_absolute_threshold OR relative shift >
+                hl_relative_threshold) and magnitude (|Glass's delta| >
+                glass_delta_threshold) gates to pass. "legacy" keeps the
+                previous Cohen's-d + mean-%-change gating (deprecated,
+                retained one release).
+            hl_absolute_threshold: Hodges-Lehmann shift gate in metric units
+                (default 10, i.e. 10 ms for latency metrics)
+            hl_relative_threshold: HL shift relative to baseline
+                pseudo-median gate (default 0.05 = 5%)
+            glass_delta_threshold: |Glass's delta| gate (default 0.5)
         """
         self.significance_level = significance_level
         self.min_effect_size = min_effect_size
         self.regression_threshold_percent = regression_threshold_percent
         self.critical_threshold_percent = critical_threshold_percent
+        self.verdict_mode = verdict_mode
+        self.hl_absolute_threshold = hl_absolute_threshold
+        self.hl_relative_threshold = hl_relative_threshold
+        self.glass_delta_threshold = glass_delta_threshold
 
     def detect(
         self,
@@ -83,6 +116,7 @@ class RegressionDetector:
             return RegressionResult(
                 metric_name=metric_name,
                 description="Insufficient data for comparison",
+                verdict_basis="insufficient_data",
             )
 
         before_mean, before_std = calculate_mean_std(before)
@@ -104,19 +138,66 @@ class RegressionDetector:
             before_mean, before_std, len(before), after_mean, after_std, len(after)
         )
 
-        is_statistically_significant = p_value < self.significance_level
-        is_practically_significant = abs(effect_size) >= self.min_effect_size
-        is_positive_change = after_mean > before_mean
-
-        is_regression = (
-            is_statistically_significant
-            and is_practically_significant
-            and is_positive_change
-            and mean_change_percent >= self.regression_threshold_percent
+        hl_shift = hodges_lehmann(before, after)
+        baseline_pseudo_median = pseudo_median(before)
+        # Relative shift is undefined (None, not 0) for a non-positive
+        # baseline pseudo-median; the practical gate then relies on the
+        # absolute threshold alone.
+        hl_shift_relative = (
+            hl_shift / baseline_pseudo_median if baseline_pseudo_median > 0 else None
         )
+        glass = _glass_delta(before_mean, before_std, after_mean)
+
+        is_statistically_significant = p_value < self.significance_level
+
+        if self.verdict_mode == self.VERDICT_LEGACY:
+            is_practically_significant = abs(effect_size) >= self.min_effect_size
+            is_positive_change = after_mean > before_mean
+            is_regression = (
+                is_statistically_significant
+                and is_practically_significant
+                and is_positive_change
+                and mean_change_percent >= self.regression_threshold_percent
+            )
+            verdict_basis = (
+                f"legacy: p={p_value:.4f} (<{self.significance_level}: "
+                f"{is_statistically_significant}), |d|={abs(effect_size):.2f} "
+                f"(>={self.min_effect_size}: {is_practically_significant}), "
+                f"mean_change={mean_change_percent:+.1f}% "
+                f"(>={self.regression_threshold_percent}%)"
+            )
+            severity_effect = effect_size
+        else:
+            practical_gate = hl_shift > self.hl_absolute_threshold or (
+                hl_shift_relative is not None
+                and hl_shift_relative > self.hl_relative_threshold
+            )
+            magnitude_gate = abs(glass) > self.glass_delta_threshold
+            is_practically_significant = practical_gate and magnitude_gate
+            is_regression = (
+                is_statistically_significant
+                and practical_gate
+                and magnitude_gate
+                and hl_shift > 0
+            )
+            rel_part = (
+                f"rel={hl_shift_relative:.3%} (>{self.hl_relative_threshold:.0%})"
+                if hl_shift_relative is not None
+                else "rel=undefined (non-positive baseline pseudo-median; "
+                "absolute gate only)"
+            )
+            verdict_basis = (
+                f"three_gate: statistical p={p_value:.4f} "
+                f"(<{self.significance_level}: {is_statistically_significant}); "
+                f"practical HL={hl_shift:.3f} (>{self.hl_absolute_threshold}) "
+                f"or {rel_part}: {practical_gate}; "
+                f"magnitude |Glass's delta|={abs(glass):.2f} "
+                f"(>{self.glass_delta_threshold}): {magnitude_gate}"
+            )
+            severity_effect = glass if math.isfinite(glass) else effect_size
 
         severity = determine_regression_severity(
-            is_regression, mean_change_percent, p99_change_percent, effect_size,
+            is_regression, mean_change_percent, p99_change_percent, severity_effect,
             self.critical_threshold_percent, self.regression_threshold_percent,
         )
 
@@ -124,7 +205,7 @@ class RegressionDetector:
             is_statistically_significant,
             is_practically_significant,
             p_value,
-            effect_size,
+            severity_effect,
         )
 
         description = generate_regression_description(
@@ -151,6 +232,10 @@ class RegressionDetector:
             t_statistic=t_stat,
             p_value=p_value,
             effect_size=effect_size,
+            hl_shift=hl_shift,
+            hl_shift_relative=hl_shift_relative,
+            glass_delta=glass,
+            verdict_basis=verdict_basis,
             description=description,
             recommendations=recommendations,
         )
@@ -251,6 +336,23 @@ class RegressionDetector:
             "before_max": sorted_before[-1],
             "after_max": sorted_after[-1],
         }
+
+    def mann_whitney(
+        self,
+        before: Sequence[float],
+        after: Sequence[float],
+    ) -> Tuple[float, float]:
+        """
+        Mann-Whitney U test (two-sided) as an alternative judge.
+
+        NOT the default: shape changes cause false positives and variance
+        collapse causes false negatives (Kayenta failure modes, RESEARCH_15).
+        Prefer detect(), which uses Welch's t gated by effect sizes.
+
+        Returns:
+            Tuple of (U statistic, two-sided p-value)
+        """
+        return _mann_whitney_u(before, after)
 
     def bootstrap_comparison(
         self,

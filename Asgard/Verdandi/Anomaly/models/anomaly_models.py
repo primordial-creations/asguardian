@@ -188,10 +188,222 @@ class RegressionResult(BaseModel):
     effect_size: Optional[float] = Field(
         default=None, description="Cohen's d effect size"
     )
+    hl_shift: Optional[float] = Field(
+        default=None,
+        description="Hodges-Lehmann location shift (median of pairwise diffs)",
+    )
+    hl_shift_relative: Optional[float] = Field(
+        default=None,
+        description="HL shift relative to the baseline pseudo-median",
+    )
+    glass_delta: Optional[float] = Field(
+        default=None,
+        description="Glass's delta effect size (baseline-sigma standardized)",
+    )
+    verdict_basis: Optional[str] = Field(
+        default=None,
+        description="Which gates (statistical/practical/magnitude) drove the verdict",
+    )
     description: str = Field(default="", description="Human-readable description")
     recommendations: List[str] = Field(
         default_factory=list, description="Recommendations"
     )
+
+
+class DetectionOutcome(str, Enum):
+    """Typed outcome of a detection attempt.
+
+    INSUFFICIENT_DATA is a *success* outcome (DEEPTHINK_01): the detector is
+    reporting honestly that it cannot answer, and it must never trip alerts.
+    """
+
+    OK = "ok"
+    INSUFFICIENT_DATA = "insufficient_data"
+    BIMODAL_DISTRIBUTION = "bimodal_distribution"
+
+
+class ModeStats(BaseModel):
+    """Per-mode statistics for a multimodal distribution."""
+
+    median: float = Field(..., description="Median of this mode")
+    mad: float = Field(..., description="Median absolute deviation of this mode")
+    count: int = Field(..., description="Number of samples in this mode")
+    weight: float = Field(..., description="Fraction of total samples in this mode")
+
+
+class BimodalityResult(BaseModel):
+    """Result of the bimodality guard (dip-statistic-lite)."""
+
+    outcome: DetectionOutcome = Field(default=DetectionOutcome.OK)
+    is_bimodal: bool = Field(default=False, description="Two-peaks-with-valley detected")
+    modes: List[ModeStats] = Field(default_factory=list, description="Per-mode stats (low mode first)")
+    valley_ratio: Optional[float] = Field(
+        default=None, description="Valley height / smaller peak height (< 0.5 => bimodal)"
+    )
+    split_value: Optional[float] = Field(
+        default=None, description="Value at the valley separating the two modes"
+    )
+    notes: List[str] = Field(default_factory=list)
+
+
+class StepChangeResult(BaseModel):
+    """Result of small-batch step-change detection (split-window MAD / CUSUM)."""
+
+    outcome: DetectionOutcome = Field(default=DetectionOutcome.OK)
+    detected: bool = Field(default=False)
+    method: str = Field(default="", description="Detecting method: split_window_mad, cusum")
+    change_index: Optional[int] = Field(default=None, description="Estimated index of the step")
+    magnitude: Optional[float] = Field(default=None, description="Median shift across the step")
+    mad_units: Optional[float] = Field(default=None, description="Shift expressed in baseline MADs")
+    cusum_alarm_index: Optional[int] = Field(default=None, description="First index where CUSUM crossed h")
+    notes: List[str] = Field(default_factory=list)
+
+
+class DriftResult(BaseModel):
+    """Result of gradual-drift detection via global OLS trend (boiling-frog fix)."""
+
+    outcome: DetectionOutcome = Field(default=DetectionOutcome.OK)
+    detected: bool = Field(default=False)
+    slope: Optional[float] = Field(default=None, description="OLS slope per sample")
+    slope_t_statistic: Optional[float] = Field(default=None)
+    slope_p_value: Optional[float] = Field(default=None)
+    total_drift: Optional[float] = Field(default=None, description="slope x (n-1): drift over the batch")
+    relative_drift: Optional[float] = Field(
+        default=None, description="Total drift relative to the batch median"
+    )
+    notes: List[str] = Field(default_factory=list)
+
+
+class MethodRecommendation(BaseModel):
+    """Scenario-routed method recommendation (DEEPTHINK_02 switching thresholds)."""
+
+    recommended_methods: List[str] = Field(default_factory=list)
+    avoid_methods: List[str] = Field(default_factory=list)
+    reasons: List[str] = Field(default_factory=list)
+
+
+class MetricClass(str, Enum):
+    """Metric class used to select a sensitivity profile."""
+
+    LATENCY = "latency"
+    ERROR_RATE = "error_rate"
+    CACHE_HIT_RATE = "cache_hit_rate"
+
+
+class SensitivityProfile(BaseModel):
+    """
+    Per-metric-class sensitivity preset (DEEPTHINK_08).
+
+    Exposes a sensitivity *dial* instead of raw statistical knobs:
+    latency detectors bias to specificity (effect-size gated); error-rate
+    detectors bias to sensitivity but gate on absolute event volume.
+    """
+
+    metric_class: MetricClass = Field(..., description="Metric class this profile covers")
+    z_threshold: float = Field(default=3.0)
+    min_sample_size: int = Field(default=10)
+    min_absolute_events: int = Field(
+        default=0, description="Absolute event-count gate (error-rate profiles)"
+    )
+    effect_gated: bool = Field(
+        default=False, description="Require practical effect gates before flagging"
+    )
+    trajectory_based: bool = Field(
+        default=False, description="Route to trajectory analysis (cache hit rate)"
+    )
+    bias: str = Field(default="balanced", description="specificity | sensitivity | balanced")
+    notes: List[str] = Field(default_factory=list)
+
+    @classmethod
+    def latency(cls) -> "SensitivityProfile":
+        """Specificity-biased: alert fatigue costs more than a missed slow path."""
+        return cls(
+            metric_class=MetricClass.LATENCY,
+            z_threshold=3.5,
+            min_sample_size=20,
+            effect_gated=True,
+            bias="specificity",
+            notes=[
+                "Latency anomalies are gated on practical effect size "
+                "(Hodges-Lehmann shift > 10ms or > 5% relative, |Glass's delta| > 0.5)."
+            ],
+        )
+
+    @classmethod
+    def error_rate(cls) -> "SensitivityProfile":
+        """Sensitivity-biased but gated on absolute volume."""
+        return cls(
+            metric_class=MetricClass.ERROR_RATE,
+            z_threshold=2.5,
+            min_sample_size=10,
+            min_absolute_events=50,
+            bias="sensitivity",
+            notes=[
+                "Error-rate anomalies require >= 50 absolute error events; "
+                "percentage spikes on tiny denominators are noise."
+            ],
+        )
+
+    @classmethod
+    def cache_hit_rate(cls) -> "SensitivityProfile":
+        """Trajectory-based: post-deploy dips are expected; flatlines are not."""
+        return cls(
+            metric_class=MetricClass.CACHE_HIT_RATE,
+            z_threshold=3.0,
+            min_sample_size=6,
+            trajectory_based=True,
+            bias="balanced",
+            notes=[
+                "Cache hit-rate drops are mechanical after deploys; use warm-up "
+                "trajectory analysis (Verdandi.Cache.WarmupAnalyzer) rather than "
+                "static thresholds."
+            ],
+        )
+
+    @classmethod
+    def for_metric_class(cls, metric_class: MetricClass) -> "SensitivityProfile":
+        """Return the preset profile for a metric class."""
+        factory = {
+            MetricClass.LATENCY: cls.latency,
+            MetricClass.ERROR_RATE: cls.error_rate,
+            MetricClass.CACHE_HIT_RATE: cls.cache_hit_rate,
+        }[metric_class]
+        return factory()
+
+
+class BaselineStrategy(str, Enum):
+    """Baseline comparison strategy (DEEPTHINK_07 taxonomy)."""
+
+    PRE_POST = "pre_post"
+    HISTORICAL_WEEK = "historical_week"
+    CANARY_CONCURRENT = "canary_concurrent"
+    DIFF_IN_DIFF = "diff_in_diff"
+
+
+class BaselineStrategyAssessment(BaseModel):
+    """Confound warnings and detectable-effect guidance for a baseline strategy."""
+
+    strategy: BaselineStrategy = Field(...)
+    confound_warnings: List[str] = Field(default_factory=list)
+    mdes_percent_range: str = Field(
+        default="", description="Minimum detectable effect size tier for this strategy"
+    )
+    notes: List[str] = Field(default_factory=list)
+
+
+class DiffInDiffResult(BaseModel):
+    """Difference-in-Differences estimate for no-split infrastructures."""
+
+    outcome: DetectionOutcome = Field(default=DetectionOutcome.OK)
+    effect: float = Field(default=0.0, description="(post_now - pre_now) - (post_base - pre_base)")
+    effect_percent: Optional[float] = Field(
+        default=None, description="Effect relative to the pre-change current mean"
+    )
+    pre_now_mean: float = Field(default=0.0)
+    post_now_mean: float = Field(default=0.0)
+    pre_baseline_mean: float = Field(default=0.0)
+    post_baseline_mean: float = Field(default=0.0)
+    warnings: List[str] = Field(default_factory=list)
 
 
 class AnomalyReport(BaseModel):

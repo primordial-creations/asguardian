@@ -26,6 +26,52 @@ class ViolationSeverity(str, Enum):
     INFO = "info"
 
 
+class UsabilityImpact(str, Enum):
+    """
+    Axis 2 of the dual-axis model (DEEPTHINK_01): heuristic usability
+    impact gradient, orthogonal to binary WCAG conformance.
+    """
+    BLOCKER = "blocker"
+    HIGH = "high"
+    MODERATE = "moderate"
+    LOW = "low"
+
+
+class ComponentCriticality(str, Enum):
+    """Context weight for a finding: how critical the affected component is."""
+    PRIMARY_INTERACTIVE = "primary_interactive"  # submit buttons, nav links, form fields
+    INTERACTIVE = "interactive"                  # other focusable/clickable
+    CONTENT = "content"                          # headings, main text, meaningful images
+    DECORATIVE = "decorative"                    # footers, spacers, aria-hidden trees
+
+
+class CheckVerdict(str, Enum):
+    """
+    Verdict for an automated check (DEEPTHINK_05). NEEDS_REVIEW marks
+    claims automation cannot decide; a page with such items must not be
+    reported as fully passing.
+    """
+    PASS = "pass"
+    FAIL = "fail"
+    WARNING = "warning"
+    NEEDS_REVIEW = "needs_review"
+
+
+class AutomatabilityTier(str, Enum):
+    """DEEPTHINK_05 ARIA automatability spectrum."""
+    FULLY_AUTOMATABLE = "fully_automatable"          # deterministic pass/fail
+    PARTIALLY_AUTOMATABLE = "partially_automatable"  # heuristic warning
+    NEEDS_HUMAN = "needs_human"                      # manual review required
+
+
+class ConformanceStatus(str, Enum):
+    """Axis 1: statutory per-criterion WCAG conformance ledger entries."""
+    PASS = "pass"
+    FAIL = "fail"
+    NEEDS_REVIEW = "needs_review"
+    NOT_CHECKED = "not_checked"
+
+
 class AccessibilityCategory(str, Enum):
     """Categories of accessibility requirements."""
     PERCEIVABLE = "perceivable"
@@ -82,6 +128,10 @@ class ARIAViolationType(str, Enum):
     IMPROPER_ROLE_USAGE = "improper_role_usage"
     MISSING_PARENT_ROLE = "missing_parent_role"
     DUPLICATE_ID = "duplicate_id"
+    REDUNDANT_ROLE = "redundant_role"
+    NON_NATIVE_INTERACTIVE = "non_native_interactive"
+    NEEDS_MANUAL_REVIEW = "needs_manual_review"
+    ARIA_DENSITY = "aria_density"
 
 
 class ScreenReaderIssueType(str, Enum):

@@ -12,7 +12,35 @@ from Asgard.Freya.Integration.services import (
     BaselineManager,
 )
 from Asgard.Freya.Integration.services.site_crawler import SiteCrawler
+from Asgard.Freya.Scoring.models.scoring_models import (
+    GateConfig,
+    QualityGrade,
+    UniversalSeverity,
+)
+from Asgard.Freya.Scoring.services.epistemics import TREND_INDICATOR_NOTE
+from Asgard.Freya.Scoring.services.quality_gate import QualityGate
 from Asgard.Freya.cli._formatters_visual_responsive import format_unified_text
+
+
+def _build_gate_config(args: argparse.Namespace) -> GateConfig:
+    """Build a GateConfig from CLI flags (config-file support comes later)."""
+    fail_on_raw = getattr(args, "fail_on", None)
+    if not isinstance(fail_on_raw, str):
+        fail_on_raw = "blocker,critical"
+    fail_on = []
+    for token in str(fail_on_raw).split(","):
+        token = token.strip().lower()
+        if not token:
+            continue
+        try:
+            fail_on.append(UniversalSeverity(token))
+        except ValueError:
+            continue
+    min_grade_raw = getattr(args, "min_grade", None)
+    min_grade = None
+    if isinstance(min_grade_raw, str) and min_grade_raw.upper() in QualityGrade.__members__:
+        min_grade = QualityGrade(min_grade_raw.upper())
+    return GateConfig(fail_on=fail_on, min_grade=min_grade)
 
 
 async def run_unified_test(args: argparse.Namespace, verbose: bool = False) -> int:
@@ -111,12 +139,36 @@ async def run_baseline_compare(args: argparse.Namespace, verbose: bool = False) 
         args.url,
         args.name,
         device=getattr(args, "device", None),
-        threshold=args.threshold
+        threshold=args.threshold,
+        allow_env_mismatch=getattr(args, "allow_env_mismatch", False),
     )
 
     if not result["success"]:
         print(f"Error: {result['error']}")
         return 1
+
+    baseline_fp = (result.get("baseline") or {}).get("fingerprint")
+    current_fp = result.get("current_fingerprint")
+    if baseline_fp or current_fp:
+        print("Environment (baseline vs current):")
+        for field in ("os_name", "browser_name", "browser_version",
+                      "viewport", "device_scale_factor", "font_stack_hash"):
+            base_value = (baseline_fp or {}).get(field, "unverified")
+            curr_value = (current_fp or {}).get(field, "unverified")
+            print(f"  {field}: {base_value} vs {curr_value}")
+
+    if result.get("status") == "environment_mismatch":
+        print("INCONCLUSIVE: environment mismatch — comparison refused.")
+        print(f"Mismatched fields: {', '.join(result.get('mismatched_fields', []))}")
+        print(result.get("rationale", ""))
+        # Inconclusive is distinct from regression-found (exit 2, not 1)
+        return 2
+
+    if result.get("environment_warning"):
+        print(f"WARNING: {result['environment_warning']}")
+
+    if result.get("framing"):
+        print(result["framing"])
 
     print(f"Passed: {'Yes' if result['passed'] else 'No'}")
     print(f"Difference: {result['difference_percentage']:.2f}%")
@@ -193,7 +245,7 @@ async def run_crawl(args: argparse.Namespace, verbose: bool = False) -> int:
     if args.exclude:
         exclude_patterns.extend(args.exclude)
 
-    config = CrawlConfig(
+    config_kwargs = dict(
         start_url=args.url,
         max_depth=args.depth,
         max_pages=args.max_pages,
@@ -209,6 +261,14 @@ async def run_crawl(args: argparse.Namespace, verbose: bool = False) -> int:
             headless=not args.no_headless
         ),
     )
+    if isinstance(getattr(args, "concurrency", None), int):
+        config_kwargs["concurrency"] = args.concurrency
+    if isinstance(getattr(args, "concurrency_discovery", None), int):
+        config_kwargs["concurrency_discovery"] = args.concurrency_discovery
+    if isinstance(getattr(args, "min_request_interval_ms", None), int):
+        config_kwargs["min_request_interval_ms"] = args.min_request_interval_ms
+
+    config = CrawlConfig(**config_kwargs)
 
     crawler = SiteCrawler(config)
 
@@ -235,8 +295,17 @@ async def run_crawl(args: argparse.Namespace, verbose: bool = False) -> int:
     print(f"  Pages Skipped:    {report.pages_skipped}")
     print(f"  Pages Errored:    {report.pages_errored}")
     print("")
+    site_grade = getattr(report, "site_grade", None)
+    if isinstance(site_grade, str):
+        cap_reason = getattr(report, "site_cap_reason", None)
+        cap_suffix = f" (capped by: {cap_reason})" if isinstance(cap_reason, str) else ""
+        print("-" * 70)
+        print(f"  SITE GRADE: {site_grade}{cap_suffix}")
+        print(f"  {TREND_INDICATOR_NOTE}")
+        print("-" * 70)
+        print("")
     print("-" * 70)
-    print("  SCORES (Average)")
+    print("  SCORES (Average - trend indicator only)")
     print("-" * 70)
     print(f"  Overall:        {report.average_overall_score:.0f}/100")
     print(f"  Accessibility:  {report.average_accessibility_score:.0f}/100")
@@ -275,5 +344,36 @@ async def run_crawl(args: argparse.Namespace, verbose: bool = False) -> int:
     print(f"  - JSON: {args.output}/crawl_report.json")
     print(f"  - HTML: {args.output}/crawl_report.html")
 
-    has_critical = report.total_critical > 0
-    return 1 if has_critical else 0
+    # Inconclusive: crawl produced no usable results (e.g. every page errored).
+    # Exit code 2, distinct from a real gate FAIL, so pipelines can treat
+    # environment/network flake differently from a genuine regression.
+    pages_tested = getattr(report, "pages_tested", 0)
+    pages_errored = getattr(report, "pages_errored", 0)
+    if pages_tested == 0 and pages_errored > 0:
+        print("Quality gate: INCONCLUSIVE (no pages tested successfully)")
+        return 2
+
+    if not getattr(args, "gate", True):
+        print("Quality gate: SKIPPED (--no-gate / report-only mode)")
+        return 0
+
+    gate = QualityGate(_build_gate_config(args))
+    grade = None
+    if isinstance(site_grade, str) and site_grade in QualityGrade.__members__:
+        grade = QualityGrade(site_grade)
+    gate_result = gate.evaluate_counts(
+        {
+            "blocker": getattr(report, "total_blockers", 0),
+            "critical": getattr(report, "total_critical", 0),
+            "major": getattr(report, "total_serious", 0),
+            "minor": getattr(report, "total_moderate", 0),
+        },
+        grade=grade,
+    )
+    if gate_result.passed:
+        print("Quality gate: PASSED")
+        return 0
+    print("Quality gate: FAILED")
+    for reason in gate_result.reasons:
+        print(f"  - {reason}")
+    return 1

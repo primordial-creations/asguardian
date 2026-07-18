@@ -22,6 +22,7 @@ from Asgard.Heimdall.Security.services._crypto_validation_helpers import (
     get_secure_recommendations,
     is_in_test_context,
     is_iv_nonce_false_positive,
+    is_usedforsecurity_false,
     severity_meets_threshold,
     severity_order,
 )
@@ -145,6 +146,15 @@ class CryptographicValidationService:
 
                 if pattern.name == "static_iv":
                     if is_iv_nonce_false_positive(content, match.start(), lines, line_number):
+                        continue
+
+                if pattern.name in ("md5_hash", "sha1_hash"):
+                    # Plan 07.4: honor the stdlib's own escape hatch --
+                    # `usedforsecurity=False` is an explicit declaration
+                    # that this call is NOT relying on the algorithm's
+                    # cryptographic properties (checksums, cache keys,
+                    # dedup), so it is not a crypto finding.
+                    if is_usedforsecurity_false(file_path, content, match.start(), match.group(0)):
                         continue
 
                 code_snippet = extract_code_snippet(lines, line_number)

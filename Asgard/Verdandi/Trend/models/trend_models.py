@@ -172,3 +172,52 @@ class TrendReport(BaseModel):
     def improving_count(self) -> int:
         """Count of improving metrics."""
         return len(self.improving_metrics)
+
+
+class DecompositionMode(str, Enum):
+    """Additive vs multiplicative seasonal decomposition."""
+
+    ADDITIVE = "additive"
+    MULTIPLICATIVE = "multiplicative"
+
+
+class DecompositionOutcome(str, Enum):
+    """Typed outcome of a seasonal-decomposition attempt.
+
+    INSUFFICIENT_DATA is a *success* outcome (DEEPTHINK_01): fired when
+    fewer than 3 full seasonal cycles are available, per Plan 03F.
+    """
+
+    OK = "ok"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class SeasonalDecomposition(BaseModel):
+    """
+    Result of a robust STL-lite seasonal decomposition:
+    value[i] = trend[i] + seasonal[i] + residual[i]  (additive), or
+    value[i] = trend[i] * seasonal[i] * residual[i]  (multiplicative).
+    """
+
+    outcome: DecompositionOutcome = Field(default=DecompositionOutcome.OK)
+    mode: DecompositionMode = Field(default=DecompositionMode.ADDITIVE)
+    period: int = Field(default=0, description="Seasonal period length in points")
+    cycles_available: float = Field(
+        default=0.0, description="Number of full periods present in the input"
+    )
+    trend: List[float] = Field(default_factory=list)
+    seasonal: List[float] = Field(default_factory=list)
+    residual: List[float] = Field(default_factory=list)
+    seasonal_indices: List[float] = Field(
+        default_factory=list,
+        description="One seasonal factor per phase (length == period)",
+    )
+    robust_weights: List[float] = Field(
+        default_factory=list,
+        description="Biweight robustness weights from the outlier-resistant pass",
+    )
+    outlier_indices: List[int] = Field(
+        default_factory=list,
+        description="Indices zeroed out by the robust biweight pass",
+    )
+    notes: List[str] = Field(default_factory=list)

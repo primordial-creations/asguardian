@@ -16,15 +16,19 @@ from Asgard.Volundr.Kustomize.models.kustomize_models import (
     KustomizeOverlay,
     ReplicaTransformer,
 )
+from Asgard.Volundr.Kustomize.services.base_generator_helpers import (
+    kustomization_findings,
+)
 from Asgard.Volundr.Kustomize.services.overlay_generator_helpers import (
     ENV_DEFAULTS,
-    calculate_best_practice_score,
-    calculate_overall_score,
+    calculate_best_practice_score,  # noqa: F401  (deprecated, kept for API compat)
+    calculate_overall_score,  # noqa: F401  (deprecated, kept for API compat)
     generate_overlay_kustomization,
     generate_replica_patch,
     generate_resource_patch,
     validate_overlay,
 )
+from Asgard.Volundr.Validation.services.scoring_engine import ScoringEngine
 
 
 class OverlayGenerator:
@@ -62,14 +66,22 @@ class OverlayGenerator:
             )
 
         validation_results = validate_overlay(files, overlay)
-        best_practice_score = calculate_best_practice_score(files, overlay)
+
+        # v5-semantics findings + composite scoring (plan 07) over the
+        # rendered overlay files.
+        findings = []
+        for path, content in files.items():
+            if path.endswith("kustomization.yaml"):
+                findings.extend(kustomization_findings(content, path))
+        validation_results.extend(f"{r.rule_id}: {r.message}" for r in findings)
+        score_report = ScoringEngine().score(findings, resources=list(files))
 
         return GeneratedKustomization(
             id=overlay_id,
             config_hash=config_hash,
             files=files,
             validation_results=validation_results,
-            best_practice_score=best_practice_score,
+            best_practice_score=score_report.composite,
             created_at=datetime.now(),
         )
 
@@ -85,6 +97,7 @@ class OverlayGenerator:
 
         all_files: Dict[str, str] = {}
         all_issues: List[str] = []
+        scores: List[float] = []
 
         for env in environments:
             env_defaults = ENV_DEFAULTS.get(env, ENV_DEFAULTS["development"])
@@ -101,6 +114,7 @@ class OverlayGenerator:
             result = self.generate(overlay, base_path, app_name)
             all_files.update(result.files)
             all_issues.extend(result.validation_results)
+            scores.append(result.best_practice_score)
 
         config_hash = hashlib.sha256(str(all_files).encode()).hexdigest()[:16]
 
@@ -109,7 +123,8 @@ class OverlayGenerator:
             config_hash=config_hash,
             files=all_files,
             validation_results=all_issues,
-            best_practice_score=calculate_overall_score(all_files),
+            # Weakest-link roll-up across environments (plan 07).
+            best_practice_score=min(scores) if scores else 100.0,
             created_at=datetime.now(),
         )
 

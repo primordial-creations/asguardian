@@ -8,6 +8,8 @@ from collections import defaultdict
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from Asgard.Verdandi.Tracing.models.tracing_models import (
+    AnalysisOutcome,
+    ConfidenceFlag,
     CriticalPathResult,
     CriticalPathSegment,
     DistributedTrace,
@@ -15,10 +17,17 @@ from Asgard.Verdandi.Tracing.models.tracing_models import (
 )
 from Asgard.Verdandi.Tracing.services._path_helpers import (
     calculate_parallelization_opportunity,
+    effective_end_ns,
     find_critical_path,
     generate_path_recommendations,
     percentile,
+    sweep_line_credit,
 )
+from Asgard.Verdandi.Tracing.services.causal_normalizer import normalize_trace
+
+# Threshold above which intermediate-span self-time is flagged as
+# HIGH_UNATTRIBUTED_TIME (dark-matter / missing-instrumentation signal).
+UNATTRIBUTED_TIME_THRESHOLD = 0.30
 
 
 class CriticalPathAnalyzer:
@@ -56,21 +65,30 @@ class CriticalPathAnalyzer:
     def analyze(
         self,
         trace: DistributedTrace,
+        strategy: str = "legacy",
     ) -> CriticalPathResult:
         """
         Analyze the critical path in a trace.
 
         Args:
             trace: The distributed trace to analyze
+            strategy: "legacy" (default; naive longest-path + self-time
+                subtraction, unchanged behavior) or "sweepline" (causal
+                normalization + recursive latest-finisher sweep-line path
+                with confidence flags — see analyze_sweepline()).
 
         Returns:
             CriticalPathResult with path segments and analysis
         """
+        if strategy == "sweepline":
+            return self.analyze_sweepline(trace)
+
         if not trace.spans:
             return CriticalPathResult(
                 trace_id=trace.trace_id,
                 total_duration_ms=0.0,
                 critical_path_duration_ms=0.0,
+                strategy="legacy",
             )
 
         span_lookup = {s.span_id: s for s in trace.spans}
@@ -144,6 +162,151 @@ class CriticalPathAnalyzer:
             bottleneck_operation=bottleneck_operation,
             parallelization_opportunity_ms=parallel_opportunity,
             recommendations=recommendations,
+            strategy="legacy",
+        )
+
+    def analyze_sweepline(
+        self,
+        trace: DistributedTrace,
+        apply_causal_normalization: bool = True,
+    ) -> CriticalPathResult:
+        """
+        Causal-normalized, sweep-line "latest-finisher" critical path
+        analysis (DEEPTHINK_06). Additive alongside the legacy `analyze()`
+        naive longest-path algorithm.
+
+        Pipeline: causal_normalizer.normalize_trace() (orphan adoption ->
+        clock-skew correction -> async truncation) -> collect unique
+        start/effective_end timestamps as slice boundaries -> recursive
+        sweep-line credit assignment with latest-finisher dominance at
+        fan-out points -> aggregate credited time per span as
+        contribution_ms.
+
+        Conservation invariant: sum(contribution_ms for all segments,
+        including self-time) equals the root span's effective duration
+        exactly (up to nanosecond rounding).
+
+        Args:
+            trace: The distributed trace to analyze
+            apply_causal_normalization: Run the causal_normalizer pipeline
+                first (default True). Set False to sweep-line a trace that
+                has already been normalized upstream.
+
+        Returns:
+            CriticalPathResult with strategy="sweepline", contribution_ms
+            per segment, confidence flags, and documented assumptions.
+        """
+        if not trace.spans:
+            return CriticalPathResult(
+                trace_id=trace.trace_id,
+                total_duration_ms=0.0,
+                critical_path_duration_ms=0.0,
+                strategy="sweepline",
+                outcome=AnalysisOutcome.INSUFFICIENT_DATA,
+                recommendations=["INSUFFICIENT_DATA: trace has no spans."],
+            )
+
+        flags: List[ConfidenceFlag] = []
+        assumptions: List[str] = []
+
+        if apply_causal_normalization:
+            trace, flags, assumptions = normalize_trace(trace)
+
+        spans = trace.spans
+        span_lookup = {s.span_id: s for s in spans}
+        children: Dict[str, List[TraceSpan]] = defaultdict(list)
+        for span in spans:
+            if span.parent_span_id:
+                children[span.parent_span_id].append(span)
+
+        root_span = trace.root_span
+        if root_span is None:
+            root_span = next((s for s in spans if s.parent_span_id is None), None)
+        if root_span is None:
+            root_span = min(spans, key=lambda s: s.start_time_unix_nano)
+
+        root_duration_ns = effective_end_ns(root_span) - root_span.start_time_unix_nano
+        if root_duration_ns <= 0:
+            return CriticalPathResult(
+                trace_id=trace.trace_id,
+                total_duration_ms=trace.total_duration_ms,
+                critical_path_duration_ms=0.0,
+                strategy="sweepline",
+                outcome=AnalysisOutcome.INSUFFICIENT_DATA,
+                flags=flags,
+                assumptions=assumptions,
+                recommendations=[
+                    "INSUFFICIENT_DATA: root span has zero or negative "
+                    "effective duration; cannot compute a sound path."
+                ],
+            )
+
+        credited_ns = sweep_line_credit(root_span, children)
+        total_duration_ms = trace.total_duration_ms or (root_duration_ns / 1e6)
+
+        segments: List[CriticalPathSegment] = []
+        for span_id, credit_ns in credited_ns.items():
+            span = span_lookup.get(span_id)
+            if span is None or credit_ns <= 0:
+                continue
+            contribution_ms = credit_ns / 1e6
+            contribution_percent = (
+                contribution_ms / total_duration_ms * 100 if total_duration_ms > 0 else 0.0
+            )
+            if contribution_percent >= self.min_contribution_percent or span_id == root_span.span_id:
+                segments.append(
+                    CriticalPathSegment(
+                        span=span,
+                        contribution_ms=contribution_ms,
+                        contribution_percent=contribution_percent,
+                        is_blocking=True,
+                    )
+                )
+
+        segments.sort(key=lambda s: s.contribution_ms, reverse=True)
+
+        # HIGH_UNATTRIBUTED_TIME: self-time credited to spans that have
+        # children (i.e. intermediate nodes, not pure leaves) exceeds 30%
+        # of the root's total effective duration.
+        intermediate_self_ns = sum(
+            credit_ns
+            for span_id, credit_ns in credited_ns.items()
+            if children.get(span_id)
+        )
+        if root_duration_ns > 0 and (intermediate_self_ns / root_duration_ns) > UNATTRIBUTED_TIME_THRESHOLD:
+            if ConfidenceFlag.HIGH_UNATTRIBUTED_TIME not in flags:
+                flags.append(ConfidenceFlag.HIGH_UNATTRIBUTED_TIME)
+
+        critical_path_duration = sum(s.contribution_ms for s in segments)
+
+        bottleneck_segment = max(segments, key=lambda s: s.contribution_ms) if segments else None
+        bottleneck_service = bottleneck_segment.span.service_name if bottleneck_segment else None
+        bottleneck_operation = bottleneck_segment.span.operation_name if bottleneck_segment else None
+
+        parallel_opportunity = calculate_parallelization_opportunity(spans, children)
+
+        recommendations = generate_path_recommendations(
+            segments, bottleneck_service, bottleneck_operation, parallel_opportunity
+        )
+        if ConfidenceFlag.HIGH_UNATTRIBUTED_TIME in flags:
+            recommendations.append(
+                "High unattributed time: >30% of the path is intermediate-"
+                "span self-time. Add instrumentation to narrow the gap."
+            )
+
+        return CriticalPathResult(
+            trace_id=trace.trace_id,
+            total_duration_ms=total_duration_ms,
+            critical_path_duration_ms=critical_path_duration,
+            segments=segments,
+            bottleneck_service=bottleneck_service,
+            bottleneck_operation=bottleneck_operation,
+            parallelization_opportunity_ms=parallel_opportunity,
+            recommendations=recommendations,
+            strategy="sweepline",
+            flags=flags,
+            assumptions=assumptions,
+            outcome=AnalysisOutcome.OK,
         )
 
     def analyze_batch(

@@ -25,6 +25,10 @@ def generate_text_report(report: DebtReport) -> str:
         "-" * 40,
         f"Total Debt: {report.total_debt_hours:.1f} hours",
         f"Debt Ratio: {report.debt_ratio:.2f} hours per 1K LOC",
+        (
+            f"TDR: {report.tdr_percent:.2f}% (aggregated debt vs 30 min/LOC dev cost)"
+            if report.tdr_percent is not None else "TDR: not computed (no LOC counted)"
+        ),
         "",
         "By Type:",
     ]
@@ -92,6 +96,8 @@ def generate_json_report(report: DebtReport) -> str:
         "summary": {
             "total_debt_hours": report.total_debt_hours,
             "debt_ratio": report.debt_ratio,
+            "tdr_percent": report.tdr_percent,
+            "aggregated_debt_hours": report.aggregated_debt_hours,
             "debt_by_type": report.debt_by_type,
             "debt_by_severity": report.debt_by_severity,
         },
@@ -145,6 +151,10 @@ def generate_markdown_report(report: DebtReport) -> str:
         "",
         f"**Total Debt:** {report.total_debt_hours:.1f} hours",
         f"**Debt Ratio:** {report.debt_ratio:.2f} hours per 1K LOC",
+        (
+            f"**TDR:** {report.tdr_percent:.2f}% (aggregated debt vs 30 min/LOC dev cost)"
+            if report.tdr_percent is not None else "**TDR:** not computed"
+        ),
         "",
         "### By Type",
         "",

@@ -130,8 +130,8 @@ class TestCpuMetricsCalculator:
 
         assert result.status == "critical"
 
-    def test_status_warning_high_iowait(self):
-        """Test warning status when I/O wait is high."""
+    def test_high_iowait_does_not_set_status(self):
+        """%iowait is a CPU-state artifact (RESEARCH_12) and never sets health alone."""
         result = self.calculator.analyze(
             user_percent=30.0,
             system_percent=15.0,
@@ -140,7 +140,8 @@ class TestCpuMetricsCalculator:
             iowait_percent=25.0,
         )
 
-        assert result.status == "warning"
+        assert result.status == "healthy"
+        assert result.iowait_unreliable_on_multicore is True
 
     def test_calculate_load_ratio(self):
         """Test load ratio calculation."""

@@ -73,12 +73,37 @@ def run_cicd_generate(args: argparse.Namespace) -> int:
             ],
         ))
 
+    oidc = None
+    if getattr(args, "oidc_provider", None):
+        from Asgard.Volundr.CICD import OIDCConfig, OIDCProvider
+        oidc = OIDCConfig(
+            provider=OIDCProvider(args.oidc_provider),
+            role=getattr(args, "oidc_role", None) or "CHANGE-ME-role",
+        )
+
+    suppressions = []
+    for raw in getattr(args, "suppress", None) or []:
+        from Asgard.Volundr.Validation.models.suppression_models import Suppression
+        parts = raw.split(":", 2)
+        if len(parts) != 3:
+            print(f"Error: --suppress must be RULE:TARGET:REASON (got '{raw}')")
+            return 1
+        suppressions.append(
+            Suppression(rule=parts[0], target=parts[1], reason=parts[2])
+        )
+
     config = PipelineConfig(
         name=args.name,
         platform=CICDPlatform(args.platform),
         triggers=triggers,
         stages=stages,
         concurrency={"group": "${{ github.workflow }}-${{ github.ref }}", "cancel-in-progress": True},
+        oidc=oidc,
+        provenance=getattr(args, "provenance", False),
+        sbom=getattr(args, "sbom", False),
+        split_trust=getattr(args, "split_trust", True),
+        harden_runner=getattr(args, "harden_runner", False),
+        suppressions=suppressions,
     )
 
     generator = PipelineGenerator(output_dir=args.output_dir)

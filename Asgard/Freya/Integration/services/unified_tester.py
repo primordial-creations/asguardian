@@ -24,6 +24,9 @@ from Asgard.Freya.Integration.services._unified_tester_runners import (
     run_accessibility_tests,
     run_visual_tests,
 )
+from Asgard.Freya.Scoring.services.grade_calculator import GradeCalculator
+from Asgard.Freya.Scoring.services.severity_mapper import SeverityMapper
+from Asgard.Freya.Scoring.models.scoring_models import UniversalSeverity
 
 
 class UnifiedTester:
@@ -113,7 +116,21 @@ class UnifiedTester:
             [r for r in filtered_results if r.category == TestCategory.RESPONSIVE]
         )
 
-        overall_score = (accessibility_score + visual_score + responsive_score) / 3
+        # Universal severity scoring (DEEPTHINK_04): the overall score is the
+        # CAPPED score - the worst unresolved finding sets the ceiling. The
+        # arithmetic mean survives only as GradedScore.base_score (trend data).
+        findings = SeverityMapper().map_unified_results(filtered_results)
+        graded = GradeCalculator().calculate(
+            category_scores={
+                "accessibility": accessibility_score,
+                "visual": visual_score,
+                "responsive": responsive_score,
+            },
+            findings=findings,
+        )
+        overall_score = graded.capped_score
+        blocker_count = sum(1 for f in findings if f.severity == UniversalSeverity.BLOCKER)
+        major_count = sum(1 for f in findings if f.severity == UniversalSeverity.MAJOR)
 
         return UnifiedTestReport(
             url=url,
@@ -133,6 +150,10 @@ class UnifiedTester:
             visual_score=visual_score,
             responsive_score=responsive_score,
             overall_score=overall_score,
+            graded=graded,
+            findings=findings,
+            blocker_count=blocker_count,
+            major_count=major_count,
             config=self.config,
             screenshots=screenshots,
         )

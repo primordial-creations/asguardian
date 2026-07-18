@@ -4,6 +4,7 @@ Verdandi Trend - Performance Trend Analysis
 This module provides trend analysis capabilities including:
 - Trend detection and analysis over time
 - Performance forecasting
+- Robust STL-lite seasonal decomposition (additive/multiplicative)
 
 Usage:
     from Asgard.Verdandi.Trend import TrendAnalyzer, ForecastCalculator
@@ -26,9 +27,13 @@ from Asgard.Verdandi.Trend.models.trend_models import (
     TrendAnalysis,
     ForecastResult,
     TrendReport,
+    DecompositionMode,
+    DecompositionOutcome,
+    SeasonalDecomposition,
 )
 from Asgard.Verdandi.Trend.services.trend_analyzer import TrendAnalyzer
 from Asgard.Verdandi.Trend.services.forecast_calculator import ForecastCalculator
+from Asgard.Verdandi.Trend.services.seasonal_decomposer import SeasonalDecomposer
 
 __all__ = [
     # Models
@@ -37,7 +42,11 @@ __all__ = [
     "TrendAnalysis",
     "ForecastResult",
     "TrendReport",
+    "DecompositionMode",
+    "DecompositionOutcome",
+    "SeasonalDecomposition",
     # Services
     "TrendAnalyzer",
     "ForecastCalculator",
+    "SeasonalDecomposer",
 ]

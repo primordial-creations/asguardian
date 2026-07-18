@@ -10,7 +10,7 @@ from typing import List, Dict, Any
 
 from Asgard.Heimdall.treesitter._language_loader import is_available
 from Asgard.Heimdall.treesitter._parser_pool import parse_source
-from Asgard.Heimdall.treesitter._query_runner import run_query_all
+from Asgard.Heimdall.treesitter._query_runner import run_query_all, _query_captures
 
 
 # ---------------------------------------------------------------------------
@@ -86,7 +86,7 @@ def _lcom4_for_class(class_node, source_bytes: bytes, lang_obj) -> int:
 
     # Collect method names and their line ranges
     methods_q = Query(lang_obj, "(function_definition name: (identifier) @method.name) @method.def")
-    method_captures = methods_q.captures(class_node)
+    method_captures = _query_captures(methods_q, class_node)
 
     method_nodes: Dict[str, Any] = {}
     if isinstance(method_captures, dict):
@@ -132,10 +132,10 @@ def _lcom4_for_class(class_node, source_bytes: bytes, lang_obj) -> int:
         fields: set = set()
         calls: set = set()
 
-        attr_captures = self_attr_q.captures(method_node)
+        attr_captures = _query_captures(self_attr_q, method_node)
         _collect_self_attrs(attr_captures, source_bytes, fields)
 
-        call_captures = call_q.captures(method_node)
+        call_captures = _query_captures(call_q, method_node)
         _collect_calls(call_captures, source_bytes, calls, set(method_nodes.keys()))
 
         method_fields[method_name] = fields
@@ -360,7 +360,7 @@ def _check_python_abstract_class(class_node, source_bytes: bytes, violations: li
         lang_obj,
         "(decorated_definition (decorator (identifier) @dec) definition: (function_definition name: (identifier) @method.name)) @decorated"
     )
-    captures = abstract_methods_q.captures(class_node)
+    captures = _query_captures(abstract_methods_q, class_node)
     count = 0
     if isinstance(captures, dict):
         dec_nodes = captures.get("dec", [])
@@ -422,7 +422,7 @@ def _check_java_interface(iface_node, source_bytes: bytes, lang_obj, violations:
     iface_name = source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8", errors="replace") if name_node else "<interface>"
 
     method_q = Query(lang_obj, "(method_declaration name: (identifier) @method.name) @method.def")
-    captures = method_q.captures(iface_node)
+    captures = _query_captures(method_q, iface_node)
     count = 0
     if isinstance(captures, dict):
         nodes = captures.get("method.name", [])
@@ -475,7 +475,7 @@ def _check_ts_interface(iface_node, source_bytes: bytes, lang_obj, violations: l
     iface_name = source_bytes[name_node.start_byte:name_node.end_byte].decode("utf-8", errors="replace") if name_node else "<interface>"
 
     method_q = Query(lang_obj, "(method_signature name: (property_identifier) @method.name) @method.sig")
-    captures = method_q.captures(iface_node)
+    captures = _query_captures(method_q, iface_node)
     count = 0
     if isinstance(captures, dict):
         nodes = captures.get("method.name", [])
@@ -678,21 +678,20 @@ def _check_ocp_python(root_node, source_bytes: bytes) -> List[Dict]:
     except ImportError:
         return []
 
-    # isinstance() and type() == comparisons
+    # isinstance() and type() calls — the single call query also matches
+    # calls nested inside comparisons, so no separate comparison query is
+    # needed (the old one used an invalid `left:` field and crashed on
+    # modern tree-sitter).
     isinstance_q = Query(
         lang_obj,
         "(call function: (identifier) @func.name) @call"
-    )
-    type_eq_q = Query(
-        lang_obj,
-        "(comparison_operator left: (call function: (identifier) @func.name) @call) @comparison"
     )
 
     violations = []
     seen_lines: set = set()
 
-    for q in (isinstance_q, type_eq_q):
-        captures = q.captures(root_node)
+    for q in (isinstance_q,):
+        captures = _query_captures(q, root_node)
         if isinstance(captures, dict):
             nodes = captures.get("func.name", [])
             if not isinstance(nodes, list):

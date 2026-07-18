@@ -222,7 +222,31 @@ class ComposeConfig(BaseModel):
 class ComposeProject(BaseModel):
     """Complete Docker Compose project configuration."""
     name: str = Field(description="Project name")
-    version: str = Field(default="3.8", description="Compose file version")
+    version: str = Field(
+        default="3.8",
+        description=(
+            "DEPRECATED and never emitted: the Compose Specification "
+            "obsoletes the top-level version key (VOL-COMPOSE-0001)"
+        ),
+    )
+    edge_services: List[str] = Field(
+        default_factory=list,
+        description=(
+            "Only these services may publish ports on all interfaces; "
+            "published ports of every other service are rewritten to bind "
+            "loopback (127.0.0.1) — RESEARCH_10 §5.4. Empty list keeps "
+            "legacy behavior (no rewriting), but datastore exposure is "
+            "still flagged (VOL-COMPOSE-EXPOSED)."
+        ),
+    )
+    auto_healthchecks: bool = Field(
+        default=True,
+        description=(
+            "Auto-generate healthchecks for well-known images (postgres, "
+            "redis, mysql, mariadb, mongo) so depends_on can be gated on "
+            "condition: service_healthy (RESEARCH_10 §5.1)"
+        ),
+    )
     services: List[ComposeService] = Field(description="Services to define")
     networks: List[ComposeNetwork] = Field(default_factory=list, description="Networks to define")
     volumes: List[ComposeVolume] = Field(default_factory=list, description="Volumes to define")
@@ -239,6 +263,10 @@ class GeneratedComposeConfig(BaseModel):
     override_content: Optional[str] = Field(default=None, description="Override file content")
     validation_results: List[str] = Field(default_factory=list, description="Validation issues found")
     best_practice_score: float = Field(ge=0, le=100, description="Best practice compliance score")
+    score_report: Optional[Any] = Field(
+        default=None,
+        description="Composite ScoreReport (plan 07): dimensions, grades, veto, receipts",
+    )
     created_at: datetime = Field(default_factory=datetime.now, description="Creation timestamp")
     file_path: Optional[str] = Field(default=None, description="Path where config was saved")
 

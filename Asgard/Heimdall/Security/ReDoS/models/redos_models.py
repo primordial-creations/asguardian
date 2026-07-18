@@ -22,6 +22,14 @@ class ReDoSFinding(BaseModel):
     regex_pattern: str = ""
     description: str
     recommendation: str
+    # Orthogonal confidence (plan 06/07): severity is CIA-impact, confidence
+    # is "how sure are we this actually blows up". Defaults preserve the
+    # legacy regex-heuristic behaviour (always "certain") for any caller
+    # still constructing findings without these fields.
+    confidence: float = 1.0
+    confidence_bucket: str = "certain"
+    mechanism_id: str = "redos.heuristic"
+    cwe_id: str = "CWE-1333"
 
 
 class ReDoSScanConfig(BaseModel):

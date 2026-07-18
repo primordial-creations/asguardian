@@ -23,6 +23,11 @@ Usage:
 
 from Asgard.Freya.Accessibility.models.accessibility_models import (
     WCAGLevel,
+    UsabilityImpact,
+    ComponentCriticality,
+    CheckVerdict,
+    AutomatabilityTier,
+    ConformanceStatus,
     ViolationSeverity,
     AccessibilityCategory,
     AccessibilityViolation,
@@ -54,6 +59,11 @@ __all__ = [
     "ARIAValidator",
     # Models
     "WCAGLevel",
+    "UsabilityImpact",
+    "ComponentCriticality",
+    "CheckVerdict",
+    "AutomatabilityTier",
+    "ConformanceStatus",
     "ViolationSeverity",
     "AccessibilityCategory",
     "AccessibilityViolation",

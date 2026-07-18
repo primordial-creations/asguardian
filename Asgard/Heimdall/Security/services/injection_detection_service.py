@@ -30,6 +30,25 @@ from Asgard.Heimdall.Security.services._injection_patterns import (
     COMMAND_INJECTION_PATTERNS,
     PATH_TRAVERSAL_PATTERNS,
 )
+from Asgard.Heimdall.treesitter import ast_engine
+from Asgard.Heimdall.treesitter.file_context import FileParseContext
+
+# Mapping from AST pilot-rule ids to report vulnerability types.
+_AST_RULE_VULN_TYPES = {
+    "python.eval-exec-usage": VulnerabilityType.COMMAND_INJECTION,
+    "python.yaml-unsafe-load": VulnerabilityType.INSECURE_DESERIALIZATION,
+    "python.subprocess-shell-true": VulnerabilityType.COMMAND_INJECTION,
+    "python.route-missing-auth": VulnerabilityType.MISSING_AUTH,
+    "python.injection-sink-candidate": VulnerabilityType.IMPROPER_INPUT_VALIDATION,
+}
+
+_AST_RULE_REMEDIATIONS = {
+    "python.eval-exec-usage": "Avoid eval/exec; use ast.literal_eval or explicit dispatch.",
+    "python.yaml-unsafe-load": "Use yaml.safe_load() or pass Loader=yaml.SafeLoader.",
+    "python.subprocess-shell-true": "Use shell=False and pass the command as a list of arguments.",
+    "python.route-missing-auth": "Add an authentication/authorization decorator or document the endpoint as public.",
+    "python.injection-sink-candidate": "Verify the expression is not user-controlled; use parameterized APIs.",
+}
 
 
 class InjectionDetectionService:
@@ -74,6 +93,8 @@ class InjectionDetectionService:
 
         if not path.exists():
             raise FileNotFoundError(f"Scan path does not exist: {path}")
+
+        ast_engine.log_engine_mode()
 
         start_time = time.time()
 
@@ -172,7 +193,61 @@ class InjectionDetectionService:
 
                 findings.append(finding)
 
+        findings.extend(self._scan_file_ast(file_path, root_path, lines, findings))
+
         return findings
+
+    def _scan_file_ast(
+        self,
+        file_path: Path,
+        root_path: Path,
+        lines: List[str],
+        existing: List[VulnerabilityFinding],
+    ) -> List[VulnerabilityFinding]:
+        """AST-precision pilot rules (additive; single parse per file).
+
+        Runs only when the optional tree-sitter engine is available for the
+        file's language — regex-mode behaviour is unchanged without it.
+        """
+        if file_path.suffix.lower() != ".py" or not ast_engine.is_engine_enabled("python"):
+            return []
+
+        try:
+            from Asgard.Heimdall.Security.services._ast_python_rules import (  # noqa: PLC0415
+                run_python_pilot_rules,
+            )
+            ctx = FileParseContext.parse(file_path, lines, "python")
+            if ctx.root is None:
+                return []
+            raw_findings = run_python_pilot_rules(file_path, lines, parse_context=ctx)
+        except Exception:
+            return []
+
+        occupied = {(f.line_number, f.vulnerability_type) for f in existing}
+        results: List[VulnerabilityFinding] = []
+        for raw in raw_findings:
+            vuln_type = _AST_RULE_VULN_TYPES.get(raw["rule_id"])
+            if vuln_type is None:
+                continue
+            key = (raw["line"], vuln_type.value)
+            if key in occupied:
+                continue
+            occupied.add(key)
+            results.append(VulnerabilityFinding(
+                file_path=str(file_path.relative_to(root_path)),
+                line_number=raw["line"],
+                column_start=raw.get("col", 0),
+                vulnerability_type=vuln_type,
+                severity=raw["severity"],
+                title=f"[AST] {raw['rule_id']}",
+                description=raw["message"],
+                code_snippet=extract_code_snippet(lines, raw["line"]),
+                cwe_id=raw.get("cwe_id"),
+                owasp_category="A03:2021",
+                confidence=raw["confidence"],
+                remediation=_AST_RULE_REMEDIATIONS.get(raw["rule_id"], ""),
+            ))
+        return results
 
     def _is_in_comment(self, lines: List[str], line_number: int) -> bool:
         """

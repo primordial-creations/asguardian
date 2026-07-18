@@ -1,5 +1,7 @@
 import argparse
 import json
+import re
+import sys
 from pathlib import Path
 
 from Asgard.Forseti.OpenAPI import (
@@ -36,6 +38,16 @@ def _handle_openapi(args: argparse.Namespace) -> int:
         return 1
 
     if args.command == "validate":
+        from pathlib import Path as _Path
+
+        from Asgard.Forseti.cli._handler_runner import EXIT_INPUT_ERROR, wants_unified_output
+        from Asgard.Forseti.cli.handlers_rules_baseline import run_governed_validation
+
+        if wants_unified_output(args):
+            return run_governed_validation(args.spec_file, args)
+        if not _Path(args.spec_file).is_file():
+            print(f"Error: file not found: {args.spec_file}", file=sys.stderr)
+            return EXIT_INPUT_ERROR
         config = OpenAPIConfig(strict_mode=args.strict if hasattr(args, 'strict') else False)
         validator = SpecValidatorService(config)
         result = validator.validate(args.spec_file)
@@ -68,7 +80,87 @@ def _handle_openapi(args: argparse.Namespace) -> int:
         print(json.dumps(diff, indent=2))
         return 0
 
+    elif args.command == "completeness":
+        return _handle_openapi_completeness(args)
+
+    elif args.command == "security":
+        return _handle_openapi_security(args)
+
     return 1
+
+
+def _handle_openapi_completeness(args: argparse.Namespace) -> int:
+    """Handle `forseti openapi completeness`."""
+    from Asgard.Forseti.cli._handler_runner import (
+        EXIT_GATE_FAILURE,
+        EXIT_INPUT_ERROR,
+        EXIT_OK,
+    )
+    from Asgard.Forseti.OpenAPI.models.completeness_models import MaturityTier
+    from Asgard.Forseti.OpenAPI.services.completeness_service import (
+        CompletenessService,
+    )
+
+    if not Path(args.spec_file).is_file():
+        print(f"Error: file not found: {args.spec_file}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    service = CompletenessService()
+    try:
+        report = service.assess(
+            args.spec_file,
+            profile=getattr(args, "completeness_profile", "dx") or "dx",
+        )
+    except Exception as exc:
+        print(f"Error: failed to parse specification: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    print(service.generate_report(report, getattr(args, "format", "text")))
+    min_tier = getattr(args, "min_tier", None)
+    if min_tier and not service.meets_tier(report, MaturityTier(min_tier)):
+        return EXIT_GATE_FAILURE
+    return EXIT_OK
+
+
+def _handle_openapi_security(args: argparse.Namespace) -> int:
+    """Handle `forseti openapi security` — security-category rules only."""
+    import yaml
+
+    from Asgard.Forseti.cli._handler_runner import (
+        EXIT_INPUT_ERROR,
+        run_and_report,
+    )
+    from Asgard.Forseti.Rules.models._rule_base_models import (
+        RuleCategory,
+        SchemaFormat,
+    )
+    from Asgard.Forseti.Rules.services.rule_registry_service import (
+        get_default_registry,
+    )
+
+    spec_path = Path(args.spec_file)
+    if not spec_path.is_file():
+        print(f"Error: file not found: {spec_path}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    try:
+        document = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+    except Exception as exc:
+        print(f"Error: failed to parse specification: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    if not isinstance(document, dict):
+        print(f"Error: document root is not an object: {spec_path}",
+              file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    registry = get_default_registry()
+    findings = []
+    for rule in registry.query(fmt=SchemaFormat.OPENAPI,
+                               category=RuleCategory.SECURITY):
+        for finding in rule.check(document):
+            finding.coordinates.file = str(spec_path)
+            findings.append(finding)
+    return run_and_report(
+        findings,
+        args,
+        rule_metas=[r.meta for r in registry.all_rules()],
+    )
 
 
 def _handle_graphql(args: argparse.Namespace) -> int:
@@ -140,6 +232,56 @@ def _handle_database(args: argparse.Namespace) -> int:
     return 1
 
 
+def _spec_version(path: str) -> str:
+    """Read info.version from a spec file (best-effort)."""
+    import yaml
+
+    try:
+        data = yaml.safe_load(Path(path).read_text(encoding="utf-8"))
+        return str((data or {}).get("info", {}).get("version", ""))
+    except Exception:
+        return ""
+
+
+def _apply_compat_waivers(result, args: argparse.Namespace):
+    """
+    Apply epoch waivers (.forseti-waivers.yaml) to a CompatibilityResult.
+
+    Waived breaking changes move to warnings with the waiver reason noted;
+    if every breaking change is waived, the gate opens for this epoch only.
+    """
+    from Asgard.Forseti.Rules.services.waiver_service import WAIVERS_FILENAME, WaiverService
+
+    waivers_path = getattr(args, "waivers", None)
+    if waivers_path is None and not Path(WAIVERS_FILENAME).is_file():
+        return result
+    service = WaiverService(waivers_path)
+    waivers = service.load()
+    if not waivers:
+        return result
+    from_version = _spec_version(args.old_spec)
+    to_version = _spec_version(args.new_spec)
+    remaining, waived = [], []
+    for change in result.breaking_changes:
+        change_rule = str(getattr(change, "change_type", "") or "")
+        waiver = service.is_waived(
+            change_rule, change.location, from_version, to_version, waivers=waivers
+        )
+        if waiver is None:
+            remaining.append(change)
+        else:
+            change.severity = "warning"
+            change.mitigation = (
+                f"WAIVED until {waiver.expires or 'merge'}: {waiver.reason}"
+            )
+            waived.append(change)
+    result.breaking_changes = remaining
+    result.warnings = list(result.warnings) + waived
+    if not remaining:
+        result.is_compatible = True
+    return result
+
+
 def _handle_contract(args: argparse.Namespace) -> int:
     """Handle Contract commands."""
     if not args.command:
@@ -155,18 +297,174 @@ def _handle_contract(args: argparse.Namespace) -> int:
     elif args.command == "check-compat":
         service = CompatibilityCheckerService()
         result = service.check(args.old_spec, args.new_spec)
-        print(service.generate_report(result, args.format))
+        result = _apply_compat_waivers(result, args)
+        if getattr(args, "format", "text") == "json":
+            from Asgard.Forseti.cli.handlers_compat import engine_score_extras
+
+            payload = json.loads(service.generate_report(result, "json"))
+            payload.update(engine_score_extras(args.old_spec, args.new_spec, "openapi"))
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            print(service.generate_report(result, args.format))
         return 0 if result.is_compatible else 1
 
     elif args.command == "breaking-changes":
         service = BreakingChangeDetectorService()
         changes = service.detect(args.old_spec, args.new_spec)
         version = getattr(args, 'version', 'unknown')
-        changelog = service.generate_changelog(changes, version)
-        print(changelog)
+        current_version = getattr(args, "current_version", None)
+        migration_out = getattr(args, "migration_guide", None)
+        changelog_out = getattr(args, "changelog", None)
+        recommendation = None
+        if current_version or migration_out or changelog_out \
+                or getattr(args, "format", "text") == "json":
+            try:
+                recommendation = service.recommend_version(
+                    args.old_spec, args.new_spec, current_version
+                )
+            except Exception:
+                recommendation = None
+        target_version = (recommendation.recommended_version
+                          if recommendation and recommendation.recommended_version
+                          else (version if version and version != "unknown"
+                                else "next"))
+        if migration_out:
+            Path(migration_out).write_text(
+                service.generate_migration_guide(
+                    args.old_spec, args.new_spec, target_version
+                ),
+                encoding="utf-8",
+            )
+            print(f"Migration guide written to {migration_out}")
+        if changelog_out:
+            Path(changelog_out).write_text(
+                service.generate_structured_changelog(
+                    args.old_spec, args.new_spec, target_version
+                ),
+                encoding="utf-8",
+            )
+            print(f"Changelog written to {changelog_out}")
+        if getattr(args, "format", "text") == "json":
+            payload: dict = {
+                "version": version,
+                "breaking_changes": [
+                    {"type": str(c.change_type), "location": c.location,
+                     "message": c.message, "severity": c.severity}
+                    for c in changes
+                ],
+            }
+            if recommendation is not None:
+                payload["version_recommendation"] = recommendation.model_dump(
+                    mode="json"
+                )
+            print(json.dumps(payload, indent=2, default=str))
+        else:
+            changelog = service.generate_changelog(changes, version)
+            print(changelog)
+            if recommendation is not None and current_version:
+                print(f"Recommended bump: {recommendation.recommended_bump.value}"
+                      f" ({current_version} -> "
+                      f"{recommendation.recommended_version})")
+                for reason in recommendation.reasons:
+                    print(f"  - {reason}")
         return 0 if not changes else 1
 
+    elif args.command == "audit-deps":
+        return _handle_audit_deps(args)
+
     return 1
+
+
+def _handle_audit_deps(args: argparse.Namespace) -> int:
+    """
+    Handle `forseti contract audit-deps` — 'npm-audit for APIs'
+    (DEEPTHINK_07 §3). Config shape:
+
+        dependencies:
+          - spec: path/to/openapi.yaml
+            operations: ["GET /users", "/orders/post"]
+    """
+    import yaml
+
+    from datetime import date, timedelta
+
+    from Asgard.Forseti.cli._handler_runner import (
+        EXIT_GATE_FAILURE,
+        EXIT_INPUT_ERROR,
+        EXIT_OK,
+    )
+
+    config_path = Path(args.config)
+    if not config_path.is_file():
+        print(f"Error: config not found: {config_path}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+    try:
+        config = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except Exception as exc:
+        print(f"Error: failed to parse config: {exc}", file=sys.stderr)
+        return EXIT_INPUT_ERROR
+
+    horizon = max(0, int(getattr(args, "horizon", 30) or 30))
+    deadline = date.today() + timedelta(days=horizon)
+    service = BreakingChangeDetectorService()
+    failures: list[str] = []
+    warnings: list[str] = []
+    checked = 0
+
+    for dep in config.get("dependencies") or []:
+        if not isinstance(dep, dict):
+            continue
+        spec_ref = str(dep.get("spec", ""))
+        if spec_ref.startswith(("http://", "https://")):
+            print(f"SKIP {spec_ref}: remote specs are NETWORK-cost and not "
+                  "fetched in this profile")
+            continue
+        spec_path = Path(spec_ref)
+        if not spec_path.is_absolute():
+            spec_path = config_path.parent / spec_path
+        if not spec_path.is_file():
+            print(f"Error: dependency spec not found: {spec_path}",
+                  file=sys.stderr)
+            return EXIT_INPUT_ERROR
+        metas = service.extract_lifecycle(spec_path)
+        for operation in dep.get("operations") or []:
+            checked += 1
+            key = _normalize_operation_key(str(operation))
+            meta = metas.get(key)
+            if meta is None or not meta.deprecated:
+                continue
+            label = f"{operation} ({spec_path.name})"
+            if meta.sunset is None:
+                warnings.append(f"{label} is deprecated (no sunset date declared)")
+            elif meta.sunset <= deadline:
+                failures.append(
+                    f"{label} sunsets on {meta.sunset.isoformat()} "
+                    f"(within {horizon}-day horizon)"
+                )
+            else:
+                warnings.append(
+                    f"{label} is deprecated, sunset {meta.sunset.isoformat()}"
+                )
+
+    for warning in warnings:
+        print(f"WARN {warning}")
+    for failure in failures:
+        print(f"FAIL {failure}")
+    print(f"Checked {checked} consumed operation(s): "
+          f"{len(failures)} failing, {len(warnings)} warning(s)")
+    return EXIT_GATE_FAILURE if failures else EXIT_OK
+
+
+def _normalize_operation_key(operation: str) -> str:
+    """Map 'GET /users' or '/users/get' onto the lifecycle location key."""
+    text = operation.strip()
+    match = re.match(
+        r"^(GET|PUT|POST|DELETE|OPTIONS|HEAD|PATCH|TRACE)\s+(/\S*)$",
+        text, re.IGNORECASE,
+    )
+    if match:
+        return f"{match.group(2)}/{match.group(1).lower()}"
+    return text
 
 
 def _handle_jsonschema(args: argparse.Namespace) -> int:

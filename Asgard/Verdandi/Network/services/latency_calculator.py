@@ -4,10 +4,47 @@ Latency Calculator
 Calculates network latency metrics.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from Asgard.Verdandi.Analysis import PercentileCalculator
-from Asgard.Verdandi.Network.models.network_models import LatencyMetrics
+from Asgard.Verdandi.Network.models.network_models import (
+    LatencyMetrics,
+    ProfileLatencyResult,
+    TopologyProfile,
+    TopologyRating,
+)
+
+#: Named topology baselines (RESEARCH_11): (rtt_low_ms, rtt_high_ms,
+#: degraded_above_ms, packet_loss_baseline_percent).
+_TOPOLOGY_BASELINES: Dict[TopologyProfile, Dict[str, float]] = {
+    TopologyProfile.INTRA_AZ: {
+        "low": 0.1,
+        "high": 0.6,
+        "degraded_above": 1.0,
+        "packet_loss_baseline": 0.01,
+    },
+    TopologyProfile.INTER_AZ: {
+        "low": 1.0,
+        "high": 2.0,
+        # Sync-replication risk starts at 3 ms; the profile is rated POOR
+        # only past the 5 ms end of RESEARCH_11's "3-5 ms" degraded band.
+        "degraded_above": 5.0,
+        "sync_replication_warn_ms": 3.0,
+        "packet_loss_baseline": 0.01,
+    },
+    TopologyProfile.SAME_REGION_PUBLIC: {
+        "low": 2.0,
+        "high": 10.0,
+        "degraded_above": 20.0,
+        "packet_loss_baseline": 0.01,
+    },
+    TopologyProfile.INTERNET_EDGE: {
+        "low": 20.0,
+        "high": 150.0,
+        "degraded_above": 195.0,  # 1.3x declared/expected high, RESEARCH_11
+        "packet_loss_baseline": 1.0,
+    },
+}
 
 
 class LatencyCalculator:
@@ -124,3 +161,113 @@ class LatencyCalculator:
             )
 
         return recommendations
+
+    def analyze_against_profile(
+        self,
+        latencies_ms: List[float],
+        profile: TopologyProfile,
+        packet_loss_percent: Optional[float] = None,
+        cross_region_declared_ms: Optional[float] = None,
+    ) -> ProfileLatencyResult:
+        """
+        Rate observed latency against a named topology baseline instead of
+        the absolute EXCELLENT/GOOD bands (RESEARCH_11). Named profiles:
+        INTRA_AZ, INTER_AZ, SAME_REGION_PUBLIC, CROSS_REGION, INTERNET_EDGE.
+        LEGACY_DEFAULT reuses the original absolute bands from `analyze()`.
+
+        Args:
+            latencies_ms: RTT samples in milliseconds
+            profile: Named topology baseline to rate against
+            packet_loss_percent: Optional observed packet loss
+            cross_region_declared_ms: Required for CROSS_REGION: the
+                distance-based expected RTT the caller declares up front
+
+        Returns:
+            ProfileLatencyResult; INSUFFICIENT_DATA when latencies_ms is
+            empty or CROSS_REGION is used without a declared baseline.
+        """
+        if not latencies_ms:
+            return ProfileLatencyResult(
+                profile=profile,
+                rating=TopologyRating.INSUFFICIENT_DATA,
+                warnings=["No latency samples provided."],
+            )
+
+        if profile == TopologyProfile.CROSS_REGION:
+            if not cross_region_declared_ms or cross_region_declared_ms <= 0:
+                return ProfileLatencyResult(
+                    profile=profile,
+                    rating=TopologyRating.INSUFFICIENT_DATA,
+                    warnings=[
+                        "CROSS_REGION requires cross_region_declared_ms "
+                        "(a distance-based expected RTT)."
+                    ],
+                )
+            baseline = {
+                "low": cross_region_declared_ms,
+                "high": cross_region_declared_ms,
+                "degraded_above": cross_region_declared_ms * 1.3,
+                "packet_loss_baseline": 0.01,
+            }
+        elif profile == TopologyProfile.LEGACY_DEFAULT:
+            baseline = {
+                "low": 0.0,
+                "high": self.GOOD_THRESHOLD,
+                "degraded_above": self.ACCEPTABLE_THRESHOLD,
+                "packet_loss_baseline": 5.0,
+            }
+        else:
+            baseline = _TOPOLOGY_BASELINES[profile]
+
+        percentiles = self._percentile_calc.calculate(latencies_ms)
+        p95 = percentiles.p95
+
+        warnings: List[str] = []
+        if p95 <= baseline["high"]:
+            rating = TopologyRating.GOOD
+        elif p95 <= baseline["degraded_above"]:
+            rating = TopologyRating.DEGRADED
+        else:
+            rating = TopologyRating.POOR
+
+        if profile == TopologyProfile.INTER_AZ and p95 > baseline.get(
+            "sync_replication_warn_ms", baseline["degraded_above"]
+        ):
+            warnings.append(
+                "Inter-AZ RTT above ~3-5 ms risks synchronous-replication "
+                "timeouts; review replication mode or move to same-AZ."
+            )
+
+        recommendations: List[str] = []
+        if rating == TopologyRating.POOR:
+            recommendations.append(
+                f"P95 latency ({p95:.2f} ms) exceeds the {profile.value} "
+                "degraded threshold. Investigate routing/placement."
+            )
+
+        if packet_loss_percent is not None and packet_loss_percent > baseline[
+            "packet_loss_baseline"
+        ]:
+            warnings.append(
+                f"Packet loss ({packet_loss_percent:.3f}%) exceeds the "
+                f"{profile.value} baseline "
+                f"({baseline['packet_loss_baseline']:.2f}%)."
+            )
+            if rating == TopologyRating.GOOD:
+                rating = TopologyRating.DEGRADED
+
+        return ProfileLatencyResult(
+            profile=profile,
+            rating=rating,
+            sample_count=len(latencies_ms),
+            p50_ms=round(percentiles.median, 3),
+            p95_ms=round(p95, 3),
+            p99_ms=round(percentiles.p99, 3),
+            expected_rtt_low_ms=baseline["low"],
+            expected_rtt_high_ms=baseline["high"],
+            degraded_above_ms=baseline["degraded_above"],
+            packet_loss_percent=packet_loss_percent,
+            packet_loss_baseline_percent=baseline["packet_loss_baseline"],
+            warnings=warnings,
+            recommendations=recommendations,
+        )

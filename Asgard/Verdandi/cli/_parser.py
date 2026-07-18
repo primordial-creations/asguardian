@@ -9,6 +9,7 @@ from Asgard.Verdandi.cli._parser_flags import (
 )
 from Asgard.Verdandi.cli._parser_subcommands import (
     _add_apm_parser,
+    _add_db_parser,
     _add_slo_parser,
     _add_anomaly_parser,
     _add_tracing_parser,
@@ -52,6 +53,7 @@ def create_parser() -> argparse.ArgumentParser:
     _add_cache_parser(subparsers)
     _add_apm_parser(subparsers)
     _add_slo_parser(subparsers)
+    _add_db_parser(subparsers)
     _add_anomaly_parser(subparsers)
     _add_tracing_parser(subparsers)
     _add_trend_parser(subparsers)

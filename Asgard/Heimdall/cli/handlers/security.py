@@ -12,6 +12,12 @@ from Asgard.Heimdall.Security.Hotspots.services.hotspot_detector import HotspotD
 from Asgard.Heimdall.Security.Compliance.models.compliance_models import ComplianceConfig
 from Asgard.Heimdall.Security.Compliance.services.compliance_reporter import ComplianceReporter
 from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService as _StaticSecuritySvc
+from Asgard.Heimdall.cli.handlers._security_dispatch import (
+    count_lines_of_code,
+    format_dispatch_text,
+    load_heimdall_yml,
+    run_dispatch_scan,
+)
 
 
 def run_security_analysis(args: argparse.Namespace, verbose: bool = False, analysis_type: str = "all") -> int:
@@ -39,13 +45,56 @@ def run_security_analysis(args: argparse.Namespace, verbose: bool = False, analy
         exclude_patterns=exclude_patterns,
         output_format=args.format,
         verbose=verbose,
+        scoring_version=getattr(args, "scoring", "v1"),
     )
+
+    # .heimdall.yml zero-config plumbing (test context + strict paths).
+    yml = load_heimdall_yml(scan_path)
+    test_context_enabled = bool(yml.get("test_context_enabled", True))
+    strict_scan_paths = list(yml.get("strict_scan_paths", []) or [])
+    include_test_context = bool(getattr(args, "include_test_context", False))
 
     try:
         service = StaticSecurityService(config)
         result = service.analyze(scan_path)
+
+        # LOC for v2 size normalization; recompute the dual-reported scores.
+        result.total_lines_of_code = count_lines_of_code(
+            scan_path, exclude_patterns
+        )
+        result.calculate_totals()
+
+        # Route the full scan through the layered dispatch engine.
+        dispatch_entries = []
+        if analysis_type == "all":
+            dispatch_entries = run_dispatch_scan(
+                scan_path,
+                exclude_patterns=exclude_patterns,
+                include_test_context=include_test_context,
+                test_context_enabled=test_context_enabled,
+                strict_scan_paths=strict_scan_paths,
+            )
+
         report = service.generate_report(result, args.format)
-        print(report)
+        if args.format == "json":
+            try:
+                payload = json.loads(report)
+                payload["scoring"] = {
+                    "version": config.scoring_version,
+                    "legacy_score": result.legacy_score,
+                    "security_score_v2": result.security_score_v2,
+                    "total_lines_of_code": result.total_lines_of_code,
+                }
+                if dispatch_entries:
+                    payload["dispatch_findings"] = dispatch_entries
+                report = json.dumps(payload, indent=2, default=str)
+            except (json.JSONDecodeError, TypeError):
+                pass
+            print(report)
+        else:
+            print(report)
+            if dispatch_entries:
+                print(format_dispatch_text(dispatch_entries))
         return 1 if result.has_issues else 0
 
     except FileNotFoundError as e:
@@ -70,6 +119,7 @@ def run_hotspots_analysis(args: argparse.Namespace, verbose: bool = False) -> in
     except ValueError:
         min_priority = ReviewPriority.LOW
 
+    yml = load_heimdall_yml(scan_path)
     config = HotspotConfig(
         scan_path=scan_path,
         min_priority=min_priority,
@@ -78,6 +128,9 @@ def run_hotspots_analysis(args: argparse.Namespace, verbose: bool = False) -> in
             "__pycache__", "node_modules", ".git", ".venv", "venv", "build", "dist",
         ],
         output_format=getattr(args, "format", "text"),
+        test_context_enabled=bool(yml.get("test_context_enabled", True))
+        and not getattr(args, "include_test_context", False),
+        strict_scan_paths=list(yml.get("strict_scan_paths", []) or []),
     )
 
     try:

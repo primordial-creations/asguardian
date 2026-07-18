@@ -87,7 +87,11 @@ class PageLoadMetrics(BaseModel):
         None, description="Largest Contentful Paint (ms)"
     )
     first_input_delay: Optional[float] = Field(
-        None, description="First Input Delay (ms)"
+        None,
+        description="First Input Delay (ms). DEPRECATED: FID has been "
+                    "replaced by INP; kept if observed but no longer graded. "
+                    "Lab INP is ill-defined without scripted interactions "
+                    "(pending RESEARCH_02); budget TBT instead."
     )
     cumulative_layout_shift: Optional[float] = Field(
         None, description="Cumulative Layout Shift"
@@ -131,7 +135,11 @@ class PageLoadMetrics(BaseModel):
 
     @property
     def fid_grade(self) -> Optional[PerformanceGrade]:
-        """Get grade for First Input Delay."""
+        """DEPRECATED: FID is no longer graded (FID->INP transition).
+
+        Kept for API compatibility only; new analyses leave
+        first_input_delay unset so this returns None.
+        """
         if self.first_input_delay is None:
             return None
         if self.first_input_delay <= 100:

@@ -127,6 +127,11 @@ class OpenAPIValidationResult(BaseModel):
         default_factory=list,
         description="List of informational messages"
     )
+    findings: list[Any] = Field(
+        default_factory=list,
+        exclude=True,
+        description="Unified Finding view over errors/warnings/info (plan 08)"
+    )
     validated_at: datetime = Field(
         default_factory=datetime.now,
         description="Timestamp of validation"

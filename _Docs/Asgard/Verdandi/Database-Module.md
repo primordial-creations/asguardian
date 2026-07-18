@@ -119,33 +119,63 @@ result = calculator.calculate_from_counts(
 | WARNING | 70-85% |
 | CRITICAL | > 85% |
 
+**Queue-wait vs service-time separation** (RESEARCH_14): in-process query timers measure service time only. Pass per-request `acquisition_wait_samples` (the `wait_for_connection` child-span pattern) to get wait p50/p95/p99 and `queue_share = wait_p95 / (wait_p95 + service_p95)` — otherwise the database looks healthy while requests queue for connections.
+
+**Little's-law sizing** (RESEARCH_12): with `qps` and `avg_query_ms`, `required_connections = qps × avg_query_s`; `headroom = pool_size − required`; `recommended_pool_size = ceil(required / 0.7)` (70% target utilization).
+
+**Leak heuristic**: timeouts at < 70% utilization set `leak_suspected=True` — connections are held, not busy.
+
 **Usage**:
 ```python
-from Verdandi.Database import ConnectionPoolAnalyzer
+from Asgard.Verdandi.Database import ConnectionAnalyzer
 
-analyzer = ConnectionPoolAnalyzer()
+analyzer = ConnectionAnalyzer()
 
-pool_data = {
-    "max_size": 100,
-    "active": 45,
-    "idle": 30,
-    "waiting": 5,
-    "avg_acquisition_ms": 2.5,
-    "max_acquisition_ms": 50.0,
-    "timeouts": 2
-}
+metrics = analyzer.analyze(
+    pool_size=25,
+    active_connections=20,
+    waiting_requests=3,
+    acquisition_wait_samples=[1.2, 0.8, 95.0, 1.1],  # ms
+    qps=200,
+    avg_query_ms=100,
+    service_p95_ms=30.0,
+    timeout_count=0,
+)
 
-result = analyzer.analyze(pool_data)
+print(f"Utilization: {metrics.utilization_percent:.1f}%")
+print(f"Wait p95: {metrics.wait_p95_ms}ms  queue_share: {metrics.queue_share}")
+print(f"Required: {metrics.required_connections}  Recommended: {metrics.recommended_pool_size}")
 
-print(f"Utilization: {result.utilization_percent:.1f}%")
-print(f"Status: {result.health_status}")
-print(f"Active: {result.active_connections}")
-print(f"Idle: {result.idle_connections}")
-print(f"Waiting: {result.waiting_count}")
-
-# Recommendations
-for rec in result.recommendations:
+for rec in analyzer.get_recommendations(metrics):
     print(f"  - {rec}")
+```
+
+---
+
+### 4. Pool Signature Detector (`PoolSignatureDetector`)
+
+**Purpose**: Classifies bimodal query-latency distributions (RESEARCH_11).
+
+Pool exhaustion produces **two near-equal-variance peaks** whose separation *is* the mean queue wait; cache-aside bimodality has a narrow fast peak and a wide slow peak. Blended mean/median are meaningless during exhaustion.
+
+| Classification | Rule | Meaning |
+|----------------|------|---------|
+| `POOL_EXHAUSTION` | `\|s1−s2\|/max(s1,s2) < 0.35` | `mean_queue_wait_ms ≈ m2 − m1` |
+| `CACHE_ASIDE_PATTERN` | `s2 > 2×s1` | Route to Cache segmented SLOs |
+| `AMBIGUOUS_BIMODAL` | Neither template | Investigate per-mode membership |
+| `UNIMODAL` / `INSUFFICIENT_DATA` | — | No signature / starved |
+
+Optional `acquisition_wait_samples` corroborate: p50(wait) within ±25% of the inter-peak distance raises confidence to HIGH.
+
+```python
+from Asgard.Verdandi.Database import PoolSignatureDetector, PoolSignatureClass
+
+detector = PoolSignatureDetector()
+signature = detector.detect(latencies_ms, acquisition_wait_samples=waits_ms)
+
+if signature.classification == PoolSignatureClass.POOL_EXHAUSTION:
+    print(f"Mean queue wait: {signature.mean_queue_wait_ms}ms "
+          f"(confidence: {signature.confidence})")
 ```
 
 ---
@@ -209,18 +239,39 @@ class ThroughputResult(BaseModel):
     duration_seconds: float
 ```
 
-### ConnectionPoolResult
+### ConnectionPoolMetrics
 ```python
-class ConnectionPoolResult(BaseModel):
-    max_size: int
+class ConnectionPoolMetrics(BaseModel):
+    pool_size: int
     active_connections: int
     idle_connections: int
-    waiting_count: int
+    waiting_requests: int
     utilization_percent: float
-    avg_acquisition_ms: float
-    max_acquisition_ms: float
+    average_wait_time_ms: float
+    max_wait_time_ms: float
+    connection_errors: int
     timeout_count: int
-    health_status: str  # HEALTHY, WARNING, CRITICAL
+    wait_p50_ms: Optional[float]
+    wait_p95_ms: Optional[float]
+    wait_p99_ms: Optional[float]
+    queue_share: Optional[float]
+    required_connections: Optional[float]
+    headroom_connections: Optional[float]
+    recommended_pool_size: Optional[int]
+    leak_suspected: bool
+```
+
+### PoolSignature
+```python
+class PoolSignature(BaseModel):
+    classification: PoolSignatureClass  # pool_exhaustion | cache_aside_pattern |
+                                        # ambiguous_bimodal | unimodal | insufficient_data
+    mean_queue_wait_ms: Optional[float]
+    modes: List[PoolModeStats]          # median_ms, mad_ms, count, weight
+    mad_disparity: Optional[float]
+    confidence: str                     # low | medium | high
+    corroborated_by_wait_samples: bool
+    warnings: List[str]
     recommendations: List[str]
 ```
 

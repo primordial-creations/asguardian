@@ -30,6 +30,19 @@ class ViolationSeverity(Enum):
     CRITICAL = "critical"
 
 
+class Confidence(Enum):
+    """Qualitative confidence bucket for a finding (never a raw percentage).
+
+    Per ``_Docs/Planning/Heimdall/00_Overview.md`` cross-cutting invariants:
+    severity (impact) and confidence (probability the finding is a true
+    positive) are orthogonal fields — confidence never dilutes severity.
+    """
+
+    HIGH = "high"
+    MEDIUM = "medium"
+    LOW = "low"
+
+
 @dataclass
 class SOLIDViolation:
     """A SOLID principle violation."""
@@ -41,6 +54,8 @@ class SOLIDViolation:
     message: str
     severity: ViolationSeverity = ViolationSeverity.MODERATE
     suggestion: str = ""
+    confidence: Confidence = Confidence.MEDIUM
+    evidence: str = ""
 
     @property
     def principle_name(self) -> str:

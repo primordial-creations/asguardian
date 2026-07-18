@@ -19,6 +19,12 @@ from Asgard.Verdandi.cli.handlers_anomaly_trend import (
     run_trend_analyze,
     run_forecast,
 )
+from Asgard.Verdandi.cli.handlers_new_apis import (
+    run_burn_rate_policy,
+    run_cache_warmup,
+    run_cwv_assess,
+    run_pool_signature,
+)
 from Asgard.Verdandi.cli.handlers_tracing import (
     run_tracing_parse,
     run_tracing_critical_path,
@@ -50,6 +56,8 @@ def main(args=None) -> int:
 
         if args.web_command == "vitals":
             exit_code = run_web_vitals(args, output_format)
+        elif args.web_command == "cwv-assess":
+            exit_code = run_cwv_assess(args, output_format)
         else:
             print(f"Unknown web command: {args.web_command}")
             sys.exit(1)
@@ -80,6 +88,8 @@ def main(args=None) -> int:
 
         if args.cache_command == "metrics":
             exit_code = run_cache_metrics(args, output_format)
+        elif args.cache_command == "warmup":
+            exit_code = run_cache_warmup(args, output_format)
         else:
             print(f"Unknown cache command: {args.cache_command}")
             sys.exit(1)
@@ -112,8 +122,23 @@ def main(args=None) -> int:
             exit_code = run_slo_calculate(args, output_format)
         elif args.slo_command == "burn-rate":
             exit_code = run_slo_calculate(args, output_format)
+        elif args.slo_command == "burn-rate-policy":
+            exit_code = run_burn_rate_policy(args, output_format)
         else:
             print(f"Unknown SLO command: {args.slo_command}")
+            sys.exit(1)
+
+        sys.exit(exit_code)
+
+    elif args.command == "db":
+        if not hasattr(args, "db_command") or args.db_command is None:
+            print("Error: Please specify a db command (e.g., 'pool-signature')")
+            sys.exit(1)
+
+        if args.db_command == "pool-signature":
+            exit_code = run_pool_signature(args, output_format)
+        else:
+            print(f"Unknown db command: {args.db_command}")
             sys.exit(1)
 
         sys.exit(exit_code)

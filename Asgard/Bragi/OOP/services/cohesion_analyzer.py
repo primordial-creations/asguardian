@@ -27,6 +27,7 @@ from Asgard.Bragi.OOP.utilities.class_utils import (
 from Asgard.Bragi.OOP.services._cohesion_helpers import (
     calculate_lcom_ck,
     calculate_lcom_hs,
+    calculate_true_lcom4,
     suggest_splits as _suggest_splits,
 )
 from Asgard.Bragi.Quality.utilities.file_utils import scan_directory
@@ -105,16 +106,21 @@ class CohesionAnalyzer:
 
         regular_methods = [m for m in methods if not m.name.startswith("_")]
 
+        true_lcom4 = 0
         if len(regular_methods) < 2 or len(attributes) < 1:
             lcom = 0.0
             lcom4 = 0.0
+            true_lcom4 = len(regular_methods)
         else:
             method_attr_usage: Dict[str, Set[str]] = {}
+            method_call_graph: Dict[str, Set[str]] = {}
             for method in regular_methods:
                 method_attr_usage[method.name] = method.accessed_attributes & attributes
+                method_call_graph[method.name] = method.called_methods
 
             lcom = calculate_lcom_ck(method_attr_usage)
             lcom4 = calculate_lcom_hs(method_attr_usage, len(attributes))
+            true_lcom4 = calculate_true_lcom4(method_attr_usage, method_call_graph)
 
         cohesion_level = ClassCohesionMetrics.calculate_cohesion_level(lcom)
         severity = ClassCohesionMetrics.calculate_severity(lcom, self.config.lcom_threshold)
@@ -131,6 +137,8 @@ class CohesionAnalyzer:
             line_number=cls.line_number,
             lcom=lcom,
             lcom4=lcom4,
+            true_lcom4=true_lcom4,
+            lcom5=lcom4,
             method_count=len(methods),
             attribute_count=len(attributes),
             method_attribute_usage={

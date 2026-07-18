@@ -3,23 +3,127 @@ JSONSchema Validation and Conversion Utilities.
 """
 
 import re
-from typing import Any, cast
+from typing import Any, Optional, cast
+
+# Keywords introduced in 2019-09 / 2020-12 that draft-07 validators ignore
+_MODERN_ONLY_KEYWORDS = (
+    "prefixItems", "dependentRequired", "dependentSchemas",
+    "unevaluatedProperties", "unevaluatedItems", "minContains", "maxContains",
+    "$anchor", "$dynamicAnchor", "$dynamicRef",
+)
+# draft-07 constructs removed or resemantized in 2020-12
+_LEGACY_ONLY_KEYWORDS = ("additionalItems", "dependencies", "definitions")
 
 
-def validate_schema_syntax(schema: dict[str, Any]) -> list[str]:
+def _detect_declared_dialect(schema: dict[str, Any]) -> Optional[str]:
+    uri = schema.get("$schema", "")
+    if not isinstance(uri, str):
+        return None
+    if "2020-12" in uri:
+        return "2020-12"
+    if "2019-09" in uri:
+        return "2019-09"
+    if "draft-07" in uri:
+        return "draft-07"
+    if "draft-06" in uri:
+        return "draft-06"
+    if "draft-04" in uri:
+        return "draft-04"
+    return None
+
+
+def _check_dialect_vocabulary(schema: dict[str, Any], dialect: Optional[str], errors: list[str]) -> None:
+    """Flag keyword/dialect mismatches as WARNINGs (schema still processed)."""
+    if dialect in ("draft-04", "draft-06", "draft-07"):
+        for keyword in _MODERN_ONLY_KEYWORDS:
+            if keyword in schema:
+                errors.append(
+                    f"WARNING: '{keyword}' is a 2019-09/2020-12 keyword and is ignored under {dialect}"
+                )
+        if schema.get("exclusiveMinimum") is not None and isinstance(schema["exclusiveMinimum"], bool) and dialect != "draft-04":
+            errors.append("WARNING: boolean 'exclusiveMinimum' is a draft-04 form; draft-06+ uses a number")
+    elif dialect in ("2019-09", "2020-12"):
+        for keyword in _LEGACY_ONLY_KEYWORDS:
+            if keyword in schema:
+                errors.append(
+                    f"WARNING: '{keyword}' is a draft-07 keyword; under {dialect} use "
+                    + {"additionalItems": "'items' (with 'prefixItems')",
+                       "dependencies": "'dependentRequired'/'dependentSchemas'",
+                       "definitions": "'$defs'"}[keyword]
+                )
+        if dialect == "2020-12" and isinstance(schema.get("items"), list):
+            errors.append("WARNING: array-form 'items' was replaced by 'prefixItems' in 2020-12")
+        for keyword in ("exclusiveMinimum", "exclusiveMaximum"):
+            if isinstance(schema.get(keyword), bool):
+                errors.append(f"WARNING: boolean '{keyword}' is a draft-04 form; {dialect} requires a number")
+
+
+def validate_schema_syntax(schema: dict[str, Any], _dialect: Optional[str] = None) -> list[str]:
     """
     Validate JSON Schema syntax.
 
+    Covers the draft-07 and 2019-09/2020-12 keyword vocabularies and flags
+    keyword/dialect mismatches (e.g. `prefixItems` under draft-07) as
+    "WARNING: ..." entries.
+
     Args:
         schema: Schema to validate.
+        _dialect: Internal - declared dialect inherited from the root schema.
 
     Returns:
-        List of syntax errors (empty if valid).
+        List of syntax errors and WARNING-prefixed mismatch notices
+        (empty if valid).
     """
     errors: list[str] = []
 
-    if "$schema" not in schema:
+    if _dialect is None and "$schema" not in schema:
         errors.append("Missing $schema declaration")
+
+    dialect = _detect_declared_dialect(schema) or _dialect
+    _check_dialect_vocabulary(schema, dialect, errors)
+
+    if "prefixItems" in schema:
+        if not isinstance(schema["prefixItems"], list):
+            errors.append("'prefixItems' must be an array")
+        else:
+            for i, sub_schema in enumerate(schema["prefixItems"]):
+                if isinstance(sub_schema, dict):
+                    for error in validate_schema_syntax(sub_schema, _dialect=dialect):
+                        errors.append(f"prefixItems[{i}]: {error}")
+
+    if "dependentRequired" in schema:
+        deps = schema["dependentRequired"]
+        if not isinstance(deps, dict):
+            errors.append("'dependentRequired' must be an object")
+        else:
+            for name, needed in deps.items():
+                if not isinstance(needed, list) or not all(isinstance(item, str) for item in needed):
+                    errors.append(f"dependentRequired/{name}: must be an array of strings")
+
+    if "dependentSchemas" in schema:
+        deps = schema["dependentSchemas"]
+        if not isinstance(deps, dict):
+            errors.append("'dependentSchemas' must be an object")
+        else:
+            for name, sub_schema in deps.items():
+                if isinstance(sub_schema, dict):
+                    for error in validate_schema_syntax(sub_schema, _dialect=dialect):
+                        errors.append(f"dependentSchemas/{name}: {error}")
+                elif not isinstance(sub_schema, bool):
+                    errors.append(f"dependentSchemas/{name}: must be a schema (object or boolean)")
+
+    for keyword in ("unevaluatedProperties", "unevaluatedItems"):
+        if keyword in schema and not isinstance(schema[keyword], (dict, bool)):
+            errors.append(f"'{keyword}' must be a schema (object or boolean)")
+
+    for constraint in ("minContains", "maxContains"):
+        if constraint in schema:
+            if not isinstance(schema[constraint], int) or isinstance(schema[constraint], bool) or schema[constraint] < 0:
+                errors.append(f"'{constraint}' must be a non-negative integer")
+
+    for keyword in ("$anchor", "$dynamicAnchor"):
+        if keyword in schema and not isinstance(schema[keyword], str):
+            errors.append(f"'{keyword}' must be a string")
 
     valid_types = {"string", "number", "integer", "boolean", "array", "object", "null"}
     if "type" in schema:
@@ -83,12 +187,12 @@ def validate_schema_syntax(schema: dict[str, Any]) -> list[str]:
         if key in schema and isinstance(schema[key], dict):
             for name, sub_schema in schema[key].items():
                 if isinstance(sub_schema, dict):
-                    sub_errors = validate_schema_syntax(sub_schema)
+                    sub_errors = validate_schema_syntax(sub_schema, _dialect=dialect)
                     for error in sub_errors:
                         errors.append(f"{key}/{name}: {error}")
 
     if "items" in schema and isinstance(schema["items"], dict):
-        sub_errors = validate_schema_syntax(schema["items"])
+        sub_errors = validate_schema_syntax(schema["items"], _dialect=dialect)
         for error in sub_errors:
             errors.append(f"items: {error}")
 
@@ -96,7 +200,7 @@ def validate_schema_syntax(schema: dict[str, Any]) -> list[str]:
         if combiner in schema and isinstance(schema[combiner], list):
             for i, sub_schema in enumerate(schema[combiner]):
                 if isinstance(sub_schema, dict):
-                    sub_errors = validate_schema_syntax(sub_schema)
+                    sub_errors = validate_schema_syntax(sub_schema, _dialect=dialect)
                     for error in sub_errors:
                         errors.append(f"{combiner}[{i}]: {error}")
 

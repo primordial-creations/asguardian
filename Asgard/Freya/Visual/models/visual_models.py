@@ -177,6 +177,15 @@ class ComparisonConfig(BaseModel):
     blur_radius: int = Field(0, description="Blur before comparison")
     color_tolerance: int = Field(10, description="Color difference tolerance")
     anti_aliasing_detection: bool = Field(True, description="Detect anti-aliasing")
+    ignore_antialiasing: bool = Field(
+        True,
+        description="Ignore pixel differences explainable as anti-aliasing "
+                    "(8-neighborhood heuristic, pixel_diff method only)"
+    )
+    max_difference_regions: int = Field(
+        50,
+        description="Cap on reported difference regions (overlapping boxes merged)"
+    )
 
 
 class VisualComparisonResult(BaseModel):
@@ -190,6 +199,11 @@ class VisualComparisonResult(BaseModel):
     annotated_image_path: Optional[str] = Field(None, description="Path to annotated image")
     comparison_method: ComparisonMethod = Field(ComparisonMethod.STRUCTURAL_SIMILARITY)
     analysis_time: float = Field(0.0, description="Analysis time in seconds")
+    framing: Optional[str] = Field(
+        default=None,
+        description="Epistemic framing: structural-tripwire delta language "
+                    "(DEEPTHINK_03), not an aesthetic judgment"
+    )
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 

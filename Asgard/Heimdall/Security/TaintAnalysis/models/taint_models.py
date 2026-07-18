@@ -47,6 +47,7 @@ class TaintFlowStep(BaseModel):
     """A single step in a taint propagation flow."""
     file_path: str = Field(..., description="Path to the file where this step occurs")
     line_number: int = Field(..., description="Line number of this step")
+    column: int = Field(0, description="Column offset of this step (0 when unknown)")
     function_name: str = Field(..., description="Name of the enclosing function")
     step_type: str = Field(..., description="Type of step: source, propagation, or sink")
     code_snippet: str = Field("", description="The code snippet at this step")
@@ -56,11 +57,44 @@ class TaintFlowStep(BaseModel):
         use_enum_values = True
 
 
+class SanitizerRecord(BaseModel):
+    """A sanitizer encountered along a taint flow (taxonomy, not boolean)."""
+    name: str = Field(..., description="Resolved call chain of the sanitizer")
+    kind: str = Field(..., description="Sanitizer class: exact or heuristic")
+    factor: float = Field(..., ge=0.0, le=1.0, description="Confidence multiplier applied (0.0 would have dropped the flow)")
+    line_number: int = Field(0, description="Line where the sanitizer was applied")
+
+    class Config:
+        use_enum_values = True
+
+
 class TaintFlow(BaseModel):
-    """A complete taint flow from source to sink."""
+    """A complete taint flow from source to sink.
+
+    ``severity`` encodes impact (blast radius) and ``confidence`` encodes
+    detection certainty. They are orthogonal: severity is never diluted by
+    uncertainty. ``confidence_bucket`` is the display form (certain /
+    probable / possible / unlikely) -- raw probabilities are internal.
+    """
     source_type: TaintSourceType = Field(..., description="Type of taint source")
     sink_type: TaintSinkType = Field(..., description="Type of taint sink")
     severity: str = Field(..., description="Severity: critical, high, or medium")
+    confidence: float = Field(
+        1.0, ge=0.0, le=1.0,
+        description="Bayesian-style flow confidence: source x propagator decays x hop decays x sink x context"
+    )
+    confidence_bucket: str = Field(
+        "certain",
+        description="Qualitative confidence bucket: certain/probable/possible/unlikely"
+    )
+    hop_count: int = Field(
+        0, ge=0,
+        description="Number of inter-procedural hops between source and sink (0 = intra-function)"
+    )
+    sanitizers_applied: List[SanitizerRecord] = Field(
+        default_factory=list,
+        description="Sanitizers encountered along the flow, with class and confidence factor"
+    )
     source_location: TaintFlowStep = Field(..., description="Location of the taint source")
     sink_location: TaintFlowStep = Field(..., description="Location of the taint sink")
     intermediate_steps: List[TaintFlowStep] = Field(
@@ -146,6 +180,26 @@ class TaintConfig(BaseModel):
     track_cross_file: bool = Field(True, description="Track taint across file boundaries (best-effort)")
     track_cross_function: bool = Field(True, description="Track taint across function calls within a file")
     min_severity: str = Field("medium", description="Minimum severity to report: critical, high, or medium")
+    min_confidence: float = Field(
+        0.25, ge=0.0, le=1.0,
+        description=(
+            "Minimum flow confidence to report. Default 0.25 hides the "
+            "'unlikely' bucket (audit-only) while keeping possible/probable/"
+            "certain findings visible. Set to 0.0 for audit dashboards."
+        ),
+    )
+    max_hops: int = Field(
+        4, ge=0, le=8,
+        description="Maximum inter-procedural hops to follow (paths are dropped beyond this depth)"
+    )
+    summary_cache_path: Optional[Path] = Field(
+        None,
+        description="Optional SQLite cache for function summaries (e.g. ~/.asgard/taintcache.db). None disables caching."
+    )
+    framework_stubs: List[str] = Field(
+        default_factory=lambda: ["flask", "django", "fastapi", "sqlalchemy"],
+        description="Framework stub models to load (YAML files under TaintAnalysis/stubs/)"
+    )
     exclude_patterns: List[str] = Field(
         default_factory=lambda: [
             "__pycache__",

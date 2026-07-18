@@ -21,8 +21,8 @@ from Asgard.Bragi.Dependencies.services._dependency_reporter import (
     generate_markdown_report,
     generate_text_report,
 )
-from Asgard.Bragi.Dependencies.services.import_analyzer import ImportAnalyzer
 from Asgard.Bragi.Dependencies.services.graph_builder import GraphBuilder
+from Asgard.Bragi.Dependencies.services.graph_service import DependencyGraphService
 from Asgard.Bragi.Dependencies.services.cycle_detector import CycleDetector
 from Asgard.Bragi.Dependencies.services.modularity_analyzer import ModularityAnalyzer
 
@@ -36,16 +36,22 @@ class DependencyAnalyzer:
     - Dependency graph construction
     - Circular dependency detection
     - Modularity analysis
+
+    All consumers share ONE DependencyGraphService (Plan 03 Phase B): the
+    codebase is scanned once per report, not three times.
     """
 
     def __init__(self, config: Optional[DependencyConfig] = None):
         """Initialize the dependency analyzer."""
         self.config = config or DependencyConfig()
 
-        self.import_analyzer = ImportAnalyzer(self.config)
+        self.graph_service = DependencyGraphService(self.config)
+        self.import_analyzer = self.graph_service.import_analyzer
         self.graph_builder = GraphBuilder(self.config)
-        self.cycle_detector = CycleDetector(self.config)
-        self.modularity_analyzer = ModularityAnalyzer(self.config)
+        self.cycle_detector = CycleDetector(
+            self.config, graph_service=self.graph_service)
+        self.modularity_analyzer = ModularityAnalyzer(
+            self.config, graph_service=self.graph_service)
 
     def analyze(self, scan_path: Optional[Path] = None) -> DependencyReport:
         """
@@ -65,7 +71,10 @@ class DependencyAnalyzer:
 
         start_time = time.time()
 
-        modules = self.import_analyzer.analyze(path)
+        # Single scan: the shared graph service builds the import graph once;
+        # cycles, modularity, and centrality all read from it.
+        dependency_graph = self.graph_service.build(path)
+        modules = dependency_graph.modules
         cycles = self.cycle_detector.detect(path)
         modularity = self.modularity_analyzer.analyze(path)
 
@@ -97,6 +106,7 @@ class DependencyAnalyzer:
             report.add_cycle(cycle)
 
         report.modularity = modularity
+        report.centrality = self.graph_service.centrality(path)
         report.scan_duration_seconds = time.time() - start_time
 
         return report

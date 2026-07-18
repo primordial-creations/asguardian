@@ -18,6 +18,7 @@ Programmatic Usage:
 """
 
 from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import (
+    SanitizerRecord,
     TaintConfig,
     TaintFlow,
     TaintFlowStep,
@@ -28,6 +29,7 @@ from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import (
 from Asgard.Heimdall.Security.TaintAnalysis.services.taint_analyzer import TaintAnalyzer
 
 __all__ = [
+    "SanitizerRecord",
     "TaintAnalyzer",
     "TaintConfig",
     "TaintFlow",

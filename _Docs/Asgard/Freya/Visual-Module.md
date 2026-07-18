@@ -179,6 +179,7 @@ if result.has_differences:
 
 ## Technology
 
+Zero heavy dependencies: no Pillow, no pixelmatch library.
+
 - **Playwright** for browser automation and screenshots
-- **Pillow** for image manipulation
-- **pixelmatch** for perceptual diff algorithm
+- **Pure-Python PNG codec + pixel-diff/SSIM/pHash** (`Visual/services/image_ops.py`) for image comparison — a hand-rolled equivalent of Pillow + pixelmatch

@@ -14,10 +14,24 @@ from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
 from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
 
 
-def _run_scan_steps_1_to_6(scan_path, exclude_patterns, include_tests, output_format, verbose, scan_results, step_reports):
-    overall_exit = 0
+# Scan categories that encode organisation-specific house rules (e.g. the
+# GAIA "no lazy imports" and "no env-var fallbacks" conventions). These are
+# NOT part of the default scan; they run only when the caller opts in via
+# `heimdall scan --profile gaia`.
+GAIA_HOUSE_RULE_CATEGORIES = ("lazy_imports", "env_fallbacks")
 
-    print("[1/11] Quality: File Length Analysis...")
+
+def _next_step(step_state, total_steps, label):
+    step_state[0] += 1
+    print(f"[{step_state[0]}/{total_steps}] {label}")
+
+
+def _run_scan_steps_1_to_6(scan_path, exclude_patterns, include_tests, output_format, verbose, scan_results, step_reports, house_rules=False, step_state=None, total_steps=11):
+    overall_exit = 0
+    if step_state is None:
+        step_state = [0]
+
+    _next_step(step_state, total_steps, "Quality: File Length Analysis...")
     try:
         config = AnalysisConfig(
             scan_path=scan_path,
@@ -58,7 +72,7 @@ def _run_scan_steps_1_to_6(scan_path, exclude_patterns, include_tests, output_fo
         scan_results["file_length"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
-    print("[2/11] Quality: Complexity Analysis...")
+    _next_step(step_state, total_steps, "Quality: Complexity Analysis...")
     try:
         complexity_config = ComplexityConfig(
             scan_path=scan_path, include_tests=include_tests,
@@ -82,7 +96,25 @@ def _run_scan_steps_1_to_6(scan_path, exclude_patterns, include_tests, output_fo
         scan_results["complexity"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
-    print("[3/11] Quality: Lazy Import Detection...")
+    # GAIA house rule: lazy-import detection is opt-in (--profile gaia).
+    if house_rules:
+        _next_step(step_state, total_steps, "Quality: Lazy Import Detection (GAIA profile)...")
+        overall_exit = _run_lazy_import_step(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, overall_exit)
+
+        # GAIA house rule: env-var fallback detection is opt-in (--profile gaia).
+        _next_step(step_state, total_steps, "Quality: Environment Variable Fallback Detection (GAIA profile)...")
+        overall_exit = _run_env_fallback_step(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, overall_exit)
+
+    _next_step(step_state, total_steps, "Quality: Static Type Checking (mypy)...")
+    overall_exit = _run_type_check_step(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, overall_exit)
+
+    _next_step(step_state, total_steps, "Security: Vulnerability Scan...")
+    overall_exit = _run_security_step(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, overall_exit)
+
+    return overall_exit
+
+
+def _run_lazy_import_step(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, overall_exit):
     try:
         lazy_config = LazyImportConfig(
             scan_path=scan_path, include_tests=include_tests,
@@ -106,8 +138,10 @@ def _run_scan_steps_1_to_6(scan_path, exclude_patterns, include_tests, output_fo
     except Exception as e:
         scan_results["lazy_imports"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
+    return overall_exit
 
-    print("[4/11] Quality: Environment Variable Fallback Detection...")
+
+def _run_env_fallback_step(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, overall_exit):
     try:
         env_config = EnvFallbackConfig(
             scan_path=scan_path, include_tests=include_tests,
@@ -131,8 +165,10 @@ def _run_scan_steps_1_to_6(scan_path, exclude_patterns, include_tests, output_fo
     except Exception as e:
         scan_results["env_fallbacks"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
+    return overall_exit
 
-    print("[5/11] Quality: Static Type Checking (mypy)...")
+
+def _run_type_check_step(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, overall_exit):
     try:
         type_config = TypeCheckConfig(
             engine="mypy",
@@ -161,8 +197,10 @@ def _run_scan_steps_1_to_6(scan_path, exclude_patterns, include_tests, output_fo
     except Exception as e:
         scan_results["type_check"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
+    return overall_exit
 
-    print("[6/11] Security: Vulnerability Scan...")
+
+def _run_security_step(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, overall_exit):
     try:
         sec_config = SecurityScanConfig(
             scan_path=scan_path, min_severity="low",

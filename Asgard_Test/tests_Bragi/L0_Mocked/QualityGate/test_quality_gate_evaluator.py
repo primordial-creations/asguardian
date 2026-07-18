@@ -65,15 +65,17 @@ class TestQualityGateEvaluator:
             or "critical_vulnerabilities" in metric_values
         )
 
-    def test_evaluate_empty_metrics_all_skipped(self):
-        """Test that evaluating with empty metrics dict skips all conditions."""
+    def test_evaluate_empty_metrics_is_not_evaluated(self):
+        """Missing all metrics must never produce a passing gate (epistemic honesty)."""
         evaluator = QualityGateEvaluator()
         gate = evaluator.get_default_gate()
         result = evaluator.evaluate(gate, {})
 
         assert isinstance(result, QualityGateResult)
-        # All conditions skipped (metric not provided) -> passed=True for each
-        assert result.status == GateStatus.PASSED or result.status == "passed"
+        # No metric was supplied -> every condition is NOT_EVALUATED, and the
+        # gate reports NOT_EVALUATED rather than silently passing.
+        assert result.status == GateStatus.NOT_EVALUATED or result.status == "not_evaluated"
+        assert result.not_evaluated_count == len(gate.conditions)
 
     def test_evaluate_all_passing_returns_passed(self):
         """Test that all conditions passing results in GateStatus.PASSED."""

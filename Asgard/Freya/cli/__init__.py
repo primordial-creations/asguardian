@@ -29,6 +29,8 @@ from Asgard.Freya.cli._handlers_perf_seo_security import (
     run_seo_robots,
     run_security_headers,
     run_security_csp,
+    run_security_sri,
+    run_security_mixed_content,
     run_console_errors,
     run_links_validate,
 )
@@ -42,6 +44,11 @@ from Asgard.Freya.cli._handlers_images_integration import (
     run_baseline_list,
     run_baseline_delete,
     run_crawl,
+)
+from Asgard.Freya.cli._handlers_config import (
+    run_config_init,
+    run_config_show,
+    run_config_validate,
 )
 
 
@@ -167,6 +174,10 @@ def main(args=None) -> int:
             exit_code = asyncio.run(run_security_headers(args, verbose))
         elif args.security_command == "csp":
             exit_code = asyncio.run(run_security_csp(args, verbose))
+        elif args.security_command == "sri":
+            exit_code = asyncio.run(run_security_sri(args, verbose))
+        elif args.security_command == "mixed-content":
+            exit_code = asyncio.run(run_security_mixed_content(args, verbose))
         else:
             print(f"Unknown security command: {args.security_command}")
             sys.exit(1)
@@ -245,16 +256,15 @@ def main(args=None) -> int:
 
     elif args.command == "config":
         if args.config_command == "show":
-            print("Configuration: (defaults)")
-            print("  WCAG Level: AA")
-            print("  Output Format: text")
-            print("  Baseline Directory: ./freya_baselines")
+            exit_code = run_config_show(args, verbose)
         elif args.config_command == "init":
-            print("Configuration file created: .freyarc")
+            exit_code = run_config_init(args, verbose)
+        elif args.config_command == "validate":
+            exit_code = run_config_validate(args, verbose)
         else:
-            print("Error: Please specify a config command (e.g., 'show', 'init')")
+            print("Error: Please specify a config command (e.g., 'show', 'init', 'validate')")
             sys.exit(1)
-        sys.exit(0)
+        sys.exit(exit_code)
 
     else:
         print(f"Unknown command: {args.command}")

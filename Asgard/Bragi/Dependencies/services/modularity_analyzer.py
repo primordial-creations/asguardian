@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 from Asgard.Bragi.Dependencies.models.dependency_models import (
+    CentralityInfo,
     DependencyConfig,
     ModularityMetrics,
 )
@@ -18,7 +19,7 @@ from Asgard.Bragi.Dependencies.services._modularity_helpers import (
     get_coupling_report,
     get_layering_analysis,
 )
-from Asgard.Bragi.Dependencies.services.import_analyzer import ImportAnalyzer
+from Asgard.Bragi.Dependencies.services.graph_service import DependencyGraphService
 
 
 class ModularityAnalyzer:
@@ -30,12 +31,18 @@ class ModularityAnalyzer:
     - Good separation of concerns
     - Easy to understand and navigate
     - Changes are localized
+
+    Consumes the shared DependencyGraphService (Plan 03 Phase B): no second
+    codebase scan when the graph is already built.
     """
 
-    def __init__(self, config: Optional[DependencyConfig] = None):
+    def __init__(self, config: Optional[DependencyConfig] = None,
+                 graph_service: Optional[DependencyGraphService] = None):
         """Initialize the modularity analyzer."""
         self.config = config or DependencyConfig()
-        self.import_analyzer = ImportAnalyzer(self.config)
+        self.graph_service = graph_service or DependencyGraphService(self.config)
+        # Kept for backward compatibility with callers that reached into it.
+        self.import_analyzer = self.graph_service.import_analyzer
 
     def analyze(self, scan_path: Optional[Path] = None) -> ModularityMetrics:
         """
@@ -48,7 +55,7 @@ class ModularityAnalyzer:
             ModularityMetrics with analysis results
         """
         path = scan_path or self.config.scan_path
-        modules = self.import_analyzer.analyze(path)
+        modules = self.graph_service.build(path).modules
 
         # Calculate coupling metrics
         graph = {m.module_name: m.all_dependencies for m in modules}
@@ -105,7 +112,8 @@ class ModularityAnalyzer:
         Returns:
             List of violation descriptions
         """
-        modules = self.import_analyzer.analyze(scan_path)
+        modules = self.graph_service.build(
+            scan_path or self.config.scan_path).modules
         return get_boundary_violations(modules)
 
     def get_coupling_report(
@@ -121,7 +129,7 @@ class ModularityAnalyzer:
             List of module coupling information
         """
         path = scan_path or self.config.scan_path
-        modules = self.import_analyzer.analyze(path)
+        modules = self.graph_service.build(path).modules
         graph = {m.module_name: m.all_dependencies for m in modules}
         reverse = build_reverse_graph(graph)
         return get_coupling_report(modules, reverse)
@@ -144,5 +152,12 @@ class ModularityAnalyzer:
         Returns:
             Analysis results including violations
         """
-        modules = self.import_analyzer.analyze(scan_path)
+        modules = self.graph_service.build(
+            scan_path or self.config.scan_path).modules
         return get_layering_analysis(modules, layers)
+
+    def centrality(
+        self, scan_path: Optional[Path] = None
+    ) -> Dict[str, CentralityInfo]:
+        """Centrality passthrough with afferent percentiles (Plan 03)."""
+        return self.graph_service.centrality(scan_path or self.config.scan_path)

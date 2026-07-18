@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 from Asgard.Bragi.Architecture.models._solid_models import (
+    Confidence,
     SOLIDPrinciple,
     SOLIDReport,
     SOLIDViolation,
@@ -112,6 +113,7 @@ class ArchitectureReport:
 __all__ = [
     "ArchitectureConfig",
     "ArchitectureReport",
+    "Confidence",
     "SOLIDPrinciple",
     "SOLIDViolation",
     "SOLIDReport",

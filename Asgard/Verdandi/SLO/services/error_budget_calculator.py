@@ -73,7 +73,10 @@ class ErrorBudgetCalculator:
         # Calculate totals from metrics
         total_events = sum(m.total_events for m in window_metrics)
         good_events = sum(m.good_events for m in window_metrics)
-        bad_events = total_events - good_events
+        rejected_events = sum(m.rejected_events for m in window_metrics)
+        # Valid rejections (e.g. typed INSUFFICIENT_DATA outcomes) never
+        # consume error budget (DEEPTHINK_01).
+        bad_events = max(0, total_events - good_events - rejected_events)
 
         # Calculate current SLI
         current_sli = (good_events / total_events * 100.0) if total_events > 0 else 100.0

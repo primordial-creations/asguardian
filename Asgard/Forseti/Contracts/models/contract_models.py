@@ -4,11 +4,58 @@ Contract Models - Pydantic models for API contract handling.
 These models represent API contracts, compatibility results, and breaking changes.
 """
 
-from datetime import datetime
+from datetime import date, datetime
 from enum import Enum
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
+
+from Asgard.Forseti.Compatibility.models.legacy_models import LegacyBreakingChange
+
+
+class LifecycleMeta(BaseModel):
+    """Spec-held lifecycle metadata for one API element (DEEPTHINK_07 §2)."""
+
+    location: str = Field(default="", description="Element location key")
+    deprecated: bool = Field(default=False)
+    since: Optional[date] = Field(default=None, description="Deprecation date")
+    sunset: Optional[date] = Field(
+        default=None, description="x-sunset-date (RFC 8594)"
+    )
+    replaced_by: Optional[str] = Field(
+        default=None, description="x-replaced-by JSON pointer / path"
+    )
+    migration_guide: Optional[str] = Field(
+        default=None, description="x-migration-guide URL"
+    )
+
+    def sunset_elapsed(self, today: date) -> bool:
+        """Whether the declared sunset date has passed."""
+        return self.sunset is not None and today >= self.sunset
+
+
+class Bump(str, Enum):
+    """Semantic version bump levels."""
+
+    MAJOR = "major"
+    MINOR = "minor"
+    PATCH = "patch"
+
+
+class VersionRecommendation(BaseModel):
+    """Algorithmic SemVer bump recommendation (RESEARCH_03 §7)."""
+
+    current: Optional[str] = Field(default=None)
+    recommended_bump: Bump = Field(default=Bump.PATCH)
+    recommended_version: Optional[str] = Field(default=None)
+    reasons: list[str] = Field(
+        default_factory=list,
+        description="rule ids / change descriptions that forced the bump",
+    )
+    pre_stability: bool = Field(
+        default=False,
+        description="0.x version: MAJOR downgraded to MINOR per SemVer item 4",
+    )
 
 
 class BreakingChangeType(str, Enum):
@@ -113,40 +160,19 @@ class ContractValidationResult(BaseModel):
         return len(self.errors)
 
 
-class BreakingChange(BaseModel):
-    """Represents a breaking change between API versions."""
+class BreakingChange(LegacyBreakingChange):
+    """Represents a breaking change between API versions.
+
+    Deprecated shape: thin subclass of the shared LegacyBreakingChange
+    (plan 01); new code should use Compatibility.UnifiedChange.
+    """
 
     change_type: BreakingChangeType = Field(
         description="Type of breaking change"
     )
-    path: str = Field(
-        description="API path affected"
-    )
     location: str = Field(
         description="Location within the path (e.g., request.body.field)"
     )
-    message: str = Field(
-        description="Human-readable description"
-    )
-    old_value: Optional[str] = Field(
-        default=None,
-        description="Value in old version"
-    )
-    new_value: Optional[str] = Field(
-        default=None,
-        description="Value in new version"
-    )
-    severity: str = Field(
-        default="error",
-        description="Severity level"
-    )
-    mitigation: Optional[str] = Field(
-        default=None,
-        description="Suggested mitigation"
-    )
-
-    class Config:
-        use_enum_values = True
 
 
 class CompatibilityResult(BaseModel):

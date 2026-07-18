@@ -11,6 +11,8 @@ Provides template-based generation of CI/CD pipeline configurations including:
 
 from Asgard.Volundr.CICD.models.cicd_models import (
     CICDPlatform,
+    OIDCConfig,
+    OIDCProvider,
     PipelineStage,
     DeploymentStrategy,
     PipelineConfig,
@@ -23,6 +25,8 @@ from Asgard.Volundr.CICD.services.pipeline_generator import PipelineGenerator
 
 __all__ = [
     "CICDPlatform",
+    "OIDCConfig",
+    "OIDCProvider",
     "PipelineStage",
     "DeploymentStrategy",
     "PipelineConfig",

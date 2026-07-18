@@ -1,21 +1,17 @@
 """
 Heimdall Security Hotspot Detector Service
 
-Detects security-sensitive code patterns in Python source files using AST
-analysis and regular expressions. Hotspots are not confirmed vulnerabilities
-but areas that require manual security review.
+Detects the six defensible hotspot families (plan 08 Part A): weak
+hashing, standard PRNG, disabled transport security, permissive
+bindings/CORS, opaque deserialization, and cryptography.hazmat usage.
+A hotspot is syntactically flawless code whose safety depends on
+extrinsic context — never a failed finding.
 
-Detected categories:
-1. Cookie Configuration - insecure cookie settings
-2. Cryptographic Code - crypto module usage (flag for review)
-3. Dynamic Code Execution - eval, exec, compile, __import__
-4. Regex DoS (ReDoS) - complex nested quantifier patterns
-5. XML External Entity (XXE) - XML parsing without explicit entity disabling
-6. Pickle/Deserialization - unsafe deserialization calls
-7. SSRF - HTTP calls with potentially user-supplied URLs
-8. Random Number Generation - use of random module for security operations
-9. Permission / Authorization Checks - os.chmod, os.access usage
-10. HTTP Request Without TLS Verification - verify=False in requests calls
+Python files use AST checks; other languages fall back to regex rules.
+Hotspots are routed through the test-context engine (plan 08 Part B):
+findings in test code get contextual severity or suppression (retained
+with ``suppressed_by_context=True``; include via
+``config.include_test_context``).
 """
 
 import ast
@@ -35,6 +31,26 @@ from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import (
 )
 from Asgard.Heimdall.Security.Hotspots.services._ast_hotspot_checks import detect_ast_hotspots
 from Asgard.Heimdall.Security.Hotspots.services._regex_hotspot_checks import detect_regex_hotspots
+from Asgard.Heimdall.Security.context.test_context import (
+    ContextTag,
+    FindingKind,
+    TestContextIndex,
+    contextual_action,
+    ContextAction,
+)
+
+# Hotspot family -> severity-matrix family (plan 08 Part B).
+_CATEGORY_KIND = {
+    HotspotCategory.WEAK_HASHING: FindingKind.WEAK_CRYPTO,
+    HotspotCategory.STANDARD_PRNG: FindingKind.WEAK_CRYPTO,
+    HotspotCategory.HAZMAT_CRYPTO: FindingKind.WEAK_CRYPTO,
+    HotspotCategory.DISABLED_TLS: FindingKind.NETWORK_CONFIG,
+    HotspotCategory.PERMISSIVE_BINDING: FindingKind.NETWORK_CONFIG,
+    # Deserialization of fixtures is ubiquitous in tests, but on an
+    # integration/CI runner it is a real (reduced) attack surface — same
+    # routing as command injection.
+    HotspotCategory.OPAQUE_DESERIALIZATION: FindingKind.COMMAND_INJECTION,
+}
 
 
 class HotspotDetector:
@@ -97,8 +113,13 @@ class HotspotDetector:
                 try:
                     hotspots = self._analyze_file(file_path)
                     for hotspot in hotspots:
-                        if self._meets_min_priority(hotspot.review_priority):
-                            report.add_hotspot(hotspot)
+                        if not self._meets_min_priority(hotspot.review_priority):
+                            continue
+                        if hotspot.suppressed_by_context:
+                            report.suppressed_by_context_count += 1
+                            if not self.config.include_test_context:
+                                continue
+                        report.add_hotspot(hotspot)
                 except Exception:
                     pass
 
@@ -116,19 +137,53 @@ class HotspotDetector:
         hotspots: List[SecurityHotspot] = []
         lines = source.splitlines()
         str_path = str(file_path)
+        tree = None
 
-        try:
-            tree = ast.parse(source)
-            hotspots.extend(detect_ast_hotspots(
-                tree, str_path, lines, self.config,
-                self._get_line, self._get_call_name,
-            ))
-        except SyntaxError:
-            pass
+        if file_path.suffix in (".py", ".pyw"):
+            try:
+                tree = ast.parse(source)
+                hotspots.extend(detect_ast_hotspots(
+                    tree, str_path, lines, self.config,
+                    self._get_line, self._get_call_name,
+                ))
+            except SyntaxError:
+                tree = None
 
-        hotspots.extend(detect_regex_hotspots(lines, str_path, self.config))
+        # Regex fallback; on parsed Python files, dedupe (category, line)
+        # already covered by the AST checks.
+        seen = {(h.category, h.line_number) for h in hotspots}
+        for h in detect_regex_hotspots(lines, str_path, self.config):
+            if tree is not None and (h.category, h.line_number) in seen:
+                continue
+            hotspots.append(h)
+
+        if self.config.test_context_enabled and hotspots:
+            self._apply_test_context(str_path, source, tree, hotspots)
 
         return hotspots
+
+    def _apply_test_context(self, str_path, source, tree, hotspots: List[SecurityHotspot]) -> None:
+        """Route hotspots through the contextual severity matrix (plan 08 B)."""
+        index = TestContextIndex.for_python_source(
+            str_path, source,
+            strict_scan_paths=self.config.strict_scan_paths,
+            tree=tree,
+        )
+        for hotspot in hotspots:
+            tag = index.tag_for_line(hotspot.line_number)
+            hotspot.context_tag = tag.value
+            if tag is ContextTag.PRODUCTION:
+                continue
+            category = hotspot.category if isinstance(hotspot.category, HotspotCategory) \
+                else HotspotCategory(hotspot.category)
+            kind = _CATEGORY_KIND.get(category, FindingKind.OTHER)
+            action = contextual_action(kind, tag)
+            if action is ContextAction.SUPPRESS:
+                hotspot.suppressed_by_context = True
+            elif action is ContextAction.DOWNGRADE_LOW:
+                hotspot.review_priority = ReviewPriority.LOW
+            elif action is ContextAction.DOWNGRADE_INFO:
+                hotspot.review_priority = ReviewPriority.LOW
 
     def _get_call_name(self, node: ast.Call) -> str:
         """Extract a dotted name string from a Call node's func attribute."""

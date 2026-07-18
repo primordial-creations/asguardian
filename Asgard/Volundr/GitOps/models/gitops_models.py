@@ -96,7 +96,13 @@ class ArgoSourceKustomize(BaseModel):
 class ArgoSource(BaseModel):
     """ArgoCD application source configuration."""
     repo_url: str = Field(description="Git repository URL")
-    target_revision: str = Field(default="HEAD", description="Target revision (branch/tag/commit)")
+    target_revision: str = Field(
+        default="main",
+        description=(
+            "Target revision (branch/tag/commit). Must be pinned — 'HEAD' "
+            "is a severe anti-pattern and fails validation (VOL-GITOPS-0001)."
+        ),
+    )
     path: str = Field(default=".", description="Path within repository")
     helm: Optional[ArgoSourceHelm] = Field(default=None, description="Helm configuration")
     kustomize: Optional[ArgoSourceKustomize] = Field(default=None, description="Kustomize configuration")
@@ -110,11 +116,62 @@ class ArgoDestination(BaseModel):
     name: Optional[str] = Field(default=None, description="Cluster name (alternative to server)")
 
 
+class GitOpsPolicy(BaseModel):
+    """Org-level GitOps guard rails (RESEARCH_05 App-of-Apps constraints).
+
+    Empty allowlists mean "no restriction declared" — nothing is flagged.
+    Once patterns are declared, every Application must match one
+    (VOL-GITOPS-0003 / VOL-GITOPS-0004).
+    """
+    allowed_repo_patterns: List[str] = Field(
+        default_factory=list,
+        description="fnmatch patterns for permitted source repoURLs",
+    )
+    allowed_destination_servers: List[str] = Field(
+        default_factory=list,
+        description="fnmatch patterns for permitted destination servers",
+    )
+
+
+class ArgoAppProject(BaseModel):
+    """ArgoCD AppProject — the scoped alternative to 'default'.
+
+    Generating one lets users actually satisfy the non-default-project
+    rule (VOL-GITOPS-0002) with repo/destination allowlists.
+    """
+    name: str = Field(description="AppProject name (must not be 'default')")
+    namespace: str = Field(default="argocd", description="ArgoCD namespace")
+    description: str = Field(default="", description="Project description")
+    source_repos: List[str] = Field(
+        default_factory=list, description="Permitted source repository URLs/patterns"
+    )
+    destinations: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="Permitted destinations [{server, namespace}]",
+    )
+    cluster_resource_whitelist: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="Permitted cluster-scoped resources [{group, kind}]",
+    )
+    namespace_resource_whitelist: List[Dict[str, str]] = Field(
+        default_factory=lambda: [{"group": "*", "kind": "*"}],
+        description="Permitted namespaced resources [{group, kind}]",
+    )
+    labels: Dict[str, str] = Field(default_factory=dict, description="Labels")
+
+
 class ArgoApplication(BaseModel):
     """ArgoCD Application configuration."""
     name: str = Field(description="Application name")
     namespace: str = Field(default="argocd", description="ArgoCD namespace")
-    project: str = Field(default="default", description="ArgoCD project")
+    project: str = Field(
+        default="default",
+        description=(
+            "ArgoCD AppProject. Using the unrestricted 'default' project is "
+            "an anti-pattern and is flagged by validation (VOL-GITOPS-0002); "
+            "reference a scoped AppProject with repo/destination allowlists."
+        ),
+    )
     source: ArgoSource = Field(description="Application source")
     destination: ArgoDestination = Field(description="Application destination")
     sync_policy: SyncPolicy = Field(default_factory=SyncPolicy, description="Sync policy")

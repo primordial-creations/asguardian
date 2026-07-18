@@ -12,10 +12,15 @@ from Asgard.Bragi.Coverage.models.coverage_models import CoverageConfig
 from Asgard.Bragi.Coverage.services.coverage_analyzer import CoverageAnalyzer
 
 
-def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports):
-    overall_exit = 0
+from Asgard.Heimdall.cli.handlers.scan_steps_1_6 import _next_step
 
-    print("[7/11] Performance: Pattern Analysis...")
+
+def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, step_state=None, total_steps=11):
+    overall_exit = 0
+    if step_state is None:
+        step_state = [6]
+
+    _next_step(step_state, total_steps, "Performance: Pattern Analysis...")
     try:
         perf_config = PerformanceScanConfig(
             scan_path=scan_path, include_tests=include_tests,
@@ -39,7 +44,7 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         scan_results["performance"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
-    print("[8/11] OOP: Coupling/Cohesion Metrics...")
+    _next_step(step_state, total_steps, "OOP: Coupling/Cohesion Metrics...")
     try:
         oop_config = OOPConfig(
             scan_path=scan_path, include_tests=include_tests,
@@ -63,7 +68,7 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         scan_results["oop"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
-    print("[9/11] Architecture: SOLID/Layer Analysis...")
+    _next_step(step_state, total_steps, "Architecture: SOLID/Layer Analysis...")
     try:
         arch_config = ArchitectureConfig(scan_path=scan_path, exclude_patterns=exclude_patterns)
         arch_analyzer = ArchitectureAnalyzer(arch_config)
@@ -84,7 +89,7 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         scan_results["architecture"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
-    print("[10/11] Dependencies: Circular Import Detection...")
+    _next_step(step_state, total_steps, "Dependencies: Circular Import Detection...")
     try:
         deps_config = DependencyConfig(
             scan_path=scan_path, include_tests=include_tests,
@@ -108,7 +113,7 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         scan_results["dependencies"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
 
-    print("[11/11] Test Coverage: Gap Analysis...")
+    _next_step(step_state, total_steps, "Test Coverage: Gap Analysis...")
     try:
         coverage_config = CoverageConfig(scan_path=scan_path, exclude_patterns=exclude_patterns)
         coverage_analyzer = CoverageAnalyzer(coverage_config)

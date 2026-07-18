@@ -42,7 +42,7 @@ def test_get_supported_languages_returns_set():
 
 
 def test_get_supported_languages_subset_of_known():
-    known = {"python", "javascript", "typescript", "java", "go", "ruby", "php", "csharp", "cpp", "rust"}
+    known = {"python", "javascript", "typescript", "tsx", "java", "go", "ruby", "php", "csharp", "cpp", "rust"}
     langs = get_supported_languages()
     assert langs.issubset(known), f"Unexpected languages: {langs - known}"
 
@@ -83,13 +83,20 @@ def test_parse_source_empty_bytes_does_not_raise():
 def test_parse_source_graceful_when_unavailable(monkeypatch):
     """Even if language binding is absent, parse_source returns None gracefully."""
     import Asgard.Heimdall.treesitter._language_loader as ll
+    import Asgard.Heimdall.treesitter._parser_pool as pp
+
     original = ll._AVAILABLE.copy()
+    # A parser cached by an earlier test would otherwise short-circuit the
+    # availability check, so drop the cache too and restore it afterwards.
+    original_parsers = pp._PARSERS.copy()
     ll._AVAILABLE.clear()
+    pp._PARSERS.clear()
     try:
         result = parse_source(SIMPLE_JAVA, "java")
         assert result is None
     finally:
         ll._AVAILABLE.update(original)
+        pp._PARSERS.update(original_parsers)
 
 
 # ---------------------------------------------------------------------------

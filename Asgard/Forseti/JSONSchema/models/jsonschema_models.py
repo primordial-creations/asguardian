@@ -236,12 +236,68 @@ class JSONSchemaInferenceResult(BaseModel):
     )
 
 
+class LossRecord(BaseModel):
+    """A single lossy transformation applied during dialect conversion."""
+
+    path: str = Field(description="JSON path of the schema location that lost information")
+    keyword: str = Field(description="Schema keyword involved (e.g. 'unevaluatedProperties')")
+    message: str = Field(description="Human-readable description of what was lost")
+    severity: str = Field(default="warning", description="'info' or 'warning'")
+    original_value: Optional[Any] = Field(default=None, description="Value before conversion")
+
+
+class DialectConversionResult(BaseModel):
+    """Result of converting a schema between dialects (OAS 3.0 <-> 3.1)."""
+
+    converted: dict[str, Any] = Field(description="Converted schema")
+    source_dialect: str = Field(description="Dialect converted from")
+    target_dialect: str = Field(description="Dialect converted to")
+    lossy_changes: list[LossRecord] = Field(
+        default_factory=list,
+        description="Transformations that lost information (empty = lossless)"
+    )
+    changed: bool = Field(default=False, description="Whether any transformation was applied")
+
+    @property
+    def is_lossless(self) -> bool:
+        return len(self.lossy_changes) == 0
+
+
+class LLMCompatibilityIssue(BaseModel):
+    """A schema construct incompatible with an LLM structured-output subset."""
+
+    rule_id: str = Field(description="Stable rule id (e.g. 'llm.openai.additional-properties')")
+    path: str = Field(description="JSON path of the offending schema location")
+    message: str = Field(description="Description of the incompatibility")
+    severity: str = Field(default="error", description="'error' = rejected by provider, 'warning' = degraded/ignored")
+
+
+class LLMCompatibilityResult(BaseModel):
+    """Result of checking a schema against an LLM structured-output subset."""
+
+    provider: str = Field(description="Provider profile checked (openai, anthropic, gemini)")
+    is_compatible: bool = Field(description="True when no error-severity issues were found")
+    issues: list[LLMCompatibilityIssue] = Field(default_factory=list, description="Detected issues")
+
+    @property
+    def error_count(self) -> int:
+        return sum(1 for issue in self.issues if issue.severity == "error")
+
+    @property
+    def warning_count(self) -> int:
+        return sum(1 for issue in self.issues if issue.severity == "warning")
+
+
 __all__ = [
+    "DialectConversionResult",
     "JSONSchemaConfig",
     "JSONSchemaInferenceResult",
     "JSONSchemaSpec",
     "JSONSchemaValidationError",
     "JSONSchemaValidationResult",
+    "LLMCompatibilityIssue",
+    "LLMCompatibilityResult",
+    "LossRecord",
     "SchemaFormat",
     "SchemaType",
 ]

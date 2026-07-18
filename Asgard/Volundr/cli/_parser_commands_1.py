@@ -35,6 +35,23 @@ def _add_kubernetes_commands(subparsers: argparse._SubParsersAction) -> None:
         help="Security profile",
     )
     generate.add_argument("--port", type=int, default=8080, help="Container port")
+    generate.add_argument(
+        "--target-k8s-version",
+        default="1.30",
+        help="Target Kubernetes version (drives AppArmor field shape and schema binding)",
+    )
+    generate.add_argument(
+        "--digest",
+        default=None,
+        help="Image digest (sha256:...) for immutable supply-chain pinning",
+    )
+    generate.add_argument(
+        "--suppress",
+        action="append",
+        default=[],
+        metavar="RULE:TARGET:REASON",
+        help="Reified suppression (repeatable). Requires rule, target, and a non-empty reason.",
+    )
     generate.add_argument("--output-dir", default="manifests", help="Output directory")
     generate.add_argument("--format", choices=["yaml", "json"], default="yaml", help="Output format")
 
@@ -67,6 +84,24 @@ def _add_terraform_commands(subparsers: argparse._SubParsersAction) -> None:
         help="Module complexity",
     )
     generate.add_argument("--description", default="", help="Module description")
+    generate.add_argument(
+        "--environment",
+        choices=["production", "staging", "development", "sandbox"],
+        default="production",
+        help="Scoring environment weight profile",
+    )
+    generate.add_argument(
+        "--suppress",
+        action="append",
+        default=[],
+        metavar="RULE:TARGET:REASON",
+        help="Reified suppression (repeatable). Requires rule, target, and a non-empty reason.",
+    )
+    generate.add_argument(
+        "--kms-encryption",
+        action="store_true",
+        help="Use KMS (aws:kms) instead of AES256 for generated storage encryption blocks",
+    )
     generate.add_argument("--output-dir", default="modules", help="Output directory")
 
     add_performance_flags(tf_parser)
@@ -85,6 +120,18 @@ def _add_docker_commands(subparsers: argparse._SubParsersAction) -> None:
     dockerfile.add_argument("--user", default="appuser", help="Non-root user")
     dockerfile.add_argument("--output-dir", default=".", help="Output directory")
     dockerfile.add_argument("--multi-stage", action="store_true", help="Use multi-stage build")
+    dockerfile.add_argument(
+        "--digest", default=None,
+        help="Base-image digest (sha256:...) for immutable supply-chain pinning",
+    )
+    dockerfile.add_argument(
+        "--secret-mount", action="append", dest="secret_mounts", default=[],
+        metavar="ID[:TARGET]",
+        help=(
+            "BuildKit secret mount (repeatable): secrets are mounted at build "
+            "time and never enter image layers"
+        ),
+    )
 
     compose = docker_subparsers.add_parser("compose", help="Generate docker-compose.yml")
     compose.add_argument("--name", required=True, help="Project name")
@@ -110,5 +157,35 @@ def _add_cicd_commands(subparsers: argparse._SubParsersAction) -> None:
     generate.add_argument("--branch", default="main", help="Main branch name")
     generate.add_argument("--docker-image", help="Docker image to build/push")
     generate.add_argument("--output-dir", default=".", help="Output directory")
+    generate.add_argument(
+        "--oidc-provider",
+        choices=["aws", "gcp", "azure", "vault"],
+        help="OIDC token-exchange provider (keyless auth instead of static secrets)",
+    )
+    generate.add_argument("--oidc-role", help="OIDC role/identity to assume")
+    generate.add_argument(
+        "--provenance", action="store_true",
+        help="Emit a SLSA provenance attestation job",
+    )
+    generate.add_argument(
+        "--sbom", action="store_true", help="Emit an SBOM generation step"
+    )
+    generate.add_argument(
+        "--split-trust", dest="split_trust", action="store_true", default=True,
+        help="Split build/deploy into separate workflows (default)",
+    )
+    generate.add_argument(
+        "--no-split-trust", dest="split_trust", action="store_false",
+        help="Keep build and deploy in one workflow",
+    )
+    generate.add_argument(
+        "--harden-runner", action="store_true",
+        help="Prepend a step-security/harden-runner egress-hardening step",
+    )
+    generate.add_argument(
+        "--suppress", action="append", default=[],
+        metavar="RULE:TARGET:REASON",
+        help="Reified rule suppression (repeatable): rule:target:reason",
+    )
 
     add_performance_flags(cicd_parser)

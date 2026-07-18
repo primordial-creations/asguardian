@@ -7,6 +7,11 @@ Based on WCAG 2.1 guidelines.
 
 from Asgard.Freya.Accessibility.models._accessibility_enums import (
     ARIAViolationType,
+    AutomatabilityTier,
+    CheckVerdict,
+    ComponentCriticality,
+    ConformanceStatus,
+    UsabilityImpact,
     AccessibilityCategory,
     ColorBlindnessType,
     ColorInfo,
@@ -18,6 +23,7 @@ from Asgard.Freya.Accessibility.models._accessibility_enums import (
 )
 from Asgard.Freya.Accessibility.models._accessibility_report_models import (
     ARIAReport,
+    compliance_debt_framing,
     ARIAViolation,
     AccessibilityConfig,
     AccessibilityReport,
@@ -34,6 +40,12 @@ from Asgard.Freya.Accessibility.models._accessibility_report_models import (
 
 __all__ = [
     "WCAGLevel",
+    "UsabilityImpact",
+    "ComponentCriticality",
+    "CheckVerdict",
+    "AutomatabilityTier",
+    "ConformanceStatus",
+    "compliance_debt_framing",
     "ViolationSeverity",
     "AccessibilityCategory",
     "TextSize",

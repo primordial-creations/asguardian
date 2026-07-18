@@ -137,8 +137,9 @@ def check_xss(file_path: str, lines: List[str], enabled: bool = True) -> List[Ja
     """java.xss: writing unescaped request data to the response."""
     if not enabled:
         return []
-    # Direct write of request param
-    direct = re.compile(r'(?:response\.getWriter|getWriter\s*\(\s*\))\s*.*print\w*\s*\([^)]*(?:request\.getParameter|req\.getParameter|getParameter)')
+    # Direct write of request param — any writer's print/println/write/append
+    # (response.getWriter().print(...), out.println(...), writer.write(...), ...)
+    direct = re.compile(r'\b\w+\s*(?:\.\w+\s*\([^)]*\))?\.(?:print|println|write|append)\s*\([^)]*(?:request\.getParameter|req\.getParameter|getParameter)')
     # ResponseBody/ModelAttribute returning user input (Spring MVC)
     spring = re.compile(r'return\s+(?:request\.getParameter|req\.getParameter|params\.get)\s*\(')
     # setAttribute with raw request param

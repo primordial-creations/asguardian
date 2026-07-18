@@ -10,6 +10,8 @@ from Asgard.Freya.cli._handlers_seo_security_console_links import (
     run_seo_robots,
     run_security_headers,
     run_security_csp,
+    run_security_sri,
+    run_security_mixed_content,
     run_console_errors,
     run_links_validate,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "run_seo_robots",
     "run_security_headers",
     "run_security_csp",
+    "run_security_sri",
+    "run_security_mixed_content",
     "run_console_errors",
     "run_links_validate",
 ]

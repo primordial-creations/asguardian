@@ -78,6 +78,14 @@ class SecretFinding(BaseModel):
     line_content: str = Field(..., description="Content of the line (sanitized)")
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score of the detection")
     remediation: str = Field("", description="Suggested remediation steps")
+    context_tag: str = Field(
+        "production",
+        description="Test-context tag (plan 08). Secrets are NEVER suppressed by test context.",
+    )
+    suppressed_by_context: bool = Field(
+        False,
+        description="Always False for secrets by policy; present for schema uniformity.",
+    )
 
     class Config:
         use_enum_values = True
@@ -99,6 +107,18 @@ class VulnerabilityFinding(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
     remediation: str = Field("", description="Suggested remediation steps")
     references: List[str] = Field(default_factory=list, description="Reference URLs")
+    context_tag: str = Field(
+        "production",
+        description="Test-context tag from the Security/context engine (plan 08).",
+    )
+    suppressed_by_context: bool = Field(
+        False,
+        description=(
+            "True when the test-context severity matrix suppressed this "
+            "finding; retained for --include-test-context, excluded from "
+            "score and gate."
+        ),
+    )
 
     class Config:
         use_enum_values = True
@@ -152,6 +172,15 @@ class SecurityScanConfig(BaseModel):
     scan_container: bool = Field(True, description="Enable container security scanning")
     scan_infrastructure: bool = Field(True, description="Enable infrastructure security scanning")
     min_severity: SecuritySeverity = Field(SecuritySeverity.LOW, description="Minimum severity to report")
+    scoring_version: str = Field(
+        "v1",
+        description=(
+            "Security score formula: 'v1' = legacy linear-subtractive (default "
+            "for one deprecation cycle), 'v2' = multiplicative decay with size "
+            "normalization and per-category soft caps. Both values are always "
+            "computed and dual-reported (legacy_score / security_score_v2)."
+        ),
+    )
     exclude_patterns: List[str] = Field(
         default_factory=lambda: [
             "__pycache__",

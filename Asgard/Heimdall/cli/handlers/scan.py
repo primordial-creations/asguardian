@@ -24,6 +24,11 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         return 1
 
     output_format = getattr(args, "format", "text")
+    profile = getattr(args, "profile", "general") or "general"
+    house_rules = profile == "gaia"
+    total_steps = 11 if house_rules else 9
+    step_state = [0]
+    output_dir = getattr(args, "output", None)
     exclude_patterns = list(args.exclude) if getattr(args, "exclude", None) else []
     include_tests = getattr(args, "include_tests", False)
     start_time = datetime.now()
@@ -49,6 +54,10 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
 
     print("=" * 70, flush=True)
     print("  HEIMDALL FULL SCAN", flush=True)
+    if house_rules:
+        print("  Profile: gaia (general checks + GAIA house rules)", flush=True)
+    else:
+        print("  Profile: general (house-rule checks disabled; use --profile gaia to enable)", flush=True)
     print("  Running all analysis categories...", flush=True)
     print("=" * 70, flush=True)
     print(flush=True)
@@ -61,6 +70,9 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         verbose=verbose,
         scan_results=scan_results,
         step_reports=step_reports,
+        house_rules=house_rules,
+        step_state=step_state,
+        total_steps=total_steps,
     )
     if exit_1_to_6:
         overall_exit = 1
@@ -72,6 +84,8 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         verbose=verbose,
         scan_results=scan_results,
         step_reports=step_reports,
+        step_state=step_state,
+        total_steps=total_steps,
     )
     if exit_7_to_11:
         overall_exit = 1
@@ -170,7 +184,7 @@ def run_full_scan(args: argparse.Namespace, verbose: bool = False) -> int:
         duration=duration,
         scanned_at=start_time,
     )
-    report_path = _save_html_report(html_report, "Heimdall Full Scan")
+    report_path = _save_html_report(html_report, "Heimdall Full Scan", output_dir=output_dir)
     print(f"Report saved: {report_path}", file=sys.__stdout__)
     if getattr(args, "open_browser", False):
         _open_in_browser(report_path)

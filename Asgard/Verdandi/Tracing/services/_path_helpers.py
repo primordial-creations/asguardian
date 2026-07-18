@@ -4,6 +4,7 @@ Helpers for CriticalPathAnalyzer.
 Contains private helper functions extracted from the critical path analyzer.
 """
 
+from collections import defaultdict
 from typing import Dict, List, Optional
 
 from Asgard.Verdandi.Tracing.models.tracing_models import (
@@ -95,6 +96,107 @@ def calculate_parallelization_opportunity(
                 total_opportunity += potential_savings
 
     return total_opportunity
+
+
+def effective_end_ns(span: TraceSpan) -> int:
+    """Effective end for sweep-line purposes: normalized end, or raw end."""
+    return (
+        span.effective_end_ns
+        if span.effective_end_ns is not None
+        else span.end_time_unix_nano
+    )
+
+
+def build_slice_boundaries(
+    root: TraceSpan,
+    children: Dict[str, List[TraceSpan]],
+) -> List[int]:
+    """
+    Collect all unique start/effective_end timestamps in the subtree rooted
+    at ``root``, restricted to ``root``'s own active window, and return them
+    sorted. Consecutive pairs form the sweep-line's time slices.
+    """
+    boundaries = set()
+    stack = [root]
+    visited = set()
+    while stack:
+        s = stack.pop()
+        if s.span_id in visited:
+            continue
+        visited.add(s.span_id)
+        boundaries.add(s.start_time_unix_nano)
+        boundaries.add(effective_end_ns(s))
+        for child in children.get(s.span_id, []):
+            stack.append(child)
+
+    root_start = root.start_time_unix_nano
+    root_end = effective_end_ns(root)
+    return sorted(b for b in boundaries if root_start <= b <= root_end)
+
+
+def latest_finisher(active_children: List[TraceSpan]) -> TraceSpan:
+    """Select the child with the maximum effective_end (dominance rule)."""
+    return max(active_children, key=effective_end_ns)
+
+
+def _active_children(
+    span: TraceSpan,
+    children: Dict[str, List[TraceSpan]],
+    slice_start: int,
+    slice_end: int,
+) -> List[TraceSpan]:
+    return [
+        c
+        for c in children.get(span.span_id, [])
+        if c.start_time_unix_nano <= slice_start and effective_end_ns(c) >= slice_end
+    ]
+
+
+def _credit_slice(
+    span: TraceSpan,
+    children: Dict[str, List[TraceSpan]],
+    slice_start: int,
+    slice_end: int,
+    credited: Dict[str, int],
+) -> None:
+    active = _active_children(span, children, slice_start, slice_end)
+    duration = slice_end - slice_start
+
+    if not active:
+        credited[span.span_id] = credited.get(span.span_id, 0) + duration
+    elif len(active) == 1:
+        _credit_slice(active[0], children, slice_start, slice_end, credited)
+    else:
+        dominant = latest_finisher(active)
+        _credit_slice(dominant, children, slice_start, slice_end, credited)
+
+
+def sweep_line_credit(
+    root: TraceSpan,
+    children: Dict[str, List[TraceSpan]],
+) -> Dict[str, int]:
+    """
+    Recursive sweep-line "latest-finisher" credit assignment.
+
+    For every time slice between consecutive slice boundaries, recurse from
+    ``root``: 0 active children -> credit the slice to the current span's
+    self-time; 1 active child -> recurse into it; > 1 active children ->
+    recurse only into the child with the maximum effective_end (latest-
+    finisher dominance, no gap thresholds).
+
+    Returns a dict of span_id -> credited nanoseconds. The values sum
+    exactly to ``root``'s effective duration (conservation invariant).
+    """
+    boundaries = build_slice_boundaries(root, children)
+    credited: Dict[str, int] = defaultdict(int)
+
+    for i in range(len(boundaries) - 1):
+        slice_start, slice_end = boundaries[i], boundaries[i + 1]
+        if slice_end <= slice_start:
+            continue
+        _credit_slice(root, children, slice_start, slice_end, credited)
+
+    return dict(credited)
 
 
 def generate_path_recommendations(

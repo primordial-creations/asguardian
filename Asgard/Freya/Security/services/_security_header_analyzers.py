@@ -21,14 +21,14 @@ def analyze_csp(headers: httpx.Headers, config: SecurityConfig) -> SecurityHeade
         header.status = SecurityHeaderStatus.PRESENT
         if "'unsafe-inline'" in csp_value and not config.allow_unsafe_inline:
             header.is_secure = False
-            header.issues.append("CSP contains 'unsafe-inline'")
+            header.issues.append("Misconfigured Mitigation: CSP contains 'unsafe-inline' (self-sabotaging: inline injection is not blocked)")
         if "'unsafe-eval'" in csp_value and not config.allow_unsafe_eval:
             header.is_secure = False
-            header.issues.append("CSP contains 'unsafe-eval'")
+            header.issues.append("Misconfigured Mitigation: CSP contains 'unsafe-eval' (self-sabotaging: eval-based injection is not blocked)")
         if " * " in csp_value or csp_value.endswith(" *"):
             if not config.allow_wildcard_sources:
                 header.is_secure = False
-                header.issues.append("CSP contains wildcard source")
+                header.issues.append("Misconfigured Mitigation: CSP contains a wildcard source (self-sabotaging: any origin may serve content)")
     elif csp_report_only:
         header.value = csp_report_only
         header.status = SecurityHeaderStatus.WEAK
@@ -37,8 +37,8 @@ def analyze_csp(headers: httpx.Headers, config: SecurityConfig) -> SecurityHeade
         header.recommendations.append("Switch to Content-Security-Policy header for enforcement")
     else:
         header.is_secure = False
-        header.issues.append("Content-Security-Policy header is missing")
-        header.recommendations.append("Add Content-Security-Policy header to prevent XSS attacks")
+        header.issues.append("Missing Mitigation: Content-Security-Policy")
+        header.recommendations.append("Add Content-Security-Policy so the browser can contain an XSS payload if one exists")
     return header
 
 
@@ -70,8 +70,8 @@ def analyze_hsts(headers: httpx.Headers, config: SecurityConfig) -> SecurityHead
                 header.recommendations.append("Consider adding preload directive and submitting to HSTS preload list")
     else:
         header.is_secure = False
-        header.issues.append("Strict-Transport-Security header is missing")
-        header.recommendations.append("Add HSTS header to enforce HTTPS connections")
+        header.issues.append("Missing Mitigation: Strict-Transport-Security")
+        header.recommendations.append("Add HSTS so browsers refuse plain-HTTP connections after first contact")
     return header
 
 
@@ -108,7 +108,7 @@ def analyze_frame_options(headers: httpx.Headers) -> SecurityHeader:
             header.issues.append(f"Invalid X-Frame-Options value: {value}")
     else:
         header.is_secure = False
-        header.issues.append("X-Frame-Options header is missing")
+        header.issues.append("Missing Mitigation: X-Frame-Options (clickjacking containment)")
         header.recommendations.append("Add X-Frame-Options: DENY or SAMEORIGIN to prevent clickjacking")
     return header
 
@@ -128,7 +128,7 @@ def analyze_content_type_options(headers: httpx.Headers) -> SecurityHeader:
             header.issues.append(f"Invalid value: {value}, expected 'nosniff'")
     else:
         header.is_secure = False
-        header.issues.append("X-Content-Type-Options header is missing")
+        header.issues.append("Missing Mitigation: X-Content-Type-Options (MIME-sniffing containment)")
         header.recommendations.append("Add X-Content-Type-Options: nosniff to prevent MIME sniffing")
     return header
 
@@ -176,7 +176,7 @@ def analyze_referrer_policy(headers: httpx.Headers) -> SecurityHeader:
             header.issues.append(f"Unknown Referrer-Policy value: {value}")
     else:
         header.is_secure = False
-        header.issues.append("Referrer-Policy header is missing")
+        header.issues.append("Missing Mitigation: Referrer-Policy (URL leakage containment)")
         header.recommendations.append("Add Referrer-Policy: strict-origin-when-cross-origin")
     return header
 

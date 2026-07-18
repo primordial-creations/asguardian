@@ -7,6 +7,7 @@ Data models for unified testing, reporting, and baseline management.
 from Asgard.Freya.Integration.models._integration_base_models import (
     BaselineConfig,
     BaselineEntry,
+    EnvironmentFingerprint,
     BrowserConfig,
     CrawlConfig,
     DeviceConfig,
@@ -36,6 +37,7 @@ __all__ = [
     "UnifiedTestReport",
     "ReportConfig",
     "BaselineEntry",
+    "EnvironmentFingerprint",
     "BaselineConfig",
     "CrawlConfig",
     "PageStatus",
