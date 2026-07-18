@@ -16,6 +16,7 @@ from Asgard.Heimdall.Security.Headers.models.header_models import (
 from Asgard.Heimdall.Security.Headers.services.cors_analyzer import CORSAnalyzer
 from Asgard.Heimdall.Security.Headers.services.csp_analyzer import CSPAnalyzer
 from Asgard.Heimdall.Security.Headers.services.header_validator import HeaderValidator
+from Asgard.Heimdall.Security.Headers.services._header_context import apply_header_context
 from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
 
 
@@ -78,6 +79,8 @@ class HeadersAnalyzer:
             (f.file_path, f.line_number, f.finding_type): f
             for f in combined_report.findings
         }.values())
+
+        apply_header_context(combined_report.findings, is_api=self.config.is_api)
 
         combined_report.findings.sort(
             key=lambda f: (

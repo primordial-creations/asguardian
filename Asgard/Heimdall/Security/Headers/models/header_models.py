@@ -57,14 +57,52 @@ class HeaderFinding(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
     remediation: str = Field("", description="Suggested remediation steps")
     references: List[str] = Field(default_factory=list, description="Reference URLs")
+    mechanism_id: str = Field("", description="Normalization-engine mechanism id (plan 06).")
+    confidence_bucket: str = Field("probable", description="Qualitative confidence bucket (plan 06).")
+    context_downgraded: bool = Field(
+        False,
+        description=(
+            "Plan 07.9/06: True when this browser-only header finding was "
+            "downgraded because the scan was told the surface is API-only "
+            "(HeaderConfig.is_api) -- CSP/X-Frame-Options/cookie SameSite "
+            "are browser-enforced and irrelevant to a pure JSON API."
+        ),
+    )
 
     class Config:
         use_enum_values = True
 
 
+# Header findings that are browser-enforced and meaningless on a pure
+# API surface (no HTML/JS ever rendered by a browser against this
+# origin) -- the plan 06 context modifier for HeaderConfig.is_api.
+BROWSER_ONLY_FINDING_TYPES = frozenset({
+    HeaderFindingType.MISSING_CSP,
+    HeaderFindingType.WEAK_CSP,
+    HeaderFindingType.CSP_UNSAFE_INLINE,
+    HeaderFindingType.CSP_UNSAFE_EVAL,
+    HeaderFindingType.CSP_WILDCARD_SOURCE,
+    HeaderFindingType.CSP_MISSING_DIRECTIVE,
+    HeaderFindingType.MISSING_X_FRAME,
+    HeaderFindingType.WEAK_X_FRAME_OPTIONS,
+    HeaderFindingType.COOKIE_MISSING_SAMESITE,
+    HeaderFindingType.MISSING_PERMISSIONS_POLICY,
+})
+
+
 class HeaderConfig(BaseModel):
     """Configuration for security header scanning."""
     scan_path: Path = Field(default_factory=lambda: Path("."), description="Root path to scan")
+    is_api: bool = Field(
+        False,
+        description=(
+            "Plan 07.9/06 context modifier: set True for a pure JSON/API "
+            "surface with no browser-rendered HTML. Downgrades (does not "
+            "suppress) browser-only header findings (CSP, X-Frame-Options, "
+            "cookie SameSite, Permissions-Policy) since they have no "
+            "effect outside a browser context."
+        ),
+    )
     check_csp: bool = Field(True, description="Check Content-Security-Policy")
     check_cors: bool = Field(True, description="Check CORS configuration")
     check_hsts: bool = Field(True, description="Check Strict-Transport-Security")

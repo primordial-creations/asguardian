@@ -11,8 +11,10 @@ from typing import List, Optional
 from Asgard.Heimdall.Security.TLS.models.tls_models import (
     TLSConfig,
     TLSFinding,
+    TLSFindingType,
     TLSReport,
 )
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
 from Asgard.Heimdall.Security.TLS.services._certificate_patterns import (
     CERTIFICATE_PATTERNS,
     CertificatePattern,
@@ -125,18 +127,43 @@ class CertificateValidator:
 
                 code_snippet = extract_code_snippet(lines, line_number)
 
+                # Plan 07.9 max-precision posture: apps behind a
+                # TLS-terminating proxy legitimately disable verification
+                # for internal-only calls, so a code-level verify=False /
+                # CERT_NONE signal is demoted to a hotspot (LOW, not
+                # blocking) rather than a confirmed CRITICAL/HIGH finding
+                # -- config-file evidence (nginx/HAProxy/Terraform) is the
+                # higher-precision signal, see _tls_config_analyzer.py.
+                is_hotspot = pattern.finding_type in (
+                    TLSFindingType.DISABLED_VERIFICATION,
+                    TLSFindingType.CERT_NONE,
+                    TLSFindingType.NO_CERT_VALIDATION,
+                    TLSFindingType.DISABLED_HOSTNAME_CHECK,
+                )
+                severity = "LOW" if is_hotspot else pattern.severity
+                confidence = min(pattern.confidence, 0.5) if is_hotspot else pattern.confidence
+
                 finding = TLSFinding(
                     file_path=str(file_path.relative_to(root_path)),
                     line_number=line_number,
                     column_start=column,
                     column_end=column + len(match.group(0)),
                     finding_type=pattern.finding_type,
-                    severity=pattern.severity,
+                    severity=severity,
                     title=pattern.title,
-                    description=pattern.description,
+                    description=(
+                        pattern.description
+                        + (" (reported as a hotspot for review -- runtime TLS "
+                           "posture cannot be confirmed from code alone)"
+                           if is_hotspot else "")
+                    ),
                     code_snippet=code_snippet,
                     cwe_id=pattern.cwe_id,
-                    confidence=pattern.confidence,
+                    confidence=confidence,
+                    confidence_bucket=confidence_bucket(confidence),
+                    mechanism_id=f"tls.{pattern.finding_type.value}",
+                    is_hotspot=is_hotspot,
+                    source="code",
                     remediation=pattern.remediation,
                     references=[
                         f"https://cwe.mitre.org/data/definitions/{pattern.cwe_id.replace('CWE-', '')}.html",
