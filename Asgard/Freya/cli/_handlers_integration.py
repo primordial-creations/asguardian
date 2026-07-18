@@ -147,6 +147,23 @@ async def run_baseline_compare(args: argparse.Namespace, verbose: bool = False) 
         print(f"Error: {result['error']}")
         return 1
 
+    output_format = getattr(args, "format", "text")
+    if output_format == "json":
+        import json as _json
+        print(_json.dumps(result, indent=2, default=str))
+        if result.get("status") == "environment_mismatch":
+            return 2
+        return 0 if result.get("passed") else 1
+
+    if output_format == "html":
+        from Asgard.Freya.Integration.services.html_reporter import HTMLReporter
+        output_path = getattr(args, "output", None) or "freya_baseline_comparison.html"
+        report_path = HTMLReporter().generate_baseline_comparison(result, output_path)
+        print(f"Report saved to: {report_path}")
+        if result.get("status") == "environment_mismatch":
+            return 2
+        return 0 if result.get("passed") else 1
+
     baseline_fp = (result.get("baseline") or {}).get("fingerprint")
     current_fp = result.get("current_fingerprint")
     if baseline_fp or current_fp:

@@ -45,7 +45,13 @@ CATEGORY_SEVERITY_MAPS: Dict[str, Dict[str, UniversalSeverity]] = {
         "minor": _N,
     },
     "security": {
-        "critical": _B,   # e.g. unsafe-inline + unsafe-eval together / no CSP on auth route
+        # PROVISIONAL pending RESEARCH_04. Per plan §3.5, "critical" alone
+        # never forces a site-wide Blocker: an observable-signal finding
+        # (e.g. no CSP) proves the *absence* of a defense, not exploitation.
+        # BLOCKER is reserved for CSP-absent findings on a route explicitly
+        # tagged auth/checkout/transactional -- see
+        # `escalate_security_for_route` / `TRANSACTIONAL_ROUTE_TAGS` below.
+        "critical": _C,   # e.g. no CSP at all, unsafe-inline + unsafe-eval together
         "serious": _C,    # missing HSTS on https, CSP wildcard script-src
         "moderate": _M,   # other missing headers
         "minor": _N,      # informational header advice
@@ -89,6 +95,45 @@ NO_BLOCKER_CATEGORIES = {"performance", "seo", "console", "images", "visual"}
 #: WCAG criteria that indicate journey-failing keyboard traps -> BLOCKER.
 KEYBOARD_TRAP_CRITERIA = {"2.1.2"}
 
+#: Route tags (Plan 03 archetypes / Plan 06 config -- consumers pass this
+#: string through; Freya does not infer it) whose transactional nature
+#: justifies escalating a CSP-absent finding to BLOCKER (plan §3.5).
+TRANSACTIONAL_ROUTE_TAGS = {"auth", "checkout", "transactional"}
+
+
+def _is_csp_absent_check(check_id: str, message: str = "") -> bool:
+    """True when a security check_id/message denotes an absent CSP."""
+    haystack = f"{check_id} {message}".lower()
+    if "csp" not in haystack and "content-security-policy" not in haystack:
+        return False
+    return any(
+        token in haystack
+        for token in ("missing", "absent", "no csp", "not present", "not set")
+    )
+
+
+def escalate_security_for_route(
+    severity: UniversalSeverity,
+    category: str,
+    check_id: str,
+    route_tag: Optional[str] = None,
+    message: str = "",
+) -> UniversalSeverity:
+    """
+    Route-tag-conditional escalation for security findings (plan §3.5).
+
+    A security "critical" finding (e.g. no CSP) only escalates to BLOCKER
+    when it is specifically a CSP-absent finding AND the route is tagged
+    auth/checkout/transactional. Ordinary security-critical findings
+    without that context stay at CRITICAL and cannot force a site-wide F.
+    """
+    if category != "security" or severity != _C:
+        return severity
+    if route_tag and route_tag.lower() in TRANSACTIONAL_ROUTE_TAGS:
+        if _is_csp_absent_check(check_id, message):
+            return _B
+    return severity
+
 _ESCALATION = {
     _N: _M,
     _M: _C,
@@ -121,6 +166,8 @@ class SeverityMapper:
         check_id: str = "",
         criticality: Optional[str] = None,
         wcag_reference: Optional[str] = None,
+        route_tag: Optional[str] = None,
+        message: str = "",
     ) -> UniversalSeverity:
         """
         Map a native severity to the universal scale.
@@ -131,19 +178,30 @@ class SeverityMapper:
             check_id: check identifier (used for special-case escalation)
             criticality: optional component criticality (Plan 02)
             wcag_reference: optional WCAG criterion for trap detection
+            route_tag: optional route classification ("auth", "checkout",
+                "transactional", ...) used to gate the security
+                CSP-absent -> BLOCKER escalation (Plan 05 §3.5)
+            message: optional finding message, consulted alongside
+                check_id for the CSP-absent route-gate heuristic
 
         Returns:
             UniversalSeverity
         """
-        table = CATEGORY_SEVERITY_MAPS.get(category.lower(), {})
+        category_lower = category.lower()
+        table = CATEGORY_SEVERITY_MAPS.get(category_lower, {})
         severity = table.get((source_severity or "").lower(), _N)
 
-        if category.lower() == "accessibility":
+        if category_lower == "accessibility":
             reference = (wcag_reference or "").strip()
             if reference in KEYBOARD_TRAP_CRITERIA or "keyboard trap" in check_id.lower():
                 return _B
 
-        return escalate_for_criticality(severity, category.lower(), criticality)
+        if category_lower == "security":
+            severity = escalate_security_for_route(
+                severity, category_lower, check_id, route_tag, message
+            )
+
+        return escalate_for_criticality(severity, category_lower, criticality)
 
     def map_unified_result(self, result: Any) -> Optional[Finding]:
         """
@@ -168,6 +226,7 @@ class SeverityMapper:
         details = getattr(result, "details", None) or {}
         criticality = details.get("criticality") if isinstance(details, dict) else None
         needs_review = bool(details.get("needs_review")) if isinstance(details, dict) else False
+        route_tag = details.get("route_tag") if isinstance(details, dict) else None
 
         severity = self.map(
             category=str(category),
@@ -175,6 +234,8 @@ class SeverityMapper:
             check_id=f"{check_id} {message}",
             criticality=criticality,
             wcag_reference=wcag_reference,
+            route_tag=route_tag,
+            message=message,
         )
 
         return Finding(
@@ -241,6 +302,8 @@ def issue_dicts_to_findings(
             source_severity=issue.get("severity"),
             check_id=f"{issue_type} {issue.get('message', '')}",
             wcag_reference=issue.get("wcag_reference"),
+            route_tag=issue.get("route_tag"),
+            message=str(issue.get("message", "")),
         )
         findings.append(Finding(
             category=issue_category,
@@ -259,6 +322,7 @@ def _report_issues_to_findings(
     items: List[Any],
     url: Optional[str],
     check_prefix: str,
+    route_tag: Optional[str] = None,
 ) -> List[Finding]:
     """Shared adapter for standalone subpackage report issue lists."""
     mapper = SeverityMapper()
@@ -275,9 +339,16 @@ def _report_issues_to_findings(
         issue_type = getattr(item, "issue_type", None) or getattr(item, "violation_type", None)
         issue_type = getattr(issue_type, "value", issue_type)
         check_id = f"{check_prefix}.{issue_type}" if issue_type else f"{check_prefix}.check"
+        item_route_tag = getattr(item, "route_tag", None) or route_tag
         findings.append(Finding(
             category=category,
-            severity=mapper.map(category, str(source_severity) if source_severity else None, check_id),
+            severity=mapper.map(
+                category,
+                str(source_severity) if source_severity else None,
+                check_id,
+                route_tag=item_route_tag,
+                message=str(message),
+            ),
             check_id=check_id,
             message=str(message),
             url=url,
@@ -290,9 +361,10 @@ def _report_issues_to_findings(
 def security_report_to_findings(report: Any) -> List[Finding]:
     """Adapter: SecurityHeaderReport / CSPReport -> universal Findings."""
     url = getattr(report, "url", None)
+    route_tag = getattr(report, "route_tag", None)
     items = list(getattr(report, "issues", None) or getattr(report, "violations", None) or [])
     items += list(getattr(report, "missing_headers", None) or [])
-    return _report_issues_to_findings("security", items, url, "security")
+    return _report_issues_to_findings("security", items, url, "security", route_tag=route_tag)
 
 
 def performance_report_to_findings(report: Any) -> List[Finding]:

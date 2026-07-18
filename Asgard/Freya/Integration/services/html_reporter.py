@@ -73,6 +73,231 @@ class HTMLReporter:
 
         return str(output)
 
+    def generate_security_report(self, result, output_path: str, title: Optional[str] = None) -> str:
+        """
+        Generate a standalone HTML report for a SecurityHeaderReport.
+
+        Mirrors the CLI text formatter's threat-mitigation framing
+        (Plan 05 §3.2): executive disclaimer, mitigation-status table,
+        threat-context/manual-verification notes, and the scope-matrix
+        appendix (observable signal vs unverifiable actual posture).
+        """
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+
+        css = get_css()
+        html_content = self._build_security_html(result, title or "Freya Security Report")
+
+        with open(output, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        return str(output)
+
+    def _build_security_html(self, result, title: str) -> str:
+        """Build the security threat-mitigation HTML document."""
+        disclaimer = getattr(result, "disclaimer", "") or ""
+        score_label = getattr(result, "score_label", "Frontend Defense-in-Depth Score")
+        score = getattr(result, "security_score", 0)
+        grade = getattr(result, "security_grade", "F")
+
+        headers_to_show = [
+            ("CSP", getattr(result, "content_security_policy", None)),
+            ("HSTS", getattr(result, "strict_transport_security", None)),
+            ("X-Frame-Options", getattr(result, "x_frame_options", None)),
+            ("X-Content-Type-Options", getattr(result, "x_content_type_options", None)),
+            ("Referrer-Policy", getattr(result, "referrer_policy", None)),
+            ("Permissions-Policy", getattr(result, "permissions_policy", None)),
+            ("COOP", getattr(result, "cross_origin_opener_policy", None)),
+            ("COEP", getattr(result, "cross_origin_embedder_policy", None)),
+            ("CORP", getattr(result, "cross_origin_resource_policy", None)),
+        ]
+        rows = []
+        for name, header in headers_to_show:
+            if header is None:
+                rows.append(f"<tr><td>{name}</td><td>NOT CHECKED</td><td>-</td><td>-</td></tr>")
+                continue
+            mitigation = getattr(header, "mitigation_status", None)
+            status = (mitigation.value if mitigation is not None else header.status.value)
+            threat_context = getattr(header, "threat_context", None) or "-"
+            manual = getattr(header, "manual_verification", None) or "-"
+            rows.append(
+                f'<tr class="result-row {status}"><td>{name}</td>'
+                f'<td><span class="severity-badge {status}">{status}</span></td>'
+                f"<td>{threat_context}</td><td>{manual}</td></tr>"
+            )
+
+        scope_matrix = getattr(result, "scope_matrix", None) or []
+        scope_rows = "".join(
+            f"<tr><td>{row.get('control', '')}</td>"
+            f"<td>{row.get('tool_validates', '')}</td>"
+            f"<td>{row.get('requires_manual', '')}</td></tr>"
+            for row in scope_matrix
+        )
+        scope_section = (
+            f"""
+        <section class="results-section" id="scope-matrix">
+            <h2>Appendix: Scope Matrix</h2>
+            <p>Observable signal (what this tool validates) vs actual posture
+               (what requires DAST/manual testing).</p>
+            <table class="results-table">
+                <thead><tr><th>Control</th><th>Tool Validates</th><th>Requires DAST/Manual</th></tr></thead>
+                <tbody>{scope_rows}</tbody>
+            </table>
+        </section>""" if scope_matrix else ""
+        )
+
+        critical_issues = getattr(result, "critical_issues", None) or []
+        issues_html = "".join(f"<li>{issue}</li>" for issue in critical_issues)
+        issues_section = (
+            f"""
+        <section class="results-section" id="critical-findings">
+            <h2>Critical Findings (Missing / Misconfigured Mitigations)</h2>
+            <ul>{issues_html}</ul>
+        </section>""" if critical_issues else ""
+        )
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>{get_css()}</style>
+</head>
+<body>
+    <header>
+        <h1>{title}</h1>
+        <div class="meta">
+            <span>URL: <a href="{getattr(result, 'url', '')}" target="_blank">{getattr(result, 'url', '')}</a></span>
+        </div>
+    </header>
+    <main>
+        <section class="summary">
+            <h2>Summary</h2>
+            <p class="disclaimer">{disclaimer}</p>
+            <div class="score-grid">
+                <div class="score-card overall"><div class="score-value">{score:.0f}</div><div class="score-label">{score_label}</div></div>
+                <div class="score-card"><div class="score-value">{grade}</div><div class="score-label">Resilience Grade</div></div>
+            </div>
+        </section>
+        <section class="results-section" id="mitigation-status">
+            <h2>Mitigation Status</h2>
+            <table class="results-table">
+                <thead><tr><th>Header</th><th>Status</th><th>Threat Context (assume-breach)</th><th>Manual Verification</th></tr></thead>
+                <tbody>{''.join(rows)}</tbody>
+            </table>
+        </section>
+        {issues_section}
+        {scope_section}
+    </main>
+    <footer>
+        <p>Generated by Freya - Threat Mitigation Report</p>
+    </footer>
+</body>
+</html>"""
+
+    def generate_baseline_comparison(self, result: dict, output_path: str, title: Optional[str] = None) -> str:
+        """
+        Generate a standalone HTML report for a baseline_manager.compare_to_baseline() result.
+
+        Mirrors the CLI text handler's fingerprint side-by-side display
+        (Plan 04 §3.3): baseline vs current environment fingerprint,
+        tripwire framing text, and mismatch/warning status.
+        """
+        output = Path(output_path)
+        output.parent.mkdir(parents=True, exist_ok=True)
+
+        html_content = self._build_baseline_comparison_html(result, title or "Freya Visual Baseline Comparison")
+
+        with open(output, "w", encoding="utf-8") as f:
+            f.write(html_content)
+
+        return str(output)
+
+    def _build_baseline_comparison_html(self, result: dict, title: str) -> str:
+        """Build the baseline-comparison HTML document with fingerprint table."""
+        baseline = result.get("baseline") or {}
+        baseline_fp = baseline.get("fingerprint") or {}
+        current_fp = result.get("current_fingerprint") or {}
+
+        fp_fields = (
+            "os_name", "os_release", "browser_name", "browser_version",
+            "playwright_version", "viewport", "device_scale_factor",
+            "color_scheme", "reduced_motion", "font_stack_hash",
+        )
+        fp_rows = "".join(
+            f"<tr><td>{field}</td>"
+            f"<td>{baseline_fp.get(field, 'unverified')}</td>"
+            f"<td>{current_fp.get(field, 'unverified')}</td></tr>"
+            for field in fp_fields
+        )
+
+        status = result.get("status", "")
+        env_status = result.get("environment_status", "")
+        env_warning = result.get("environment_warning") or ""
+        framing = result.get("framing") or ""
+        rationale = result.get("rationale") or ""
+        mismatched_fields = ", ".join(result.get("mismatched_fields", []) or [])
+
+        status_banner = ""
+        if status == "environment_mismatch":
+            status_banner = f"""
+            <div class="stat-card failed">
+                <div class="stat-label">INCONCLUSIVE: environment mismatch - comparison refused</div>
+                <p>Mismatched fields: {mismatched_fields}</p>
+                <p>{rationale}</p>
+            </div>"""
+        elif env_warning:
+            status_banner = f'<div class="stat-card">WARNING: {env_warning}</div>'
+
+        passed = result.get("passed")
+        diff_pct = result.get("difference_percentage", 0.0)
+        diff_image = result.get("diff_image_path")
+        diff_image_html = (
+            f'<img src="{diff_image}" alt="Diff image" loading="lazy" style="max-width:100%;">'
+            if diff_image else ""
+        )
+
+        return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{title}</title>
+    <style>{get_css()}</style>
+</head>
+<body>
+    <header>
+        <h1>{title}</h1>
+        <div class="meta"><span>Baseline: {baseline.get('name', '')}</span> <span>Environment status: {env_status}</span></div>
+    </header>
+    <main>
+        {status_banner}
+        <section class="summary">
+            <h2>Comparison</h2>
+            <p class="framing">{framing}</p>
+            <div class="score-grid">
+                <div class="score-card overall"><div class="score-value">{diff_pct:.2f}%</div><div class="score-label">Pixel Difference</div></div>
+                <div class="score-card"><div class="score-value">{'PASS' if passed else 'FAIL' if passed is not None else '-'}</div><div class="score-label">Result</div></div>
+            </div>
+        </section>
+        <section class="results-section" id="fingerprint">
+            <h2>Environment Fingerprint (baseline vs current)</h2>
+            <table class="results-table">
+                <thead><tr><th>Field</th><th>Baseline</th><th>Current</th></tr></thead>
+                <tbody>{fp_rows}</tbody>
+            </table>
+        </section>
+        <section class="screenshots-section" id="diff-image">
+            {diff_image_html}
+        </section>
+    </main>
+    <footer>
+        <p>Generated by Freya - Visual Testing Framework</p>
+    </footer>
+</body>
+</html>"""
+
     def generate_junit(self, report: UnifiedTestReport, output_path: str) -> str:
         """Generate JUnit XML report for CI/CD."""
         output = Path(output_path)
