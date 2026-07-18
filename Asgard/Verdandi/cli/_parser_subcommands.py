@@ -147,6 +147,45 @@ def _add_slo_parser(subparsers) -> None:
         help="Evaluate as of this ISO timestamp (default: now)",
     )
 
+    portfolio_parser = slo_subparsers.add_parser(
+        "portfolio",
+        help=(
+            "Cross-journey/service portfolio health score (CXI/SRI) from "
+            "journey success rates and/or per-service burn rates"
+        ),
+    )
+    portfolio_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {journey_success_rates: {}, business_weights: {}?, "
+            "service_burn_rates: {}, centrality: {}?}"
+        ),
+    )
+
+    budget_policy_parser = slo_subparsers.add_parser(
+        "budget-policy",
+        help="Evaluate the error-budget policy tier (normal/caution/freeze)",
+    )
+    budget_policy_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {budget: {...ErrorBudget...}, incidents: [...]?, "
+            "slo: {...SLODefinition...}?}"
+        ),
+    )
+
+    dynamic_budget_parser = slo_subparsers.add_parser(
+        "dynamic-budget",
+        help="Evaluate a complexity-aware dynamic latency budget",
+    )
+    dynamic_budget_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {base_ms, cost_per_unit_ms, cost_function: "
+            "'linear'|'nlogn', durations_ms: [...], complexity_units: [...]}"
+        ),
+    )
+
     add_performance_flags(slo_parser)
 
 
@@ -175,6 +214,139 @@ def _add_db_parser(subparsers) -> None:
             "acquisition_waits_ms: [...]}"
         ),
     )
+
+    budget_parser = db_subparsers.add_parser(
+        "budget",
+        help="Evaluate query-duration budgets against a complexity-scaled config",
+    )
+    budget_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {config: {...QueryBudgetConfig...}, "
+            "durations_ms: [...], units: [...]}"
+        ),
+    )
+
+    queries_parser = db_subparsers.add_parser(
+        "queries",
+        help="Analyze query metrics, optionally grouped per query class",
+    )
+    queries_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: array of {...QueryMetricsInput...}, or "
+            "{queries: [...], baseline: {fingerprint: [durations_ms]}?}"
+        ),
+    )
+    queries_parser.add_argument(
+        "--per-class",
+        action="store_true",
+        help="Group and analyze metrics per query fingerprint/class",
+    )
+    queries_parser.add_argument(
+        "--slow-threshold",
+        type=float,
+        default=100.0,
+        help="Slow-query threshold in ms (default: 100.0)",
+    )
+
+
+def _add_system_parser(subparsers) -> None:
+    """Add system-level performance commands (PSI, cgroup throttle, USE/RED)."""
+    system_parser = subparsers.add_parser(
+        "system",
+        help="System-level performance analysis (PSI, cgroups, USE/RED)",
+    )
+    system_subparsers = system_parser.add_subparsers(
+        dest="system_command",
+        help="System commands",
+    )
+
+    psi_parser = system_subparsers.add_parser(
+        "psi",
+        help="Analyze pressure stall information (PSI) severity/trajectory",
+    )
+    psi_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {snapshot: {...PsiSnapshot...}, previous: {...}?} "
+            "or {snapshots: {cpu: {...}, memory: {...}, io: {...}}}"
+        ),
+    )
+
+    throttle_parser = system_subparsers.add_parser(
+        "throttle",
+        help="Analyze cgroup CPU-throttle stats for limit-induced latency",
+    )
+    throttle_parser.add_argument(
+        "metrics_file",
+        help="JSON file: {...CgroupCpuStats fields...}",
+    )
+
+    correlate_parser = system_subparsers.add_parser(
+        "correlate",
+        help="Correlate USE-method saturation against RED-method latency",
+    )
+    correlate_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {saturation: [...], p99_duration_ms: [...], "
+            "max_lag: 5, rate: [...]?, errors: [...]?}"
+        ),
+    )
+
+    add_performance_flags(system_parser)
+
+
+def _add_network_parser(subparsers) -> None:
+    """Add network performance commands (phases, USE method, signatures)."""
+    network_parser = subparsers.add_parser(
+        "network",
+        help="Network performance analysis (phases, USE method, signatures)",
+    )
+    network_subparsers = network_parser.add_subparsers(
+        dest="network_command",
+        help="Network commands",
+    )
+
+    phases_parser = network_subparsers.add_parser(
+        "phases",
+        help="Analyze connection-phase breakdown (DNS/TCP/TLS/request/response)",
+    )
+    phases_parser.add_argument(
+        "metrics_file",
+        help="JSON file: array of {...ConnectionPhases fields...} samples",
+    )
+
+    use_parser = network_subparsers.add_parser(
+        "use",
+        help="USE-method analysis of NIC/TCP-stack/DNS-resolver saturation",
+    )
+    use_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {snapshot: {...UseCounterSnapshot...}, "
+            "retransmit_series: [...]?, utilization_series: [...]?}"
+        ),
+    )
+
+    signature_parser = network_subparsers.add_parser(
+        "signature",
+        help=(
+            "Classify network signature (route change / congestion / DNS "
+            "hijack / clock skew) from RTT and related series"
+        ),
+    )
+    signature_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: {rtt_series: [...], hop_count_series: [...]?, "
+            "resolved_asn_series: [...]?, tls_failure_series: [...]?, "
+            "one_way_latencies_ms: [...]?, sample_interval_seconds: 60}"
+        ),
+    )
+
+    add_performance_flags(network_parser)
 
 
 def _add_anomaly_parser(subparsers) -> None:

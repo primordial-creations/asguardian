@@ -43,6 +43,11 @@ from Asgard.Heimdall.cli.subparsers._management import (
     setup_mcp_server_command,
     setup_dashboard_command,
 )
+from Asgard.Heimdall.cli.subparsers._calibration import (
+    setup_calibrate_command,
+    setup_validate_rules_command,
+    setup_eval_command,
+)
 
 
 COMMAND_DEFAULT_SUBCOMMANDS = {
@@ -141,6 +146,9 @@ def create_parser() -> argparse.ArgumentParser:
     setup_codefix_command(subparsers)
     setup_mcp_server_command(subparsers)
     setup_dashboard_command(subparsers)
+    setup_calibrate_command(subparsers)
+    setup_validate_rules_command(subparsers)
+    setup_eval_command(subparsers)
 
     # Scan command (runs ALL analyses)
     scan_parser = subparsers.add_parser(

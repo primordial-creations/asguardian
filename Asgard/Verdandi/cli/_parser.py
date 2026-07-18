@@ -14,6 +14,8 @@ from Asgard.Verdandi.cli._parser_subcommands import (
     _add_anomaly_parser,
     _add_tracing_parser,
     _add_trend_parser,
+    _add_system_parser,
+    _add_network_parser,
 )
 
 
@@ -58,5 +60,7 @@ def create_parser() -> argparse.ArgumentParser:
     _add_tracing_parser(subparsers)
     _add_trend_parser(subparsers)
     _add_report_parser(subparsers)
+    _add_system_parser(subparsers)
+    _add_network_parser(subparsers)
 
     return parser

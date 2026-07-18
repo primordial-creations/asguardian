@@ -206,6 +206,50 @@ def run_cache_warmup(args, output_format: str = "text") -> int:
     return 1 if result.severity == "critical" else 0
 
 
+def run_cache_stampede(args, output_format: str = "text") -> int:
+    """`verdandi cache stampede <access_log.json>`.
+
+    Input: JSON array of {key, t, hit, recompute_ms?, ttl_s?} access-log
+    records.
+    """
+    from Asgard.Verdandi.Cache.services.stampede_analyzer import StampedeAnalyzer
+
+    data = _load_json(args.metrics_file)
+    if data is None:
+        return 1
+    records = data.get("access_log", data) if isinstance(data, dict) else data
+    if not isinstance(records, list) or not records:
+        print("Error: Expected a non-empty JSON array of access-log records.")
+        return 1
+
+    analyzer = StampedeAnalyzer()
+    kwargs = {}
+    beta = getattr(args, "beta", None)
+    if beta is not None:
+        kwargs["beta"] = beta
+
+    try:
+        report = analyzer.analyze(records, **kwargs)
+    except (TypeError, ValueError) as e:
+        print(f"Error: {e}")
+        return 1
+
+    if output_format == "json":
+        print(json.dumps(_dump(report), indent=2, default=str))
+    else:
+        lines = ["", "CACHE STAMPEDE ANALYSIS", "=" * 60,
+                 f"  Status: {report.status}",
+                 f"  Keys analyzed: {report.total_keys_analyzed}",
+                 f"  Flagged keys:  {len(report.flagged_keys)}"]
+        for rec in report.recommendations:
+            lines.append(f"  ! {rec}")
+        for note in report.notes:
+            lines.append(f"  - {note}")
+        print("\n".join(lines))
+
+    return 1 if report.status == "critical" else 0
+
+
 def run_pool_signature(args, output_format: str = "text") -> int:
     """`verdandi db pool-signature <latencies.json>`.
 
@@ -256,3 +300,99 @@ def run_pool_signature(args, output_format: str = "text") -> int:
         signature.classification, "value", signature.classification
     ))
     return 1 if classification == "pool_exhaustion" else 0
+
+
+def run_db_budget(args, output_format: str = "text") -> int:
+    """`verdandi db budget <input.json>`.
+
+    Input: {"config": {...QueryBudgetConfig fields...},
+            "durations_ms": [...], "units": [...]}
+    """
+    from Asgard.Verdandi.Database.models.database_models import QueryBudgetConfig
+    from Asgard.Verdandi.Database.services.query_budget import QueryBudgetAnalyzer
+
+    data = _load_json(args.metrics_file)
+    if data is None:
+        return 1
+    if not isinstance(data, dict):
+        print("Error: Expected a JSON object.")
+        return 1
+
+    durations = data.get("durations_ms")
+    units = data.get("units")
+    if not isinstance(durations, list) or not isinstance(units, list):
+        print("Error: 'durations_ms' and 'units' arrays are required.")
+        return 1
+
+    try:
+        config = QueryBudgetConfig.model_validate(data.get("config", {}))
+    except (TypeError, ValueError) as e:
+        print(f"Error: Invalid budget config: {e}")
+        return 1
+
+    result = QueryBudgetAnalyzer().evaluate(config, durations, units)
+
+    if output_format == "json":
+        print(json.dumps(_dump(result), indent=2, default=str))
+    else:
+        lines = ["", "DATABASE QUERY BUDGET EVALUATION", "=" * 60,
+                 f"  Passed: {result.good}/{result.total}"]
+        if result.sli_passed_fraction is not None:
+            lines.append(f"  SLI passed fraction: {result.sli_passed_fraction:.4f}")
+        lines.append(f"  Violations: {len(result.violations)}")
+        for note in result.notes:
+            lines.append(f"  - {note}")
+        print("\n".join(lines))
+
+    return 1 if result.violations else 0
+
+
+def run_db_queries_per_class(args, output_format: str = "text") -> int:
+    """`verdandi db queries <input.json> --per-class`.
+
+    Input: {"queries": [...QueryMetricsInput...], "baseline": {fingerprint:
+            [durations_ms...]}?} or a bare JSON array of queries.
+    """
+    from Asgard.Verdandi.Database.models.database_models import QueryMetricsInput
+    from Asgard.Verdandi.Database.services.query_metrics import (
+        QueryMetricsCalculator,
+    )
+
+    data = _load_json(args.metrics_file)
+    if data is None:
+        return 1
+
+    if isinstance(data, dict):
+        raw_queries = data.get("queries", [])
+        baseline = data.get("baseline")
+    else:
+        raw_queries, baseline = data, None
+    if not isinstance(raw_queries, list) or not raw_queries:
+        print("Error: Expected a non-empty array of queries.")
+        return 1
+
+    try:
+        queries = [QueryMetricsInput.model_validate(q) for q in raw_queries]
+    except (TypeError, ValueError) as e:
+        print(f"Error: Invalid query input: {e}")
+        return 1
+
+    threshold = getattr(args, "slow_threshold", None) or 100.0
+    calculator = QueryMetricsCalculator(slow_query_threshold_ms=threshold)
+    classes = calculator.analyze_by_fingerprint(queries, baseline=baseline)
+
+    if output_format == "json":
+        print(json.dumps([_dump(c) for c in classes], indent=2, default=str))
+    else:
+        lines = ["", "DATABASE QUERY METRICS BY CLASS (fingerprint)", "=" * 60]
+        for c in classes:
+            lines.append(
+                f"  {c.fingerprint[:60]:<60} n={c.count:<5} "
+                f"p50={c.p50_ms:.1f}ms p95={c.p95_ms:.1f}ms "
+                f"shift={c.shift_detected}"
+            )
+            for note in c.shift_notes:
+                lines.append(f"      ! {note}")
+        print("\n".join(lines))
+
+    return 1 if any(c.shift_detected for c in classes) else 0
