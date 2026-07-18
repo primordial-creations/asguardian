@@ -58,7 +58,9 @@ class ValidityVerdict(str, Enum):
     """Rule-validity classification (Plan 05 Sec.3.3)."""
     PREDICTIVE = "predictive"
     NEUTRAL = "neutral"
+    NOISY = "noisy"
     UNKNOWN = "unknown"
+    INSUFFICIENT_DATA = "insufficient_data"
 
 
 class ValidityReport(BaseModel):
@@ -73,9 +75,101 @@ class ValidityReport(BaseModel):
         15, description="Minimum events required before a verdict beyond UNKNOWN is issued"
     )
     note: str = Field("", description="Why the verdict was reached")
+    stage2: Optional["Stage2ValidityReport"] = Field(
+        None, description="Full-SZZ statistical validity report, when available (Plan 05 Phase D)"
+    )
 
     class Config:
         use_enum_values = True
+
+
+class BugFixCommit(BaseModel):
+    """A commit identified by message heuristics as a bug fix (SZZ input)."""
+    sha: str
+    parent_sha: str
+    timestamp: int = Field(..., description="Commit time, unix epoch seconds")
+    subject: str
+
+
+class SZZStatus(str, Enum):
+    OK = "ok"
+    INSUFFICIENT_DATA = "insufficient_data"
+
+
+class SZZResult(BaseModel):
+    """
+    Output of the SZZ bug-inducing-commit trace (Plan 05 Sec.3.3 Stage 2).
+
+    `induced_commit_counts` maps a file path (as it existed at the time a
+    fix touched it) to the number of *distinct* commits that SZZ traced as
+    having introduced lines subsequently removed/modified by a bug-fix -
+    the per-file defect-inducement count consumed as the outcome variable
+    by the Stage 2 count model.
+    """
+    status: SZZStatus = Field(SZZStatus.INSUFFICIENT_DATA)
+    fix_commit_count: int = Field(0, ge=0)
+    min_fix_commits: int = Field(0, ge=0)
+    induced_commit_counts: Dict[str, int] = Field(default_factory=dict)
+    note: str = Field("")
+
+    class Config:
+        use_enum_values = True
+
+
+class NBModelFit(BaseModel):
+    """
+    Fitted Negative-Binomial count-regression model (Plan 05 Sec.3.3 Stage 2).
+
+    Log-link GLM `mu = exp(X @ beta)` fit via IRLS; `alpha` is the
+    method-of-moments overdispersion parameter (alpha == 0 degenerates to a
+    quasi-Poisson fit - documented simplification in lieu of a full NB MLE,
+    which is out of scope for pure-stdlib arithmetic).
+    """
+    feature_names: List[str] = Field(default_factory=list, description="Order matches `coefficients` after intercept")
+    coefficients: Dict[str, float] = Field(default_factory=dict, description="'intercept' + one entry per feature")
+    alpha: float = Field(0.0, ge=0.0, description="Method-of-moments overdispersion parameter")
+    converged: bool = Field(False)
+    n: int = Field(0, ge=0)
+    iterations: int = Field(0, ge=0)
+
+
+class FeatureAttribution(BaseModel):
+    """
+    SHAP-lite (exact, for an additive log-link linear predictor) per-feature
+    contribution to one observation's predicted defect count, on the link
+    (log-eta) scale: `beta_j * (x_j - baseline_j)`. Because the linear
+    predictor is additive across features by construction, this equals the
+    exact Shapley value for each feature - no coalition sampling is needed
+    (see module docstring in `nb_model.py`).
+    """
+    rule_id: str
+    mean_abs_rule_attribution: float = Field(0.0, description="Mean |attribution| of the rule-firing feature")
+    mean_abs_control_attribution: float = Field(
+        0.0, description="Mean |attribution| summed over LOC+churn control features"
+    )
+    per_feature_mean_attribution: Dict[str, float] = Field(default_factory=dict)
+
+
+class Stage2ValidityReport(BaseModel):
+    """Full-SZZ, NB-regression validity report for one rule (Plan 05 Stage 2)."""
+    rule_id: str
+    verdict: ValidityVerdict = Field(ValidityVerdict.INSUFFICIENT_DATA)
+    n: int = Field(0, ge=0, description="Observations (files) used to fit the model")
+    fix_commit_count: int = Field(0, ge=0)
+    rate_ratio: Optional[float] = Field(
+        None, description="exp(beta_rule): multiplicative effect of one more rule-firing on expected defect count, controlling for LOC+churn"
+    )
+    attribution: Optional[FeatureAttribution] = None
+    small_sample_warning: bool = Field(
+        False, description="True when n is technically above the gate but still low enough that the fit is underpowered"
+    )
+    note: str = Field("")
+
+    class Config:
+        use_enum_values = True
+
+
+ValidityReport.model_rebuild()
 
 
 class CalibrationRun(BaseModel):
