@@ -23,6 +23,19 @@ class InputValidationFinding(BaseModel):
     code_snippet: str = ""
     description: str
     recommendation: str
+    mechanism_id: str = Field("", description="Normalization-engine mechanism id (plan 06).")
+    confidence: float = Field(0.6, ge=0.0, le=1.0, description="Confidence score")
+    confidence_bucket: str = Field("probable", description="Qualitative confidence bucket (plan 06).")
+    is_advisory: bool = Field(
+        False,
+        description=(
+            "Plan 07.12: mass-assignment findings (Pydantic models without "
+            "extra='forbid' on update routes) are advisory -- a design "
+            "recommendation, not a confirmed vulnerability, since many "
+            "APIs intentionally accept partial/extra fields."
+        ),
+    )
+    cwe_id: str = Field("", description="CWE identifier, e.g. CWE-179 for early-validation-before-mutation.")
 
 
 class InputValidationScanConfig(BaseModel):
