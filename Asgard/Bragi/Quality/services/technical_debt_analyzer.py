@@ -32,14 +32,24 @@ from Asgard.Bragi.Quality.services._debt_aggregator import (
     DebtAggregator,
     compute_tdr_percent,
 )
+from Asgard.Bragi.Quality.services._debt_state_store import (
+    DeltaResult,
+    apply_delta,
+    load_state,
+    save_state,
+)
 from Asgard.Bragi.Quality.services._debt_workers import (
     analyze_code_debt,
     analyze_dependency_debt,
     analyze_design_debt,
     analyze_documentation_debt,
+    analyze_file_complexity,
     analyze_test_debt,
     count_file_lines,
     count_lines_of_code,
+    find_undocumented_functions,
+    get_business_impact,
+    should_analyze_file,
 )
 from Asgard.Bragi.Quality.services._git_friction import (
     collect_friction,
@@ -239,6 +249,77 @@ class TechnicalDebtAnalyzer:
             DebtReport with detected debt
         """
         return self.analyze(file_path)
+
+    def analyze_delta(
+        self, path: Path, changed_files: Optional[List[Path]] = None
+    ) -> DeltaResult:
+        """
+        Incremental debt analysis (Plan 02 Phase E / RESEARCH_15).
+
+        Only files whose SHA-256 content hash changed since the last run
+        (or those explicitly passed via `changed_files`, e.g. from a PR
+        diff for Plan 06's gating) are re-analyzed; the persisted project
+        total in `.asgard_cache/bragi_debt_state.json` is updated
+        arithmetically rather than by rescanning the whole tree.
+
+        Covers code-complexity and documentation debt (the two categories
+        that are naturally per-file); design/test/dependency debt require
+        whole-project context and stay on the full `analyze()` path.
+        """
+        path = Path(path)
+        if not path.exists():
+            raise FileNotFoundError(f"Path does not exist: {path}")
+
+        all_files = [
+            f for f in path.rglob("*")
+            if f.is_file() and should_analyze_file(f.name, self.config)
+        ]
+        all_current_keys = set()
+        for f in all_files:
+            try:
+                all_current_keys.add(str(f.resolve().relative_to(path.resolve())))
+            except ValueError:
+                continue
+
+        state = load_state(path)
+        to_analyze = changed_files if changed_files is not None else self._changed_since(path, all_files, state)
+
+        file_items: Dict[str, List[DebtItem]] = {}
+        for file_path in to_analyze:
+            file_path = Path(file_path)
+            try:
+                rel = str(file_path.resolve().relative_to(path.resolve()))
+            except ValueError:
+                rel = str(file_path)
+            items: List[DebtItem] = []
+            items.extend(analyze_file_complexity(file_path, self.config))
+            undocumented = find_undocumented_functions(file_path)
+            if undocumented:
+                items.append(DebtItem(
+                    debt_type=DebtType.DOCUMENTATION,
+                    file_path=str(file_path.absolute()),
+                    line_number=undocumented[0][1],
+                    description=f"{len(undocumented)} undocumented public functions",
+                    severity=DebtSeverity.MEDIUM if len(undocumented) > 5 else DebtSeverity.LOW,
+                    effort_hours=self.config.effort_models.documentation_factor * len(undocumented),
+                    business_impact=get_business_impact(str(file_path), self.config),
+                    interest_rate=self.config.interest_rates.poor_docs,
+                    remediation_strategy="Add docstrings to public functions following project standards",
+                ))
+            for item in items:
+                minutes = self.remediation_model.minutes_for(item)
+                item.effort_interval = self._item_interval(minutes)
+                item.non_remediation_factor = self.remediation_model.non_remediation_factor(item)
+            file_items[rel] = items
+
+        delta = apply_delta(path, state, file_items, all_current_keys)
+        save_state(path, state)
+        return delta
+
+    @staticmethod
+    def _changed_since(path: Path, all_files: List[Path], state) -> List[Path]:
+        from Asgard.Bragi.Quality.services._debt_state_store import changed_files as _changed
+        return _changed(path, all_files, state)
 
     @staticmethod
     def _item_interval(minutes: float) -> EffortInterval:
