@@ -137,6 +137,116 @@ class TestHexagonalAnalyzerPortClean:
         assert report.violations == []
 
 
+class TestAnemicDomainModelDetector:
+    """Plan 03 §4 anti-pattern: domain class holds data but has no
+    behaviour of its own."""
+
+    def test_data_only_class_is_flagged(self, tmp_path):
+        domain_dir = tmp_path / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "__init__.py").write_text("")
+        (domain_dir / "order.py").write_text(
+            "class Order:\n"
+            "    def __init__(self, order_id, total):\n"
+            "        self.order_id = order_id\n"
+            "        self.total = total\n"
+            "    def get_total(self):\n"
+            "        return self.total\n"
+            "    def set_total(self, value):\n"
+            "        self.total = value\n"
+        )
+        analyzer = HexagonalAnalyzer()
+        report = analyzer.analyze(scan_path=tmp_path)
+        anemic = [v for v in report.violations if "Anemic Domain Model" in v.message]
+        assert len(anemic) == 1
+        assert anemic[0].class_name == "Order"
+
+    def test_class_with_real_behaviour_not_flagged(self, tmp_path):
+        domain_dir = tmp_path / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "__init__.py").write_text("")
+        (domain_dir / "order.py").write_text(
+            "class Order:\n"
+            "    def __init__(self, order_id, total):\n"
+            "        self.order_id = order_id\n"
+            "        self.total = total\n"
+            "    def apply_discount(self, pct):\n"
+            "        self.total = self.total * (1 - pct)\n"
+            "        return self.total\n"
+        )
+        analyzer = HexagonalAnalyzer()
+        report = analyzer.analyze(scan_path=tmp_path)
+        anemic = [v for v in report.violations if "Anemic Domain Model" in v.message]
+        assert anemic == []
+
+    def test_class_with_no_fields_not_flagged(self, tmp_path):
+        domain_dir = tmp_path / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "__init__.py").write_text("")
+        (domain_dir / "stateless.py").write_text(
+            "class Stateless:\n"
+            "    def compute(self, x):\n"
+            "        return x * 2\n"
+        )
+        analyzer = HexagonalAnalyzer()
+        report = analyzer.analyze(scan_path=tmp_path)
+        anemic = [v for v in report.violations if "Anemic Domain Model" in v.message]
+        assert anemic == []
+
+
+class TestInfrastructureLeakDetector:
+    """Plan 03 §4 anti-pattern: domain entity bound to a persistence/web
+    framework via base class, decorator, or ORM field declaration."""
+
+    def test_sqlalchemy_declarative_base_flagged(self, tmp_path):
+        domain_dir = tmp_path / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "__init__.py").write_text("")
+        (domain_dir / "user.py").write_text(
+            "class User(Base):\n"
+            "    id = Column(Integer, primary_key=True)\n"
+            "    name = Column(String)\n"
+        )
+        analyzer = HexagonalAnalyzer()
+        report = analyzer.analyze(scan_path=tmp_path)
+        leaks = [v for v in report.violations if "leaks infrastructure" in v.message]
+        assert len(leaks) == 1
+        assert leaks[0].class_name == "User"
+        assert leaks[0].severity.name in ("HIGH", "CRITICAL") or "HIGH" in str(leaks[0].severity)
+
+    def test_jpa_style_entity_decorator_flagged(self, tmp_path):
+        domain_dir = tmp_path / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "__init__.py").write_text("")
+        (domain_dir / "account.py").write_text(
+            "@Entity\n"
+            "class Account:\n"
+            "    def __init__(self, balance):\n"
+            "        self.balance = balance\n"
+        )
+        analyzer = HexagonalAnalyzer()
+        report = analyzer.analyze(scan_path=tmp_path)
+        leaks = [v for v in report.violations if "leaks infrastructure" in v.message]
+        assert len(leaks) == 1
+
+    def test_plain_domain_class_not_flagged(self, tmp_path):
+        domain_dir = tmp_path / "domain"
+        domain_dir.mkdir()
+        (domain_dir / "__init__.py").write_text("")
+        (domain_dir / "money.py").write_text(
+            "class Money:\n"
+            "    def __init__(self, amount, currency):\n"
+            "        self.amount = amount\n"
+            "        self.currency = currency\n"
+            "    def add(self, other):\n"
+            "        return Money(self.amount + other.amount, self.currency)\n"
+        )
+        analyzer = HexagonalAnalyzer()
+        report = analyzer.analyze(scan_path=tmp_path)
+        leaks = [v for v in report.violations if "leaks infrastructure" in v.message]
+        assert leaks == []
+
+
 class TestHexagonalAnalyzerReportStructure:
     def test_report_has_expected_fields(self, tmp_path):
         (tmp_path / "module.py").write_text("x = 1\n")
