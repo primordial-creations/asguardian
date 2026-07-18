@@ -110,6 +110,9 @@ MECHANISMS: Dict[str, Mechanism] = {m.mechanism_id: m for m in [
        description="Missing browser header in an API-only context"),
     _m("secret.dummy", "low", "secrets",
        description="Placeholder/dummy key"),
+    _m("deserialization.hotspot", "low", "deserialization", "CWE-502",
+       description="Deserialization sink with unconfirmed data provenance "
+                    "(reviewed as a hotspot, not a proven finding)"),
 ]}
 
 # Severity a browser-only mechanism drops to when the surrounding context is

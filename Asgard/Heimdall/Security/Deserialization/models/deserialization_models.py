@@ -23,6 +23,17 @@ class DeserializationFinding(BaseModel):
     code_snippet: str = ""
     description: str
     recommendation: str
+    # Plan 07.5: taint-integrated provenance classification. A sink is a
+    # "finding" (is_hotspot=False) only when the deserialized value can be
+    # traced to an untrusted source (network/request/stdin) in a nearby
+    # backward window; otherwise it is reported as a "hotspot" -- a
+    # data-provenance question for a human, never a confident claim of
+    # exploitability (gadget-chain existence is statically unprovable).
+    mechanism_id: str = "deserialization.untrusted"
+    confidence: float = 0.5
+    confidence_bucket: str = "possible"
+    is_hotspot: bool = False
+    provenance: str = "unknown"
 
 
 class DeserializationScanConfig(BaseModel):

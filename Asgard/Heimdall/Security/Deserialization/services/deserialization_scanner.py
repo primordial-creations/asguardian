@@ -11,6 +11,31 @@ from Asgard.Heimdall.Security.Deserialization.models.deserialization_models impo
     DeserializationScanReport,
     DeserializationSeverity,
 )
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
+
+# Plan 07.5: backward-window provenance markers. These are intentionally
+# textual (not full inter-procedural taint -- that lives in TaintAnalysis
+# and is a larger lift) but give a "near-free" precision win: a sink fed by
+# an obviously untrusted source nearby is a real finding; one fed by a
+# static/internal source is a hotspot, not a finding. Documented FN: a
+# variable renamed/reassigned outside the window, or untrusted data that
+# arrives via a call several functions away, is not traced (silently
+# treated as unknown -> hotspot, never silently dropped).
+_UNTRUSTED_MARKERS = re.compile(
+    r"(?:request\.|req\.|flask\.request|django\.http|self\.request|"
+    r"socket\.(?:recv|accept)|urlopen|urlretrieve|sys\.stdin|input\(|"
+    r"\.body\b|\.data\b|\.get_json|\.form\[|\.args\[|"
+    r"kafka|rabbitmq|celery|redis\.get|sqs|websocket|ws\.recv|"
+    r"\$_(?:GET|POST|REQUEST|COOKIE)|params\[|query\[)",
+    re.IGNORECASE,
+)
+_INTERNAL_MARKERS = re.compile(
+    r"(?:open\(|Path\(|\.read_text\(|\.read_bytes\(|importlib|"
+    r"pkgutil|pkg_resources|__file__|os\.path\.join\(.*(?:config|internal|fixtures))",
+    re.IGNORECASE,
+)
+# Backward window size (lines) for the textual provenance scan.
+_PROVENANCE_WINDOW = 15
 
 _LANG_EXTENSIONS = {
     ".py": "python",
@@ -116,15 +141,56 @@ class DeserializationScanner:
         for line_num, line in enumerate(lines, 1):
             for regex, severity, ptype, desc, rec in self._compiled[lang]:
                 if regex.search(line):
+                    provenance, confidence, is_hotspot = self._classify_provenance(lines, line_num)
+                    finding_severity = severity
+                    description = desc
+                    if is_hotspot:
+                        # Never claim gadget-chain proof for data whose origin we
+                        # can't demonstrate is attacker-influenced -- downgrade
+                        # to a hotspot instead of an actionable finding.
+                        finding_severity = "LOW"
+                        description = (
+                            f"{desc} (data provenance not confirmed attacker-influenced "
+                            f"-- reported as a hotspot for review, provenance={provenance})"
+                        )
+                    else:
+                        description = f"{desc} (deserialization of attacker-influenced data)"
+
                     findings.append(DeserializationFinding(
                         file_path=str(file_path),
                         line_number=line_num,
-                        severity=DeserializationSeverity(severity),
+                        severity=DeserializationSeverity(finding_severity),
                         language=lang,
                         pattern_type=ptype,
                         code_snippet=line.strip()[:150],
-                        description=desc,
+                        description=description,
                         recommendation=rec,
+                        mechanism_id="deserialization.hotspot" if is_hotspot else "deserialization.untrusted",
+                        confidence=confidence,
+                        confidence_bucket=confidence_bucket(confidence),
+                        is_hotspot=is_hotspot,
+                        provenance=provenance,
                     ))
 
         return findings
+
+    def _classify_provenance(self, lines: List[str], line_num: int):
+        """
+        Plan 07.5 provenance heuristic: scan a backward window of source
+        lines around the deserialization sink for untrusted-source or
+        internal-source textual markers.
+
+        Returns (provenance, confidence, is_hotspot). Documented limitation:
+        this is a textual backward scan, not inter-procedural taint --
+        sources several call-frames away are not traced and default to
+        "unknown" (treated as a hotspot, never silently dropped and never
+        confidently claimed as attacker-controlled without evidence).
+        """
+        start = max(0, line_num - 1 - _PROVENANCE_WINDOW)
+        window = "\n".join(lines[start:line_num])
+
+        if _UNTRUSTED_MARKERS.search(window):
+            return "untrusted", 0.85, False
+        if _INTERNAL_MARKERS.search(window):
+            return "internal", 0.3, True
+        return "unknown", 0.5, True
