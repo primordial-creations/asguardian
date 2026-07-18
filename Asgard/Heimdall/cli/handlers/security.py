@@ -77,6 +77,24 @@ def run_security_analysis(args: argparse.Namespace, verbose: bool = False, analy
                 strict_scan_paths=strict_scan_paths,
             )
 
+        # StaticSecurityService's totals (and hence the summary header:
+        # "Total Issues" / "Critical" / etc.) never see the DispatchEngine's
+        # findings -- those are only appended as a separate text/JSON
+        # section below. Fold them into the same counters so the header
+        # matches what's actually listed (a CI gate keying off these counts
+        # must not undercount JS/TS/Java findings).
+        for entry in dispatch_entries:
+            result.total_issues += 1
+            sev = str(entry["severity"]).lower()
+            if sev == "critical":
+                result.critical_issues += 1
+            elif sev == "high":
+                result.high_issues += 1
+            elif sev == "medium":
+                result.medium_issues += 1
+            elif sev == "low":
+                result.low_issues += 1
+
         report = service.generate_report(result, args.format)
         if args.format == "json":
             try:
