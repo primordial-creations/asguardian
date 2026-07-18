@@ -110,3 +110,51 @@ def loc_penalty(loc: int, l_c: float = 600.0, k: float = 0.01) -> float:
 def cycle_count_to_utility(cycle_count: int, lam: float = 0.15) -> float:
     """Map a dependency-cycle count to a utility via exponential decay."""
     return math.exp(-lam * max(cycle_count, 0))
+
+
+# --------------------------------------------------------------------------
+# TestHealth category (Plan 04 Sec.3.2 / DEEPTHINK_12): test-exclusive
+# health metrics that only apply to TEST-context files.
+# --------------------------------------------------------------------------
+
+def assertion_density_to_utility(density: float, target_low: float = 1.0, target_high: float = 10.0) -> float:
+    """
+    Map assertion density (assertions per test case) to a utility.
+
+    Healthy range is 1-10 assertions/test (DEEPTHINK_12): below the range
+    a test barely checks anything, above it a single test is doing too
+    much (harder failure triage). Utility peaks at 1.0 inside the band and
+    decays outside it in both directions.
+    """
+    if density <= 0:
+        return 0.0
+    if target_low <= density <= target_high:
+        return 1.0
+    if density < target_low:
+        return max(density / target_low, 0.0)
+    # Above the band: gentle decay, doesn't crush an over-thorough test.
+    return math.exp(-0.15 * (density - target_high))
+
+
+def hermeticity_to_utility(hermeticity_score: float) -> float:
+    """
+    Map a hermeticity score (0-1: fraction of tests with no shared-mutable
+    state / external dependency leakage without teardown) directly to
+    utility - already bounded and "higher is better" by construction.
+    """
+    return min(max(hermeticity_score, 0.0), 1.0)
+
+
+def test_to_prod_ratio_to_utility(ratio: float, target_low: float = 0.5, target_high: float = 4.0) -> float:
+    """
+    Map test-to-prod LOC ratio to a utility. Healthy band is 0.5-4.0
+    (DEEPTHINK_12): below it, test coverage is likely thin; above it, the
+    test suite may be over-engineered relative to production code.
+    """
+    if ratio <= 0:
+        return 0.0
+    if target_low <= ratio <= target_high:
+        return 1.0
+    if ratio < target_low:
+        return max(ratio / target_low, 0.0)
+    return math.exp(-0.1 * (ratio - target_high))

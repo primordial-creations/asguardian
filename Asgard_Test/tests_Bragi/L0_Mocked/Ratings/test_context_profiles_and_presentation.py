@@ -54,6 +54,53 @@ class TestTestProfileScoring:
         assert excluded_from_denominators(None) is False
 
 
+class TestTestHealthCategory:
+    """Plan 04 Sec.3.2: assertion density, hermeticity, test-to-prod LOC ratio."""
+
+    def test_assertion_density_only_scored_for_test_context(self):
+        engine = CompositeScoreEngine()
+        prod = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="production", assertion_density=5.0,
+        ))
+        test = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="test", assertion_density=5.0,
+        ))
+        assert "assertion_density" not in prod.utilities
+        assert "assertion_density" in test.utilities
+        assert test.utilities["assertion_density"] == 1.0
+
+    def test_hermeticity_only_scored_for_test_context(self):
+        engine = CompositeScoreEngine()
+        test = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="test", hermeticity_score=0.9,
+        ))
+        assert test.utilities["hermeticity"] == 0.9
+
+    def test_test_to_prod_ratio_only_scored_for_test_context(self):
+        engine = CompositeScoreEngine()
+        test = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="test", test_to_prod_loc_ratio=2.0,
+        ))
+        assert test.utilities["test_to_prod_ratio"] == 1.0
+
+    def test_testhealth_utilities_feed_reliability_category(self):
+        engine = CompositeScoreEngine()
+        score = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="test",
+            assertion_density=5.0, hermeticity_score=1.0, test_to_prod_loc_ratio=2.0,
+        ))
+        reliability = next(c for c in score.category_scores if c.category == "reliability")
+        metric_ids = {u.metric_id for u in reliability.utilities}
+        assert {"assertion_density", "hermeticity", "test_to_prod_ratio"} <= metric_ids
+
+    def test_backward_compat_bundle_without_testhealth_fields(self):
+        engine = CompositeScoreEngine()
+        score = engine.score_file(FileMetricBundle(file_path="x.py", loc=100, context="test"))
+        assert "assertion_density" not in score.utilities
+        assert "hermeticity" not in score.utilities
+        assert "test_to_prod_ratio" not in score.utilities
+
+
 class TestPresentation:
     def test_fact_renders_as_violation(self):
         f = RenderedFinding("method_length", "65 lines; project limit 50", FindingClass.FACT)
