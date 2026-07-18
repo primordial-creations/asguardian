@@ -216,6 +216,25 @@ class SecurityScanConfig(BaseModel):
     scan_tls: bool = Field(True, description="Enable TLS/SSL scanning")
     scan_container: bool = Field(True, description="Enable container security scanning")
     scan_infrastructure: bool = Field(True, description="Enable infrastructure security scanning")
+    enable_network: bool = Field(
+        False,
+        description=(
+            "STRICT OPT-IN (Cost: NETWORK). When True, dependency vulnerability "
+            "scanning additionally queries OSV.dev (and, if nvd_fallback is also "
+            "set, NVD) for live advisory data over the network, merged with the "
+            "bundled local vulnerability DB. Defaults to False: the default scan "
+            "path NEVER makes a network call. CLI: --online."
+        ),
+    )
+    nvd_fallback: bool = Field(
+        False,
+        description=(
+            "When enable_network=True, also query NVD's keyword-search API for "
+            "packages OSV had zero hits for. No effect unless enable_network is "
+            "also True. Optional NVD_API_KEY env var raises NVD's rate limit; "
+            "never required and never hardcoded."
+        ),
+    )
     min_severity: SecuritySeverity = Field(SecuritySeverity.LOW, description="Minimum severity to report")
     scoring_version: str = Field(
         "v1",

@@ -46,6 +46,8 @@ def run_security_analysis(args: argparse.Namespace, verbose: bool = False, analy
         output_format=args.format,
         verbose=verbose,
         scoring_version=getattr(args, "scoring", "v1"),
+        enable_network=bool(getattr(args, "online", False)),
+        nvd_fallback=bool(getattr(args, "nvd_fallback", False)),
     )
 
     # .heimdall.yml zero-config plumbing (test context + strict paths).
