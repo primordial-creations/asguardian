@@ -113,8 +113,17 @@ CONTROL_PATTERNS: List[ControlPattern] = [
         title="Insecure Direct Object Reference",
         description="Object accessed directly using user-supplied ID without ownership verification.",
         cwe_id="CWE-639",
-        remediation="Verify that the current user has permission to access the requested resource.",
-        confidence=0.7,
+        # Plan 07.6: BOLA/IDOR is a data-provenance/business-logic question
+        # SAST structurally cannot prove -- ship as an advisory (Possible
+        # confidence bucket per plan 04), not a high-trust finding, and
+        # point at the real control (contract-driven fuzzing).
+        remediation=(
+            "Verify that the current user has permission to access the "
+            "requested resource. Note: static analysis cannot prove BOLA/IDOR "
+            "exploitability -- pair this advisory with contract-driven "
+            "fuzzing (e.g. Schemathesis) against the live API."
+        ),
+        confidence=0.4,
     ),
     ControlPattern(
         name="missing_ownership_check",
@@ -124,8 +133,13 @@ CONTROL_PATTERNS: List[ControlPattern] = [
         title="Missing Resource Ownership Check",
         description="User resource accessed without verifying ownership.",
         cwe_id="CWE-639",
-        remediation="Add ownership verification before returning user-specific resources.",
-        confidence=0.6,
+        remediation=(
+            "Add ownership verification before returning user-specific "
+            "resources. Note: static analysis cannot prove BOLA/IDOR "
+            "exploitability -- pair this advisory with contract-driven "
+            "fuzzing (e.g. Schemathesis) against the live API."
+        ),
+        confidence=0.35,
     ),
     ControlPattern(
         name="privilege_escalation_role_change",
