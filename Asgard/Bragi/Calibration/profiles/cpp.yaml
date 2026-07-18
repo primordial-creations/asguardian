@@ -1,0 +1,20 @@
+# C++ language profile (Plan 05 Sec.3.1).
+#
+# Manual resource management and template metaprogramming push both
+# complexity and coupling higher than the generic default without being
+# proportionally riskier - thresholds are widened similarly to Go's
+# idiomatic-error-handling adjustment (DEEPTHINK_10), applied here to
+# template/RAII idioms instead.
+language: cpp
+provenance: "corpus P90/P95 estimate, top OSS C++ repos, 2025 snapshot; RESEARCH_02 anchors widened for template/RAII idiom"
+thresholds:
+  cognitive_complexity: {warn: 18, fail: 55}
+  cyclomatic_complexity: {warn: 12, fail: 25}
+scalar_thresholds:
+  wmc: 22
+  cbo: 11
+  max_efferent: 12
+  method_ast_mass_p90: 130
+  loc_file_critical: 700
+severity_confidence:
+  global_dead_code: HIGH   # statically compiled: dead code is provable, not heuristic

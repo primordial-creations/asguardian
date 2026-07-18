@@ -15,6 +15,7 @@ tri-state confidence - a missing scan can never produce a silent grade A.
 
 from typing import Dict, List, Optional, Tuple
 
+from Asgard.Bragi.Calibration.models.calibration_models import LanguageProfile
 from Asgard.Bragi.Ratings.models._scoring_models import (
     CategoryScore,
     FileMetricBundle,
@@ -66,6 +67,30 @@ def excluded_from_denominators(context: Optional[str]) -> bool:
     return (context or "production") in GENERATED_CONTEXTS
 
 
+def category_weights_from_profile(
+    profile: Optional[LanguageProfile],
+) -> Dict[ScoreCategory, float]:
+    """
+    Translate a calibration `LanguageProfile.category_weights` (Plan 05
+    Sec.3.3, PCA-derived inter-category weights keyed by category name)
+    into the `Dict[ScoreCategory, float]` shape `CompositeScoreEngine`
+    expects.
+
+    Missing or partial profiles fall back to `DEFAULT_CATEGORY_WEIGHTS`
+    entirely, and any category absent from the profile's dict falls back
+    to its individual default - a profile that only calibrated Reliability
+    still gets sane Maintainability/Comprehensibility weights rather than
+    zero.
+    """
+    if profile is None or not profile.category_weights:
+        return dict(DEFAULT_CATEGORY_WEIGHTS)
+    resolved: Dict[ScoreCategory, float] = {}
+    for category in ScoreCategory:
+        value = profile.category_weights.get(category.value)
+        resolved[category] = value if value is not None else DEFAULT_CATEGORY_WEIGHTS[category]
+    return resolved
+
+
 def score_to_grade(score: float) -> str:
     """Map a final score in [0, 1] to a letter grade."""
     for threshold, grade in GRADE_THRESHOLDS:
@@ -84,6 +109,25 @@ class CompositeScoreEngine:
     ):
         self.category_weights = dict(category_weights or DEFAULT_CATEGORY_WEIGHTS)
         self.complexity_threshold = complexity_threshold
+
+    @classmethod
+    def from_language_profile(
+        cls,
+        profile: Optional[LanguageProfile],
+        complexity_threshold: float = 15.0,
+    ) -> "CompositeScoreEngine":
+        """
+        Build an engine whose inter-category weights come from a
+        calibration profile's PCA-derived `category_weights` (Plan 05
+        Sec.3.3) instead of the static `DEFAULT_CATEGORY_WEIGHTS`. A
+        profile without calibrated weights (the common case until a
+        project has enough history) behaves identically to the default
+        constructor.
+        """
+        return cls(
+            category_weights=category_weights_from_profile(profile),
+            complexity_threshold=complexity_threshold,
+        )
 
     # ------------------------------------------------------------------ file
 
@@ -146,6 +190,29 @@ class CompositeScoreEngine:
                 detail=f"TDR {b.debt_ratio_percent:.2f}%",
             ))
         is_test = b.context in TEST_CONTEXTS
+
+        # TestHealth (Plan 04 Sec.3.2 / DEEPTHINK_12): only meaningful for
+        # TEST-context files - feeds the Reliability pillar for the test
+        # tree in place of bug_density, which has little signal for test
+        # code (assertions failing IS the point).
+        if is_test and b.assertion_density is not None:
+            utilities.append(MetricUtility(
+                metric_id="assertion_density", category=ScoreCategory.RELIABILITY,
+                utility=um.assertion_density_to_utility(b.assertion_density), weight=1.0,
+                detail=f"assertion density {b.assertion_density:.2f}/test",
+            ))
+        if is_test and b.hermeticity_score is not None:
+            utilities.append(MetricUtility(
+                metric_id="hermeticity", category=ScoreCategory.RELIABILITY,
+                utility=um.hermeticity_to_utility(b.hermeticity_score), weight=1.0,
+                detail=f"hermeticity {b.hermeticity_score:.2f}",
+            ))
+        if is_test and b.test_to_prod_loc_ratio is not None:
+            utilities.append(MetricUtility(
+                metric_id="test_to_prod_ratio", category=ScoreCategory.RELIABILITY,
+                utility=um.test_to_prod_ratio_to_utility(b.test_to_prod_loc_ratio), weight=0.5,
+                detail=f"test:prod LOC ratio {b.test_to_prod_loc_ratio:.2f}",
+            ))
         if b.max_cognitive_complexity is not None:
             threshold = TEST_PROFILE_COMPLEXITY_THRESHOLD if is_test else self.complexity_threshold
             utilities.append(MetricUtility(

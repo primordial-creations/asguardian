@@ -4,8 +4,9 @@ presentation layer (fact/heuristic + channel filtering), and suppression
 telemetry built on the QualityGate suppression schema.
 """
 
+from Asgard.Bragi.Calibration.models.calibration_models import LanguageProfile
 from Asgard.Bragi.QualityGate.suppressions import parse_suppressions
-from Asgard.Bragi.Ratings.models._scoring_models import FileMetricBundle, ROIAction
+from Asgard.Bragi.Ratings.models._scoring_models import FileMetricBundle, ROIAction, ScoreCategory
 from Asgard.Bragi.Ratings.models.ratings_models import ChannelProfile, FindingClass
 from Asgard.Bragi.Ratings.services._ratings_presenter import (
     RenderedFinding,
@@ -15,7 +16,9 @@ from Asgard.Bragi.Ratings.services._ratings_presenter import (
 )
 from Asgard.Bragi.Ratings.services._suppression_telemetry import build_suppression_stats
 from Asgard.Bragi.Ratings.services.composite_score_engine import (
+    DEFAULT_CATEGORY_WEIGHTS,
     CompositeScoreEngine,
+    category_weights_from_profile,
     excluded_from_denominators,
 )
 
@@ -52,6 +55,97 @@ class TestTestProfileScoring:
         assert excluded_from_denominators("production") is False
         assert excluded_from_denominators("test") is False
         assert excluded_from_denominators(None) is False
+
+
+class TestTestHealthCategory:
+    """Plan 04 Sec.3.2: assertion density, hermeticity, test-to-prod LOC ratio."""
+
+    def test_assertion_density_only_scored_for_test_context(self):
+        engine = CompositeScoreEngine()
+        prod = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="production", assertion_density=5.0,
+        ))
+        test = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="test", assertion_density=5.0,
+        ))
+        assert "assertion_density" not in prod.utilities
+        assert "assertion_density" in test.utilities
+        assert test.utilities["assertion_density"] == 1.0
+
+    def test_hermeticity_only_scored_for_test_context(self):
+        engine = CompositeScoreEngine()
+        test = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="test", hermeticity_score=0.9,
+        ))
+        assert test.utilities["hermeticity"] == 0.9
+
+    def test_test_to_prod_ratio_only_scored_for_test_context(self):
+        engine = CompositeScoreEngine()
+        test = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="test", test_to_prod_loc_ratio=2.0,
+        ))
+        assert test.utilities["test_to_prod_ratio"] == 1.0
+
+    def test_testhealth_utilities_feed_reliability_category(self):
+        engine = CompositeScoreEngine()
+        score = engine.score_file(FileMetricBundle(
+            file_path="x.py", loc=100, context="test",
+            assertion_density=5.0, hermeticity_score=1.0, test_to_prod_loc_ratio=2.0,
+        ))
+        reliability = next(c for c in score.category_scores if c.category == "reliability")
+        metric_ids = {u.metric_id for u in reliability.utilities}
+        assert {"assertion_density", "hermeticity", "test_to_prod_ratio"} <= metric_ids
+
+    def test_backward_compat_bundle_without_testhealth_fields(self):
+        engine = CompositeScoreEngine()
+        score = engine.score_file(FileMetricBundle(file_path="x.py", loc=100, context="test"))
+        assert "assertion_density" not in score.utilities
+        assert "hermeticity" not in score.utilities
+        assert "test_to_prod_ratio" not in score.utilities
+
+
+class TestPCAWeightWiring:
+    """Plan 05 Sec.3.3: PCA-derived inter-category weights from a
+    calibration profile drive CompositeScoreEngine.category_weights."""
+
+    def test_profile_without_category_weights_uses_defaults(self):
+        profile = LanguageProfile(language="python")
+        assert category_weights_from_profile(profile) == dict(DEFAULT_CATEGORY_WEIGHTS)
+
+    def test_none_profile_uses_defaults(self):
+        assert category_weights_from_profile(None) == dict(DEFAULT_CATEGORY_WEIGHTS)
+
+    def test_full_profile_weights_are_used(self):
+        profile = LanguageProfile(
+            language="python",
+            category_weights={"reliability": 0.6, "maintainability": 0.3, "comprehensibility": 0.1},
+        )
+        resolved = category_weights_from_profile(profile)
+        assert resolved[ScoreCategory.RELIABILITY] == 0.6
+        assert resolved[ScoreCategory.MAINTAINABILITY] == 0.3
+        assert resolved[ScoreCategory.COMPREHENSIBILITY] == 0.1
+
+    def test_partial_profile_falls_back_per_missing_category(self):
+        profile = LanguageProfile(
+            language="python", category_weights={"reliability": 0.7},
+        )
+        resolved = category_weights_from_profile(profile)
+        assert resolved[ScoreCategory.RELIABILITY] == 0.7
+        assert resolved[ScoreCategory.MAINTAINABILITY] == DEFAULT_CATEGORY_WEIGHTS[ScoreCategory.MAINTAINABILITY]
+        assert resolved[ScoreCategory.COMPREHENSIBILITY] == DEFAULT_CATEGORY_WEIGHTS[ScoreCategory.COMPREHENSIBILITY]
+
+    def test_engine_from_language_profile_uses_resolved_weights(self):
+        profile = LanguageProfile(
+            language="python",
+            category_weights={"reliability": 0.8, "maintainability": 0.15, "comprehensibility": 0.05},
+        )
+        engine = CompositeScoreEngine.from_language_profile(profile)
+        assert engine.category_weights[ScoreCategory.RELIABILITY] == 0.8
+
+    def test_engine_from_none_profile_matches_default_constructor(self):
+        engine_default = CompositeScoreEngine()
+        engine_from_profile = CompositeScoreEngine.from_language_profile(None)
+        assert engine_from_profile.category_weights == engine_default.category_weights
 
 
 class TestPresentation:

@@ -132,13 +132,38 @@ class DebtItem(BaseModel):
     recommendation: DebtRecommendation = Field(
         DebtRecommendation.FIX, description="Recommended handling for this item"
     )
+    context: str = Field(
+        "production",
+        description=(
+            "Code context this item's file was classified under (Plan 04 "
+            "Phase A): production | test | generated | suspected_generated | "
+            "script. Stamped automatically by the analyzer via "
+            "Bragi.common.context_classifier."
+        ),
+    )
+    priority_score_override: Optional[float] = Field(
+        None,
+        description=(
+            "Plan 02 Phase D priority score (interest x non_remediation_factor "
+            "/ remediation_minutes) when git friction telemetry was available; "
+            "falls back to the legacy business_impact-based heuristic when unset."
+        ),
+    )
 
     class Config:
         use_enum_values = True
 
     @property
     def priority_score(self) -> float:
-        """Calculate priority score based on ROI."""
+        """
+        Calculate priority score based on ROI.
+
+        When friction-derived telemetry is available (Plan 02 Phase D:
+        `priority = interest x non_remediation_factor / remediation_minutes`),
+        it takes precedence over the legacy business-impact heuristic.
+        """
+        if self.priority_score_override is not None:
+            return self.priority_score_override
         severity_multiplier = {
             "low": 1,
             "medium": 2,

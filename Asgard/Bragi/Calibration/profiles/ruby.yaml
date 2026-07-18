@@ -1,0 +1,19 @@
+# Ruby language profile (Plan 05 Sec.3.1).
+#
+# Dynamic, highly metaprogrammed language in the same family as Python for
+# calibration purposes - shares Python's dead-code confidence downgrade
+# (monkey-patching and `method_missing` make static dead-code detection
+# heuristic, not proof) while keeping generic complexity thresholds.
+language: ruby
+provenance: "corpus P90/P95 estimate, top OSS Ruby repos, 2025 snapshot; RESEARCH_02 (Shatnawi WMC/CBO anchors)"
+thresholds:
+  cognitive_complexity: {warn: 15, fail: 50}
+  cyclomatic_complexity: {warn: 10, fail: 20}
+scalar_thresholds:
+  wmc: 20
+  cbo: 9
+  max_efferent: 10
+  method_ast_mass_p90: 120
+  loc_file_critical: 600
+severity_confidence:
+  global_dead_code: LOW   # dynamic language: metaprogramming makes static dead-code detection heuristic

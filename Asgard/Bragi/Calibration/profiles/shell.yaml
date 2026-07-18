@@ -1,0 +1,20 @@
+# Shell (bash/POSIX sh) language profile (Plan 05 Sec.3.1).
+#
+# Scripts are typically small, flat, and control-flow-heavy (option
+# parsing, guard clauses) rather than deeply structured - complexity
+# thresholds are tightened relative to the generic default since a long
+# shell script is a much stronger smell than a long Python module, and
+# coupling metrics (CBO/efferent) don't map cleanly onto shell so they
+# keep the generic defaults rather than being fabricated.
+language: shell
+provenance: "corpus estimate, top OSS shell scripts, 2025 snapshot; heuristic tightening for script-scale code"
+thresholds:
+  cognitive_complexity: {warn: 10, fail: 30}
+  cyclomatic_complexity: {warn: 8, fail: 15}
+scalar_thresholds:
+  wmc: 20
+  cbo: 9
+  max_efferent: 10
+  loc_file_critical: 400
+severity_confidence:
+  global_dead_code: LOW   # dynamic sourcing/eval makes static dead-code detection heuristic
