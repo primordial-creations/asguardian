@@ -83,6 +83,11 @@ _CONTAINER_MUTATORS = frozenset({
     "insert", "extend", "update", "setdefault",
 })
 
+# Container-read accessors: `list.get(i)`/`map.get(k)` etc. propagate the
+# *receiver's* taint (container-granularity over-approximation), mirroring
+# the subscript/index-access handling in `_eval` for `arr[0]`/`obj['k']`.
+_CONTAINER_READERS = frozenset({"get", "getOrDefault", "peek", "element"})
+
 _FUNCTION_TYPES_JS = frozenset({
     "function_declaration", "function_expression", "arrow_function",
     "method_definition", "generator_function_declaration",
@@ -251,6 +256,13 @@ class CstFunctionTaintVisitor:
             if state is not None:
                 return state
             return self._eval(node.child_by_field_name("object"))
+        if t in ("subscript_expression", "array_access"):
+            # Index/member access on a tainted container returns the
+            # container's taint (container-granularity over-approximation,
+            # same as the Python ast engine) -- covers JS `arr[0]`/`obj['k']`
+            # and Java array-index access.
+            base = node.child_by_field_name("object") or node.child_by_field_name("array")
+            return self._eval(base)
         if t in ("call_expression", "method_invocation", "object_creation_expression"):
             return self._eval_call(node)
         if t == "template_string":
@@ -322,6 +334,15 @@ class CstFunctionTaintVisitor:
             return self._fresh_source_state(spec, node.start_point[0] + 1, chain)
 
         method_name = chain.rsplit(".", 1)[-1] if "." in chain else chain
+        if method_name in _CONTAINER_READERS:
+            obj_node = node.child_by_field_name("object")
+            if obj_node is None:
+                fn = node.child_by_field_name("function")
+                obj_node = fn.child_by_field_name("object") if fn is not None else None
+            if obj_node is not None:
+                receiver_state = self._eval(obj_node)
+                if receiver_state is not None:
+                    return receiver_state
         if method_name in _CONTAINER_MUTATORS and arg_state is not None:
             obj_node = node.child_by_field_name("object")
             if obj_node is None:
@@ -418,6 +439,20 @@ class CstFunctionTaintVisitor:
             return
         name = self.ctx.node_text(target_node)
         if state is None:
+            # Sticky taint (never-mute mandate): a later assignment of a
+            # clean/None value must NOT clear a name that was tainted
+            # earlier in the scan (e.g. an if-branch taints `x`, an
+            # unconditional else/later assignment sets `x` to a literal --
+            # under a linear single-pass walk that would silently kill a
+            # real flow). Only an explicit sanitizer call (handled in
+            # ``_eval_call`` via ``classify_sanitizer``, which returns a
+            # *state*, not None-through-here) clears taint. This is a
+            # deliberate over-approximation: `x = tainted; x = "safe";
+            # sink(x)` on a straight-line path now also reports (a false
+            # positive) -- acceptable per the "muting a real flow is not
+            # acceptable" invariant; document at call sites/tests.
+            if name in self.env:
+                return
             self.env.pop(name, None)
             return
         new_state = replace(state, trace=list(state.trace), sanitizers=list(state.sanitizers))
@@ -450,6 +485,14 @@ class CstFunctionTaintVisitor:
         if key in self._visited_calls:
             return
         self._visited_calls.add(key)
+        # `_eval_call` also performs container-mutator side effects
+        # (`list.add(tainted)` taints the receiver in `self.env`). A bare
+        # call-statement like `ids.add(x);` is never routed through
+        # `_eval()` (only assignment/declarator RHS positions are), so
+        # without this it silently skips the mutation and a later
+        # `ids.get(0)` read sees an untainted receiver -- run it here for
+        # its env side effects regardless of the return value.
+        self._eval_call(node)
         chain = _node_chain(node, self.ctx)
         spec = self._lookup_sink(chain)
         custom_hit = False
@@ -464,12 +507,15 @@ class CstFunctionTaintVisitor:
 
         args = _call_args(node)
         candidate_args = args[:1] if (spec.sink_type in _FIRST_ARG_SINKS and not custom_hit and args) else args
+        # Emit a finding for EACH independently-tainted argument, not just
+        # the first: `logger.info(a, b)` with both `a` and `b` tainted from
+        # distinct sources must report both flows, or one is silently
+        # muted -- unacceptable per the never-mute mandate.
         for arg in candidate_args:
             state = self._eval(arg)
             if state is None:
                 continue
             self._emit_finding(state, spec, node, chain, arg_node=arg)
-            break
 
     def _emit_finding(self, state: TaintState, spec: SinkSpec, node, chain: str, arg_node=None) -> None:
         context = 1.0
@@ -485,8 +531,15 @@ class CstFunctionTaintVisitor:
         if final_conf <= 0.0:
             return
         final_conf = min(1.0, final_conf)
-        line = node.start_point[0] + 1
-        col = node.start_point[1]
+        # Position the sink step at the tainted ARGUMENT, not the call node
+        # itself: two independently-tainted arguments to the same call
+        # (e.g. `logger.info(a, b)`) otherwise share one (line, column),
+        # which collapses to a single finding under dispatch's
+        # (file, line, column, cwe_id) dedup key -- silently muting the
+        # second argument's flow.
+        pos_node = arg_node if arg_node is not None else node
+        line = pos_node.start_point[0] + 1
+        col = pos_node.start_point[1]
         sink_step = self._make_step(line, "sink", chain, column=col)
         self.found_flows.append(self._build_flow(state, spec, sink_step, final_conf))
 

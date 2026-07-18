@@ -33,25 +33,45 @@ EXACT_SANITIZERS = frozenset({
     "bindparam",
 })
 
-# JavaScript/TypeScript exact sanitizers (Express/Node ecosystem).
+# JavaScript/TypeScript UNSHADOWABLE exact sanitizers: language builtins and
+# module-namespaced calls on receivers that are never plausibly redefined by
+# application code without an obvious binding change (no import/binding
+# resolution is implemented, so these are trusted as-is). Full-drop (0.0).
 JS_EXACT_SANITIZERS = frozenset({
     "parseInt", "parseFloat", "Number", "Boolean", "String",
     "encodeURIComponent", "encodeURI",
-    "DOMPurify.sanitize", "sanitize-html", "sanitizeHtml",
-    "escapeHtml", "he.encode", "validator.escape",
     "path.normalize", "path.basename",
     "mysql.escape", "pg.escapeLiteral", "connection.escape",
     "util.escapeRegExp",
 })
 
-# Java exact sanitizers (Servlet/Spring ecosystem: parameterized queries and
-# well-understood encoders neutralize the corresponding sink class).
+# JavaScript/TypeScript SHADOWABLE library sanitizers: plausible for a local
+# function/const of the same bare name (e.g. `function escapeHtml(x){return
+# x}`) to shadow the real library call without our (absent) binding
+# resolution being able to tell the difference. A no-op local shadow must
+# NOT fully launder a real flow -- downgrade only (heuristic factor),
+# never full-drop, until import/binding resolution lands.
+JS_LIBRARY_SANITIZERS = frozenset({
+    "DOMPurify.sanitize", "sanitize-html", "sanitizeHtml",
+    "escapeHtml", "he.encode", "validator.escape",
+})
+
+# Java UNSHADOWABLE exact sanitizers (JDBC API / stdlib boxing methods and
+# well-known encoder classes are not plausibly shadowed by a same-named
+# local method in idiomatic Java -- methods are always receiver-qualified
+# and the JDK/JDBC types cannot be redeclared).
 JAVA_EXACT_SANITIZERS = frozenset({
     "PreparedStatement", "preparedStatement", "setString", "setInt",
     "Integer.parseInt", "Integer.valueOf", "Long.parseLong", "Double.parseDouble",
+    "URLEncoder.encode", "UUID.fromString",
+})
+
+# Java SHADOWABLE library sanitizers: third-party encoder helpers where a
+# locally-declared same-named static method could plausibly shadow the real
+# import without binding resolution catching it. Downgrade only.
+JAVA_LIBRARY_SANITIZERS = frozenset({
     "StringEscapeUtils.escapeHtml4", "StringEscapeUtils.escapeSql",
     "ESAPI.encoder", "Encode.forHtml", "Encode.forJavaScript",
-    "URLEncoder.encode", "UUID.fromString",
 })
 
 # Naming conventions that *suggest* a custom sanitizer.
@@ -87,6 +107,13 @@ def classify_sanitizer(
         return SanitizerMatch(call_chain, "exact", 0.0)
     if call_chain in JAVA_EXACT_SANITIZERS or tail in JAVA_EXACT_SANITIZERS:
         return SanitizerMatch(call_chain, "exact", 0.0)
+    # Shadowable library sanitizers: without binding resolution we cannot
+    # tell a real import apart from a locally-declared no-op of the same
+    # name, so only downgrade (never fully drop) the flow.
+    if call_chain in JS_LIBRARY_SANITIZERS or tail in JS_LIBRARY_SANITIZERS:
+        return SanitizerMatch(call_chain, "heuristic", HEURISTIC_SANITIZER_FACTOR)
+    if call_chain in JAVA_LIBRARY_SANITIZERS or tail in JAVA_LIBRARY_SANITIZERS:
+        return SanitizerMatch(call_chain, "heuristic", HEURISTIC_SANITIZER_FACTOR)
     lowered = tail.lower()
     if lowered.startswith(_HEURISTIC_PREFIXES) or call_chain in _HEURISTIC_EXACT:
         return SanitizerMatch(call_chain, "heuristic", HEURISTIC_SANITIZER_FACTOR)
