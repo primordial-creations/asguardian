@@ -180,6 +180,56 @@ if signature.classification == PoolSignatureClass.POOL_EXHAUSTION:
 
 ---
 
+### 5. Query Budget Analyzer (`QueryBudgetAnalyzer`)
+
+**Purpose**: Work-normalized latency SLI (DEEPTHINK_09): static slow-query
+thresholds punish heavy-but-efficient queries and mask fast-path
+regressions when work (rows scanned, bytes read) varies by orders of
+magnitude. Evaluates `sli_passed = duration <= base_ms + f(units) *
+cost_per_unit_ms` per query. The budget math itself lives once in
+`SLO.services.dynamic_budget.DynamicLatencyBudget`; this is a thin,
+Database-shaped adapter plus a calibration helper.
+
+```python
+from Asgard.Verdandi.Database import QueryBudgetAnalyzer, QueryBudgetConfig
+
+analyzer = QueryBudgetAnalyzer()
+config = QueryBudgetConfig(base_ms=50.0, cost_per_unit_ms=0.5, unit="rows_scanned")
+
+# rows=0 -> 50ms budget (cache-hit path); rows=10_000 -> 5050ms budget
+result = analyzer.evaluate(config, durations_ms=[300.0, 4900.0], units=[0, 10_000])
+print(result.sli_passed_fraction, result.violations)   # 0.5 [0] -- the zero-row query fails
+
+# Calibrate base_ms/cost_per_unit_ms from a healthy baseline week via a
+# robust (Theil-Sen) slope + p75 intercept fit
+fitted = analyzer.calibrate(baseline_durations_ms, baseline_units)
+```
+
+### 6. Query Fingerprint Segmentation (`QueryMetricsCalculator.analyze_by_fingerprint`)
+
+**Purpose**: Normalize query text into a fingerprint (literals/whitespace
+collapsed) and compute per-class percentiles, so one blended P99 across
+`GET /user` lookups and export queries no longer hides 80x degradations
+(DEEPTHINK_04). With a baseline (fingerprint -> durations), flags classes
+whose median shifted more than `shift_threshold` baseline MADs (a robust,
+Hodges-Lehmann-style shift test — Plan 03).
+
+```python
+from Asgard.Verdandi.Database import QueryMetricsCalculator, fingerprint_query
+
+calc = QueryMetricsCalculator()
+classes = calc.analyze_by_fingerprint(queries, baseline=baseline_by_fingerprint)
+for c in classes:
+    if c.shift_detected:
+        print(c.fingerprint, c.p95_ms, c.shift_notes)
+```
+
+Static slow-query buckets (10/100/1000ms) remain as a legacy view on
+`QueryMetricsResult`; primary verdicts should move to budget violations
+(§5) and per-class shifts (§6).
+
+---
+
 ## CLI Usage
 
 ```bash
@@ -273,6 +323,37 @@ class PoolSignature(BaseModel):
     corroborated_by_wait_samples: bool
     warnings: List[str]
     recommendations: List[str]
+```
+
+### QueryBudgetConfig / QueryBudgetResult
+```python
+class QueryBudgetConfig(BaseModel):
+    base_ms: float                 # default 50.0
+    cost_per_unit_ms: float        # default 0.5
+    unit: str                      # rows_scanned | bytes_read | planner_cost
+    model: str                     # linear | nlogn
+
+class QueryBudgetResult(BaseModel):
+    config: QueryBudgetConfig
+    total: int
+    good: int
+    sli_passed_fraction: Optional[float]
+    violations: List[int]          # indices of queries that exceeded budget
+    notes: List[str]
+```
+
+### QueryClassStats
+```python
+class QueryClassStats(BaseModel):
+    fingerprint: str
+    count: int
+    p50_ms: float
+    p95_ms: float
+    p99_ms: float
+    mean_ms: float
+    max_ms: float
+    shift_detected: bool           # HL-style shift vs baseline
+    shift_notes: List[str]
 ```
 
 ---

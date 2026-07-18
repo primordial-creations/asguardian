@@ -129,6 +129,80 @@ print(result.utilization_misleading_for_parallel_devices)  # True
 
 ---
 
+### 4. PSI Analyzer (`PsiAnalyzer`)
+
+**Purpose**: Interpret `/proc/pressure/{cpu,memory,io}`-shaped snapshots —
+the unified replacement for the utilization-average edge cases (RESEARCH_12
+sec5).
+
+**Severity**: `full_avg10 > 0` → critical (whole-cgroup stall); `some_avg10 >
+25` → severe; `some_avg10 > 10` → warning.
+
+**Trajectory**: `avg10 / avg300 > 2` → `fresh_spike`; both elevated →
+`sustained_bottleneck`. A large jump in `total_us` between snapshots that
+isn't explained by `avg10` flags `micro_burst_detected` (sub-10s stalls
+smoothed out of the rolling averages — e.g. CFS throttle bursts).
+
+**Cross-resource diagnosis** (`analyze_cross_resource`): `io.some↑` with
+`memory.some≈0` → pure disk bottleneck; `memory.full↑ + io.some↑` →
+thrashing; `cpu.some↑` alone → run-queue contention.
+
+```python
+from Asgard.Verdandi.System import PsiAnalyzer, PsiSnapshot, PsiResource
+
+analyzer = PsiAnalyzer()
+snap = PsiSnapshot(resource=PsiResource.MEMORY, some_avg10=40, full_avg10=3)
+report = analyzer.analyze(snap)
+print(report.severity)  # "critical"
+```
+
+### 5. CFS Throttling Analyzer (`CgroupAnalyzer`)
+
+**Purpose**: Turn `nr_throttled`/`nr_periods`/`throttled_time_ns` cgroup
+counters into an effective-quota-starvation verdict (RESEARCH_12 sec2.3).
+
+**Bands**: `throttle_ratio > 25%` → critical; `> 5%` → warning, with an
+explicit note that request-clustered bursts mean user-facing impact is
+several times the raw ratio. Throttling while the node has idle cores flags
+`limit_induced_latency` (raise/remove the limit, or use Guaranteed QoS).
+`max_injected_latency_ms = period - quota` estimates the worst-case
+per-period stall.
+
+```python
+from Asgard.Verdandi.System import CgroupAnalyzer, CgroupCpuStats
+
+analyzer = CgroupAnalyzer()
+stats = CgroupCpuStats(
+    cpu_quota_us=50_000, cpu_period_us=100_000,
+    nr_periods=1000, nr_throttled=300, throttled_time_ns=15_000_000_000,
+)
+report = analyzer.analyze(stats)
+print(report.verdict, report.max_injected_latency_ms)  # "critical" 50.0
+```
+
+### 6. USE↔RED Correlator (`UseRedCorrelator`)
+
+**Purpose**: Encode the USE→RED causality chain (Rate↑ → Utilization↑ →
+Saturation spike → p99 Duration degrades first → Errors↑ → Rate collapses)
+as a correlation/ordering analysis instead of three unrelated health scores.
+
+Cross-correlates a saturation series (run-queue, PSI, `aqu-sz`, throttle
+ratio, ...) against p99 duration at small lags; the lag with the strongest
+Pearson r identifies whether saturation *leads* the degradation
+(`capacity_bound`) or whether saturation stays flat while p99 rises
+(`regression_suspected` — not a capacity problem, route to anomaly/
+regression analysis).
+
+```python
+from Asgard.Verdandi.System import UseRedCorrelator
+
+correlator = UseRedCorrelator()
+result = correlator.correlate(saturation=[...], p99_duration_ms=[...])
+print(result.best_lag, result.verdict)
+```
+
+---
+
 ## CLI Usage
 
 ```bash
@@ -205,6 +279,64 @@ class IoMetrics(BaseModel):
     utilization_misleading_for_parallel_devices: bool
     status: str
     recommendations: List[str]
+```
+
+### PsiSnapshot / PsiReport
+```python
+class PsiSnapshot(BaseModel):
+    resource: PsiResource             # cpu | memory | io
+    some_avg10: float
+    some_avg60: float
+    some_avg300: float
+    full_avg10: float
+    full_avg60: float
+    full_avg300: float
+    total_us: int
+    cgroup_id: Optional[str]
+    timestamp: Optional[float]
+
+class PsiReport(BaseModel):
+    resource: Optional[PsiResource]
+    severity: str                     # healthy | warning | severe | critical
+    trajectory: Optional[str]         # fresh_spike | sustained_bottleneck
+    micro_burst_detected: bool
+    cross_resource_diagnosis: Optional[str]
+    notes: List[str]
+    recommendations: List[str]
+```
+
+### CgroupCpuStats / ThrottleReport
+```python
+class CgroupCpuStats(BaseModel):
+    cpu_quota_us: Optional[int]
+    cpu_period_us: int
+    nr_periods: int
+    nr_throttled: int
+    throttled_time_ns: int
+    usage_ns: Optional[int]
+    limit_cores: Optional[float]
+    request_cores: Optional[float]
+    idle_cores_available: Optional[bool]
+
+class ThrottleReport(BaseModel):
+    throttle_ratio: Optional[float]
+    avg_stall_ms: Optional[float]
+    max_injected_latency_ms: Optional[float]
+    verdict: str                      # healthy | warning | critical
+    limit_induced_latency: bool
+    notes: List[str]
+    recommendations: List[str]
+```
+
+### UseRedCorrelation
+```python
+class UseRedCorrelation(BaseModel):
+    best_lag: Optional[int]
+    best_correlation: Optional[float]
+    correlations_by_lag: Dict[int, float]
+    verdict: str                      # capacity_bound | regression_suspected | insufficient_data
+    ordering_confirmed: bool
+    notes: List[str]
 ```
 
 ---

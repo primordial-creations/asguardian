@@ -30,6 +30,9 @@ class QueryMetricsInput(BaseModel):
     rows_affected: int = Field(default=0, description="Number of rows affected")
     used_index: bool = Field(default=True, description="Whether query used an index")
     timestamp: Optional[str] = Field(default=None, description="Query timestamp")
+    query_text: Optional[str] = Field(
+        default=None, description="Raw SQL text, used for fingerprint normalization"
+    )
 
 
 class QueryMetricsResult(BaseModel):
@@ -144,6 +147,48 @@ class PoolSignature(BaseModel):
     corroborated_by_wait_samples: bool = Field(default=False)
     warnings: List[str] = Field(default_factory=list)
     recommendations: List[str] = Field(default_factory=list)
+
+
+class QueryBudgetConfig(BaseModel):
+    """Work-normalized latency budget configuration (DEEPTHINK_09)."""
+
+    base_ms: float = Field(default=50.0, description="Fixed baseline latency budget")
+    cost_per_unit_ms: float = Field(
+        default=0.5, description="Milliseconds of budget granted per work unit"
+    )
+    unit: str = Field(
+        default="rows_scanned", description="rows_scanned | bytes_read | planner_cost"
+    )
+    model: str = Field(default="linear", description="linear | nlogn")
+
+
+class QueryBudgetResult(BaseModel):
+    """Per-query and aggregate work-normalized budget evaluation."""
+
+    config: QueryBudgetConfig = Field(...)
+    total: int = Field(default=0)
+    good: int = Field(default=0)
+    sli_passed_fraction: Optional[float] = Field(default=None)
+    violations: List[int] = Field(
+        default_factory=list, description="Indices of queries that exceeded budget"
+    )
+    notes: List[str] = Field(default_factory=list)
+
+
+class QueryClassStats(BaseModel):
+    """Per-fingerprint (query class) statistics."""
+
+    fingerprint: str = Field(...)
+    count: int = Field(default=0)
+    p50_ms: float = Field(default=0.0)
+    p95_ms: float = Field(default=0.0)
+    p99_ms: float = Field(default=0.0)
+    mean_ms: float = Field(default=0.0)
+    max_ms: float = Field(default=0.0)
+    shift_detected: bool = Field(
+        default=False, description="Hodges-Lehmann shift vs baseline detected"
+    )
+    shift_notes: List[str] = Field(default_factory=list)
 
 
 class TransactionMetrics(BaseModel):

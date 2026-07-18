@@ -25,6 +25,8 @@ from Asgard.Verdandi.Cache.models.cache_models import (
     KeyAnalysisResult,
     KeyStats,
     SegmentedCacheSLO,
+    StampedeKeyReport,
+    StampedeReport,
     TTLAnalysis,
     WarmupState,
     WarmupTrajectory,
@@ -33,6 +35,7 @@ from Asgard.Verdandi.Cache.services.cache_calculator import CacheMetricsCalculat
 from Asgard.Verdandi.Cache.services.eviction_analyzer import EvictionAnalyzer
 from Asgard.Verdandi.Cache.services.warmup_analyzer import WarmupAnalyzer
 from Asgard.Verdandi.Cache.services.segmented_slo import SegmentedSloAnalyzer
+from Asgard.Verdandi.Cache.services.stampede_analyzer import StampedeAnalyzer
 
 __all__ = [
     "CacheEfficiency",
@@ -44,6 +47,9 @@ __all__ = [
     "KeyStats",
     "SegmentedCacheSLO",
     "SegmentedSloAnalyzer",
+    "StampedeAnalyzer",
+    "StampedeKeyReport",
+    "StampedeReport",
     "TTLAnalysis",
     "WarmupAnalyzer",
     "WarmupState",
