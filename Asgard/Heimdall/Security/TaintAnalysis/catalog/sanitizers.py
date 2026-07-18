@@ -33,6 +33,27 @@ EXACT_SANITIZERS = frozenset({
     "bindparam",
 })
 
+# JavaScript/TypeScript exact sanitizers (Express/Node ecosystem).
+JS_EXACT_SANITIZERS = frozenset({
+    "parseInt", "parseFloat", "Number", "Boolean", "String",
+    "encodeURIComponent", "encodeURI",
+    "DOMPurify.sanitize", "sanitize-html", "sanitizeHtml",
+    "escapeHtml", "he.encode", "validator.escape",
+    "path.normalize", "path.basename",
+    "mysql.escape", "pg.escapeLiteral", "connection.escape",
+    "util.escapeRegExp",
+})
+
+# Java exact sanitizers (Servlet/Spring ecosystem: parameterized queries and
+# well-understood encoders neutralize the corresponding sink class).
+JAVA_EXACT_SANITIZERS = frozenset({
+    "PreparedStatement", "preparedStatement", "setString", "setInt",
+    "Integer.parseInt", "Integer.valueOf", "Long.parseLong", "Double.parseDouble",
+    "StringEscapeUtils.escapeHtml4", "StringEscapeUtils.escapeSql",
+    "ESAPI.encoder", "Encode.forHtml", "Encode.forJavaScript",
+    "URLEncoder.encode", "UUID.fromString",
+})
+
 # Naming conventions that *suggest* a custom sanitizer.
 _HEURISTIC_PREFIXES = ("clean", "sanitize", "sanitise", "validate", "escape_", "strip_")
 _HEURISTIC_EXACT = frozenset({"re.sub", "sub"})
@@ -61,6 +82,10 @@ def classify_sanitizer(
         if call_chain == custom or call_chain.endswith("." + custom) or tail == custom:
             return SanitizerMatch(call_chain, "exact", 0.0)
     if call_chain in EXACT_SANITIZERS or tail in EXACT_SANITIZERS:
+        return SanitizerMatch(call_chain, "exact", 0.0)
+    if call_chain in JS_EXACT_SANITIZERS or tail in JS_EXACT_SANITIZERS:
+        return SanitizerMatch(call_chain, "exact", 0.0)
+    if call_chain in JAVA_EXACT_SANITIZERS or tail in JAVA_EXACT_SANITIZERS:
         return SanitizerMatch(call_chain, "exact", 0.0)
     lowered = tail.lower()
     if lowered.startswith(_HEURISTIC_PREFIXES) or call_chain in _HEURISTIC_EXACT:

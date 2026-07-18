@@ -1,0 +1,33 @@
+# JavaScript/TypeScript taint benchmark corpus (plan 04 Phase 4; plan 01
+# wave 2 acceptance gate: migrated rules must ship benchmark corpus cases).
+#
+# Each fixture is scanned in isolation through DispatchEngine.scan_file and
+# checked against the expected outcome:
+#   expect: flow     -> exactly `count` flows, with the given bucket/severity
+#   expect: no_flow  -> zero flows (parameterized queries, exact sanitizers,
+#                       constant-only concatenation)
+cases:
+  - file: tp_sqli_concat.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: tp_command_injection.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: tp_dom_xss_innerhtml.js
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [certain, probable]
+    cwe: CWE-79
+  - file: fp_parameterized_query.js
+    expect: no_flow
+  - file: fp_exact_sanitizer.js
+    expect: no_flow
+  - file: fp_constant_concat.js
+    expect: no_flow
