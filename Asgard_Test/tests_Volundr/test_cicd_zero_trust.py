@@ -425,6 +425,112 @@ class TestOtherPlatformHardening:
         assert deploy_entry["deploy"]["filters"]["branches"]["only"] == ["main"]
 
 
+class TestNonGitHubHardeningAndScoring:
+    """Plan 04 + 07: GitLab CI and Azure DevOps must not be second-class —
+    injection-immunity and the shared Validation+Scoring engine apply to
+    them exactly as they do to GitHub Actions, instead of emitting raw
+    ``${{ }}`` interpolation and falling back to the legacy config-shape
+    score."""
+
+    def test_gitlab_script_is_hardened_no_raw_interpolation(self, generator):
+        config = PipelineConfig(
+            name="CI", platform=CICDPlatform.GITLAB_CI,
+            stages=[PipelineStage(
+                name="Build",
+                steps=[StepConfig(
+                    name="b",
+                    run='echo "${{ github.event.pull_request.title }}"',
+                )],
+            )],
+        )
+        result = generator.generate(config)
+        parsed = yaml.safe_load(result.pipeline_content)
+        job = parsed["build"]
+        # The script text itself must never carry a raw interpolation
+        # primitive; the expression is hoisted into a job variable instead
+        # (the variable's own value still carries the GHA-context
+        # expression text as provenance — GitLab has no equivalent syntax
+        # to resolve it into, so this is documentation, not a functional
+        # substitution).
+        assert not any("${{" in s for s in job.get("script", []))
+        assert any("github.event.pull_request.title" in str(v)
+                   for v in job.get("variables", {}).values())
+
+    def test_azure_script_is_hardened_no_raw_interpolation(self, generator):
+        config = PipelineConfig(
+            name="CI", platform=CICDPlatform.AZURE_DEVOPS,
+            triggers=[TriggerConfig(type=TriggerType.PUSH, branches=["main"])],
+            stages=[PipelineStage(
+                name="Build",
+                steps=[StepConfig(
+                    name="b",
+                    run='echo "${{ github.event.issue.title }}"',
+                )],
+            )],
+        )
+        result = generator.generate(config)
+        parsed = yaml.safe_load(result.pipeline_content)
+        job = parsed["stages"][0]["jobs"][0]
+        assert not any(
+            "${{" in (s.get("script") or "") for s in job.get("steps", [])
+        )
+        assert any("github.event.issue.title" in str(v)
+                   for v in job.get("variables", {}).values())
+
+    def test_gitlab_routes_through_validation_and_scoring_engine(self, generator):
+        config = PipelineConfig(
+            name="CI", platform=CICDPlatform.GITLAB_CI,
+            stages=[PipelineStage(name="Build",
+                                  steps=[StepConfig(name="b", run="make")])],
+        )
+        result = generator.generate(config)
+        assert result.score_report is not None
+        assert result.best_practice_score == result.score_report.composite
+
+    def test_azure_routes_through_validation_and_scoring_engine(self, generator):
+        config = PipelineConfig(
+            name="CI", platform=CICDPlatform.AZURE_DEVOPS,
+            triggers=[TriggerConfig(type=TriggerType.PUSH, branches=["main"])],
+            stages=[PipelineStage(name="Build",
+                                  steps=[StepConfig(name="b", run="make")])],
+        )
+        result = generator.generate(config)
+        assert result.score_report is not None
+        assert result.best_practice_score == result.score_report.composite
+
+    def test_gitlab_static_secret_flagged_by_shared_engine(self, generator):
+        config = PipelineConfig(
+            name="CI", platform=CICDPlatform.GITLAB_CI,
+            stages=[PipelineStage(
+                name="Deploy",
+                environment="prod",
+                steps=[StepConfig(
+                    name="d",
+                    run="deploy.sh",
+                    env={"KEY": "${{ secrets.AWS_ACCESS_KEY_ID }}"},
+                )],
+            )],
+        )
+        result = generator.generate(config)
+        assert any(
+            "VOL-CICD-0005" in v for v in result.validation_results
+        ), result.validation_results
+
+    def test_jenkins_and_circleci_still_use_legacy_score(self, generator):
+        # Jenkins (Groovy DSL) and CircleCI (schema not normalized) are
+        # explicitly out of scope for this pass — they must keep working
+        # via the legacy config-shape score rather than erroring.
+        for platform in (CICDPlatform.JENKINS, CICDPlatform.CIRCLECI):
+            config = PipelineConfig(
+                name="CI", platform=platform,
+                stages=[PipelineStage(name="Build",
+                                      steps=[StepConfig(name="b", run="make")])],
+            )
+            result = generator.generate(config)
+            assert result.score_report is None
+            assert isinstance(result.best_practice_score, float)
+
+
 class TestSuppressions:
     def _config_with_unknown_action(self, suppressions):
         return PipelineConfig(

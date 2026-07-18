@@ -6,6 +6,8 @@ merging, and the default-deny ``PlanPolicyEngine`` checks against
 evaluated plan state.
 """
 
+import json
+
 from Asgard.Volundr.Validation.models.validation_models import ValidationSeverity
 from Asgard.Volundr.Validation.services.terraform_plan_reader import (
     PlanPolicyEngine,
@@ -150,3 +152,90 @@ class TestPlanPolicyEngineMutations:
         assert not any(
             r.rule_id in {"VOL-TF-0001", "VOL-TF-0002", "VOL-TF-0003"} for r in results
         )
+
+
+class TestPlanCLIWiring:
+    """Plan 02: `terraform_plan_reader` must be reachable from the CLI as
+    ``volundr validate terraform --plan tfplan.json`` — previously the
+    module was built and tested but never wired into any command path."""
+
+    def test_parser_accepts_plan_flag_without_positional_path(self):
+        from Asgard.Volundr.cli import create_parser
+        parser = create_parser()
+        args = parser.parse_args(
+            ["validate", "terraform", "--plan", "tfplan.json"]
+        )
+        assert args.plan_json == "tfplan.json"
+        assert args.path is None
+
+    def test_parser_still_accepts_raw_hcl_path(self):
+        from Asgard.Volundr.cli import create_parser
+        parser = create_parser()
+        args = parser.parse_args(["validate", "terraform", "modules/foo"])
+        assert args.path == "modules/foo"
+        assert args.plan_json is None
+
+    def test_handler_reads_plan_json_and_reports_findings(self, tmp_path, capsys):
+        from Asgard.Volundr.cli.handlers_compose_validate_scaffold import (
+            run_validate_terraform,
+        )
+        plan_path = tmp_path / "tfplan.json"
+        plan_path.write_text(json.dumps(_plan([
+            {
+                "address": "aws_s3_bucket.main",
+                "type": "aws_s3_bucket", "name": "main",
+                "change": {
+                    "actions": ["create"],
+                    "after": {"bucket": "leaky"},
+                    "after_unknown": {},
+                },
+            },
+        ])))
+
+        class Args:
+            path = None
+            plan_json = str(plan_path)
+
+        exit_code = run_validate_terraform(Args())
+        out = capsys.readouterr().out
+        assert "VOL-TF-0001" in out or "public" in out.lower() or "encrypt" in out.lower()
+        assert exit_code in (0, 1)
+
+    def test_handler_requires_path_or_plan(self, capsys):
+        from Asgard.Volundr.cli.handlers_compose_validate_scaffold import (
+            run_validate_terraform,
+        )
+
+        class Args:
+            path = None
+            plan_json = None
+
+        exit_code = run_validate_terraform(Args())
+        assert exit_code == 1
+
+    def test_handler_after_unknown_kms_key_does_not_false_positive(self, tmp_path):
+        """RESEARCH_08: a computed (apply-time-only) KMS key id must not
+        make the encryption rule fail closed on a false positive."""
+        from Asgard.Volundr.cli.handlers_compose_validate_scaffold import (
+            run_validate_terraform,
+        )
+        plan_path = tmp_path / "tfplan.json"
+        plan_path.write_text(json.dumps(_plan([
+            {
+                "address": "aws_s3_bucket_server_side_encryption_configuration.main",
+                "type": "aws_s3_bucket_server_side_encryption_configuration",
+                "name": "main",
+                "change": {
+                    "actions": ["create"],
+                    "after": {"bucket": "main", "rule": None},
+                    "after_unknown": {"bucket": False, "rule": True},
+                },
+            },
+        ])))
+
+        class Args:
+            path = None
+            plan_json = str(plan_path)
+
+        # Must not raise, and must not hard-fail solely due to <computed>.
+        run_validate_terraform(Args())

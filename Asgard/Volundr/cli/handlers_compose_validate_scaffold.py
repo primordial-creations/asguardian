@@ -1,4 +1,6 @@
 import argparse
+import hashlib
+from datetime import datetime
 from pathlib import Path
 
 from Asgard.common.output_formatter import OutputFormat, UnifiedFormatter
@@ -15,6 +17,12 @@ from Asgard.Volundr.Validation import (
     DockerfileValidator,
     ValidationContext,
 )
+from Asgard.Volundr.Validation.models.validation_models import (
+    FileValidationSummary,
+    ValidationReport,
+    ValidationSeverity,
+)
+from Asgard.Volundr.Validation.services.terraform_plan_reader import check_plan_file
 from Asgard.Volundr.Scaffold import (
     ServiceConfig,
     ProjectConfig,
@@ -102,18 +110,65 @@ def run_validate_kubernetes(args: argparse.Namespace) -> int:
     return 0 if report.passed else 1
 
 
+def _report_from_plan_results(results, plan_path: str) -> ValidationReport:
+    """Wrap `check_plan_file` results into a ValidationReport (plan 02:
+    plan-aware validation shares the same report shape as raw-HCL mode)."""
+    errors = sum(1 for r in results if r.severity == ValidationSeverity.ERROR)
+    warns = sum(1 for r in results if r.severity == ValidationSeverity.WARNING)
+    infos = sum(1 for r in results if r.severity == ValidationSeverity.INFO)
+    score = max(0.0, 100.0 - errors * 10 - warns * 3 - infos * 1)
+    report_id = hashlib.sha256(
+        ("plan" + plan_path + str(results)).encode()
+    ).hexdigest()[:16]
+    return ValidationReport(
+        id=f"volundr-tfplan-{report_id}",
+        title="Volundr Terraform Plan Validation",
+        validator="TerraformPlanReader",
+        results=results,
+        file_summaries=[FileValidationSummary(
+            file_path=plan_path,
+            error_count=errors,
+            warning_count=warns,
+            info_count=infos,
+            passed=errors == 0,
+        )],
+        total_files=1,
+        total_errors=errors,
+        total_warnings=warns,
+        total_info=infos,
+        passed=errors == 0,
+        score=score,
+        created_at=datetime.now(),
+    )
+
+
 def run_validate_terraform(args: argparse.Namespace) -> int:
-    """Validate Terraform configurations."""
-    validator = TerraformValidator()
+    """Validate Terraform configurations.
 
-    path = Path(args.path)
-    if path.is_file():
-        report = validator.validate_file(args.path)
+    Raw-HCL mode (default) walks `.tf` files with `TerraformValidator`.
+    Plan-aware mode (`--plan tfplan.json`) traverses `terraform show -json`
+    evaluated state via `terraform_plan_reader.check_plan_file`, applying
+    the same VOL-TF-* registry rules; `after_unknown` leaves never fail a
+    rule outright (see terraform_plan_reader module docstring).
+    """
+    plan_json = getattr(args, "plan_json", None)
+    if plan_json:
+        results = check_plan_file(plan_json)
+        report = _report_from_plan_results(results, plan_json)
     else:
-        report = validator.validate_directory(args.path)
+        if not args.path:
+            print("Error: provide a path to validate, or --plan tfplan.json")
+            return 1
+        validator = TerraformValidator()
+        path = Path(args.path)
+        if path.is_file():
+            report = validator.validate_file(args.path)
+        else:
+            report = validator.validate_directory(args.path)
 
-    formatter = UnifiedFormatter(OutputFormat.TEXT)
-    print(formatter.format_report(report))
+    for result in report.results:
+        location = f"{result.file_path}: " if result.file_path else ""
+        print(f"[{result.severity.value.upper()}] {location}{result.rule_id}: {result.message}")
 
     print(f"\nValidation Score: {report.score:.1f}/100")
 

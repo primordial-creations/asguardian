@@ -34,9 +34,13 @@ from Asgard.Volundr.Validation.models.validation_models import (
 )
 from Asgard.Volundr.Validation.services.normalizers import (
     has_obsolete_version_key,
+    looks_like_azure_pipeline,
     looks_like_github_workflow,
+    looks_like_gitlab_ci,
+    normalize_azure_pipeline,
     normalize_compose,
     normalize_github_workflow,
+    normalize_gitlab_ci,
     normalize_manifest,
 )
 from Asgard.Volundr.Validation.services.schema_binder import SchemaBinder
@@ -175,14 +179,30 @@ class ValidationEngine:
     def validate_pipeline(
         self, content: str, source: str = "pipeline"
     ) -> ValidationReport:
-        """Validate rendered CI pipeline YAML (GitHub Actions first)."""
+        """Validate rendered CI pipeline YAML.
+
+        GitHub Actions is normalized with full fidelity (permissions,
+        SHA-pin, injection, static-secret, provenance rules). GitLab CI and
+        Azure DevOps are normalized onto the same canonical pipeline-job
+        model so the platform-agnostic rules (timeout, injection,
+        static-secret) apply identically; those platforms have no
+        per-job token-permissions concept, so the permissions rule is
+        deliberately not evaluated for them (see normalizer docstrings).
+        """
         start = time.time()
         docs, _line_maps, results = self._parse(content, source)
 
         for doc in docs:
-            if not isinstance(doc, dict) or not looks_like_github_workflow(doc):
+            if not isinstance(doc, dict):
                 continue
-            jobs = normalize_github_workflow(doc, source)
+            if looks_like_github_workflow(doc):
+                jobs = normalize_github_workflow(doc, source)
+            elif looks_like_gitlab_ci(doc):
+                jobs = normalize_gitlab_ci(doc, source)
+            elif looks_like_azure_pipeline(doc):
+                jobs = normalize_azure_pipeline(doc, source)
+            else:
+                continue
             for job in jobs:
                 results.extend(self.policy_engine.check_pipeline_job(job, source))
             results.extend(
