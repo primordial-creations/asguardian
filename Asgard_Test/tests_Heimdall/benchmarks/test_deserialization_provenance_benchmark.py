@@ -57,9 +57,11 @@ def load_cache():
     assert "hotspot" in f.description.lower()
 
 
-def test_pickle_with_unknown_provenance_defaults_to_hotspot(tmp_path):
-    # No nearby markers either way -- must not be confidently claimed as an
-    # attacker-controlled finding (the 70%-FP "flag every sink" trap).
+def test_pickle_with_unknown_provenance_is_needs_review_medium(tmp_path):
+    # Post-review fix (BLOCKER-1): an unresolvable origin must NEVER be
+    # silently folded into the low-severity hotspot bucket -- "unknown"
+    # is not "safe". A bare parameter with no untrusted OR internal
+    # naming/structural signal surfaces as a needs-review MEDIUM finding.
     report = _scan(tmp_path, """
 import pickle
 
@@ -68,9 +70,10 @@ def load_thing(data):
 """)
     assert report.total_findings == 1
     f = report.findings[0]
-    assert f.is_hotspot is True
+    assert f.is_hotspot is False
     assert f.provenance == "unknown"
-    assert f.severity == "LOW"
+    assert f.severity == "MEDIUM"
+    assert "needs-review" in f.description.lower() or "needs review" in f.description.lower()
 
 
 def test_php_unserialize_from_superglobal_is_untrusted(tmp_path):

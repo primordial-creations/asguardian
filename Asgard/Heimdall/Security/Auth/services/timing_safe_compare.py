@@ -32,9 +32,9 @@ from Asgard.Heimdall.Security.utilities.security_utils import (
 )
 
 _SECRET_LEXICON = (
-    "password", "passwd", "secret", "token", "signature", "sig",
-    "hmac", "digest", "api_key", "apikey", "csrf", "auth_key",
-    "session_key", "private_key",
+    "password", "passwd", "pwd", "secret", "token", "signature", "sig",
+    "hmac", "digest", "hash", "api_key", "apikey", "csrf", "auth_key",
+    "session_key", "private_key", "mac", "otp", "nonce", "cookie", "bearer",
 )
 
 _SEVERITY_FOR_NORMALIZED = {

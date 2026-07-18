@@ -1,9 +1,10 @@
 """Insecure deserialization scanner."""
 
+import ast
 import os
 import re
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 from Asgard.Heimdall.Security.Deserialization.models.deserialization_models import (
     DeserializationFinding,
@@ -11,19 +12,21 @@ from Asgard.Heimdall.Security.Deserialization.models.deserialization_models impo
     DeserializationScanReport,
     DeserializationSeverity,
 )
+from Asgard.Heimdall.Security.Deserialization.services import _deserialization_ast_analysis as _ast_analysis
 from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
 
-# Plan 07.5: backward-window provenance markers. These are intentionally
-# textual (not full inter-procedural taint -- that lives in TaintAnalysis
-# and is a larger lift) but give a "near-free" precision win: a sink fed by
-# an obviously untrusted source nearby is a real finding; one fed by a
-# static/internal source is a hotspot, not a finding. Documented FN: a
-# variable renamed/reassigned outside the window, or untrusted data that
-# arrives via a call several functions away, is not traced (silently
-# treated as unknown -> hotspot, never silently dropped).
+# Post-review fix (BLOCKER-1/2, MAJOR-3): Python provenance classification
+# now goes through real AST variable-origin tracking
+# (`_deserialization_ast_analysis.py`, same pattern as the SSRF module)
+# instead of a fixed-line textual backward window. The window/marker
+# approach below is kept ONLY as the fallback for non-Python languages,
+# where no AST engine is wired in here -- it is deliberately never used
+# for Python anymore precisely because it was gameable by padding
+# (BLOCKER-1) and blind to actual dataflow (MAJOR-3).
 _UNTRUSTED_MARKERS = re.compile(
     r"(?:request\.|req\.|flask\.request|django\.http|self\.request|"
-    r"socket\.(?:recv|accept)|urlopen|urlretrieve|sys\.stdin|input\(|"
+    r"socket\.(?:recv|accept)|urlopen|urlretrieve|sys\.stdin|sys\.argv|"
+    r"os\.environ|input\(|"
     r"\.body\b|\.data\b|\.get_json|\.form\[|\.args\[|"
     r"kafka|rabbitmq|celery|redis\.get|sqs|websocket|ws\.recv|"
     r"\$_(?:GET|POST|REQUEST|COOKIE)|params\[|query\[|"
@@ -34,13 +37,29 @@ _UNTRUSTED_MARKERS = re.compile(
     r"user_data|user_input|untrusted|client_data|raw_input)",
     re.IGNORECASE,
 )
+# BLOCKER-2b fix: `open(...)`/`Path(...)` are no longer treated as
+# unconditional internal markers -- what matters is what path is opened,
+# which the textual approach cannot determine safely. Only genuinely
+# self-contained, non-path-taking internal signals remain here.
 _INTERNAL_MARKERS = re.compile(
-    r"(?:open\(|Path\(|\.read_text\(|\.read_bytes\(|importlib|"
-    r"pkgutil|pkg_resources|__file__|os\.path\.join\(.*(?:config|internal|fixtures))",
+    r"(?:importlib|pkgutil|pkg_resources|__file__)",
     re.IGNORECASE,
 )
-# Backward window size (lines) for the textual provenance scan.
+# Backward window size (lines) for the textual (non-Python fallback only)
+# provenance scan.
 _PROVENANCE_WINDOW = 15
+
+# pattern_type -> expected final-attribute name of the sink Call, used to
+# locate the actual ast.Call node for AST-based provenance resolution.
+_PY_SINK_ATTR_BY_PTYPE = {
+    "pickle_load": "loads",
+    "cpickle_load": "loads",
+    "marshal_load": "loads",
+    "shelve_open": "open",
+    "yaml_unsafe_load": "load",
+    "jsonpickle_decode": "decode",
+    "dill_load": "loads",
+}
 
 _LANG_EXTENSIONS = {
     ".py": "python",
@@ -139,24 +158,45 @@ class DeserializationScanner:
             return findings
 
         try:
-            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            source_text = file_path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             return findings
+        lines = source_text.splitlines()
+
+        py_tree = None
+        if lang == "python":
+            try:
+                py_tree = ast.parse(source_text)
+            except SyntaxError:
+                py_tree = None
 
         for line_num, line in enumerate(lines, 1):
             for regex, severity, ptype, desc, rec in self._compiled[lang]:
                 if regex.search(line):
-                    provenance, confidence, is_hotspot = self._classify_provenance(lines, line_num)
+                    if py_tree is not None:
+                        provenance, confidence, is_hotspot = self._classify_provenance_ast(
+                            py_tree, line_num, ptype
+                        )
+                    else:
+                        provenance, confidence, is_hotspot = self._classify_provenance(lines, line_num)
                     finding_severity = severity
                     description = desc
                     if is_hotspot:
-                        # Never claim gadget-chain proof for data whose origin we
-                        # can't demonstrate is attacker-influenced -- downgrade
-                        # to a hotspot instead of an actionable finding.
+                        # Genuinely internal-only provenance: never claim
+                        # gadget-chain proof, downgrade to a hotspot.
                         finding_severity = "LOW"
                         description = (
                             f"{desc} (data provenance not confirmed attacker-influenced "
                             f"-- reported as a hotspot for review, provenance={provenance})"
+                        )
+                    elif provenance == "unknown":
+                        # BLOCKER-1 directive: unresolved origin is NOT safe.
+                        # Never silently collapse to LOW/hotspot -- surface as
+                        # a "needs review" MEDIUM finding instead.
+                        finding_severity = "MEDIUM"
+                        description = (
+                            f"{desc} (data provenance could not be resolved -- "
+                            f"treated as needs-review, not assumed safe)"
                         )
                     else:
                         description = f"{desc} (deserialization of attacker-influenced data)"
@@ -178,6 +218,43 @@ class DeserializationScanner:
                     ))
 
         return findings
+
+    def _classify_provenance_ast(self, tree: ast.AST, line_num: int, ptype: str):
+        """
+        Post-review (BLOCKER-1/2, MAJOR-3) Python provenance classification:
+        real AST intraprocedural variable-origin tracking of the actual
+        sink argument, via `_deserialization_ast_analysis.resolve_origin`.
+        No fixed line window, no textual co-occurrence -- only the value
+        that actually reaches the sink argument is inspected.
+
+        Returns (provenance, confidence, is_hotspot). "is_hotspot" is True
+        only for a demonstrated-internal chain; "unknown" is surfaced
+        separately by the caller as a needs-review MEDIUM finding, never
+        silently folded into the hotspot/LOW bucket.
+        """
+        expected_attr = _PY_SINK_ATTR_BY_PTYPE.get(ptype)
+        call = _ast_analysis.find_sink_call(tree, line_num, expected_attr)
+        if call is None:
+            # Regex matched but we couldn't locate a corresponding Call
+            # node on this line (e.g. multi-line call, parser quirk) --
+            # don't guess; unresolved is not safe.
+            return "unknown", 0.5, False
+
+        func = _ast_analysis.find_enclosing_function(tree, line_num)
+        func_body = func.body if func is not None else list(ast.walk(tree))
+        param_names: set = set()
+        if func is not None:
+            for a in list(func.args.args) + list(func.args.posonlyargs) + list(func.args.kwonlyargs):
+                param_names.add(a.arg)
+
+        arg = _ast_analysis.extract_sink_arg(call)
+        provenance = _ast_analysis.resolve_origin(arg, func_body, line_num, param_names)
+
+        if provenance == "untrusted":
+            return "untrusted", 0.9, False
+        if provenance == "internal":
+            return "internal", 0.3, True
+        return "unknown", 0.5, False
 
     def _classify_provenance(self, lines: List[str], line_num: int):
         """
