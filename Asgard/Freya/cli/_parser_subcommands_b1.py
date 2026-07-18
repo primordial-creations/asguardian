@@ -126,7 +126,7 @@ def add_security_parser(subparsers) -> None:
     )
     headers_parser.add_argument("url", type=str, help="URL to test")
     headers_parser.add_argument(
-        "--format", "-f", choices=["text", "json", "github"], default="text"
+        "--format", "-f", choices=["text", "json", "github", "html"], default="text"
     )
     headers_parser.add_argument(
         "--output", "-o", type=str, help="Output file path"

@@ -138,6 +138,14 @@ async def run_security_headers(args: argparse.Namespace, verbose: bool = False) 
 
     result = await scanner.scan(args.url)
 
+    if args.format == "html":
+        from Asgard.Freya.Integration.services.html_reporter import HTMLReporter
+        output_path = getattr(args, "output", None) or "freya_security_report.html"
+        report_path = HTMLReporter().generate_security_report(result, output_path)
+        print(f"Report saved to: {report_path}")
+        await scanner.close()
+        return 1 if result.has_issues else 0
+
     if args.format == "json":
         output = result.model_dump_json(indent=2)
     else:

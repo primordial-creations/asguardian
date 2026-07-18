@@ -621,3 +621,149 @@ class TestHTMLReporterBuildJUnitXML:
         xml = reporter._build_junit_xml(report)
 
         assert "&quot;" in xml or "&lt;" in xml or "&gt;" in xml
+
+
+class TestSecurityHtmlReport:
+    """Plan 05 §3.2: mirror the CLI mitigation-framing surfaces into HTML."""
+
+    def _build_result(self):
+        from Asgard.Freya.Security.models.security_header_models import (
+            SecurityHeader,
+            SecurityHeaderReport,
+            SecurityHeaderStatus,
+            MitigationStatus,
+        )
+        csp_header = SecurityHeader(
+            name="Content-Security-Policy",
+            value=None,
+            status=SecurityHeaderStatus.MISSING,
+            is_secure=False,
+            mitigation_status=MitigationStatus.MISSING,
+            threat_context="If an XSS vulnerability exists, the browser has "
+                           "no instructions to block the payload.",
+        )
+        hsts_header = SecurityHeader(
+            name="Strict-Transport-Security",
+            value="max-age=31536000",
+            status=SecurityHeaderStatus.PRESENT,
+            is_secure=True,
+            mitigation_status=MitigationStatus.PRESENT_NEEDS_VERIFICATION,
+            manual_verification="Verify the server drops plain-HTTP before preload pinning.",
+        )
+        return SecurityHeaderReport(
+            url="https://example.com",
+            content_security_policy=csp_header,
+            strict_transport_security=hsts_header,
+            security_score=42.0,
+            score_label="Frontend Defense-in-Depth Score",
+            security_grade="D",
+            disclaimer="This report validates observable signals, not actual posture.",
+            scope_matrix=[
+                {
+                    "control": "CSP",
+                    "tool_validates": "Header presence and directive parsing",
+                    "requires_manual": "Runtime XSS exploitability (DAST)",
+                },
+            ],
+            critical_issues=["Missing Mitigation: Content-Security-Policy"],
+        )
+
+    def test_generate_security_report_writes_file(self, tmp_path):
+        result = self._build_result()
+        output_path = tmp_path / "security.html"
+        reporter = HTMLReporter()
+
+        report_path = reporter.generate_security_report(result, str(output_path))
+
+        assert Path(report_path).exists()
+        content = Path(report_path).read_text(encoding="utf-8")
+        assert "Frontend Defense-in-Depth Score" in content
+        assert result.disclaimer in content
+
+    def test_security_html_includes_mitigation_status_and_threat_context(self):
+        result = self._build_result()
+        html = HTMLReporter()._build_security_html(result, "Security Report")
+
+        assert "missing" in html
+        assert "no instructions to block the payload" in html
+        assert "Verify the server drops plain-HTTP" in html
+
+    def test_security_html_includes_scope_matrix(self):
+        result = self._build_result()
+        html = HTMLReporter()._build_security_html(result, "Security Report")
+
+        assert "Scope Matrix" in html
+        assert "Runtime XSS exploitability (DAST)" in html
+
+    def test_security_html_no_scope_matrix_section_when_empty(self):
+        result = self._build_result()
+        result.scope_matrix = []
+        html = HTMLReporter()._build_security_html(result, "Security Report")
+
+        assert "scope-matrix" not in html
+
+
+class TestBaselineComparisonHtmlReport:
+    """Plan 04 §3.3: display baseline vs current fingerprint in HTML."""
+
+    def _build_result(self, status="compared", environment_status="none"):
+        return {
+            "success": True,
+            "status": status,
+            "passed": False,
+            "baseline": {
+                "name": "home",
+                "fingerprint": {
+                    "os_name": "Linux",
+                    "os_release": "6.0",
+                    "browser_name": "chromium",
+                    "browser_version": "120.0",
+                    "playwright_version": "1.40.0",
+                    "viewport": "1920x1080",
+                    "device_scale_factor": 1.0,
+                },
+            },
+            "current_fingerprint": {
+                "os_name": "Linux",
+                "os_release": "6.0",
+                "browser_name": "chromium",
+                "browser_version": "121.0",
+                "playwright_version": "1.40.0",
+                "viewport": "1920x1080",
+                "device_scale_factor": 1.0,
+            },
+            "environment_status": environment_status,
+            "environment_warning": None,
+            "framing": "Structural tripwire: 2.50% of pixels diverged from baseline 'home'.",
+            "has_difference": True,
+            "difference_percentage": 2.5,
+            "diff_image_path": "/tmp/diff.png",
+        }
+
+    def test_generate_baseline_comparison_writes_file(self, tmp_path):
+        result = self._build_result()
+        output_path = tmp_path / "compare.html"
+        reporter = HTMLReporter()
+
+        report_path = reporter.generate_baseline_comparison(result, str(output_path))
+
+        assert Path(report_path).exists()
+        content = Path(report_path).read_text(encoding="utf-8")
+        assert "Structural tripwire" in content
+
+    def test_baseline_comparison_html_shows_fingerprint_side_by_side(self):
+        result = self._build_result()
+        html = HTMLReporter()._build_baseline_comparison_html(result, "Comparison")
+
+        assert "120.0" in html
+        assert "121.0" in html
+        assert "chromium" in html
+
+    def test_baseline_comparison_html_shows_mismatch_banner(self):
+        result = self._build_result(status="environment_mismatch", environment_status="hard")
+        result["mismatched_fields"] = ["device_scale_factor"]
+        result["rationale"] = "cross-environment pixel comparison measures the environment"
+        html = HTMLReporter()._build_baseline_comparison_html(result, "Comparison")
+
+        assert "INCONCLUSIVE" in html
+        assert "device_scale_factor" in html
