@@ -1,0 +1,21 @@
+{
+  "_comment": [
+    "Plan 10 CVE-holdout manifest schema. Repos are referenced by commit",
+    "SHA + patch line spans, never vendored (see Asgard/Heimdall/evaluation/corpus.py).",
+    "CVE holdouts require a local checkout (`checkout_root`) supplied at",
+    "run time -- CI runs without network, so this seed manifest ships with",
+    "zero entries populated; curating the 50 CVE / 50 clean-repo corpus",
+    "called for in plan 10 s1 is tracked as follow-up work (needs network",
+    "access to clone/pin real OSS repos, out of scope for this harness",
+    "commit). CorpusManifest.load()/.ground_truth_instances() are exercised",
+    "against this schema by test_corpus_manifest.py using a temp fixture",
+    "manifest with synthetic entries."
+  ],
+  "cve_holdouts": [],
+  "clean_repos": [],
+  "stratification": {
+    "framework": {"django": 0.40, "fastapi_starlette": 0.30, "flask": 0.15, "non_web": 0.15},
+    "maturity": {"enterprise": 0.30, "mid": 0.50, "hobbyist": 0.20},
+    "temporal_holdout_min_fraction": 0.50
+  }
+}
