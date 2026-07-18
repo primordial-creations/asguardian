@@ -277,7 +277,8 @@ app.listen(PORT, () => {{
         mock_data = {}
         for endpoint in server_def.endpoints:
             default_status = endpoint.default_response or "200"
-            response_key = f"{endpoint.method.value}_{endpoint.path}_{default_status}"
+            method_str = endpoint.method.value if hasattr(endpoint.method, "value") else str(endpoint.method)
+            response_key = f"{method_str}_{endpoint.path}_{default_status}"
             if default_status in endpoint.responses:
                 mock_data[response_key] = endpoint.responses[default_status].body
         files.append(GeneratedFile(path="mockData.json", content=json.dumps(mock_data, indent=2), file_type="json"))

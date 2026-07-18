@@ -163,6 +163,21 @@ def _add_contract_parser(subparsers: argparse._SubParsersAction) -> None:
                       help="Disable TLS certificate verification")
     add_performance_flags(test)
 
+    workflow = contract_sub.add_parser(
+        "workflow",
+        help="Run an Arazzo-lite multi-step workflow against a live implementation "
+             "(Cost: NETWORK, explicit opt-in)",
+    )
+    workflow.add_argument("workflow_file", help="Workflow YAML file (steps: [{operationId, extract, expect}])")
+    workflow.add_argument("--spec", required=True, help="OpenAPI specification file (resolves operationIds)")
+    workflow.add_argument("--base-url", required=True, help="Base URL of the live implementation")
+    workflow.add_argument("--auth-header", default=None, help="Raw 'Header: value' string")
+    workflow.add_argument("--timeout", type=float, default=5.0, dest="timeout_s",
+                          help="Per-request socket timeout in seconds")
+    workflow.add_argument("--no-verify-tls", action="store_false", dest="verify_tls",
+                          help="Disable TLS certificate verification")
+    add_performance_flags(workflow)
+
 
 def _add_align_parser(subparsers: argparse._SubParsersAction) -> None:
     """Add Alignment (cross-format entity alignment) subparser."""
@@ -243,12 +258,27 @@ def _add_mock_parser(subparsers: argparse._SubParsersAction) -> None:
     generate.add_argument("--framework", choices=["flask", "fastapi", "express"], default="flask",
                          help="Server framework to generate (default: flask)")
     generate.add_argument("--port", type=int, default=8080, help="Port for mock server (default: 8080)")
+    generate.add_argument("--stateful", action="store_true",
+                          help="Generate a WireMock-style in-memory resource store: POST creates "
+                               "under a generated id, GET/PUT/DELETE {id} operate on stored state")
 
     data = mock_sub.add_parser("data", help="Generate mock data from schema")
     data.add_argument("schema_file", help="Path to JSON Schema file")
     data.add_argument("--count", type=int, default=1, help="Number of items to generate (default: 1)")
     data.add_argument("--output", "-o", help="Output file path")
     data.add_argument("--seed", type=int, help="Random seed for reproducible generation")
+
+    proxy = mock_sub.add_parser(
+        "proxy",
+        help="Validation proxy: forward requests to --upstream, validate against spec, "
+             "report drift (Cost: NETWORK, explicit opt-in)",
+    )
+    proxy.add_argument("spec_file", help="Path to OpenAPI specification file")
+    proxy.add_argument("--upstream", required=True, help="Upstream base URL to forward requests to")
+    proxy.add_argument("--port", type=int, default=8080, help="Port to listen on (default: 8080)")
+    proxy.add_argument("--host", default="0.0.0.0", help="Host to bind to (default: 0.0.0.0)")
+    proxy.add_argument("--timeout", type=float, default=5.0, dest="timeout_s",
+                       help="Per-request upstream timeout in seconds")
 
 
 def _add_codegen_parser(subparsers: argparse._SubParsersAction) -> None:
