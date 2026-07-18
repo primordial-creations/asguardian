@@ -19,8 +19,10 @@ from Asgard.Bragi.Quality.models.debt_models import (
     DebtConfig,
     DebtItem,
     DebtReport,
+    DebtSeverity,
     DebtType,
     EffortInterval,
+    FileFriction,
     ROIAnalysis,
     TimeHorizon,
     TimeProjection,
@@ -38,6 +40,13 @@ from Asgard.Bragi.Quality.services._debt_workers import (
     analyze_test_debt,
     count_file_lines,
     count_lines_of_code,
+)
+from Asgard.Bragi.Quality.services._git_friction import (
+    collect_friction,
+    compute_interest_scores,
+    is_minefield,
+    is_sleeping_bear,
+    SEVERITY_DOWNGRADE,
 )
 from Asgard.Bragi.Quality.services._remediation_model import RemediationModel
 from Asgard.Bragi.Quality.services._technical_debt_report import (
@@ -84,6 +93,21 @@ class TechnicalDebtAnalyzer:
             remediation_model=self.remediation_model,
             centrality_provider=self.centrality_provider,
         )
+        # Git friction telemetry (Plan 02 Phase D). Opt-in via
+        # use_git_friction(); off by default so analysis stays offline and
+        # deterministic outside a git checkout.
+        self._friction_by_file: Dict[str, FileFriction] = {}
+        self._use_friction: bool = False
+
+    def use_git_friction(self, repo_root: Optional[Path] = None) -> None:
+        """
+        Enable churn/author/bugfix-density friction collection from
+        `repo_root` (default: the path passed to `analyze()`). Degrades
+        gracefully to no telemetry outside a git repo.
+        """
+        self._use_friction = True
+        if repo_root is not None:
+            self._friction_by_file = collect_friction(Path(repo_root))
 
     def set_centrality_provider(
         self, provider: Optional[CentralityProvider]
@@ -146,6 +170,30 @@ class TechnicalDebtAnalyzer:
         if report.total_lines_of_code > 0:
             report.debt_ratio = report.total_debt_hours / report.total_lines_of_code * 1000
 
+        # Plan 02 Phase D: collect friction telemetry for this scan root if
+        # not already wired via use_git_friction(repo_root=...).
+        if self._use_friction and not self._friction_by_file:
+            self._friction_by_file = collect_friction(path)
+        interest_by_file = compute_interest_scores(self._friction_by_file)
+
+        # Churn/age modulation (DEEPTHINK_07): dormant files ("Sleeping
+        # Bear") are downgraded one severity tier and tagged
+        # fix_when_touching; high-metric + high-churn files ("Minefield")
+        # retain maximum severity.
+        if self._friction_by_file:
+            for item in report.debt_items:
+                friction = self._friction_by_file.get(item.file_path)
+                severity = item.severity if isinstance(item.severity, str) else item.severity.value
+                high_metric = severity in ("high", "critical")
+                if is_minefield(friction, high_metric):
+                    continue
+                if is_sleeping_bear(friction):
+                    item.severity = DebtSeverity(SEVERITY_DOWNGRADE.get(severity, severity))
+                    item.remediation_strategy = (
+                        (item.remediation_strategy + " " if item.remediation_strategy else "")
+                        + "[fix_when_touching: file dormant, low interest]"
+                    ).strip()
+
         # Plan 02: batched, pessimism-corrected aggregation with effort
         # intervals, plus the standard TDR (30 min/LOC development-cost
         # anchor) - the single source of truth for the Maintainability grade.
@@ -161,6 +209,13 @@ class TechnicalDebtAnalyzer:
             minutes = self.remediation_model.minutes_for(item)
             item.effort_interval = self._item_interval(minutes)
             item.non_remediation_factor = self.remediation_model.non_remediation_factor(item)
+            interest = interest_by_file.get(item.file_path)
+            if interest is not None:
+                item.interest_rate = interest
+                # priority = interest x non_remediation_factor / remediation_minutes
+                item.priority_score_override = (
+                    interest * item.non_remediation_factor / max(minutes, 1.0)
+                )
         report.tdr_percent = compute_tdr_percent(
             aggregated.total_minutes, report.total_lines_of_code)
 
@@ -290,6 +345,18 @@ class TechnicalDebtAnalyzer:
 
         if report.time_projection.growth_percentage > 20:
             priorities.append(f"Warning: Debt growing {report.time_projection.growth_percentage:.1f}% per {report.time_projection.time_horizon}")
+
+        # High-Yield Refactors (DEEPTHINK_05 Sec.3 dashboard): top-N items by
+        # friction-derived priority score, only when telemetry was available.
+        friction_ranked = [
+            item for item in report.prioritized_items
+            if item.priority_score_override is not None
+        ]
+        for item in friction_ranked[:5]:
+            priorities.append(
+                f"High-Yield Refactor: {item.location} - {item.description} "
+                f"(priority {item.priority_score:.2f})"
+            )
 
         return priorities
 
