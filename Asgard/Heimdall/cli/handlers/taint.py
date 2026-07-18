@@ -5,6 +5,30 @@ from pathlib import Path
 
 from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import TaintConfig
 from Asgard.Heimdall.Security.TaintAnalysis.services.taint_analyzer import TaintAnalyzer
+from Asgard.Heimdall.Security.engine.dispatch import DispatchEngine
+from Asgard.Heimdall.cli.handlers._security_dispatch import _iter_code_files
+
+#: Non-Python extensions the DispatchEngine's CST taint path supports.
+#: `TaintAnalyzer` only walks the Python `ast`, so JS/TS/Java files never
+#: reach it -- route those through the DispatchEngine instead and merge
+#: the resulting flows into the same report.
+_MULTILANG_TAINT_EXTENSIONS = frozenset({
+    ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".java",
+})
+
+
+def _collect_multilang_flows(scan_path: Path, exclude_patterns):
+    """Scan non-Python files via the DispatchEngine and return raw TaintFlows."""
+    engine = DispatchEngine()
+    flows = []
+    files_seen = 0
+    for path in _iter_code_files(
+        scan_path, exclude_patterns, suffixes=_MULTILANG_TAINT_EXTENSIONS
+    ):
+        files_seen += 1
+        result = engine.scan_file(path)
+        flows.extend(result.taint_flows)
+    return flows, files_seen
 
 
 def run_taint_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
@@ -29,6 +53,25 @@ def run_taint_analysis(args: argparse.Namespace, verbose: bool = False) -> int:
     try:
         analyzer = TaintAnalyzer(config)
         report = analyzer.scan()
+
+        multilang_flows, multilang_files = _collect_multilang_flows(
+            scan_path, exclude_patterns
+        )
+        min_severity_order = {"low": 0, "medium": 1, "high": 2, "critical": 3}
+        min_rank = min_severity_order.get(severity_str, 0)
+        for flow in multilang_flows:
+            if min_severity_order.get(str(flow.severity).lower(), 0) < min_rank:
+                continue
+            report.flows.append(flow)
+            report.total_flows += 1
+            sev = str(flow.severity).lower()
+            if sev == "critical":
+                report.critical_count += 1
+            elif sev == "high":
+                report.high_count += 1
+            elif sev == "medium":
+                report.medium_count += 1
+        report.files_analyzed += multilang_files
 
         if output_format == "json":
             data = {
