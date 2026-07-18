@@ -91,7 +91,18 @@ class PipelineGenerator:
 
         validation_results = validate_pipeline(primary, config)
         score_report = None
-        if config.platform == CICDPlatform.GITHUB_ACTIONS:
+        # GitHub Actions, GitLab CI, and Azure DevOps are all normalized
+        # onto the shared canonical pipeline-job model (plan 06), so they
+        # are all validated and scored adversarially through the same
+        # engine — the generator never grades its own intent. Jenkins
+        # (Groovy DSL, not YAML) and CircleCI (schema not yet normalized)
+        # still fall back to the legacy config-shape score.
+        engine_platforms = {
+            CICDPlatform.GITHUB_ACTIONS,
+            CICDPlatform.GITLAB_CI,
+            CICDPlatform.AZURE_DEVOPS,
+        }
+        if config.platform in engine_platforms:
             # Adversarial validation of the rendered artifact through the
             # shared engine; suppressions are applied there (warning
             # annihilation with hygiene findings for stale/expired ones).
@@ -106,8 +117,9 @@ class PipelineGenerator:
                     f"{r.rule_id}: {r.message}" for r in report.results
                 )
             # Composite 4-dimension score (plan 07) over the rendered
-            # workflows — security veto, per-job defect density. Logical
-            # resources are the workflow files (jobs roll up under them).
+            # pipeline files — security veto, per-job defect density.
+            # Logical resources are the pipeline files (jobs roll up
+            # under them).
             score_report = ScoringEngine().score(
                 all_findings,
                 resources=list(files.keys()),

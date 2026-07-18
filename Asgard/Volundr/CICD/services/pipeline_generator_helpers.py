@@ -358,8 +358,7 @@ def generate_gitlab_ci(config: PipelineConfig) -> str:
         if stage.needs:
             job["needs"] = [_job_id(n) for n in stage.needs]
 
-        if stage.env:
-            job["variables"] = stage.env
+        variables: Dict[str, Any] = dict(stage.env) if stage.env else {}
 
         if stage.services:
             job["services"] = list(stage.services.keys())
@@ -373,9 +372,16 @@ def generate_gitlab_ci(config: PipelineConfig) -> str:
             }
 
         scripts: List[str] = []
-        for step in stage.steps:
+        for step in harden_steps(stage.steps):
+            # Interpolation-hoisted values become job-scoped CI/CD variables
+            # so the "$VAR" reference the hardening pass left behind
+            # actually resolves (GitLab has no `${{ }}` expression syntax).
+            variables.update(step.env)
             if step.run:
                 scripts.append(step.run)
+
+        if variables:
+            job["variables"] = variables
 
         if scripts:
             job["script"] = scripts
@@ -430,17 +436,24 @@ def generate_azure_devops(config: PipelineConfig) -> str:
             "timeoutInMinutes": stage.timeout_minutes or DEFAULT_TIMEOUT_MINUTES,
         }
 
-        if stage.env:
-            job["variables"] = stage.env
+        variables: Dict[str, Any] = dict(stage.env) if stage.env else {}
 
         steps: List[Dict[str, Any]] = []
-        for step in stage.steps:
+        for step in harden_steps(stage.steps):
+            # Interpolation-hoisted values become pipeline variables so the
+            # "$VAR" reference the hardening pass left behind resolves
+            # (Azure DevOps has no `${{ }}` runtime expression syntax; its
+            # own template expressions are a build-time construct and are
+            # left untouched by this pass).
+            variables.update(step.env)
             if step.run:
                 steps.append({
                     "script": step.run,
                     "displayName": step.name,
                 })
 
+        if variables:
+            job["variables"] = variables
         job["steps"] = steps
         jobs.append(job)
         stage_dict["jobs"] = jobs
