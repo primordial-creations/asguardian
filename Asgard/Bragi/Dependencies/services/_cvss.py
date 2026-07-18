@@ -31,7 +31,7 @@ def cvss_score_to_severity(score: Optional[float]) -> str:
         return "medium"
     if value > 0.0:
         return "low"
-    return "low"
+    return "none"
 
 
 def extract_cvss_score(vuln: dict) -> Optional[float]:
