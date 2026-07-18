@@ -552,3 +552,48 @@ class TestModuleBuilder:
         """Test the has_issues property."""
         result = builder.generate(basic_config)
         assert isinstance(result.has_issues, bool)
+
+
+class TestForEachLifecycleEmission:
+    """Plan 02: multi-instance templates use for_each over count (avoids
+    index-shift drift storms, RESEARCH_02 §2) and emit lifecycle {
+    ignore_changes } for fields mutated out-of-band (RESEARCH_02 §4)."""
+
+    def test_complex_instance_module_uses_for_each_not_count(self):
+        config = ModuleConfig(
+            name="web",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.COMPUTE,
+            complexity=ModuleComplexity.COMPLEX,
+            resources=["aws_instance"],
+        )
+        result = ModuleBuilder().generate(config)
+        main_tf = result.module_files["main.tf"]
+        assert "for_each = var.instances" in main_tf
+        assert re.search(r"^\s*count\s*=", main_tf, re.MULTILINE) is None
+
+    def test_complex_instance_module_emits_lifecycle_ignore_changes(self):
+        config = ModuleConfig(
+            name="web",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.COMPUTE,
+            complexity=ModuleComplexity.ENTERPRISE,
+            resources=["aws_instance"],
+        )
+        result = ModuleBuilder().generate(config)
+        main_tf = result.module_files["main.tf"]
+        assert "lifecycle {" in main_tf
+        assert "ignore_changes" in main_tf
+
+    def test_simple_instance_module_stays_single_resource(self):
+        config = ModuleConfig(
+            name="web",
+            provider=CloudProvider.AWS,
+            category=ResourceCategory.COMPUTE,
+            complexity=ModuleComplexity.SIMPLE,
+            resources=["aws_instance"],
+        )
+        result = ModuleBuilder().generate(config)
+        main_tf = result.module_files["main.tf"]
+        assert "for_each" not in main_tf
+        assert "var.instance_name" in main_tf

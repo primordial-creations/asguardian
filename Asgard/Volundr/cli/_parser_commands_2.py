@@ -173,7 +173,16 @@ def _add_validate_commands(subparsers: argparse._SubParsersAction) -> None:
     k8s.add_argument("--strict", action="store_true", help="Enable strict mode")
 
     tf = validate_subparsers.add_parser("terraform", aliases=["tf"], help="Validate Terraform configurations")
-    tf.add_argument("path", help="File or directory to validate")
+    tf.add_argument("path", nargs="?", help="File or directory of raw HCL to validate")
+    tf.add_argument(
+        "--plan", metavar="tfplan.json", dest="plan_json",
+        help=(
+            "Path to a `terraform show -json <plan>` document. Applies the "
+            "same VOL-TF-* rules to evaluated plan state instead of raw "
+            "HCL; after_unknown (apply-time-only) values never fail a rule "
+            "outright — they soften to WARN."
+        ),
+    )
 
     dockerfile = validate_subparsers.add_parser("dockerfile", help="Validate Dockerfile")
     dockerfile.add_argument("path", help="Dockerfile or directory to validate")
