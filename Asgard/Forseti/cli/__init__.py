@@ -26,6 +26,7 @@ from Asgard.Forseti.cli.handlers_rules_baseline import (
     _handle_rules,
     _handle_baseline,
 )
+from Asgard.Forseti.cli.handlers_align import _handle_align
 
 
 def main(args: Optional[list[str]] = None) -> int:
@@ -68,6 +69,8 @@ def main(args: Optional[list[str]] = None) -> int:
             return _handle_baseline(parsed)
         elif parsed.module == "compat":
             return _handle_compat(parsed)
+        elif parsed.module == "align":
+            return _handle_align(parsed)
         else:
             parser.print_help()
             return 1

@@ -372,7 +372,54 @@ def _handle_contract(args: argparse.Namespace) -> int:
     elif args.command == "audit-deps":
         return _handle_audit_deps(args)
 
+    elif args.command == "test":
+        return _handle_contract_test(args)
+
     return 1
+
+
+def _handle_contract_test(args: argparse.Namespace) -> int:
+    """Handle `forseti contract test <spec> --base-url ...` (Cost: NETWORK, explicit opt-in)."""
+    import yaml
+
+    from Asgard.Forseti.LiveContract import LiveValidatorService, ProbePlannerService
+    from Asgard.Forseti.LiveContract.models.live_contract_models import ProbeConfig
+
+    spec_path = Path(args.spec)
+    if not spec_path.is_file():
+        print(f"Error: spec not found: {spec_path}", file=sys.stderr)
+        return 1
+    document = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+
+    plan = ProbePlannerService().plan(document)
+    config = ProbeConfig(
+        base_url=args.base_url,
+        auth_header=args.auth_header,
+        max_requests=args.max_requests,
+        negative=args.negative,
+        timeout_s=args.timeout_s,
+        verify_tls=args.verify_tls,
+    )
+    report = LiveValidatorService(config).run(plan)
+
+    if getattr(args, "format", "text") == "json":
+        print(json.dumps(report.model_dump(mode="json"), indent=2, default=str))
+    else:
+        print("=" * 60)
+        print("Live Contract Drift Report")
+        print("=" * 60)
+        print(f"Base URL: {report.base_url}")
+        print(f"Operations attempted: {report.operations_attempted}  "
+              f"succeeded: {report.operations_succeeded}")
+        if report.findings:
+            print("-" * 60)
+            for finding in report.findings:
+                print(f"  [{finding.rule_id}] {finding.severity.value.upper()}: {finding.message}")
+        else:
+            print("No drift findings.")
+        print("=" * 60)
+
+    return 1 if report.has_errors else 0
 
 
 def _handle_audit_deps(args: argparse.Namespace) -> int:

@@ -147,6 +147,44 @@ def _add_contract_parser(subparsers: argparse._SubParsersAction) -> None:
                                  "audit (default: 30)")
     add_performance_flags(audit_deps)
 
+    test = contract_sub.add_parser(
+        "test",
+        help="Probe a live implementation against its spec (Cost: NETWORK, explicit opt-in)",
+    )
+    test.add_argument("spec", help="OpenAPI specification file")
+    test.add_argument("--base-url", required=True, help="Base URL of the live implementation")
+    test.add_argument("--auth-header", default=None, help="Raw 'Header: value' string")
+    test.add_argument("--max-requests", type=int, default=50, help="Hard cap on requests issued")
+    test.add_argument("--negative", action="store_true",
+                      help="Enable CATS-style negative pass (mutate one required field, expect 4xx)")
+    test.add_argument("--timeout", type=float, default=5.0, dest="timeout_s",
+                      help="Per-request socket timeout in seconds")
+    test.add_argument("--no-verify-tls", action="store_false", dest="verify_tls",
+                      help="Disable TLS certificate verification")
+    add_performance_flags(test)
+
+
+def _add_align_parser(subparsers: argparse._SubParsersAction) -> None:
+    """Add Alignment (cross-format entity alignment) subparser."""
+    align = subparsers.add_parser(
+        "align",
+        help="Cross-format entity alignment (OpenAPI/Avro/Protobuf/GraphQL/SQL)",
+    )
+    align_sub = align.add_subparsers(dest="command")
+
+    check = align_sub.add_parser("check", help="Check entities against alignment-config.yaml")
+    check.add_argument("--config", default="alignment-config.yaml", help="Path to alignment-config.yaml")
+    check.add_argument("--entity", default=None, help="Only check this entity")
+    add_performance_flags(check)
+
+    discover = align_sub.add_parser(
+        "discover",
+        help="Draft an alignment-config.yaml from name-heuristics across the given files",
+    )
+    discover.add_argument("paths", nargs="+", help="Schema/message/table files to scan")
+    discover.add_argument("--output", "-o", default="alignment-config.yaml",
+                          help="Output path for the drafted config")
+
 
 def _add_jsonschema_parser(subparsers: argparse._SubParsersAction) -> None:
     """Add JSONSchema subparser."""
