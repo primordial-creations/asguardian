@@ -51,6 +51,30 @@ def py_only_project(tmp_path):
     return tmp_path
 
 
+# Flask/sqlite3 SQLi that BOTH StaticSecurityService's regex/pattern rules
+# and the DispatchEngine's taint path independently flag on the same .py
+# file -- the repro case for the Python double-count regression.
+PY_FLASK_SQLI_SOURCE = (
+    "from flask import Flask, request\n"
+    "import sqlite3\n\n"
+    "app = Flask(__name__)\n\n"
+    "@app.route(\"/user\")\n"
+    "def get_user():\n"
+    "    user_id = request.args.get(\"id\")\n"
+    "    conn = sqlite3.connect(\"db.sqlite\")\n"
+    "    cur = conn.cursor()\n"
+    "    query = \"SELECT * FROM users WHERE id = \" + user_id\n"
+    "    cur.execute(query)\n"
+    "    return str(cur.fetchall())\n"
+)
+
+
+@pytest.fixture()
+def py_flask_sqli_project(tmp_path):
+    (tmp_path / "app.py").write_text(PY_FLASK_SQLI_SOURCE)
+    return tmp_path
+
+
 # --------------------------------------------------------- Fix 1: security scan
 
 def test_dispatch_scan_covers_js_ts_java_files(js_sqli_project):
@@ -138,3 +162,65 @@ def test_full_scan_python_project_still_reports_real_coverage(
     )
     assert "N/A" not in coverage_line
     assert "method coverage" in coverage_line
+
+
+# --------------------------------------------- MAJOR-1: no Python double-count
+
+def test_security_scan_does_not_double_count_python_findings(
+    py_flask_sqli_project, capsys
+):
+    """run_dispatch_scan() also re-scans .py files. StaticSecurityService
+    already reports its own findings for the same SQLi -- folding
+    DispatchEngine's .py findings back in must NOT double the counts.
+    The merged counts (dispatch restricted to non-.py) must equal the
+    pre-merge StaticSecurityService-only baseline exactly."""
+    from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
+    from Asgard.Heimdall.Security.services.static_security_service import (
+        StaticSecurityService,
+    )
+    from Asgard.Heimdall.cli.handlers._security_dispatch import count_lines_of_code
+
+    baseline_cfg = SecurityScanConfig(
+        scan_path=py_flask_sqli_project, scan_type="all", min_severity="low",
+        exclude_patterns=[], verbose=False,
+    )
+    baseline_svc = StaticSecurityService(baseline_cfg)
+    baseline_result = baseline_svc.analyze(py_flask_sqli_project)
+    baseline_result.total_lines_of_code = count_lines_of_code(
+        py_flask_sqli_project, []
+    )
+    baseline_result.calculate_totals()
+
+    args = create_parser().parse_args(
+        ["security", "scan", str(py_flask_sqli_project), "--format", "json"]
+    )
+    run_security_analysis(args, analysis_type="all")
+    out = capsys.readouterr().out
+    payload = json.loads(out[out.find("{"):out.rfind("}") + 1])
+
+    assert payload["summary"]["total_issues"] == baseline_result.total_issues
+    assert payload["summary"]["critical_issues"] == baseline_result.critical_issues
+    assert payload["summary"]["high_issues"] == baseline_result.high_issues
+    assert payload["scoring"]["legacy_score"] == baseline_result.legacy_score
+
+
+# ------------------------------------------- MAJOR-2: score reflects merge
+
+def test_security_scan_score_reflects_multilang_criticals(
+    js_sqli_project, capsys
+):
+    """A JS-only tree with 2 CRITICAL findings must NOT report a false
+    security_score of 100 -- the score must be consistent with the
+    counts and the FAIL/is_passing verdict."""
+    args = create_parser().parse_args(
+        ["security", "scan", str(js_sqli_project), "--format", "json"]
+    )
+    code = run_security_analysis(args, analysis_type="all")
+    out = capsys.readouterr().out
+    payload = json.loads(out[out.find("{"):out.rfind("}") + 1])
+
+    assert payload["summary"]["critical_issues"] >= 1
+    assert payload["scoring"]["legacy_score"] < 100.0
+    assert payload["scoring"]["security_score_v2"] < 100.0
+    assert payload["summary"]["is_passing"] is False
+    assert code == 1
