@@ -10,24 +10,31 @@ yaml.load flow) and sanitizers are a taxonomy, not a boolean.
 
 from Asgard.Heimdall.Security.TaintAnalysis.catalog.sources import (
     SOURCE_SPECS,
+    JS_SOURCE_SPECS,
+    JAVA_SOURCE_SPECS,
     SourceSpec,
     lookup_source,
 )
 from Asgard.Heimdall.Security.TaintAnalysis.catalog.sinks import (
     SINK_SPECS,
+    JS_SINK_SPECS,
+    JAVA_SINK_SPECS,
     SinkSpec,
     lookup_sink,
 )
 from Asgard.Heimdall.Security.TaintAnalysis.catalog.sanitizers import (
     EXACT_SANITIZERS,
+    JS_EXACT_SANITIZERS,
+    JAVA_EXACT_SANITIZERS,
     HEURISTIC_SANITIZER_FACTOR,
     SanitizerMatch,
     classify_sanitizer,
 )
 
 __all__ = [
-    "SOURCE_SPECS", "SourceSpec", "lookup_source",
-    "SINK_SPECS", "SinkSpec", "lookup_sink",
-    "EXACT_SANITIZERS", "HEURISTIC_SANITIZER_FACTOR",
+    "SOURCE_SPECS", "JS_SOURCE_SPECS", "JAVA_SOURCE_SPECS", "SourceSpec", "lookup_source",
+    "SINK_SPECS", "JS_SINK_SPECS", "JAVA_SINK_SPECS", "SinkSpec", "lookup_sink",
+    "EXACT_SANITIZERS", "JS_EXACT_SANITIZERS", "JAVA_EXACT_SANITIZERS",
+    "HEURISTIC_SANITIZER_FACTOR",
     "SanitizerMatch", "classify_sanitizer",
 ]

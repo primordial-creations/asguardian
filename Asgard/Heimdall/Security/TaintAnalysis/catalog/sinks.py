@@ -102,6 +102,89 @@ SINK_SPECS: Tuple[SinkSpec, ...] = (
 )
 
 
+# --------------------------------------------------------------------------
+# JavaScript / TypeScript (Express/Node) -- DEEPTHINK_04 top-level catalogue.
+# --------------------------------------------------------------------------
+JS_SINK_SPECS: Tuple[SinkSpec, ...] = (
+    # SQL sinks
+    SinkSpec("connection.query", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("db.query", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("pool.query", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("knex.raw", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("sequelize.query", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("query", TaintSinkType.SQL_QUERY, "critical", 0.4),
+    # Command injection
+    SinkSpec("child_process.exec", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
+    SinkSpec("child_process.execSync", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
+    SinkSpec("child_process.spawn", TaintSinkType.SHELL_COMMAND, "critical", 0.8),
+    SinkSpec("exec", TaintSinkType.SHELL_COMMAND, "critical", 0.6, match_suffix=False),
+    SinkSpec("execSync", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
+    # Eval / dynamic code
+    SinkSpec("eval", TaintSinkType.EVAL_EXEC, "critical", 1.0, match_suffix=False),
+    SinkSpec("Function", TaintSinkType.EVAL_EXEC, "critical", 0.8, match_suffix=False),
+    SinkSpec("setTimeout", TaintSinkType.EVAL_EXEC, "medium", 0.4, match_suffix=False),
+    SinkSpec("setInterval", TaintSinkType.EVAL_EXEC, "medium", 0.4, match_suffix=False),
+    SinkSpec("vm.runInNewContext", TaintSinkType.EVAL_EXEC, "critical", 1.0),
+    # XSS / DOM
+    SinkSpec("innerHTML", TaintSinkType.HTML_OUTPUT, "high", 0.8, match_suffix=False),
+    SinkSpec("outerHTML", TaintSinkType.HTML_OUTPUT, "high", 0.8, match_suffix=False),
+    SinkSpec("document.write", TaintSinkType.HTML_OUTPUT, "high", 0.8),
+    SinkSpec("insertAdjacentHTML", TaintSinkType.HTML_OUTPUT, "high", 0.8),
+    SinkSpec("res.send", TaintSinkType.HTML_OUTPUT, "medium", 0.6),
+    SinkSpec("res.write", TaintSinkType.HTML_OUTPUT, "medium", 0.6),
+    SinkSpec("dangerouslySetInnerHTML", TaintSinkType.HTML_OUTPUT, "high", 0.8),
+    # File path
+    SinkSpec("fs.readFile", TaintSinkType.FILE_PATH, "high", 0.8),
+    SinkSpec("fs.readFileSync", TaintSinkType.FILE_PATH, "high", 0.8),
+    SinkSpec("fs.writeFile", TaintSinkType.FILE_WRITE, "medium", 0.8),
+    SinkSpec("fs.writeFileSync", TaintSinkType.FILE_WRITE, "medium", 0.8),
+    # Redirect
+    SinkSpec("res.redirect", TaintSinkType.REDIRECT, "medium", 0.8),
+    # Log
+    SinkSpec("console.log", TaintSinkType.LOG_OUTPUT, "medium", 0.4),
+    SinkSpec("logger.info", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    SinkSpec("logger.warn", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    SinkSpec("logger.error", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+)
+
+# --------------------------------------------------------------------------
+# Java (Servlet/Spring) -- DEEPTHINK_04 top-level catalogue.
+# --------------------------------------------------------------------------
+JAVA_SINK_SPECS: Tuple[SinkSpec, ...] = (
+    SinkSpec("Statement.execute", TaintSinkType.SQL_QUERY, "critical", 1.0),
+    SinkSpec("statement.execute", TaintSinkType.SQL_QUERY, "critical", 1.0),
+    SinkSpec("statement.executeQuery", TaintSinkType.SQL_QUERY, "critical", 1.0),
+    SinkSpec("statement.executeUpdate", TaintSinkType.SQL_QUERY, "critical", 1.0),
+    SinkSpec("stmt.executeQuery", TaintSinkType.SQL_QUERY, "critical", 1.0),
+    SinkSpec("stmt.executeUpdate", TaintSinkType.SQL_QUERY, "critical", 1.0),
+    SinkSpec("stmt.execute", TaintSinkType.SQL_QUERY, "critical", 1.0),
+    SinkSpec("createQuery", TaintSinkType.SQL_QUERY, "critical", 0.6, match_suffix=False),
+    SinkSpec("createNativeQuery", TaintSinkType.SQL_QUERY, "critical", 0.8, match_suffix=False),
+    SinkSpec("executeQuery", TaintSinkType.SQL_QUERY, "critical", 0.4),
+    SinkSpec("executeUpdate", TaintSinkType.SQL_QUERY, "critical", 0.4),
+    SinkSpec("Runtime.exec", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
+    SinkSpec("runtime.exec", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
+    # Covers the common Runtime.getRuntime().exec(...) chained-call idiom,
+    # which resolves to "Runtime.getRuntime.exec" (not a suffix of the
+    # exact "Runtime.exec" pattern above) -- generic name, lower confidence.
+    SinkSpec("exec", TaintSinkType.SHELL_COMMAND, "critical", 0.6),
+    SinkSpec("ProcessBuilder", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
+    SinkSpec("response.getWriter", TaintSinkType.HTML_OUTPUT, "medium", 0.4, match_suffix=False),
+    SinkSpec("out.println", TaintSinkType.HTML_OUTPUT, "medium", 0.4),
+    SinkSpec("FileWriter", TaintSinkType.FILE_WRITE, "medium", 0.6, match_suffix=False),
+    SinkSpec("FileOutputStream", TaintSinkType.FILE_WRITE, "medium", 0.6, match_suffix=False),
+    SinkSpec("Files.newInputStream", TaintSinkType.FILE_PATH, "high", 0.8),
+    SinkSpec("File", TaintSinkType.FILE_PATH, "high", 0.4, match_suffix=False),
+    SinkSpec("response.sendRedirect", TaintSinkType.REDIRECT, "medium", 0.8),
+    SinkSpec("logger.info", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    SinkSpec("logger.debug", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    SinkSpec("logger.warn", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    SinkSpec("logger.error", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    SinkSpec("log.info", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    SinkSpec("log.error", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+)
+
+
 def lookup_sink(
     chain: str, extra_specs: Sequence[SinkSpec] = ()
 ) -> Optional[SinkSpec]:

@@ -33,6 +33,17 @@ from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import (
     build_alias_map,
     resolve_chain,
 )
+from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_taint_visitor import (
+    scan_java_source,
+    scan_js_ts_source,
+)
+from Asgard.Heimdall.treesitter.ast_engine import is_engine_enabled
+from Asgard.Heimdall.treesitter.file_context import FileParseContext, language_for_path
+
+# Extensions routed through the CST taint path (plan 04 Phase 4 / plan 01
+# waves 2-3). Python keeps the ``ast``-backed path above, unchanged.
+_JS_TS_EXTENSIONS = frozenset({".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"})
+_JAVA_EXTENSIONS = frozenset({".java"})
 
 # Layer-1 default sweep: unambiguous machine-issued token prefixes only
 # (low-FP by construction). Full secret scanning stays in SecretsDetection.
@@ -115,7 +126,13 @@ class DispatchEngine:
         # Layer 1: raw-text regex sweep -- always runs, even on unparsable files.
         result.structural_findings.extend(self._layer1(source, str(file_path)))
 
-        if file_path.suffix != ".py":
+        suffix = file_path.suffix.lower()
+        if suffix in _JS_TS_EXTENSIONS or suffix in _JAVA_EXTENSIONS:
+            result.taint_flows = self._scan_cst_language(source, file_path)
+            result.taint_flows = self._dedup(result.taint_flows)
+            return result
+
+        if suffix != ".py":
             return result
 
         try:
@@ -137,6 +154,42 @@ class DispatchEngine:
         )
         result.taint_flows = self._dedup(result.taint_flows)
         return result
+
+    # ------------------------------------------------ CST path (JS/TS/Java)
+
+    def _scan_cst_language(self, source: str, file_path: Path) -> List[TaintFlow]:
+        """Route JS/TS/Java files through the tree-sitter CST taint engine.
+
+        Behind ``@with_ast_fallback``'s spirit (graceful degradation): when
+        tree-sitter or the grammar for this language is unavailable, or the
+        parse fails, this returns an empty list -- Layer 1 regex findings
+        (already collected by the caller) are still reported, but no
+        data-flow reasoning happens. This mirrors plan 01's "tree-sitter
+        stays optional" mandate: the test suite must pass without the
+        grammars installed.
+        """
+        lang = language_for_path(file_path)
+        if lang is None or not is_engine_enabled(lang):
+            return []
+        ctx = FileParseContext.parse(file_path, source.splitlines(), lang)
+        if ctx.root is None:
+            return []
+        if lang == "java":
+            scan_fn = scan_java_source
+        elif lang in ("javascript", "typescript", "tsx"):
+            scan_fn = scan_js_ts_source
+        else:
+            return []
+        try:
+            return scan_fn(
+                str(file_path), ctx,
+                custom_sanitizers=self.custom_sanitizers,
+                is_test_context=self.is_test_context,
+            )
+        except Exception:
+            # A CST-rule failure must never crash the scan -- degrade to
+            # "no taint findings for this file" (Layer 1 still reported).
+            return []
 
     # -------------------------------------------------------------- layer 1
 
