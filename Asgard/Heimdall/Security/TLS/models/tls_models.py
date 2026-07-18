@@ -47,6 +47,22 @@ class TLSFinding(BaseModel):
     confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
     remediation: str = Field("", description="Suggested remediation steps")
     references: List[str] = Field(default_factory=list, description="Reference URLs")
+    mechanism_id: str = Field("", description="Normalization-engine mechanism id (plan 06).")
+    confidence_bucket: str = Field("probable", description="Qualitative confidence bucket (plan 06).")
+    is_hotspot: bool = Field(
+        False,
+        description=(
+            "Plan 07.9: code-level TLS/verify signals (e.g. Python "
+            "requests verify=False) are demoted to a hotspot rather than "
+            "a confirmed finding -- apps legitimately terminate TLS at a "
+            "proxy and use plain HTTP or verify=False internally, so "
+            "config-file evidence outranks code-level guesses."
+        ),
+    )
+    source: str = Field(
+        "code",
+        description="'code' (Python/JS static pattern) or 'config' (nginx/HAProxy/Terraform, max-precision).",
+    )
 
     class Config:
         use_enum_values = True

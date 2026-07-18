@@ -4,6 +4,10 @@ from Asgard.Forseti.LiveContract.models.live_contract_models import (
     ProbeOperation,
     ProbePlan,
     ProbeResult,
+    Workflow,
+    WorkflowReport,
+    WorkflowStep,
+    WorkflowStepResult,
 )
 
 __all__ = [
@@ -12,4 +16,8 @@ __all__ = [
     "ProbePlan",
     "ProbeResult",
     "DriftReport",
+    "Workflow",
+    "WorkflowStep",
+    "WorkflowStepResult",
+    "WorkflowReport",
 ]

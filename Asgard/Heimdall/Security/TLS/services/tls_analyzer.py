@@ -16,7 +16,11 @@ from Asgard.Heimdall.Security.TLS.models.tls_models import (
 from Asgard.Heimdall.Security.TLS.services.protocol_analyzer import ProtocolAnalyzer
 from Asgard.Heimdall.Security.TLS.services.cipher_validator import CipherValidator
 from Asgard.Heimdall.Security.TLS.services.certificate_validator import CertificateValidator
+from Asgard.Heimdall.Security.TLS.services.tls_config_analyzer import analyze_config_file
 from Asgard.Heimdall.Security.models.security_models import SecuritySeverity
+from Asgard.Heimdall.Security.utilities.security_utils import scan_directory_for_security
+
+_CONFIG_EXTENSIONS = (".conf", ".cfg", ".tf")
 
 
 class TLSAnalyzer:
@@ -72,6 +76,16 @@ class TLSAnalyzer:
         if self.config.check_certificates or self.config.check_verification:
             cert_report = self.certificate_validator.scan(path)
             self._merge_reports(combined_report, cert_report)
+
+        # Plan 07.9: config-file evidence (nginx/HAProxy/Terraform ALB)
+        # outranks code-level guesses -- always max-precision confidence,
+        # never a hotspot.
+        for file_path in scan_directory_for_security(
+            path, exclude_patterns=self.config.exclude_patterns,
+            include_extensions=list(_CONFIG_EXTENSIONS),
+        ):
+            for finding in analyze_config_file(file_path):
+                combined_report.add_finding(finding)
 
         combined_report.scan_duration_seconds = time.time() - start_time
 

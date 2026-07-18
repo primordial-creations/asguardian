@@ -10,8 +10,12 @@ from Asgard.Volundr.Validation.services.normalizers.compose_normalizer import (
     normalize_compose,
 )
 from Asgard.Volundr.Validation.services.normalizers.pipeline_normalizer import (
+    looks_like_azure_pipeline,
     looks_like_github_workflow,
+    looks_like_gitlab_ci,
+    normalize_azure_pipeline,
     normalize_github_workflow,
+    normalize_gitlab_ci,
 )
 
 __all__ = [
@@ -22,4 +26,8 @@ __all__ = [
     "has_obsolete_version_key",
     "normalize_github_workflow",
     "looks_like_github_workflow",
+    "normalize_gitlab_ci",
+    "looks_like_gitlab_ci",
+    "normalize_azure_pipeline",
+    "looks_like_azure_pipeline",
 ]

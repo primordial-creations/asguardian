@@ -245,6 +245,14 @@ def add_baseline_parser(subparsers) -> None:
         help="Compare despite a hard environment mismatch (result is "
              "flagged and capped at WARNING severity)"
     )
+    compare_parser.add_argument(
+        "--format", "-f", choices=["text", "json", "html"], default="text",
+        help="Output format"
+    )
+    compare_parser.add_argument(
+        "--output", "-o", type=str,
+        help="Output file path (required for html format)"
+    )
 
     list_parser = baseline_subparsers.add_parser(
         "list",

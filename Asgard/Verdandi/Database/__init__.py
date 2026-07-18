@@ -27,11 +27,18 @@ from Asgard.Verdandi.Database.models.database_models import (
     PoolModeStats,
     PoolSignature,
     PoolSignatureClass,
+    QueryBudgetConfig,
+    QueryBudgetResult,
+    QueryClassStats,
 )
-from Asgard.Verdandi.Database.services.query_metrics import QueryMetricsCalculator
+from Asgard.Verdandi.Database.services.query_metrics import (
+    QueryMetricsCalculator,
+    fingerprint_query,
+)
 from Asgard.Verdandi.Database.services.throughput_calculator import ThroughputCalculator
 from Asgard.Verdandi.Database.services.connection_analyzer import ConnectionAnalyzer
 from Asgard.Verdandi.Database.services.pool_signature_detector import PoolSignatureDetector
+from Asgard.Verdandi.Database.services.query_budget import QueryBudgetAnalyzer
 
 __all__ = [
     "ConnectionAnalyzer",
@@ -41,9 +48,14 @@ __all__ = [
     "PoolSignature",
     "PoolSignatureClass",
     "PoolSignatureDetector",
+    "QueryBudgetAnalyzer",
+    "QueryBudgetConfig",
+    "QueryBudgetResult",
+    "QueryClassStats",
     "QueryMetricsCalculator",
     "QueryMetricsInput",
     "QueryMetricsResult",
     "ThroughputCalculator",
     "TransactionMetrics",
+    "fingerprint_query",
 ]

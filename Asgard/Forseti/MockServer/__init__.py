@@ -50,6 +50,7 @@ from Asgard.Forseti.MockServer.models import (
 from Asgard.Forseti.MockServer.services import (
     MockDataGeneratorService,
     MockServerGeneratorService,
+    ValidationProxyService,
 )
 
 __all__ = [
@@ -71,4 +72,5 @@ __all__ = [
     # Services
     "MockDataGeneratorService",
     "MockServerGeneratorService",
+    "ValidationProxyService",
 ]

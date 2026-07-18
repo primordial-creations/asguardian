@@ -16,15 +16,17 @@ from Asgard.Volundr.GitOps.models.gitops_models import (
     GeneratedGitOpsConfig,
     GitOpsProvider,
 )
+from Asgard.Volundr.GitOps.services.argocd_generator import _issues_to_findings
 from Asgard.Volundr.GitOps.services.flux_generator_helpers import (
-    calculate_combined_score,
-    calculate_git_repo_score,
-    calculate_kustomization_score,
+    calculate_combined_score,  # noqa: F401  (deprecated, kept for API compat)
+    calculate_git_repo_score,  # noqa: F401  (deprecated, kept for API compat)
+    calculate_kustomization_score,  # noqa: F401  (deprecated, kept for API compat)
     generate_git_repository_manifest,
     generate_kustomization_manifest,
     validate_git_repository,
     validate_kustomization,
 )
+from Asgard.Volundr.Validation.services.scoring_engine import ScoringEngine
 
 
 class FluxGenerator:
@@ -44,7 +46,9 @@ class FluxGenerator:
         files[f"{git_repo.name}-gitrepository.yaml"] = generate_git_repository_manifest(git_repo)
 
         validation_results = validate_git_repository(git_repo)
-        best_practice_score = calculate_git_repo_score(git_repo)
+        findings = _issues_to_findings(validation_results, git_repo.name)
+        score_report = ScoringEngine().score(findings, resources=[git_repo.name])
+        best_practice_score = score_report.composite
 
         return GeneratedGitOpsConfig(
             id=repo_id,
@@ -67,7 +71,9 @@ class FluxGenerator:
         files[f"{kustomization.name}-kustomization.yaml"] = generate_kustomization_manifest(kustomization)
 
         validation_results = validate_kustomization(kustomization)
-        best_practice_score = calculate_kustomization_score(kustomization)
+        findings = _issues_to_findings(validation_results, kustomization.name)
+        score_report = ScoringEngine().score(findings, resources=[kustomization.name])
+        best_practice_score = score_report.composite
 
         return GeneratedGitOpsConfig(
             id=ks_id,
@@ -119,13 +125,17 @@ class FluxGenerator:
 
         config_hash = hashlib.sha256(str(files).encode()).hexdigest()[:16]
 
+        validation_results = validate_git_repository(git_repo) + validate_kustomization(kustomization)
+        findings = _issues_to_findings(validation_results, name)
+        score_report = ScoringEngine().score(findings, resources=[name])
+
         return GeneratedGitOpsConfig(
             id=f"{name}-flux-{config_hash}",
             config_hash=config_hash,
             provider=GitOpsProvider.FLUX,
             files=files,
-            validation_results=[],
-            best_practice_score=calculate_combined_score(git_repo, kustomization),
+            validation_results=validation_results,
+            best_practice_score=score_report.composite,
             created_at=datetime.now(),
         )
 
@@ -154,6 +164,7 @@ class FluxGenerator:
             },
         )
         files[f"{name}-gitrepository.yaml"] = generate_git_repository_manifest(git_repo)
+        all_issues.extend(validate_git_repository(git_repo))
 
         for env in environments:
             depends_on = []
@@ -185,8 +196,15 @@ class FluxGenerator:
                 },
             )
             files[f"{name}-{env}-kustomization.yaml"] = generate_kustomization_manifest(kustomization)
+            all_issues.extend(validate_kustomization(kustomization))
 
         config_hash = hashlib.sha256(str(files).encode()).hexdigest()[:16]
+
+        # Never grade the generator's own intent (plan 07): score the
+        # real accumulated findings across the repo + every environment's
+        # Kustomization instead of the previous hardcoded 90.0.
+        findings = _issues_to_findings(all_issues, name)
+        score_report = ScoringEngine().score(findings, resources=[name])
 
         return GeneratedGitOpsConfig(
             id=f"{name}-multi-env-{config_hash}",
@@ -194,7 +212,7 @@ class FluxGenerator:
             provider=GitOpsProvider.FLUX,
             files=files,
             validation_results=all_issues,
-            best_practice_score=90.0,
+            best_practice_score=score_report.composite,
             created_at=datetime.now(),
         )
 

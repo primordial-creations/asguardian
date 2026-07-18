@@ -8,6 +8,7 @@ Key semantics:
 
 - **Warm-up drops are expected; flatlines are not** (DEEPTHINK_08): post-deploy hit-rate dips with a positive recovery slope are classified `WARMING` and suppressed; plunge-and-flatline is the broken-connection signature and is `CRITICAL` immediately.
 - **Blended latency percentiles mask cache regressions** (DEEPTHINK_04): hit and miss paths carry independent threshold-fraction SLIs, and a hit-mode median shift > 3× baseline MAD raises a fast-path-regression alarm even when blended p99 stays green.
+- **Cache stampedes are a concurrency signature, not a rate signature**: many concurrent misses on the same expiring key cluster within one recompute window; XFetch's probabilistic early recomputation spreads that cluster out before it happens.
 
 ## Services
 
@@ -147,6 +148,39 @@ print(ttl.cache_undersized, ttl.working_set_bytes)    # LRU pressure -> sizing e
 
 ---
 
+### 5. Stampede / XFetch Analyzer (`StampedeAnalyzer`)
+
+**Purpose**: Detect cache-stampede / thundering-herd events on expiring hot
+keys and recommend XFetch (probabilistic early recomputation).
+
+**Usage**:
+```python
+from Asgard.Verdandi.Cache import StampedeAnalyzer
+
+analyzer = StampedeAnalyzer()
+
+# Per-key access log: {key, t (ms), hit, recompute_ms?, ttl_s?}
+access_log = [
+    {"key": "hot:1", "t": i * 0.5, "hit": False, "recompute_ms": 40.0, "ttl_s": 60}
+    for i in range(50)
+]
+report = analyzer.analyze(access_log)
+for k in report.flagged_keys:
+    print(k.key, k.stampede_factor, k.xfetch_rule)
+```
+
+**Heuristics**:
+- **Stampede signature**: for each key, cluster misses that fall within one
+  observed recompute window (`Delta` = p95 `recompute_ms`) after an expiry.
+  `stampede_factor = concurrent_misses`; `factor > 5` → flagged.
+- **XFetch rule**: `fetch_early when: now + Delta * beta * ln(1/rand()) >= expiry`
+  (`beta = 1.0` by default), reported per flagged key along with a heuristic
+  estimate of stampede-probability reduction.
+- **TTL-vs-Delta sanity**: `Delta > 0.1 x TTL` → `ttl_too_short_for_delta`,
+  recommending a longer TTL or refresh-ahead instead of expire-and-recompute.
+
+---
+
 ## CLI Usage
 
 ```bash
@@ -238,6 +272,30 @@ class TTLAnalysis(BaseModel):
     cache_undersized: bool
     working_set_bytes: Optional[float]
     recommended_size_bytes: Optional[float]
+    recommendations: List[str]
+    notes: List[str]
+```
+
+### StampedeReport / StampedeKeyReport
+```python
+class StampedeKeyReport(BaseModel):
+    key: str
+    concurrent_misses: int
+    stampede_factor: float          # concurrent_misses / expected_1
+    flagged: bool                   # factor > 5
+    delta_ms: Optional[float]       # p95 observed recompute time
+    ttl_s: Optional[float]
+    xfetch_rule: Optional[str]
+    expected_stampede_reduction_pct: Optional[float]
+    ttl_too_short_for_delta: bool   # Delta > 0.1 x TTL
+    notes: List[str]
+
+class StampedeReport(BaseModel):
+    keys: List[StampedeKeyReport]
+    flagged_keys: List[StampedeKeyReport]
+    total_keys_analyzed: int
+    beta: float
+    status: str                     # healthy | warning | critical
     recommendations: List[str]
     notes: List[str]
 ```

@@ -95,6 +95,13 @@ MECHANISMS: Dict[str, Mechanism] = {m.mechanism_id: m for m in [
        description="Internal/test credential in source"),
     _m("defense_in_depth.bypass", "medium", "hardening",
        description="Bypass of a defense-in-depth layer"),
+    _m("auth.timing_unsafe_compare", "medium", "auth", "CWE-208",
+       description="Secret/token compared with a non-constant-time operator"),
+    _m("access.bola_advisory", "medium", "access",
+       description="Object fetched by request-supplied ID without an "
+                    "ownership filter in the same slice (advisory; SAST "
+                    "cannot prove exploitability -- pair with "
+                    "contract-driven fuzzing, e.g. Schemathesis)"),
     _m("open_redirect", "medium", "redirect", "CWE-601",
        description="Open redirect"),
     _m("log_injection", "medium", "logging", "CWE-117",
@@ -110,6 +117,9 @@ MECHANISMS: Dict[str, Mechanism] = {m.mechanism_id: m for m in [
        description="Missing browser header in an API-only context"),
     _m("secret.dummy", "low", "secrets",
        description="Placeholder/dummy key"),
+    _m("deserialization.hotspot", "low", "deserialization", "CWE-502",
+       description="Deserialization sink with unconfirmed data provenance "
+                    "(reviewed as a hotspot, not a proven finding)"),
 ]}
 
 # Severity a browser-only mechanism drops to when the surrounding context is

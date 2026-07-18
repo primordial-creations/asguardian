@@ -21,13 +21,32 @@ from Asgard.Verdandi.cli.handlers_anomaly_trend import (
 )
 from Asgard.Verdandi.cli.handlers_new_apis import (
     run_burn_rate_policy,
+    run_cache_stampede,
     run_cache_warmup,
     run_cwv_assess,
+    run_db_budget,
+    run_db_queries_per_class,
     run_pool_signature,
 )
 from Asgard.Verdandi.cli.handlers_tracing import (
     run_tracing_parse,
     run_tracing_critical_path,
+)
+from Asgard.Verdandi.cli.handlers_system import (
+    run_system_psi,
+    run_system_throttle,
+    run_system_correlate,
+)
+from Asgard.Verdandi.cli.handlers_network import (
+    run_network_phases,
+    run_network_use,
+    run_network_signature,
+)
+from Asgard.Verdandi.cli.handlers_slo_extras import (
+    run_slo_portfolio,
+    run_slo_budget_policy,
+    run_slo_dynamic_budget,
+    run_self_slo,
 )
 
 
@@ -75,6 +94,8 @@ def main(args=None) -> int:
             exit_code = run_apdex(args, output_format)
         elif args.analyze_command == "sla":
             exit_code = run_sla_check(args, output_format)
+        elif args.analyze_command == "self-slo":
+            exit_code = run_self_slo(args, output_format)
         else:
             print(f"Unknown analyze command: {args.analyze_command}")
             sys.exit(1)
@@ -90,6 +111,8 @@ def main(args=None) -> int:
             exit_code = run_cache_metrics(args, output_format)
         elif args.cache_command == "warmup":
             exit_code = run_cache_warmup(args, output_format)
+        elif args.cache_command == "stampede":
+            exit_code = run_cache_stampede(args, output_format)
         else:
             print(f"Unknown cache command: {args.cache_command}")
             sys.exit(1)
@@ -124,6 +147,12 @@ def main(args=None) -> int:
             exit_code = run_slo_calculate(args, output_format)
         elif args.slo_command == "burn-rate-policy":
             exit_code = run_burn_rate_policy(args, output_format)
+        elif args.slo_command == "portfolio":
+            exit_code = run_slo_portfolio(args, output_format)
+        elif args.slo_command == "budget-policy":
+            exit_code = run_slo_budget_policy(args, output_format)
+        elif args.slo_command == "dynamic-budget":
+            exit_code = run_slo_dynamic_budget(args, output_format)
         else:
             print(f"Unknown SLO command: {args.slo_command}")
             sys.exit(1)
@@ -137,8 +166,46 @@ def main(args=None) -> int:
 
         if args.db_command == "pool-signature":
             exit_code = run_pool_signature(args, output_format)
+        elif args.db_command == "budget":
+            exit_code = run_db_budget(args, output_format)
+        elif args.db_command == "queries":
+            exit_code = run_db_queries_per_class(args, output_format)
         else:
             print(f"Unknown db command: {args.db_command}")
+            sys.exit(1)
+
+        sys.exit(exit_code)
+
+    elif args.command == "system":
+        if not hasattr(args, "system_command") or args.system_command is None:
+            print("Error: Please specify a system command (e.g., 'psi', 'throttle', 'correlate')")
+            sys.exit(1)
+
+        if args.system_command == "psi":
+            exit_code = run_system_psi(args, output_format)
+        elif args.system_command == "throttle":
+            exit_code = run_system_throttle(args, output_format)
+        elif args.system_command == "correlate":
+            exit_code = run_system_correlate(args, output_format)
+        else:
+            print(f"Unknown system command: {args.system_command}")
+            sys.exit(1)
+
+        sys.exit(exit_code)
+
+    elif args.command == "network":
+        if not hasattr(args, "network_command") or args.network_command is None:
+            print("Error: Please specify a network command (e.g., 'phases', 'use', 'signature')")
+            sys.exit(1)
+
+        if args.network_command == "phases":
+            exit_code = run_network_phases(args, output_format)
+        elif args.network_command == "use":
+            exit_code = run_network_use(args, output_format)
+        elif args.network_command == "signature":
+            exit_code = run_network_signature(args, output_format)
+        else:
+            print(f"Unknown network command: {args.network_command}")
             sys.exit(1)
 
         sys.exit(exit_code)

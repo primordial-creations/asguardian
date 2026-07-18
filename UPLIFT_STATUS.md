@@ -2,6 +2,27 @@
 
 **Branch:** `uplift/asgard-p0` | **Started:** 2026-07-17 | **Orchestrator resume point — read this first.**
 
+## Partials completion — Batch 1 (2026-07-18, branch `uplift/asgard-p1`)
+Pushed Waves 0-3 to `origin/main` (95d6766; had to purge a live Vault token in CLAUDE.md from all history first — never reached GitHub; CLAUDE.md now gitignored). Deleted 19 fully-delivered plans (see `DELIVERED.md`). Then completed partials via 8 module-scoped agents, all merged onto `uplift/asgard-p1`:
+- **Heimdall/10** evaluation & benchmarking harness — built from NOT_STARTED (corpus, dedup, AST-bbox matching, isotonic calibration, Brier gate).
+- **Heimdall/02,03,05,06** — CIR extended to 10 languages + OCP type-switch; anemic-domain/infra-leak detectors; cohesion thresholds via profile plane + `explain_class`; SAVD trend metrics.
+- **Heimdall/07.5,07.6** — deserialization (AST variable-origin provenance) + auth timing-compare/BOLA. **Adversarial-reviewed: 2 BLOCKERs + 2 MAJORs found (RCE-muting via textual window, sys.argv/open laundering, FP, narrow secret lexicon) and fixed; re-verified by orchestrator.**
+- **Forseti/06,07** — stateful mocks, validation-proxy, Arazzo-lite runner; proto/GraphQL/SQL IR adapters, align discover, CLI. (Agent broke worktree isolation — committed to p1 directly; consolidated cleanly.)
+- **Freya/04,05,07** — visual fingerprint report display; **route-conditional CSP escalation (fixed the unconditional-Blocker deviation)**; security scope-matrix HTML; 6 module docs.
+- **Verdandi/04.4,06,07** — stampede/XFetch analyzer; PSI/CFS/USE↔RED analyzers; query-budget + fingerprint segmentation. (Audit gap-list was partly stale — several items were already done.)
+- **Volundr/02,04,05,07** — Terraform `--plan` CLI + for_each/lifecycle; GitLab/Azure hardening+scoring; Helm values.schema.json/hook hygiene; 5 module docs.
+- **Bragi/02,04,05** — git-friction/interest + delta-store; scanner context-stamping + TestHealth; PCA weights into scoring + more language profiles.
+
+## Partials completion — Batches 2 & 3 (2026-07-18)
+All merged onto `uplift/asgard-p1` (51 commits ahead of main), each security slice adversarially reviewed:
+- **Heimdall/07 remaining 7 domains** (TOCTOU, secrets, container/IaC, TLS, supply-chain, sensitive-data, input-validation) → **plan 07 now COMPLETE (12/12 domains)**. Adversarial review caught 3 BLOCKERs + 4 MAJORs (TLS scanner crash on `verify=False`, secrets semantic-context dead-code offset bug, real-key drop near `os.environ`, dev-dep substring misclass, static confidence_bucket, unflagged `ADD http://`, single-hop PII alias) — all fixed + re-verified.
+- **Cross-module CLI wiring** — 13 subcommands (Verdandi cache/system/network/db/slo/self-slo, Heimdall explain/calibrate/validate-rules/eval).
+- **Heimdall/04 Phase 4 multi-language taint** (JS/TS/Java CST engine + dispatch language-branching). Adversarial review caught 3 BLOCKERs + 1 MAJOR (branch-kill muting real injections, unevaluated array subscripts, dropped multi-arg flows, `escapeHtml` no-op laundering) — all fixed + re-verified by orchestrator.
+
+**Essentially all partials now delivered.** Deliberately scoped-OUT (documented): Bragi SZZ Stage 2 (needs 200-300 traceable bugfix commits); live-network OSV/NVD queries in supply-chain (no-network-default mandate; local vuln DB used). Known residual limitations documented in-code: taint engines intra-procedural (no cross-file summaries for JS/Java), no import/binding resolution for library-sanitizer shadowing (downgraded not full-cleared), Spring `@RequestParam` seeding unwired. Isolation note: 2 of 8 batch-1 agents (Forseti, Freya) escaped worktrees into the main checkout; batch-2/3 agents were explicitly pinned and stayed isolated.
+
+Prior "Still remaining after batch 1" list is now resolved except the scoped-out items above.
+
 ## Plan completeness audit (2026-07-18, 6 independent read-only verifier agents)
 Answer to "are ALL plans implemented?": **NO.** ~22 of 47 actionable plan files (the 53 files minus 6 overviews) are FULLY implemented; ~24 PARTIAL; 1 NOT_STARTED. **Plan files retained** (not deleted) — each PARTIAL/NOT_STARTED plan still describes unbuilt work and is the resume roadmap.
 

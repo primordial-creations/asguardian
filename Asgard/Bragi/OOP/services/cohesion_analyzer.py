@@ -181,6 +181,35 @@ class CohesionAnalyzer:
         metrics = self.analyze(scan_path)
         return [m for m in metrics if m.lcom > threshold]
 
+    def explain_class(
+        self, scan_path: Optional[Path], class_name: str,
+    ) -> Optional[str]:
+        """``heimdall oop cohesion <path> --explain <Class>``: return the
+        LCOM4 method/field component partition for *class_name*, or
+        ``None`` if the class isn't found under *scan_path*.
+
+        Exposed as a service-layer API per
+        ``_Docs/Planning/Heimdall/05_Cohesion_Coupling.md`` — CLI flag
+        wiring under ``Asgard/Heimdall/cli/`` is a separate concern owned
+        elsewhere.
+        """
+        for metrics in self.analyze(scan_path):
+            if metrics.class_name != class_name:
+                continue
+            groups = self.suggest_splits(metrics) if metrics.true_lcom4 > 1 else []
+            if groups:
+                parts = " | ".join(
+                    "{" + ", ".join(sorted(methods)) + "}" for _name, methods in groups
+                )
+            else:
+                parts = "{" + ", ".join(sorted(metrics.method_attribute_usage.keys())) + "}"
+            return (
+                f"{class_name}: LCOM4={metrics.true_lcom4} ({parts}); "
+                f"LCOM(CK)={metrics.lcom:.2f}; LCOM5(HS)={metrics.lcom5:.2f}; "
+                f"methods={metrics.method_count}; attributes={metrics.attribute_count}"
+            )
+        return None
+
     def suggest_splits(
         self, cls_metrics: ClassCohesionMetrics
     ) -> List[Tuple[str, Set[str]]]:

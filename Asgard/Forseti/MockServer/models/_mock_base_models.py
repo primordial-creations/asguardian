@@ -73,6 +73,11 @@ class MockServerConfig(BaseModel):
         default="flask",
         description="Server framework to generate (flask, fastapi, express)"
     )
+    stateful: bool = Field(
+        default=False,
+        description="Generate a WireMock-style in-memory resource store: POST stores under a "
+                    "generated id, GET/PUT/DELETE by id operate on stored state (plan 06-B.1)",
+    )
 
     class Config:
         use_enum_values = True

@@ -372,7 +372,109 @@ def _handle_contract(args: argparse.Namespace) -> int:
     elif args.command == "audit-deps":
         return _handle_audit_deps(args)
 
+    elif args.command == "test":
+        return _handle_contract_test(args)
+
+    elif args.command == "workflow":
+        return _handle_contract_workflow(args)
+
     return 1
+
+
+def _handle_contract_test(args: argparse.Namespace) -> int:
+    """Handle `forseti contract test <spec> --base-url ...` (Cost: NETWORK, explicit opt-in)."""
+    import yaml
+
+    from Asgard.Forseti.LiveContract import LiveValidatorService, ProbePlannerService
+    from Asgard.Forseti.LiveContract.models.live_contract_models import ProbeConfig
+
+    spec_path = Path(args.spec)
+    if not spec_path.is_file():
+        print(f"Error: spec not found: {spec_path}", file=sys.stderr)
+        return 1
+    document = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+
+    plan = ProbePlannerService().plan(document)
+    config = ProbeConfig(
+        base_url=args.base_url,
+        auth_header=args.auth_header,
+        max_requests=args.max_requests,
+        negative=args.negative,
+        timeout_s=args.timeout_s,
+        verify_tls=args.verify_tls,
+    )
+    report = LiveValidatorService(config).run(plan)
+
+    if getattr(args, "format", "text") == "json":
+        print(json.dumps(report.model_dump(mode="json"), indent=2, default=str))
+    else:
+        print("=" * 60)
+        print("Live Contract Drift Report")
+        print("=" * 60)
+        print(f"Base URL: {report.base_url}")
+        print(f"Operations attempted: {report.operations_attempted}  "
+              f"succeeded: {report.operations_succeeded}")
+        if report.findings:
+            print("-" * 60)
+            for finding in report.findings:
+                print(f"  [{finding.rule_id}] {finding.severity.value.upper()}: {finding.message}")
+        else:
+            print("No drift findings.")
+        print("=" * 60)
+
+    return 1 if report.has_errors else 0
+
+
+def _handle_contract_workflow(args: argparse.Namespace) -> int:
+    """Handle `forseti contract workflow <workflow.yaml> --spec ... --base-url ...`
+
+    Arazzo-lite multi-step runner (plan 06-C). Cost: NETWORK, explicit opt-in.
+    """
+    import yaml
+
+    from Asgard.Forseti.LiveContract import WorkflowRunnerService
+    from Asgard.Forseti.LiveContract.models.live_contract_models import ProbeConfig, Workflow
+
+    workflow_path = Path(args.workflow_file)
+    spec_path = Path(args.spec)
+    if not workflow_path.is_file():
+        print(f"Error: workflow file not found: {workflow_path}", file=sys.stderr)
+        return 1
+    if not spec_path.is_file():
+        print(f"Error: spec not found: {spec_path}", file=sys.stderr)
+        return 1
+
+    workflow_data = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+    workflow = Workflow.model_validate(workflow_data)
+    document = yaml.safe_load(spec_path.read_text(encoding="utf-8"))
+
+    config = ProbeConfig(
+        base_url=args.base_url,
+        auth_header=args.auth_header,
+        timeout_s=args.timeout_s,
+        verify_tls=args.verify_tls,
+    )
+    report = WorkflowRunnerService(document, config).run(workflow)
+
+    if getattr(args, "format", "text") == "json":
+        print(json.dumps(report.model_dump(mode="json"), indent=2, default=str))
+    else:
+        print("=" * 60)
+        print("Workflow Run Report")
+        print("=" * 60)
+        print(f"Base URL: {report.base_url}")
+        for step in report.steps:
+            status = step.error or step.status_code
+            print(f"  - {step.operation_id}: {status}")
+        if report.findings:
+            print("-" * 60)
+            for finding in report.findings:
+                print(f"  [{finding.rule_id}] {finding.severity.value.upper()}: {finding.message}")
+        else:
+            print("No workflow findings.")
+        print("=" * 60)
+
+    return 1 if report.has_errors else 0
 
 
 def _handle_audit_deps(args: argparse.Namespace) -> int:

@@ -60,6 +60,48 @@ SOURCE_SPECS: Tuple[SourceSpec, ...] = (
 ROUTE_PARAM_CONFIDENCE = 0.6
 
 
+# --------------------------------------------------------------------------
+# JavaScript / TypeScript (Express/Node) -- DEEPTHINK_04 top-level catalogue.
+# --------------------------------------------------------------------------
+JS_SOURCE_SPECS: Tuple[SourceSpec, ...] = (
+    SourceSpec("req.query", TaintSourceType.HTTP_PARAMETER, 1.0),
+    SourceSpec("req.body", TaintSourceType.HTTP_PARAMETER, 1.0),
+    SourceSpec("req.params", TaintSourceType.PATH_PARAMETER, 1.0),
+    SourceSpec("request.query", TaintSourceType.HTTP_PARAMETER, 1.0),
+    SourceSpec("request.body", TaintSourceType.HTTP_PARAMETER, 1.0),
+    SourceSpec("request.params", TaintSourceType.PATH_PARAMETER, 1.0),
+    SourceSpec("req.cookies", TaintSourceType.COOKIE, 1.0),
+    SourceSpec("req.headers", TaintSourceType.HEADER, 0.8),
+    SourceSpec("req.get", TaintSourceType.HEADER, 0.8, is_call=True),
+    SourceSpec("process.env", TaintSourceType.ENV_VAR, 0.8),
+    SourceSpec("process.argv", TaintSourceType.COMMAND_LINE_ARG, 1.0),
+    SourceSpec("location.search", TaintSourceType.HTTP_PARAMETER, 0.8),
+    SourceSpec("location.hash", TaintSourceType.HTTP_PARAMETER, 0.8),
+    SourceSpec("window.location", TaintSourceType.HTTP_PARAMETER, 0.6),
+    SourceSpec("document.location", TaintSourceType.HTTP_PARAMETER, 0.6),
+    SourceSpec("localStorage.getItem", TaintSourceType.USER_INPUT, 0.6, is_call=True),
+    SourceSpec("URLSearchParams", TaintSourceType.HTTP_PARAMETER, 0.6),
+)
+
+# --------------------------------------------------------------------------
+# Java (Servlet/Spring) -- DEEPTHINK_04 top-level catalogue.
+# --------------------------------------------------------------------------
+JAVA_SOURCE_SPECS: Tuple[SourceSpec, ...] = (
+    SourceSpec("request.getParameter", TaintSourceType.HTTP_PARAMETER, 1.0, is_call=True),
+    SourceSpec("request.getParameterValues", TaintSourceType.HTTP_PARAMETER, 1.0, is_call=True),
+    SourceSpec("request.getQueryString", TaintSourceType.HTTP_PARAMETER, 1.0, is_call=True),
+    SourceSpec("request.getHeader", TaintSourceType.HEADER, 0.8, is_call=True),
+    SourceSpec("request.getCookies", TaintSourceType.COOKIE, 1.0, is_call=True),
+    SourceSpec("request.getInputStream", TaintSourceType.HTTP_PARAMETER, 0.8, is_call=True),
+    SourceSpec("request.getReader", TaintSourceType.HTTP_PARAMETER, 0.8, is_call=True),
+    SourceSpec("request.getRequestURI", TaintSourceType.HTTP_PARAMETER, 0.8, is_call=True),
+    SourceSpec("System.getenv", TaintSourceType.ENV_VAR, 0.8, is_call=True),
+    SourceSpec("System.getProperty", TaintSourceType.ENV_VAR, 0.6, is_call=True),
+    # Spring MVC-annotated parameters are seeded separately (ROUTE_PARAM_CONFIDENCE)
+    # by the CST visitor when a method carries @RequestMapping/@GetMapping/etc.
+)
+
+
 def lookup_source(
     chain: str,
     is_call: bool = False,

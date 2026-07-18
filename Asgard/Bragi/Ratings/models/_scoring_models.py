@@ -171,3 +171,17 @@ class FileMetricBundle(BaseModel):
     # Context (Plan 04 Phase A/B): resolved via Bragi.common.context_classifier.
     # "production" (default) | "test" | "generated" | "suspected_generated" | "script".
     context: str = Field("production", description="Code context this bundle was scored under")
+
+    # TestHealth inputs (Plan 04 Sec.3.2): only meaningful for TEST-context
+    # bundles; feed the Reliability pillar for the test tree instead of
+    # bug_density, which has little meaning for test code.
+    assertion_density: Optional[float] = Field(
+        None, description="Mean assertions per test case (TEST context only)"
+    )
+    hermeticity_score: Optional[float] = Field(
+        None, ge=0.0, le=1.0,
+        description="Fraction of tests with no shared-mutable-state/teardown leakage (TEST context only)"
+    )
+    test_to_prod_loc_ratio: Optional[float] = Field(
+        None, description="Ratio of test LOC to production LOC for the scope this bundle covers"
+    )

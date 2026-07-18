@@ -16,6 +16,10 @@ from Asgard.Bragi.Quality.models.duplication_models import (
     DuplicationType,
 )
 from Asgard.Bragi.Quality.services.duplication_detector import DuplicationDetector
+from Asgard.Bragi.Quality.services._duplication_helpers import (
+    TEST_PROFILE_DUPLICATION_MULTIPLIER,
+    extract_blocks_from_file,
+)
 
 
 class TestDuplicationDetector:
@@ -175,6 +179,50 @@ def func():
             result = detector.analyze_single_file(file_path)
 
             assert result.total_files_scanned == 1
+
+
+class TestTestProfileDuplicationRelaxation:
+    """Plan 04 Sec.3.2 / DEEPTHINK_12: TEST-context files get a relaxed
+    (~3x) minimum clone size so setup/assertion repetition across test
+    cases isn't flagged as duplication the way production code would be."""
+
+    FUNC_SRC = (
+        "def sample():\n"
+        "    a = 1\n"
+        "    b = 2\n"
+        "    c = 3\n"
+        "    return a + b + c\n"
+    )
+
+    def test_multiplier_is_three(self):
+        assert TEST_PROFILE_DUPLICATION_MULTIPLIER == 3
+
+    def test_production_file_extracts_block_at_base_threshold(self, tmp_path: Path) -> None:
+        f = tmp_path / "prod.py"
+        f.write_text(self.FUNC_SRC)
+        config = DuplicationConfig(min_block_size=4)
+        blocks, total_lines = extract_blocks_from_file(f, tmp_path, config)
+        assert len(blocks) == 1
+
+    def test_test_file_relaxes_threshold_and_skips_short_block(self, tmp_path: Path) -> None:
+        test_dir = tmp_path / "tests"
+        test_dir.mkdir()
+        f = test_dir / "test_sample.py"
+        f.write_text(self.FUNC_SRC)
+        config = DuplicationConfig(min_block_size=4)
+        blocks, total_lines = extract_blocks_from_file(f, tmp_path, config)
+        # Effective threshold is 4 * 3 = 12; this 5-line function/file no
+        # longer qualifies as a block once the test profile is applied.
+        assert blocks == []
+
+    def test_original_config_object_is_not_mutated(self, tmp_path: Path) -> None:
+        test_dir = tmp_path / "tests"
+        test_dir.mkdir()
+        f = test_dir / "test_sample.py"
+        f.write_text(self.FUNC_SRC)
+        config = DuplicationConfig(min_block_size=4)
+        extract_blocks_from_file(f, tmp_path, config)
+        assert config.min_block_size == 4
 
 
 class TestCloneFamily:

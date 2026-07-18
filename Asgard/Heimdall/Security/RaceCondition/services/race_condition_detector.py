@@ -1,5 +1,25 @@
-"""Race condition detector."""
+"""
+Race condition / TOCTOU detector (plan 07.7).
 
+Precision-first per RESEARCH_06 / DEEPTHINK_04's FP-bias table: this
+category is precision-biased, not recall-biased, so the old
+line-regex table (flagging every `x += 1`, every module-level `{}`, every
+`await` followed by an assignment) has been removed -- it was
+unconditionally noisy on completely race-free code. Python now goes
+through the AST canonical-pattern resolver
+(`_toctou_ast_analysis.scan_toctou`, plan 07.7): exists()-then-open()
+file races and ORM get/mutate/save without select_for_update(). Other
+languages keep a small, deliberately narrow regex fallback restricted to
+the two patterns that are unambiguous from text alone (`tempfile.mktemp`,
+raw non-atomic file check-then-open shape) -- broad shared-state/counter
+guessing is not reinstated for any language.
+
+Severity is capped at MEDIUM: TOCTOU findings are never gate-blocking
+(plan 07.7 explicit instruction) since exploitability depends on runtime
+scheduling this static pass cannot observe.
+"""
+
+import ast
 import os
 import re
 from pathlib import Path
@@ -11,33 +31,17 @@ from Asgard.Heimdall.Security.RaceCondition.models.race_condition_models import 
     RaceConditionScanReport,
     RaceConditionSeverity,
 )
+from Asgard.Heimdall.Security.RaceCondition.services import _toctou_ast_analysis as _ast_analysis
+from Asgard.Heimdall.Security.context.test_context import is_test_context
+from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
 
+# Non-Python fallback: only the two patterns unambiguous from text alone.
 _RACE_PATTERNS: dict = {
     "toctou_file": [
-        (r"(?:os\.path\.exists|Path.*\.exists|fs\.exists)\s*\([^)]+\)", "HIGH", "toctou_exists", "TOCTOU: Check-then-use on file existence", "Use atomic operations or file locking"),
-        (r"(?:os\.access|access)\s*\([^)]+\)", "HIGH", "toctou_access", "TOCTOU: Check-then-use on file access", "Use try/except instead of access check"),
-    ],
-    "shared_state": [
-        (r"(?:global|static)\s+\w+\s*=\s*(?:\[\]|\{\}|0|None|null)", "MEDIUM", "shared_mutable_state", "Shared mutable state without synchronization", "Use thread-safe data structures or locks"),
-    ],
-    "thread_unsafe": [
-        (r"threading\.Thread.*target.*(?:self\.|cls\.)\w+\s*(?:\+=|-=|\+\+|--)", "HIGH", "thread_unsafe_mutation", "Thread mutation without lock", "Protect shared state with threading.Lock()"),
-        (r"concurrent\.futures.*(?:self\.|cls\.)\w+\s*(?:\+=|-=)", "HIGH", "executor_unsafe", "Shared state mutation in thread pool", "Use locks or thread-safe collections"),
-    ],
-    "async_issues": [
-        (r"await\s+\w+\([^)]*\)\s*\n.*\w+\s*=", "MEDIUM", "async_shared_assign", "Assignment after await may have race with other coroutines", "Use asyncio.Lock() for shared state"),
-    ],
-    "database": [
-        (r"SELECT.*WHERE.*(?:=|IN).*(?:\n.*)?UPDATE.*WHERE.*(?:=|IN)", "HIGH", "select_then_update", "SELECT then UPDATE without transaction (TOCTOU in DB)", "Use SELECT FOR UPDATE or transactions"),
-    ],
-    "cache": [
-        (r"if\s+\w+\s+(?:not\s+)?in\s+(?:cache|redis|memcache).*\n.*(?:cache|redis|memcache)\[", "MEDIUM", "cache_toctou", "Cache check-then-set without atomic operation", "Use atomic cache operations (SET NX, SETNX)"),
-    ],
-    "counter_operations": [
-        (r"(?:self\.|cls\.)?\w+\s*\+=\s*1(?!\s*#\s*atomic)", "MEDIUM", "non_atomic_counter", "Non-atomic counter increment in multi-threaded context", "Use threading.Lock() or atomic operations"),
+        (r"(?:os\.path\.exists|Path.*\.exists|fs\.exists)\s*\([^)]+\)", "LOW", "toctou_exists", "Possible TOCTOU: check-then-use on file existence (unconfirmed without cross-statement dataflow on this language)", "Use atomic operations or file locking"),
     ],
     "file_operations": [
-        (r"tempfile\.mktemp\s*\(", "HIGH", "mktemp_toctou", "mktemp() is vulnerable to TOCTOU (use mkstemp/NamedTemporaryFile)", "Use tempfile.mkstemp() or NamedTemporaryFile"),
+        (r"tempfile\.mktemp\s*\(", "MEDIUM", "mktemp_toctou", "mktemp() is vulnerable to TOCTOU (use mkstemp/NamedTemporaryFile)", "Use tempfile.mkstemp() or NamedTemporaryFile"),
     ],
 }
 
@@ -91,15 +95,59 @@ class RaceConditionDetector:
         if file_path.suffix.lower() not in {".py", ".js", ".ts", ".java", ".go", ".cs", ".rb"}:
             return []
         try:
-            lines = file_path.read_text(encoding="utf-8", errors="ignore").splitlines()
+            source = file_path.read_text(encoding="utf-8", errors="ignore")
         except OSError:
             return []
+        lines = source.splitlines()
+        in_test = is_test_context(str(file_path))
 
+        if file_path.suffix.lower() == ".py":
+            try:
+                tree = ast.parse(source)
+            except SyntaxError:
+                tree = None
+            if tree is not None:
+                return self._scan_python_ast(tree, lines, file_path, in_test)
+
+        return self._scan_regex_fallback(lines, file_path, in_test)
+
+    def _scan_python_ast(self, tree, lines, file_path: Path, in_test: bool) -> List[RaceConditionFinding]:
+        findings: List[RaceConditionFinding] = []
+        for hit in _ast_analysis.scan_toctou(tree, lines):
+            severity = hit.severity
+            confidence = hit.confidence
+            description = hit.description
+            if in_test:
+                # TOCTOU races in test fixtures are not shipped-code risk;
+                # downgrade rather than suppress (plan 08 network-config
+                # class action for TEST_UNIT/TEST_INTEGRATION).
+                confidence = min(confidence, 0.2)
+                description += " (in test code -- downgraded, not suppressed)"
+            findings.append(RaceConditionFinding(
+                file_path=str(file_path),
+                line_number=hit.line_number,
+                severity=RaceConditionSeverity(severity),
+                category="toctou",
+                issue_type=hit.issue_type,
+                code_snippet=hit.snippet,
+                description=description,
+                recommendation=hit.recommendation,
+                mechanism_id=hit.mechanism_id,
+                confidence=confidence,
+                confidence_bucket=confidence_bucket(confidence),
+                is_hotspot=confidence < 0.5,
+            ))
+        return findings
+
+    def _scan_regex_fallback(self, lines, file_path: Path, in_test: bool) -> List[RaceConditionFinding]:
         findings: List[RaceConditionFinding] = []
         for line_num, line in enumerate(lines, 1):
             for category, patterns in self._compiled.items():
                 for regex, sev, ptype, desc, rec in patterns:
                     if regex.search(line):
+                        confidence = 0.3 if sev == "LOW" else 0.5
+                        if in_test:
+                            confidence = min(confidence, 0.15)
                         findings.append(RaceConditionFinding(
                             file_path=str(file_path),
                             line_number=line_num,
@@ -109,6 +157,10 @@ class RaceConditionDetector:
                             code_snippet=line.strip()[:150],
                             description=desc,
                             recommendation=rec,
+                            mechanism_id=f"race_condition.{ptype}",
+                            confidence=confidence,
+                            confidence_bucket=confidence_bucket(confidence),
+                            is_hotspot=confidence < 0.5,
                         ))
                         break
 

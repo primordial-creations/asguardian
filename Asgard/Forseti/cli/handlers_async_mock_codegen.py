@@ -2,12 +2,18 @@ import argparse
 import json
 from pathlib import Path
 
+import yaml  # type: ignore[import-untyped]
+
 from Asgard.Forseti.AsyncAPI import AsyncAPIValidatorService, AsyncAPIParserService, AsyncAPIConfig
 from Asgard.Forseti.MockServer import (
     MockServerGeneratorService,
     MockServerConfig,
     MockDataGeneratorService,
     MockDataConfig,
+)
+from Asgard.Forseti.MockServer.services.validation_proxy_service import (
+    ValidationProxyService,
+    run_proxy_server,
 )
 from Asgard.Forseti.CodeGen import (
     TypeScriptGeneratorService,
@@ -61,6 +67,7 @@ def _handle_mock(args: argparse.Namespace) -> int:
         config = MockServerConfig(
             server_framework=args.framework if hasattr(args, 'framework') else "flask",
             port=args.port if hasattr(args, 'port') else 8080,
+            stateful=getattr(args, "stateful", False),
         )
         service = MockServerGeneratorService(config)
 
@@ -128,6 +135,39 @@ def _handle_mock(args: argparse.Namespace) -> int:
             print(json.dumps(output_data, indent=2))
 
         return 0
+
+    elif args.command == "proxy":
+        spec_path = Path(args.spec_file)
+        if not spec_path.exists():
+            print(f"Error: Specification file not found: {spec_path}")
+            return 1
+        with open(spec_path) as f:
+            content = f.read()
+        try:
+            openapi_doc = yaml.safe_load(content)
+        except yaml.YAMLError:
+            openapi_doc = json.loads(content)
+
+        service = ValidationProxyService(
+            openapi_doc,
+            upstream=args.upstream,
+            timeout_s=getattr(args, "timeout_s", 5.0),
+        )
+        print(
+            f"Validation proxy listening on http://{args.host}:{args.port} "
+            f"-> forwarding to {args.upstream} (Ctrl+C to stop)"
+        )
+        run_proxy_server(service, host=args.host, port=args.port)
+
+        report = service.report()
+        if getattr(args, "format", "text") == "json":
+            print(json.dumps(report.model_dump(), indent=2, default=str))
+        else:
+            print(f"\nRequests forwarded: {report.operations_attempted}")
+            print(f"Findings: {len(report.findings)}")
+            for finding in report.findings:
+                print(f"  [{finding.severity}] {finding.rule_id}: {finding.message}")
+        return 1 if report.has_errors else 0
 
     return 1
 

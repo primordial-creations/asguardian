@@ -22,16 +22,37 @@ def is_false_positive(
     match_start: int,
 ) -> bool:
     """
-    Check if a match is likely a false positive.
+    Check if the matched VALUE itself is a placeholder/dummy secret and
+    should be dropped outright (never reported).
+
+    Adversarial-review fix (BLOCKER-3): this used to ALSO full-drop any
+    match with "example"/"sample" wording or an os.environ/getenv call
+    anywhere within a 100-char window of the match -- regardless of
+    whether that context word/call had anything to do with the matched
+    value. That silently dropped real secrets, e.g.:
+
+        os.environ.get("DB_HOST")           # unrelated env lookup
+        aws_secret_access_key = "wJalr..."  # real key, 100 chars later
+
+    A docstring promise elsewhere in this module ("never disappears,
+    floor keeps it visible") was being violated by this full-drop path.
+    This function is now scoped to the VALUE only: it drops a match only
+    when the matched value (or its own regex-matched text) literally
+    looks like a placeholder/dummy (e.g. "your_key_here", "XXXX",
+    "example_secret", a template `${VAR}` / `<PLACEHOLDER>` token, or a
+    bare generic word like "password"). Proximity of an unrelated
+    env-var call or the word "example"/"sample" *elsewhere* in the
+    surrounding code is handled separately by
+    `has_env_or_example_proximity`, which only DOWNGRADES confidence
+    (see `secrets_detection_service.py`) -- it never drops a finding.
 
     Args:
         secret_value: The detected secret value
         matched_text: The full matched text
-        content: Full file content
-        match_start: Start position of the match
 
     Returns:
-        True if the match is likely a false positive
+        True if the matched value itself is a placeholder/dummy and the
+        finding should be dropped outright.
     """
     for fp_pattern in FALSE_POSITIVE_PATTERNS:
         if fp_pattern.search(secret_value):
@@ -39,8 +60,36 @@ def is_false_positive(
         if fp_pattern.search(matched_text):
             return True
 
+    return False
+
+
+def has_env_or_example_proximity(
+    content: str,
+    match_start: int,
+    matched_len: int,
+) -> bool:
+    """
+    Check whether "example"/"sample" wording or an env-var read call
+    (os.environ / process.env / getenv) appears near the match.
+
+    This is a SOFT signal only (BLOCKER-3 fix): it does not by itself
+    mean the matched value is safe -- a real hardcoded secret can sit a
+    few lines away from an unrelated `os.environ.get(...)` call. Callers
+    must use this to floor/downgrade confidence, never to drop the
+    finding outright. Only a placeholder VALUE (see `is_false_positive`
+    above) justifies a full drop.
+
+    Args:
+        content: Full file content
+        match_start: Start position of the match
+        matched_len: Length of the matched text
+
+    Returns:
+        True if "example"/"sample" wording or an env-read call appears
+        within 100 chars of the match.
+    """
     context_start = max(0, match_start - 100)
-    context_end = min(len(content), match_start + len(matched_text) + 100)
+    context_end = min(len(content), match_start + matched_len + 100)
     context = content[context_start:context_end]
 
     if "example" in context.lower() or "sample" in context.lower():

@@ -24,6 +24,16 @@ _LOWER_IS_BETTER_METRICS = {
     "critical_vulnerabilities",
     "high_vulnerabilities",
     "naming_violations",
+    # SAVD (Severity-Adjusted Vulnerability Density, plan 06 §D): lower
+    # findings-per-KLOC is always the improving direction, for every
+    # severity bucket. Kept as literal strings (rather than importing
+    # savd_metrics here) to avoid a persistence-layer -> service-layer
+    # dependency; see Reporting/History/services/savd_metrics.py for the
+    # canonical name builder used when constructing these metrics.
+    "savd_critical",
+    "savd_high",
+    "savd_medium",
+    "savd_low",
 }
 
 _SCHEMA = """

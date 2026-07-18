@@ -17,6 +17,9 @@ from Asgard.Heimdall.Security.Container.models.container_models import (
     ContainerFinding,
     ContainerReport,
 )
+from Asgard.Heimdall.Security.Container.services._compliance_mapping import (
+    apply_compliance_mapping,
+)
 from Asgard.Heimdall.Security.Container.services._compose_checks import (
     check_capabilities,
     check_environment_secrets,
@@ -90,6 +93,8 @@ class ComposeAnalyzer:
                     report.compose_issues += 1
 
         report.scan_duration_seconds = time.time() - start_time
+
+        apply_compliance_mapping(report.findings)
 
         report.findings.sort(
             key=lambda f: (

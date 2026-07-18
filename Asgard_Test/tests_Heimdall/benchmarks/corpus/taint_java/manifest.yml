@@ -1,0 +1,19 @@
+# Java taint benchmark corpus (plan 04 Phase 4; plan 01 wave 3 acceptance
+# gate: migrated rules must ship benchmark corpus cases).
+cases:
+  - file: tp_sqli_concat.java
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: tp_command_injection.java
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_prepared_statement.java
+    expect: no_flow
+  - file: fp_int_sanitizer.java
+    expect: no_flow

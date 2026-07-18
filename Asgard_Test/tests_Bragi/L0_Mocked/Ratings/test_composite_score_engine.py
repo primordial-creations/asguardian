@@ -75,6 +75,46 @@ class TestUtilityMapper:
         assert um.loc_penalty(5000) < 0.1
 
 
+class TestTestHealthUtilityMapper:
+    """Plan 04 Sec.3.2 utility functions: assertion density, hermeticity,
+    test-to-prod LOC ratio."""
+
+    def test_assertion_density_zero_is_zero_utility(self):
+        assert um.assertion_density_to_utility(0.0) == 0.0
+
+    def test_assertion_density_healthy_band_is_perfect(self):
+        assert um.assertion_density_to_utility(1.0) == 1.0
+        assert um.assertion_density_to_utility(5.0) == 1.0
+        assert um.assertion_density_to_utility(10.0) == 1.0
+
+    def test_assertion_density_below_band_scales_down(self):
+        assert um.assertion_density_to_utility(0.5) == pytest.approx(0.5)
+
+    def test_assertion_density_above_band_decays(self):
+        u = um.assertion_density_to_utility(20.0)
+        assert 0.0 < u < 1.0
+
+    def test_hermeticity_passthrough_bounded(self):
+        assert um.hermeticity_to_utility(0.5) == 0.5
+        assert um.hermeticity_to_utility(-1.0) == 0.0
+        assert um.hermeticity_to_utility(2.0) == 1.0
+
+    def test_test_to_prod_ratio_zero_is_zero_utility(self):
+        assert um.test_to_prod_ratio_to_utility(0.0) == 0.0
+
+    def test_test_to_prod_ratio_healthy_band_is_perfect(self):
+        assert um.test_to_prod_ratio_to_utility(0.5) == 1.0
+        assert um.test_to_prod_ratio_to_utility(2.0) == 1.0
+        assert um.test_to_prod_ratio_to_utility(4.0) == 1.0
+
+    def test_test_to_prod_ratio_below_band_scales_down(self):
+        assert um.test_to_prod_ratio_to_utility(0.25) == pytest.approx(0.5)
+
+    def test_test_to_prod_ratio_above_band_decays(self):
+        u = um.test_to_prod_ratio_to_utility(10.0)
+        assert 0.0 < u < 1.0
+
+
 class TestEngineAggregation:
     """WAM/WGM behavior and weight renormalization."""
 

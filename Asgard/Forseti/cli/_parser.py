@@ -17,6 +17,7 @@ from Asgard.Forseti.cli._parser_commands import (
     _add_rules_parser,
     _add_baseline_parser,
     _add_compat_parser,
+    _add_align_parser,
 )
 
 
@@ -141,5 +142,6 @@ Examples:
     _add_rules_parser(subparsers)
     _add_baseline_parser(subparsers)
     _add_compat_parser(subparsers)
+    _add_align_parser(subparsers)
 
     return parser

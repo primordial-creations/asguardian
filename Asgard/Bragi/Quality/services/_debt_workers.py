@@ -5,7 +5,7 @@ import fnmatch
 import math
 import os
 from pathlib import Path
-from typing import Dict, List, Tuple, cast
+from typing import Dict, List, Optional, Set, Tuple, cast
 
 from Asgard.Bragi.Quality.models.debt_models import (
     DebtConfig,
@@ -183,14 +183,25 @@ def get_business_impact(file_path: str, config: DebtConfig) -> float:
     return 0.5
 
 
-def count_lines_of_code(path: Path, config: DebtConfig) -> int:
-    """Count total lines of code in project."""
+def count_lines_of_code(
+    path: Path, config: DebtConfig, exclude_paths: Optional[Set[str]] = None
+) -> int:
+    """
+    Count total lines of code in project.
+
+    `exclude_paths` (Plan 04 Phase A): absolute file paths to skip - used to
+    keep GENERATED/SUSPECTED_GENERATED files out of the TDR denominator.
+    """
+    exclude_paths = exclude_paths or set()
     total_lines = 0
     for root, dirs, files in os.walk(path):
         dirs[:] = [d for d in dirs if not any(matches_pattern(d, p) for p in config.exclude_patterns)]
         for file in files:
             if should_analyze_file(file, config):
-                total_lines += count_file_lines(os.path.join(root, file))
+                file_path = os.path.join(root, file)
+                if os.path.abspath(file_path) in exclude_paths:
+                    continue
+                total_lines += count_file_lines(file_path)
     return total_lines
 
 

@@ -54,14 +54,39 @@ def generate_resource_block(resource: str, config: ModuleConfig) -> List[str]:
     tags_ref = "local.common_tags" if config.tags else "var.tags"
     if config.provider == CloudProvider.AWS:
         if "instance" in resource.lower():
-            lines.extend([
-                'resource "aws_instance" "main" {',
-                "  ami           = data.aws_ami.latest.id",
-                "  instance_type = var.instance_type",
-                "  subnet_id     = data.aws_subnets.default.ids[0]", "",
-                f"  tags = merge({tags_ref}, {{",
-                "    Name = var.instance_name", "  })", "}",
-            ])
+            multi_instance = config.complexity in (
+                ModuleComplexity.COMPLEX, ModuleComplexity.ENTERPRISE
+            )
+            if multi_instance:
+                # for_each over a map (RESEARCH_02 §2): index-shift drift
+                # storms from `count` are avoided since each key maps
+                # stably to one instance regardless of insertion/removal
+                # order elsewhere in the map.
+                lines.extend([
+                    'resource "aws_instance" "main" {',
+                    "  for_each = var.instances", "",
+                    "  ami           = coalesce(each.value.ami, data.aws_ami.latest.id)",
+                    "  instance_type = coalesce(each.value.instance_type, var.instance_type)",
+                    "  subnet_id     = data.aws_subnets.default.ids[0]", "",
+                    f"  tags = merge({tags_ref}, {{",
+                    "    Name = each.key", "  })", "",
+                    "  lifecycle {",
+                    "    # Autoscaler / external controller mutates these",
+                    "    # fields out-of-band; ignoring them here prevents",
+                    "    # every apply from fighting that controller",
+                    "    # (RESEARCH_02 §4 drift-resilient structure).",
+                    "    ignore_changes = [ami, tags[\"LastModifiedBy\"]]",
+                    "  }", "}",
+                ])
+            else:
+                lines.extend([
+                    'resource "aws_instance" "main" {',
+                    "  ami           = data.aws_ami.latest.id",
+                    "  instance_type = var.instance_type",
+                    "  subnet_id     = data.aws_subnets.default.ids[0]", "",
+                    f"  tags = merge({tags_ref}, {{",
+                    "    Name = var.instance_name", "  })", "}",
+                ])
         elif "s3" in resource.lower():
             lines.extend([
                 'resource "aws_s3_bucket" "main" {',

@@ -197,6 +197,70 @@ def check_add_instead_of_copy(
     return findings
 
 
+def check_add_remote_url(
+    instructions: List[DockerfileInstruction],
+    lines: List[str],
+    file_path: str,
+) -> List[ContainerFinding]:
+    """
+    Check for ``ADD <url>`` pulling a remote file directly into the image
+    (adversarial-review MAJOR-6 fix).
+
+    ``check_add_instead_of_copy`` above deliberately EXCLUDES url-form ADD
+    (that's the one legitimate use of ADD over COPY), but that exclusion
+    meant a remote fetch such as::
+
+        ADD http://example.com/install.sh /tmp/install.sh
+
+    was never flagged by ANY check, despite this being exactly the
+    supply-chain/integrity risk CIS Docker Benchmark 4.9 is about: the
+    fetched content has no checksum/signature pinning inside the
+    Dockerfile, the URL may not be TLS, and image rebuilds are not
+    reproducible if the remote content changes. This is a distinct
+    finding from the "use COPY for local files" rule -- it fires only for
+    the url-form ADD case that rule intentionally skips.
+    """
+    findings: List[ContainerFinding] = []
+
+    for instr in instructions:
+        if instr.instruction != "ADD":
+            continue
+        args = instr.arguments.strip()
+        args_lower = args.lower()
+        if args_lower.startswith("http://") or args_lower.startswith("https://"):
+            findings.append(ContainerFinding(
+                file_path=file_path,
+                line_number=instr.line_number,
+                finding_type=ContainerFindingType.ADD_REMOTE_URL,
+                severity=SecuritySeverity.MEDIUM,
+                title="ADD Fetches Remote URL Without Integrity Pinning",
+                description=(
+                    "ADD is fetching a remote URL directly into the image "
+                    "layer. This content has no checksum/signature "
+                    "verification, may not be served over TLS, and is not "
+                    "guaranteed to be the same on every rebuild -- an "
+                    "attacker who compromises the remote host (or a "
+                    "plain-HTTP MITM) can inject arbitrary content into "
+                    "the image."
+                ),
+                code_snippet=extract_code_snippet(lines, instr.line_number),
+                instruction="ADD",
+                cwe_id="CWE-494",
+                confidence=0.75,
+                remediation=(
+                    "Use RUN curl/wget with an explicit checksum "
+                    "verification step (or COPY a locally-fetched, "
+                    "checksum-verified artifact) instead of ADD <url>."
+                ),
+                references=[
+                    "https://docs.docker.com/develop/develop-images/dockerfile_best-practices/#add-or-copy",
+                    "https://cwe.mitre.org/data/definitions/494.html",
+                ],
+            ))
+
+    return findings
+
+
 def check_missing_healthcheck(
     instructions: List[DockerfileInstruction],
     lines: List[str],

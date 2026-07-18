@@ -13,12 +13,20 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, List, Set, Tuple, cast
 
+from Asgard.Bragi.common.context_classifier import CodeContext, classify
 from Asgard.Bragi.Quality.models.duplication_models import (
     CloneFamily,
     CodeBlock,
     DuplicationConfig,
     DuplicationType,
 )
+
+# Test-profile duplication relaxation (Plan 04 Sec.3.2 / DEEPTHINK_12): DAMP,
+# not DRY - test files legitimately repeat setup/assertion shapes across
+# cases, so the minimum clone size to flag as duplication is relaxed
+# (~50 -> ~150 "tokens" in the plan's language; here it multiplies the
+# line-based min_block_size by the same ratio).
+TEST_PROFILE_DUPLICATION_MULTIPLIER = 3
 
 
 # Normalization patterns for token comparison
@@ -163,18 +171,29 @@ def extract_blocks_from_file(
     lines = content.splitlines()
     total_lines = len(lines)
 
-    if total_lines < config.min_block_size:
+    effective_config = config
+    try:
+        if classify(file_path) == CodeContext.TEST:
+            effective_config = config.model_copy(
+                update={"min_block_size": config.min_block_size * TEST_PROFILE_DUPLICATION_MULTIPLIER}
+            )
+    except Exception:
+        # Classification must never break duplication scanning - fall back
+        # to the production profile on any error.
+        effective_config = config
+
+    if total_lines < effective_config.min_block_size:
         return [], total_lines
 
     relative_path = str(file_path.relative_to(root_path))
 
     if file_path.suffix == ".py":
         blocks = extract_python_blocks(
-            content, lines, str(file_path), relative_path, config
+            content, lines, str(file_path), relative_path, effective_config
         )
     else:
         blocks = extract_sliding_window_blocks(
-            lines, str(file_path), relative_path, config
+            lines, str(file_path), relative_path, effective_config
         )
 
     return blocks, total_lines

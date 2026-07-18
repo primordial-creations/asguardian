@@ -366,8 +366,14 @@ def process_file(path):
         config = RaceConditionScanConfig(scan_path=target)
         report = RaceConditionDetector().scan(config)
         assert report.total_findings > 0, "RaceCondition detector produced no findings"
-        assert _has_critical_or_high(report.findings), (
-            f"Expected CRITICAL/HIGH severity, got: {[f.severity for f in report.findings]}"
+        # Plan 07.7 (precision-first TOCTOU): severity is capped at
+        # LOW/MEDIUM and findings are never gate-blocking -- exploitability
+        # depends on runtime scheduling a static pass cannot observe, so
+        # CRITICAL/HIGH would be an overclaim. This intentionally
+        # supersedes the pre-uplift regex scanner's HIGH severity for this
+        # pattern.
+        assert all(f.severity in ("LOW", "MEDIUM") for f in report.findings), (
+            f"Expected LOW/MEDIUM severity (never gate-blocking), got: {[f.severity for f in report.findings]}"
         )
 
 

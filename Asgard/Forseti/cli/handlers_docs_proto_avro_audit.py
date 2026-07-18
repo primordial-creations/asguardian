@@ -232,6 +232,37 @@ def _handle_audit(args: argparse.Namespace) -> int:
                 "message": str(e),
             })
 
+    alignment_config_path = path / "alignment-config.yaml"
+    if alignment_config_path.is_file():
+        try:
+            from Asgard.Forseti.Alignment.services.alignment_loader_service import (
+                check_config,
+                load_config,
+            )
+
+            align_config = load_config(str(alignment_config_path))
+            _findings, align_report = check_config(align_config, base_dir=str(path))
+            results.append({
+                "file": str(alignment_config_path),
+                "type": "alignment",
+                "valid": align_report.build_passes,
+                "errors": align_report.critical_count,
+                "message": (
+                    f"{len(align_report.entities_checked)} entities: "
+                    f"{align_report.critical_count} critical, "
+                    f"{align_report.warning_count} warning, "
+                    f"{align_report.info_count} info"
+                ),
+            })
+        except Exception as e:
+            results.append({
+                "file": str(alignment_config_path),
+                "type": "alignment",
+                "valid": False,
+                "errors": 1,
+                "message": str(e),
+            })
+
     print("=" * 60)
     print("Forseti Audit Report")
     print("=" * 60)

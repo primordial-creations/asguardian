@@ -1,0 +1,43 @@
+# Java Servlet/Spring framework model for taint analysis (Java CST engine).
+#
+# NOTE: see express.yml -- the CST engine does not yet load YAML stubs; its
+# JAVA_SOURCE_SPECS/JAVA_SINK_SPECS catalog entries cover the Servlet API
+# surface directly. This file documents the Spring MVC route-parameter
+# annotation model (@RequestMapping/@GetMapping/@PathVariable/@RequestParam)
+# for the future summary-computation pass mentioned in the CST visitor's
+# module docstring ("Spring route parameter seeding is not yet implemented").
+framework: spring
+route_annotations:
+  - RequestMapping
+  - GetMapping
+  - PostMapping
+  - PutMapping
+  - DeleteMapping
+  - PatchMapping
+route_param_annotations:
+  - RequestParam
+  - PathVariable
+  - RequestBody
+  - RequestHeader
+  - CookieValue
+sources:
+  - pattern: request.getParameter
+    type: http_parameter
+    confidence: 1.0
+  - pattern: request.getHeader
+    type: header
+    confidence: 0.8
+sinks:
+  - pattern: jdbcTemplate.query
+    type: sql_query
+    severity: critical
+    confidence: 0.8
+  - pattern: entityManager.createNativeQuery
+    type: sql_query
+    severity: critical
+    confidence: 0.8
+sanitizers:
+  - pattern: PreparedStatement
+    kind: exact
+  - pattern: StringEscapeUtils.escapeHtml4
+    kind: exact

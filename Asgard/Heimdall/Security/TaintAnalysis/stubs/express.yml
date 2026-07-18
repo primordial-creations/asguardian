@@ -1,0 +1,54 @@
+# Express/Node framework model for taint analysis (JS/TS CST engine).
+#
+# NOTE: unlike the Python stub loader (stubs/__init__.py, consumed by
+# TaintAnalyzer), the CST engine (Security/TaintAnalysis/engine/
+# cst_taint_visitor.py) does not yet load YAML stubs -- its JS_SOURCE_SPECS/
+# JS_SINK_SPECS catalog entries (catalog/sources.py, catalog/sinks.py)
+# cover the same route-decorator-free surface directly in Python, since
+# Express has no decorator-based routing to model (route handlers are
+# plain callback arguments, already captured by function-node discovery).
+# This file documents the equivalent framework model for future work that
+# wires route-method allowlisting (app.get/post/put/delete/patch) into the
+# stub-loading path shared with the Python engine.
+framework: express
+route_methods:
+  - app.get
+  - app.post
+  - app.put
+  - app.delete
+  - app.patch
+  - router.get
+  - router.post
+  - router.put
+  - router.delete
+  - router.patch
+sources:
+  - pattern: req.query
+    type: http_parameter
+    confidence: 1.0
+  - pattern: req.body
+    type: http_parameter
+    confidence: 1.0
+  - pattern: req.params
+    type: path_parameter
+    confidence: 1.0
+  - pattern: req.cookies
+    type: cookie
+    confidence: 1.0
+  - pattern: req.headers
+    type: header
+    confidence: 0.8
+sinks:
+  - pattern: res.send
+    type: html_output
+    severity: medium
+    confidence: 0.6
+  - pattern: child_process.exec
+    type: shell_command
+    severity: critical
+    confidence: 1.0
+sanitizers:
+  - pattern: encodeURIComponent
+    kind: exact
+  - pattern: DOMPurify.sanitize
+    kind: exact

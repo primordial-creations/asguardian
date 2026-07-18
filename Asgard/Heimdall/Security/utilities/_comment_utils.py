@@ -114,6 +114,8 @@ def is_example_or_placeholder(text: str, context: str = "") -> bool:
         r"^\w*test\w*$",
         r"^\w*demo\w*$",
         r"^\w*dummy\w*$",
+        r"^\w*mock\w*$",
+        r"^\w*fake\w*$",
         r"^\*+$",
         r"^\.{3,}$",
         r"^\[.*\]$",

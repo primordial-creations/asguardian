@@ -70,6 +70,16 @@ def add_oop_args(parser: argparse.ArgumentParser) -> None:
         default=[],
         help="Glob patterns for paths to exclude from scanning",
     )
+    parser.add_argument(
+        "--explain",
+        type=str,
+        default=None,
+        metavar="CLASS_NAME",
+        help=(
+            "Explain the LCOM4/CBO metrics for a single class by name "
+            "(e.g., --explain UserService) instead of running a full scan"
+        ),
+    )
 
 
 def add_deps_args(parser: argparse.ArgumentParser) -> None:

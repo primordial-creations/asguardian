@@ -25,5 +25,10 @@ ASGARD_WAY_STRICT = QualityProfile(
         RuleConfig(rule_id="quality.comment_density", enabled=True, severity="warning", threshold=20.0),
         RuleConfig(rule_id="quality.api_documentation", enabled=True, severity="error", threshold=90.0),
         RuleConfig(rule_id="quality.cyclomatic_complexity", enabled=True, severity="error", threshold=7.0),
+        # Tighter cohesion/coupling thresholds than the base profile.
+        RuleConfig(rule_id="architecture.cohesion.cbo", enabled=True, severity="error", threshold=12.0),
+        RuleConfig(rule_id="architecture.cohesion.lcom4", enabled=True, severity="error", threshold=1.0),
+        RuleConfig(rule_id="architecture.cohesion.rfc", enabled=True, severity="warning", threshold=35.0),
+        RuleConfig(rule_id="architecture.cohesion.wmc", enabled=True, severity="error", threshold=15.0),
     ],
 )

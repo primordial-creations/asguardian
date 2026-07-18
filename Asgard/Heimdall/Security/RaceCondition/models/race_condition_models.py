@@ -23,6 +23,10 @@ class RaceConditionFinding(BaseModel):
     code_snippet: str = ""
     description: str
     recommendation: str
+    mechanism_id: str = ""
+    confidence: float = 0.5
+    confidence_bucket: str = "possible"
+    is_hotspot: bool = False
 
 
 class RaceConditionScanConfig(BaseModel):

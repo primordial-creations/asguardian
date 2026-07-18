@@ -32,6 +32,10 @@ from Asgard.Bragi.Architecture.services._generic_hexagonal_checks import (
     check_domain_imports_infrastructure,
     check_missing_port_reference,
 )
+from Asgard.Bragi.Architecture.services._hexagonal_anti_patterns import (
+    detect_anemic_domain_models as _detect_anemic_domain_models,
+    detect_infrastructure_leaks as _detect_infrastructure_leaks,
+)
 from Asgard.Shared.common.language_registry import EXTENSION_TO_LANGUAGE
 from Asgard.Bragi.Architecture.services._hexagonal_validators import (
     validate_domain_isolation as _validate_domain,
@@ -158,6 +162,14 @@ class HexagonalAnalyzer:
             path, zone_assignments
         )
         for v in cross_violations:
+            report.add_violation(v)
+
+        # Step 6b: Anti-pattern detectors (plan 03 §4) — Anemic Domain
+        # Model and Infrastructure Leak, the two gaps left after Missing
+        # Ports (already covered by _hexagonal_validators/_generic_hexagonal_checks).
+        for v in self._detect_anemic_domain_models(path, zone_assignments):
+            report.add_violation(v)
+        for v in self._detect_infrastructure_leaks(path, zone_assignments):
             report.add_violation(v)
 
         # Step 7: Import-graph layer inference (Plan 03) — only when the
@@ -347,6 +359,27 @@ class HexagonalAnalyzer:
             root_path, zone_assignments,
             self.config.exclude_patterns, self.config.include_extensions,
             self._resolve_import_zone, self._path_to_module,
+        )
+
+    def _detect_anemic_domain_models(
+        self, root_path: Path, zone_assignments: Dict[str, str],
+    ) -> List[HexagonalViolation]:
+        """Domain-zone classes that hold data but expose no behaviour."""
+        return _detect_anemic_domain_models(
+            root_path, zone_assignments,
+            self.config.exclude_patterns, self.config.include_extensions,
+            self._path_to_module,
+        )
+
+    def _detect_infrastructure_leaks(
+        self, root_path: Path, zone_assignments: Dict[str, str],
+    ) -> List[HexagonalViolation]:
+        """Domain-zone classes bound to a persistence/web framework via
+        base class, decorator, or ORM field declaration."""
+        return _detect_infrastructure_leaks(
+            root_path, zone_assignments,
+            self.config.exclude_patterns, self.config.include_extensions,
+            self._path_to_module,
         )
 
     def _find_framework_imports(self, imports: Set[str], from_imports: Dict[str, Set[str]]) -> Set[str]:

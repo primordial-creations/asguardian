@@ -138,6 +138,46 @@ class TTLAnalysis(BaseModel):
     notes: List[str] = Field(default_factory=list)
 
 
+class StampedeKeyReport(BaseModel):
+    """Stampede signature for a single key."""
+
+    key: str = Field(...)
+    concurrent_misses: int = Field(
+        default=0, description="Misses observed within one recompute window after expiry"
+    )
+    stampede_factor: float = Field(
+        default=0.0, description="concurrent_misses / expected_1 (i.e. concurrent_misses)"
+    )
+    flagged: bool = Field(default=False, description="stampede_factor > STAMPEDE_FACTOR_THRESHOLD")
+    delta_ms: Optional[float] = Field(
+        default=None, description="p95 observed recompute time (Delta in the XFetch rule)"
+    )
+    ttl_s: Optional[float] = Field(default=None)
+    xfetch_rule: Optional[str] = Field(
+        default=None, description="Recommended early-recompute rule string"
+    )
+    expected_stampede_reduction_pct: Optional[float] = Field(
+        default=None,
+        description="Heuristic estimate of stampede-probability reduction from adopting XFetch",
+    )
+    ttl_too_short_for_delta: bool = Field(
+        default=False, description="Delta > 0.1 x TTL: recompute cost eats into the TTL window"
+    )
+    notes: List[str] = Field(default_factory=list)
+
+
+class StampedeReport(BaseModel):
+    """Cache-stampede / thundering-herd analysis across a per-key access log."""
+
+    keys: List[StampedeKeyReport] = Field(default_factory=list)
+    flagged_keys: List[StampedeKeyReport] = Field(default_factory=list)
+    total_keys_analyzed: int = Field(default=0)
+    beta: float = Field(default=1.0, description="XFetch beta parameter used")
+    status: str = Field(default="healthy", description="healthy | warning | critical")
+    recommendations: List[str] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+
+
 class CacheMetrics(BaseModel):
     """Cache performance metrics."""
 

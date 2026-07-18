@@ -4,14 +4,43 @@ Query Metrics Calculator
 Calculates database query performance metrics.
 """
 
-from typing import Dict, List
+import re
+import statistics
+from typing import Dict, List, Optional
 
 from Asgard.Verdandi.Analysis import PercentileCalculator
 from Asgard.Verdandi.Database.models.database_models import (
+    QueryClassStats,
     QueryMetricsInput,
     QueryMetricsResult,
     QueryType,
 )
+
+_STRING_LITERAL_RE = re.compile(r"'(?:[^'\\]|\\.)*'")
+_NUMERIC_LITERAL_RE = re.compile(r"(?<![\w])-?\d+(\.\d+)?(?![\w])")
+_IN_LIST_RE = re.compile(r"\bIN\s*\([^)]*\)", re.IGNORECASE)
+_WHITESPACE_RE = re.compile(r"\s+")
+
+
+def fingerprint_query(query_text: str) -> str:
+    """
+    Normalize a raw SQL string into a fingerprint by collapsing literals
+    and whitespace, so `SELECT * FROM t WHERE id = 1` and
+    `SELECT * FROM t WHERE id = 2` share a fingerprint.
+
+    Args:
+        query_text: Raw SQL text
+
+    Returns:
+        Normalized fingerprint string
+    """
+    if not query_text:
+        return ""
+    text = _STRING_LITERAL_RE.sub("?", query_text)
+    text = _IN_LIST_RE.sub("IN (?)", text)
+    text = _NUMERIC_LITERAL_RE.sub("?", text)
+    text = _WHITESPACE_RE.sub(" ", text).strip()
+    return text.upper()
 
 
 class QueryMetricsCalculator:
@@ -82,6 +111,104 @@ class QueryMetricsCalculator:
             scan_rate=round(scan_rate, 2),
             recommendations=recommendations,
         )
+
+    def analyze_by_fingerprint(
+        self,
+        queries: List[QueryMetricsInput],
+        baseline: Optional[Dict[str, List[float]]] = None,
+        shift_threshold: float = 3.0,
+    ) -> List[QueryClassStats]:
+        """
+        Segment queries by normalized fingerprint and compute per-class
+        percentiles. When a baseline (fingerprint -> durations) is supplied,
+        flag classes whose median has shifted by more than
+        `shift_threshold` baseline MADs (a robust Hodges-Lehmann-style shift
+        test) — this replaces one blended P99 across heterogeneous query
+        classes (DEEPTHINK_04) with per-class regression detection.
+
+        Args:
+            queries: Queries to segment (uses `query_text`; falls back to
+                `query_id` or query_type when `query_text` is absent)
+            baseline: Optional per-fingerprint baseline durations (ms)
+            shift_threshold: MAD multiples defining a "shift"
+
+        Returns:
+            List of QueryClassStats, one per fingerprint, sorted by count desc
+        """
+        by_fp: Dict[str, List[float]] = {}
+        for q in queries:
+            fp = self._fingerprint_for(q)
+            by_fp.setdefault(fp, []).append(q.execution_time_ms)
+
+        results: List[QueryClassStats] = []
+        for fp, durations in by_fp.items():
+            sorted_d = sorted(durations)
+            stats = QueryClassStats(
+                fingerprint=fp,
+                count=len(durations),
+                p50_ms=round(self._pct(sorted_d, 50), 3),
+                p95_ms=round(self._pct(sorted_d, 95), 3),
+                p99_ms=round(self._pct(sorted_d, 99), 3),
+                mean_ms=round(statistics.fmean(durations), 3),
+                max_ms=round(max(durations), 3),
+            )
+
+            if baseline and fp in baseline and baseline[fp]:
+                shift_detected, notes = self._shift_vs_baseline(
+                    durations, baseline[fp], shift_threshold
+                )
+                stats.shift_detected = shift_detected
+                stats.shift_notes = notes
+
+            results.append(stats)
+
+        results.sort(key=lambda s: s.count, reverse=True)
+        return results
+
+    @staticmethod
+    def _fingerprint_for(q: QueryMetricsInput) -> str:
+        if q.query_text:
+            return fingerprint_query(q.query_text)
+        if q.query_id:
+            return q.query_id
+        return q.query_type.value
+
+    @staticmethod
+    def _shift_vs_baseline(
+        current: List[float],
+        baseline: List[float],
+        shift_threshold: float,
+    ):
+        cur_median = statistics.median(current)
+        base_median = statistics.median(baseline)
+        base_mad = statistics.median(
+            [abs(v - base_median) for v in baseline]
+        ) * 1.4826  # normal-consistent MAD
+        if base_mad == 0:
+            base_mad = 1e-9
+
+        shift_mads = abs(cur_median - base_median) / base_mad
+        shift_detected = shift_mads > shift_threshold
+        notes = []
+        if shift_detected:
+            notes.append(
+                f"Median shifted {cur_median - base_median:+.2f}ms "
+                f"({shift_mads:.1f}x baseline MAD, threshold {shift_threshold}x)."
+            )
+        return shift_detected, notes
+
+    @staticmethod
+    def _pct(sorted_values: List[float], pct: float) -> float:
+        if not sorted_values:
+            return 0.0
+        n = len(sorted_values)
+        if n == 1:
+            return float(sorted_values[0])
+        rank = (pct / 100) * (n - 1)
+        lower = int(rank)
+        upper = min(lower + 1, n - 1)
+        frac = rank - lower
+        return sorted_values[lower] + frac * (sorted_values[upper] - sorted_values[lower])
 
     def _group_by_type(
         self,

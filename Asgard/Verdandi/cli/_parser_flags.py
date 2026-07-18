@@ -168,6 +168,15 @@ def _add_analyze_parser(subparsers) -> None:
         help="Target percentile (default: 95)"
     )
 
+    self_slo_parser = analyze_subparsers.add_parser(
+        "self-slo",
+        help="Evaluate Verdandi's own tool-quality self-SLI (analytical yield)",
+    )
+    self_slo_parser.add_argument(
+        "metrics_file",
+        help="JSON file: {...RunRecord fields...} (entities_submitted, ...)",
+    )
+
     add_performance_flags(analyze_parser)
 
 
@@ -222,6 +231,24 @@ def _add_cache_parser(subparsers) -> None:
             "JSON file: array of {hits, misses} buckets in time order, or "
             "{buckets: [...], db_load: [...]}"
         ),
+    )
+
+    stampede_parser = cache_subparsers.add_parser(
+        "stampede",
+        help="Detect cache-stampede clustering (thundering herd on key expiry)",
+    )
+    stampede_parser.add_argument(
+        "metrics_file",
+        help=(
+            "JSON file: array of {key, t, hit, recompute_ms?, ttl_s?} "
+            "access-log records"
+        ),
+    )
+    stampede_parser.add_argument(
+        "--beta",
+        type=float,
+        default=None,
+        help="XFetch-style beta parameter (default: service default)",
     )
 
     add_performance_flags(cache_parser)

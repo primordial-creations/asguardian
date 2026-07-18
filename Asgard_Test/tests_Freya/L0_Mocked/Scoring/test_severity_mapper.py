@@ -14,9 +14,12 @@ from Asgard.Freya.Integration.models.integration_models import (
 from Asgard.Freya.Scoring.models.scoring_models import UniversalSeverity
 from Asgard.Freya.Scoring.services.severity_mapper import (
     CATEGORY_SEVERITY_MAPS,
+    TRANSACTIONAL_ROUTE_TAGS,
     SeverityMapper,
     escalate_for_criticality,
+    escalate_security_for_route,
     issue_dicts_to_findings,
+    security_report_to_findings,
 )
 
 
@@ -32,8 +35,15 @@ class TestMappingTables:
         assert mapper.map("accessibility", "serious") == UniversalSeverity.MAJOR
         assert mapper.map("accessibility", "info") == UniversalSeverity.MINOR
 
-    def test_security_critical_is_blocker(self):
-        assert SeverityMapper().map("security", "critical") == UniversalSeverity.BLOCKER
+    def test_security_critical_is_not_blocker_by_default(self):
+        # Plan 05 §3.5: an observable-signal security "critical" (e.g. no
+        # CSP) never forces a site-wide Blocker on its own -- it proves
+        # absence of a defense, not exploitation. Ceiling is CRITICAL
+        # unless route-tagged (see TestSecurityRouteGating below).
+        assert SeverityMapper().map("security", "critical") == UniversalSeverity.CRITICAL
+        assert SeverityMapper().map(
+            "security", "critical", check_id="security.header.missing"
+        ) == UniversalSeverity.CRITICAL
 
     def test_performance_never_blocker(self):
         mapper = SeverityMapper()
@@ -54,6 +64,90 @@ class TestMappingTables:
         assert mapper.map(
             "accessibility", "serious", check_id="Keyboard trap detected"
         ) == UniversalSeverity.BLOCKER
+
+
+class TestSecurityRouteGating:
+    """Plan 05 §3.5: CSP-absent -> BLOCKER only when route-tagged."""
+
+    def test_csp_absent_on_auth_route_is_blocker(self):
+        for tag in TRANSACTIONAL_ROUTE_TAGS:
+            assert SeverityMapper().map(
+                "security", "critical",
+                check_id="security.csp.missing",
+                route_tag=tag,
+            ) == UniversalSeverity.BLOCKER
+
+    def test_csp_absent_without_route_tag_stays_critical(self):
+        assert SeverityMapper().map(
+            "security", "critical", check_id="security.csp.missing"
+        ) == UniversalSeverity.CRITICAL
+
+    def test_csp_absent_on_untagged_route_stays_critical(self):
+        assert SeverityMapper().map(
+            "security", "critical",
+            check_id="security.csp.missing",
+            route_tag="marketing",
+        ) == UniversalSeverity.CRITICAL
+
+    def test_non_csp_critical_never_escalates_even_when_tagged(self):
+        assert SeverityMapper().map(
+            "security", "critical",
+            check_id="security.header.missing",
+            route_tag="checkout",
+        ) == UniversalSeverity.CRITICAL
+
+    def test_serious_csp_finding_on_auth_route_does_not_escalate(self):
+        # Only "critical"-mapped (CRITICAL) severities are eligible; a
+        # "serious" finding maps to CRITICAL already and is not further
+        # escalated by the route gate (gate only lifts CRITICAL->BLOCKER
+        # for CSP-absent checks specifically).
+        assert SeverityMapper().map(
+            "security", "moderate",
+            check_id="security.csp.missing",
+            route_tag="auth",
+        ) == UniversalSeverity.MAJOR
+
+    def test_message_based_csp_detection(self):
+        assert SeverityMapper().map(
+            "security", "critical",
+            check_id="security.header.check",
+            message="Missing Content-Security-Policy header",
+            route_tag="checkout",
+        ) == UniversalSeverity.BLOCKER
+
+    def test_escalate_security_for_route_helper_ignores_non_security(self):
+        assert escalate_security_for_route(
+            UniversalSeverity.CRITICAL, "accessibility", "csp.missing", "auth"
+        ) == UniversalSeverity.CRITICAL
+
+    def test_security_report_to_findings_respects_route_tag(self):
+        class Issue:
+            severity = "critical"
+            message = "Missing Content-Security-Policy header"
+            issue_type = "csp_missing"
+
+        class Report:
+            url = "https://example.com/checkout"
+            issues = [Issue()]
+            route_tag = "checkout"
+
+        findings = security_report_to_findings(Report())
+        assert len(findings) == 1
+        assert findings[0].severity == UniversalSeverity.BLOCKER
+
+    def test_security_report_to_findings_without_route_tag_stays_critical(self):
+        class Issue:
+            severity = "critical"
+            message = "Missing Content-Security-Policy header"
+            issue_type = "csp_missing"
+
+        class Report:
+            url = "https://example.com/"
+            issues = [Issue()]
+
+        findings = security_report_to_findings(Report())
+        assert len(findings) == 1
+        assert findings[0].severity == UniversalSeverity.CRITICAL
 
 
 class TestCriticalityEscalation:

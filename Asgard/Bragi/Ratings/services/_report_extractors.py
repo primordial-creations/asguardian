@@ -9,9 +9,24 @@ composite score engine, recording which sources were actually present
 
 from typing import Any, Dict, List, Optional, Tuple
 
+from Asgard.Bragi.common.context_classifier import classify
 from Asgard.Bragi.Ratings.models._scoring_models import FileMetricBundle
 
 _SEVERITY_KEYS = ("blocker", "critical", "high", "medium", "low", "info")
+
+
+def _classify_context(file_path: str) -> str:
+    """
+    Best-effort context classification (Plan 04 Phase A): path-based
+    signals always apply; never raises (a classifier failure must not break
+    scoring - it degrades to the PRODUCTION default).
+    """
+    if not file_path:
+        return "production"
+    try:
+        return classify(file_path).value
+    except Exception:
+        return "production"
 
 SOURCE_DEBT = "debt_report"
 SOURCE_QUALITY = "quality_report"
@@ -121,6 +136,7 @@ def extract_bundles(
             blocker_description=file_blocker,
             sources_present=present,
             sources_missing=missing,
+            context=_classify_context(file_path),
         ))
 
     tdr: Optional[float] = None

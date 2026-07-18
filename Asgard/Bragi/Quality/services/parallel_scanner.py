@@ -12,9 +12,36 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Dict, Generic, Iterator, List, Optional, TypeVar
 
+from Asgard.Bragi.common.context_classifier import classify
+
 # Type variables
 T = TypeVar('T')  # Input type
 R = TypeVar('R')  # Result type
+
+
+def stamp_context(file_path: "str | Path", result: Any) -> Any:
+    """
+    Classify `file_path` (Plan 04 Phase A) and stamp the code context onto
+    `result` if it exposes a settable `context` attribute, so scanner
+    entry points get context-awareness "for free" without re-guessing it
+    themselves. Results without a `context` slot (e.g. plain scalars) pass
+    through unchanged; classification failures never raise - the context
+    is simply left unset.
+    """
+    if result is None or not hasattr(result, "context"):
+        return result
+    try:
+        context = classify(file_path).value
+    except Exception:
+        return result
+    try:
+        setattr(result, "context", context)
+    except (AttributeError, TypeError, ValueError):
+        # Immutable / validated models (e.g. frozen dataclasses, strict
+        # pydantic models with an unexpected type) simply keep their
+        # existing context rather than erroring the scan.
+        pass
+    return result
 
 
 @dataclass
@@ -71,6 +98,7 @@ def _process_file_wrapper(args: tuple) -> tuple:
     file_path, analyzer_func, config_dict = args
     try:
         result = analyzer_func(file_path, config_dict)
+        result = stamp_context(file_path, result)
         return (str(file_path), result, None)
     except Exception as e:
         return (str(file_path), None, str(e))
@@ -137,6 +165,7 @@ class ParallelScanner(Generic[T, R]):
         for file_path in files:
             try:
                 result = self.analyze_func(file_path, config_dict)
+                result = stamp_context(file_path, result)
                 if result is not None:
                     results.append(result)
             except Exception as e:

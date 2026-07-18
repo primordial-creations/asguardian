@@ -35,5 +35,10 @@ ASGARD_WAY_PYTHON = QualityProfile(
         RuleConfig(rule_id="security.injection", enabled=True, severity="error"),
         RuleConfig(rule_id="security.crypto", enabled=True, severity="error"),
         RuleConfig(rule_id="security.hotspots", enabled=True, severity="warning"),
+        # Cohesion/coupling thresholds (_Docs/Planning/Heimdall/05_Cohesion_Coupling.md).
+        RuleConfig(rule_id="architecture.cohesion.cbo", enabled=True, severity="warning", threshold=20.0),
+        RuleConfig(rule_id="architecture.cohesion.lcom4", enabled=True, severity="warning", threshold=1.0),
+        RuleConfig(rule_id="architecture.cohesion.rfc", enabled=True, severity="info", threshold=50.0),
+        RuleConfig(rule_id="architecture.cohesion.wmc", enabled=True, severity="warning", threshold=20.0),
     ],
 )
