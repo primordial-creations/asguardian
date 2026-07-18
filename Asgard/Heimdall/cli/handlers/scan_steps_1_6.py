@@ -12,6 +12,10 @@ from Asgard.Bragi.Quality.models.type_check_models import TypeCheckConfig
 from Asgard.Bragi.Quality.services.type_checker import TypeChecker
 from Asgard.Heimdall.Security.models.security_models import SecurityScanConfig
 from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
+from Asgard.Heimdall.cli.handlers._security_dispatch import (
+    format_dispatch_text,
+    run_dispatch_scan,
+)
 
 
 # Scan categories that encode organisation-specific house rules (e.g. the
@@ -208,20 +212,53 @@ def _run_security_step(scan_path, exclude_patterns, include_tests, verbose, scan
         )
         sec_service = StaticSecurityService(sec_config)
         sec_result = sec_service.scan(scan_path)
-        sec_total = sec_result.total_findings if hasattr(sec_result, "total_findings") else 0
-        sec_critical = sec_result.critical_count if hasattr(sec_result, "critical_count") else 0
+        # NOTE: SecurityReport exposes `total_issues`/`critical_issues`, not
+        # `total_findings`/`critical_count` (that shape belongs to
+        # TaintReport). The old attribute names never existed on this model,
+        # so the previous hasattr guard silently produced 0 every time --
+        # a false PASS on real Python vulnerabilities.
+        sec_total = sec_result.total_issues if hasattr(sec_result, "total_issues") else 0
+        sec_critical = sec_result.critical_issues if hasattr(sec_result, "critical_issues") else 0
+
+        # StaticSecurityService does not run the DispatchEngine's CST-based
+        # taint analysis (JS/TS/Java data-flow tracking) -- only its own
+        # regex/pattern rules, which happen to also match some non-Python
+        # files. Merge in DispatchEngine taint findings for non-.py files so
+        # `heimdall scan` surfaces the same taint flows `heimdall security
+        # scan` would. Restricted to non-.py files to avoid double-counting
+        # Python findings StaticSecurityService already reports.
+        dispatch_entries = run_dispatch_scan(scan_path, exclude_patterns)
+        multilang_entries = [
+            e for e in dispatch_entries
+            if not str(e["file_path"]).endswith(".py")
+        ]
+        multilang_total = len(multilang_entries)
+        multilang_critical = sum(
+            1 for e in multilang_entries if e["severity"] == "critical"
+        )
+
+        combined_total = sec_total + multilang_total
+        combined_critical = sec_critical + multilang_critical
         scan_results["security"] = {
-            "total_findings": sec_total,
-            "critical": sec_critical,
-            "status": "PASS" if sec_total == 0 else "FAIL",
+            "total_findings": combined_total,
+            "critical": combined_critical,
+            "static_service_findings": sec_total,
+            "dispatch_multilang_findings": multilang_total,
+            "status": "PASS" if combined_total == 0 else "FAIL",
         }
-        if sec_total > 0:
+        if combined_total > 0:
             overall_exit = 1
-        print(f"       {sec_total} findings ({sec_critical} critical)")
+        print(
+            f"       {combined_total} findings ({combined_critical} critical)"
+            f" [{sec_total} static-service, {multilang_total} dispatch/multi-language]"
+        )
         try:
-            step_reports["security"] = sec_service.generate_report(sec_result, "text")
+            report_text = sec_service.generate_report(sec_result, "text")
         except Exception:
-            step_reports["security"] = f"Security Analysis\n\n{json.dumps(scan_results['security'], indent=2)}"
+            report_text = f"Security Analysis\n\n{json.dumps(scan_results['security'], indent=2)}"
+        if multilang_entries:
+            report_text += format_dispatch_text(multilang_entries)
+        step_reports["security"] = report_text
     except Exception as e:
         scan_results["security"] = {"status": "ERROR", "error": str(e)}
         print(f"       Error: {e}")
