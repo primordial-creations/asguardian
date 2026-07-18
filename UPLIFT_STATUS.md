@@ -13,7 +13,15 @@ Pushed Waves 0-3 to `origin/main` (95d6766; had to purge a live Vault token in C
 - **Volundr/02,04,05,07** — Terraform `--plan` CLI + for_each/lifecycle; GitLab/Azure hardening+scoring; Helm values.schema.json/hook hygiene; 5 module docs.
 - **Bragi/02,04,05** — git-friction/interest + delta-store; scanner context-stamping + TestHealth; PCA weights into scoring + more language profiles.
 
-**Still remaining after batch 1** (batch 2+): Heimdall/07 domains 7.3,7.7-7.12 (7 of 12); Heimdall/04-P4 + 01-C/D multi-language taint (large port); cross-module CLI wiring deferred by Verdandi/Heimdall/Volundr agents (`verdandi cache stampede|system psi|throttle|correlate|database budget`, heimdall `--explain`, etc.); Bragi SZZ Stage 2 (out of scope). Isolation note: 2 of 8 agents (Forseti, Freya) escaped their worktrees into the main checkout — future agents must be pinned to their worktree path.
+## Partials completion — Batches 2 & 3 (2026-07-18)
+All merged onto `uplift/asgard-p1` (51 commits ahead of main), each security slice adversarially reviewed:
+- **Heimdall/07 remaining 7 domains** (TOCTOU, secrets, container/IaC, TLS, supply-chain, sensitive-data, input-validation) → **plan 07 now COMPLETE (12/12 domains)**. Adversarial review caught 3 BLOCKERs + 4 MAJORs (TLS scanner crash on `verify=False`, secrets semantic-context dead-code offset bug, real-key drop near `os.environ`, dev-dep substring misclass, static confidence_bucket, unflagged `ADD http://`, single-hop PII alias) — all fixed + re-verified.
+- **Cross-module CLI wiring** — 13 subcommands (Verdandi cache/system/network/db/slo/self-slo, Heimdall explain/calibrate/validate-rules/eval).
+- **Heimdall/04 Phase 4 multi-language taint** (JS/TS/Java CST engine + dispatch language-branching). Adversarial review caught 3 BLOCKERs + 1 MAJOR (branch-kill muting real injections, unevaluated array subscripts, dropped multi-arg flows, `escapeHtml` no-op laundering) — all fixed + re-verified by orchestrator.
+
+**Essentially all partials now delivered.** Deliberately scoped-OUT (documented): Bragi SZZ Stage 2 (needs 200-300 traceable bugfix commits); live-network OSV/NVD queries in supply-chain (no-network-default mandate; local vuln DB used). Known residual limitations documented in-code: taint engines intra-procedural (no cross-file summaries for JS/Java), no import/binding resolution for library-sanitizer shadowing (downgraded not full-cleared), Spring `@RequestParam` seeding unwired. Isolation note: 2 of 8 batch-1 agents (Forseti, Freya) escaped worktrees into the main checkout; batch-2/3 agents were explicitly pinned and stayed isolated.
+
+Prior "Still remaining after batch 1" list is now resolved except the scoped-out items above.
 
 ## Plan completeness audit (2026-07-18, 6 independent read-only verifier agents)
 Answer to "are ALL plans implemented?": **NO.** ~22 of 47 actionable plan files (the 53 files minus 6 overviews) are FULLY implemented; ~24 PARTIAL; 1 NOT_STARTED. **Plan files retained** (not deleted) — each PARTIAL/NOT_STARTED plan still describes unbuilt work and is the resume roadmap.
