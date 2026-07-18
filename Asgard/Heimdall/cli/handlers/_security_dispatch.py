@@ -31,6 +31,17 @@ _DEFAULT_EXCLUDES = (
     "build", "dist", ".next", "coverage",
 )
 
+#: Extensions the DispatchEngine actually parses (regex + AST/CST triggers +
+#: taint). Mirrors the JS/TS/Java branch in
+#: `Asgard.Heimdall.Security.engine.dispatch` plus native Python support.
+#: Feeding the engine extensions it can't parse would silently no-op those
+#: files, so this MUST stay in sync with that module's supported set.
+_DISPATCH_SUPPORTED_EXTENSIONS = frozenset({
+    ".py",
+    ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
+    ".java",
+})
+
 #: Display labels for confidence buckets (qualitative only).
 BUCKET_LABELS = {
     "certain": "Certain",
@@ -110,7 +121,8 @@ def run_dispatch_scan(
     strict_scan_paths: Sequence[str] = (),
 ) -> List[Dict[str, Any]]:
     """
-    Run the 3-layer DispatchEngine across Python files.
+    Run the 3-layer DispatchEngine across every language it supports
+    (Python, JS/TS, Java — see ``_DISPATCH_SUPPORTED_EXTENSIONS``).
 
     Returns display-ready finding dicts sorted by descending actionable
     priority. Test-context findings are dropped unless
@@ -124,7 +136,7 @@ def run_dispatch_scan(
     entries: List[Dict[str, Any]] = []
 
     for path in _iter_code_files(scan_path, exclude_patterns,
-                                 suffixes={".py"}):
+                                 suffixes=_DISPATCH_SUPPORTED_EXTENSIONS):
         result = engine.scan_file(path)
         tag = classify_file_context(str(path), strict_scan_paths)
         tag_value = getattr(tag, "value", str(tag))

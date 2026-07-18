@@ -6,6 +6,11 @@ from Asgard.Heimdall.Security.models.security_models import (
     SecurityScanConfig,
     SecuritySeverity,
 )
+from Asgard.Heimdall.Security.models.security_models_base import (
+    VulnerabilityFinding,
+    VulnerabilityType,
+)
+from Asgard.Heimdall.Security.models.security_models_findings import VulnerabilityReport
 from Asgard.Heimdall.Security.services.static_security_service import StaticSecurityService
 from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import HotspotConfig, ReviewPriority
 from Asgard.Heimdall.Security.Hotspots.services.hotspot_detector import HotspotDetector
@@ -18,6 +23,69 @@ from Asgard.Heimdall.cli.handlers._security_dispatch import (
     load_heimdall_yml,
     run_dispatch_scan,
 )
+
+#: Best-effort rule_id/message substring -> VulnerabilityType mapping for
+#: DispatchEngine findings folded into StaticSecurityService's
+#: VulnerabilityReport (see `_dispatch_entry_to_finding`).
+_VULN_TYPE_HINTS = (
+    ("sql", VulnerabilityType.SQL_INJECTION),
+    ("command", VulnerabilityType.COMMAND_INJECTION),
+    ("os_command", VulnerabilityType.COMMAND_INJECTION),
+    ("exec", VulnerabilityType.COMMAND_INJECTION),
+    ("xss", VulnerabilityType.XSS),
+    ("html", VulnerabilityType.XSS),
+    ("path", VulnerabilityType.PATH_TRAVERSAL),
+    ("traversal", VulnerabilityType.PATH_TRAVERSAL),
+    ("pickle", VulnerabilityType.INSECURE_DESERIALIZATION),
+    ("deserial", VulnerabilityType.INSECURE_DESERIALIZATION),
+    ("yaml", VulnerabilityType.INSECURE_DESERIALIZATION),
+    ("ssrf", VulnerabilityType.SSRF),
+    ("http_request", VulnerabilityType.SSRF),
+    ("redirect", VulnerabilityType.OPEN_REDIRECT),
+    ("hash", VulnerabilityType.WEAK_HASH),
+    ("random", VulnerabilityType.INSECURE_RANDOM),
+    ("crypto", VulnerabilityType.INSECURE_CRYPTO),
+    ("secret", VulnerabilityType.HARDCODED_SECRET),
+    ("auth", VulnerabilityType.MISSING_AUTH),
+)
+
+#: Qualitative confidence bucket labels (see BUCKET_LABELS in
+#: _security_dispatch.py) mapped back to a representative float within
+#: their band, so `score_weight()`/`confidence_bucket()` treat them
+#: identically to how they were originally classified. dispatch entries
+#: only ever expose the qualitative label, never the raw probability.
+_BUCKET_TO_CONFIDENCE = {
+    "Certain": 0.90,
+    "Probable": 0.65,
+    "Possible": 0.35,
+    "Unlikely": 0.10,
+}
+
+
+def _dispatch_entry_to_finding(entry: dict) -> VulnerabilityFinding:
+    """Convert a run_dispatch_scan() display entry into a real finding so
+    it flows through VulnerabilityReport.calculate_totals() -- the single
+    source of truth for both issue counts and the security score -- instead
+    of being hand-tallied into counters the score never sees."""
+    rule_id = str(entry.get("rule_id", ""))
+    message = str(entry.get("message", ""))
+    haystack = f"{rule_id} {message}".lower()
+    vuln_type = VulnerabilityType.IMPROPER_INPUT_VALIDATION
+    for needle, mapped in _VULN_TYPE_HINTS:
+        if needle in haystack:
+            vuln_type = mapped
+            break
+    confidence = _BUCKET_TO_CONFIDENCE.get(str(entry.get("confidence")), 0.65)
+    return VulnerabilityFinding(
+        file_path=entry["file_path"],
+        line_number=int(entry["line"]),
+        vulnerability_type=vuln_type,
+        severity=str(entry["severity"]).lower(),
+        title=rule_id or "Dispatch engine finding",
+        description=message,
+        cwe_id=entry.get("cwe_id") or None,
+        confidence=confidence,
+    )
 
 
 def run_security_analysis(args: argparse.Namespace, verbose: bool = False, analysis_type: str = "all") -> int:
@@ -76,6 +144,36 @@ def run_security_analysis(args: argparse.Namespace, verbose: bool = False, analy
                 test_context_enabled=test_context_enabled,
                 strict_scan_paths=strict_scan_paths,
             )
+
+        # StaticSecurityService's totals (and hence the summary header:
+        # "Total Issues" / "Critical" / "security_score" / "is_passing")
+        # never see the DispatchEngine's findings -- those were previously
+        # only appended as a separate text/JSON section below, so the
+        # header undercounted and the score stayed a false 100.
+        #
+        # run_dispatch_scan() also re-scans .py files (it isn't restricted
+        # to non-Python), so anything it finds there is *already* counted
+        # by StaticSecurityService -- folding those back in would double
+        # count a single Python finding. Restrict to non-.py so this is a
+        # disjoint union, matching the same filter used for `heimdall scan`
+        # (scan_steps_1_6.py).
+        multilang_entries = [
+            e for e in dispatch_entries
+            if not str(e["file_path"]).endswith(".py")
+        ]
+        if multilang_entries:
+            if result.vulnerability_report is None:
+                result.vulnerability_report = VulnerabilityReport(
+                    scan_path=str(scan_path)
+                )
+            result.vulnerability_report.findings.extend(
+                _dispatch_entry_to_finding(e) for e in multilang_entries
+            )
+            # Single recompute over ALL findings (StaticSecurityService's
+            # plus the newly-added multilang ones): counts, legacy_score,
+            # security_score_v2, and security_score all come out mutually
+            # consistent -- no separate hand-tally that the score misses.
+            result.calculate_totals()
 
         report = service.generate_report(result, args.format)
         if args.format == "json":

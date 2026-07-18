@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 from Asgard.Bragi.Performance.models.performance_models import PerformanceScanConfig
 from Asgard.Bragi.Performance.services.static_performance_service import StaticPerformanceService
@@ -13,6 +14,33 @@ from Asgard.Bragi.Coverage.services.coverage_analyzer import CoverageAnalyzer
 
 
 from Asgard.Heimdall.cli.handlers.scan_steps_1_6 import _next_step
+
+#: Directories never worth walking to answer "is there Python here".
+_LANG_PROBE_EXCLUDES = {
+    "__pycache__", "node_modules", ".git", ".venv", "venv",
+    "build", "dist", ".next", "coverage",
+}
+
+
+def _has_python_sources(scan_path, exclude_patterns=()) -> bool:
+    """
+    Cheap presence check: does this tree contain any `.py` source file?
+
+    Several Bragi analyzers (OOP/cohesion, Test Coverage) parse only Python
+    via the stdlib `ast` module. Fed a JS/TS/Java/etc. tree, they silently
+    find zero classes/methods and report a trivial PASS / 100% — which
+    reads as "this codebase is perfect" when really "nothing was analyzed".
+    This lets callers detect that case and report N/A honestly instead.
+    """
+    scan_path = Path(scan_path)
+    if scan_path.is_file():
+        return scan_path.suffix == ".py"
+    excludes = set(exclude_patterns) | _LANG_PROBE_EXCLUDES
+    for path in scan_path.rglob("*.py"):
+        if any(part in excludes for part in path.parts):
+            continue
+        return True
+    return False
 
 
 def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose, scan_results, step_reports, step_state=None, total_steps=11):
@@ -45,28 +73,40 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         print(f"       Error: {e}")
 
     _next_step(step_state, total_steps, "OOP: Coupling/Cohesion Metrics...")
-    try:
-        oop_config = OOPConfig(
-            scan_path=scan_path, include_tests=include_tests,
-            exclude_patterns=exclude_patterns, verbose=verbose,
-        )
-        oop_analyzer = OOPAnalyzer(oop_config)
-        oop_result = oop_analyzer.analyze(scan_path)
-        oop_violations = oop_result.total_violations if hasattr(oop_result, "total_violations") else 0
+    if not _has_python_sources(scan_path, exclude_patterns):
         scan_results["oop"] = {
-            "violations": oop_violations,
-            "status": "PASS" if oop_violations == 0 else "FAIL",
+            "status": "N/A",
+            "reason": "not analyzed (no Python sources found; OOP/cohesion "
+                      "metrics currently only support Python)",
         }
-        if oop_violations > 0:
-            overall_exit = 1
-        print(f"       {oop_violations} violations")
+        print("       N/A - no Python sources found (Python-only analyzer)")
+        step_reports["oop"] = (
+            "OOP Metrics\n\nN/A - not analyzed: no Python sources found in "
+            "scan tree. OOP/cohesion metrics currently only support Python."
+        )
+    else:
         try:
-            step_reports["oop"] = oop_analyzer.generate_report(oop_result, "text")
-        except Exception:
-            step_reports["oop"] = f"OOP Metrics\n\n{json.dumps(scan_results['oop'], indent=2)}"
-    except Exception as e:
-        scan_results["oop"] = {"status": "ERROR", "error": str(e)}
-        print(f"       Error: {e}")
+            oop_config = OOPConfig(
+                scan_path=scan_path, include_tests=include_tests,
+                exclude_patterns=exclude_patterns, verbose=verbose,
+            )
+            oop_analyzer = OOPAnalyzer(oop_config)
+            oop_result = oop_analyzer.analyze(scan_path)
+            oop_violations = oop_result.total_violations if hasattr(oop_result, "total_violations") else 0
+            scan_results["oop"] = {
+                "violations": oop_violations,
+                "status": "PASS" if oop_violations == 0 else "FAIL",
+            }
+            if oop_violations > 0:
+                overall_exit = 1
+            print(f"       {oop_violations} violations")
+            try:
+                step_reports["oop"] = oop_analyzer.generate_report(oop_result, "text")
+            except Exception:
+                step_reports["oop"] = f"OOP Metrics\n\n{json.dumps(scan_results['oop'], indent=2)}"
+        except Exception as e:
+            scan_results["oop"] = {"status": "ERROR", "error": str(e)}
+            print(f"       Error: {e}")
 
     _next_step(step_state, total_steps, "Architecture: SOLID/Layer Analysis...")
     try:
@@ -114,26 +154,39 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         print(f"       Error: {e}")
 
     _next_step(step_state, total_steps, "Test Coverage: Gap Analysis...")
-    try:
-        coverage_config = CoverageConfig(scan_path=scan_path, exclude_patterns=exclude_patterns)
-        coverage_analyzer = CoverageAnalyzer(coverage_config)
-        coverage_result = coverage_analyzer.analyze(scan_path)
-        method_coverage = coverage_result.metrics.method_coverage_percent
-        total_gaps = coverage_result.total_gaps
+    if not _has_python_sources(scan_path, exclude_patterns):
         scan_results["test_coverage"] = {
-            "method_coverage_percent": round(method_coverage, 1),
-            "total_gaps": total_gaps,
-            "status": "PASS" if method_coverage >= coverage_config.min_method_coverage else "FAIL",
+            "status": "N/A",
+            "reason": "not analyzed (no Python sources found; test coverage "
+                      "gap analysis currently only supports Python)",
         }
-        if method_coverage < coverage_config.min_method_coverage:
-            overall_exit = 1
-        print(f"       {method_coverage:.1f}% method coverage, {total_gaps} gaps")
+        print("       N/A - no Python sources found (Python-only analyzer)")
+        step_reports["test_coverage"] = (
+            "Test Coverage\n\nN/A - not analyzed: no Python sources found "
+            "in scan tree. Coverage gap analysis currently only supports "
+            "Python."
+        )
+    else:
         try:
-            step_reports["test_coverage"] = coverage_analyzer.generate_report(coverage_result, "text")
-        except Exception:
-            step_reports["test_coverage"] = f"Test Coverage\n\n{json.dumps(scan_results['test_coverage'], indent=2)}"
-    except Exception as e:
-        scan_results["test_coverage"] = {"status": "ERROR", "error": str(e)}
-        print(f"       Error: {e}")
+            coverage_config = CoverageConfig(scan_path=scan_path, exclude_patterns=exclude_patterns)
+            coverage_analyzer = CoverageAnalyzer(coverage_config)
+            coverage_result = coverage_analyzer.analyze(scan_path)
+            method_coverage = coverage_result.metrics.method_coverage_percent
+            total_gaps = coverage_result.total_gaps
+            scan_results["test_coverage"] = {
+                "method_coverage_percent": round(method_coverage, 1),
+                "total_gaps": total_gaps,
+                "status": "PASS" if method_coverage >= coverage_config.min_method_coverage else "FAIL",
+            }
+            if method_coverage < coverage_config.min_method_coverage:
+                overall_exit = 1
+            print(f"       {method_coverage:.1f}% method coverage, {total_gaps} gaps")
+            try:
+                step_reports["test_coverage"] = coverage_analyzer.generate_report(coverage_result, "text")
+            except Exception:
+                step_reports["test_coverage"] = f"Test Coverage\n\n{json.dumps(scan_results['test_coverage'], indent=2)}"
+        except Exception as e:
+            scan_results["test_coverage"] = {"status": "ERROR", "error": str(e)}
+            print(f"       Error: {e}")
 
     return overall_exit

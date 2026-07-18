@@ -49,6 +49,8 @@ _SCAN_DESCRIPTIONS: dict = {
 
 def _detail_str(category: str, data: dict) -> str:
     status = data.get("status", "?")
+    if status == "N/A":
+        return cast(str, data.get("reason", "not analyzed")[:80])
     if status == "ERROR":
         return cast(str, data.get("error", "")[:80])
     if category == "type_check":
@@ -91,7 +93,7 @@ def _generate_scan_html_report(
         label = _SCAN_DISPLAY_NAMES.get(cat, cat.replace("_", " ").title())
         detail = _detail_str(cat, data)
         desc = _SCAN_DESCRIPTIONS.get(cat, "")
-        cls = "pass" if status == "PASS" else ("fail" if status == "FAIL" else "err")
+        cls = "pass" if status == "PASS" else ("fail" if status == "FAIL" else ("na" if status == "N/A" else "err"))
         rows_html += (
             f"<tr>"
             f"<td>{label}</td>"
@@ -106,7 +108,7 @@ def _generate_scan_html_report(
     for key, report_text in step_reports.items():
         label = _SCAN_TAB_LABELS.get(key, key.replace("_", " ").title())
         status = scan_results.get(key, {}).get("status", "?")
-        dot_cls = "pass" if status == "PASS" else ("fail" if status == "FAIL" else "err")
+        dot_cls = "pass" if status == "PASS" else ("fail" if status == "FAIL" else ("na" if status == "N/A" else "err"))
         escaped = (
             _strip_ansi(report_text)
             .replace("&", "&amp;")
@@ -143,6 +145,7 @@ def _generate_scan_html_report(
     .pass-dot::before{{content:"● ";color:#4ec9b0}}
     .fail-dot::before{{content:"● ";color:#f44747}}
     .err-dot::before{{content:"● ";color:#ff8c00}}
+    .na-dot::before{{content:"● ";color:#888888}}
     .tab-content{{flex:1;overflow:auto;padding:20px 24px}}
     .tab-panel{{display:none}}
     .tab-panel pre{{white-space:pre-wrap;word-wrap:break-word}}
@@ -153,6 +156,7 @@ def _generate_scan_html_report(
     .pass{{color:#4ec9b0}}
     .fail{{color:#f44747}}
     .err{{color:#ff8c00}}
+    .na{{color:#888888}}
     .summary{{margin-top:14px;color:#777;font-size:.9em}}
   </style>
 </head>
