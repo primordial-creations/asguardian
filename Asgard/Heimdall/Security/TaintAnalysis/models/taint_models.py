@@ -44,6 +44,12 @@ class TaintSinkType(str, Enum):
     SSRF = "ssrf"                       # outbound HTTP request (requests.get, fetch, HttpClient) with tainted URL/host
     BUFFER_OVERFLOW = "buffer_overflow" # C: sprintf/strcpy/strcat/gets into a fixed-size buffer with tainted data
     FORMAT_STRING = "format_string"     # C: printf/fprintf/syslog with a tainted (non-literal) format string
+    DYNAMIC_CONSTRUCT = "dynamic_construct"  # eval/exec/reflection/dynamic require-import/computed dispatch with a
+                                              # non-constant operand -- undecidable statically (WS5); ALWAYS surfaced
+                                              # as an explicit needs-review finding rather than silently skipped, even
+                                              # when the operand's taint provenance cannot be resolved by the normal
+                                              # source/sink pipeline. Never emitted for a statically-constant operand
+                                              # (e.g. eval("1+1")).
 
 
 class TaintFlowStep(BaseModel):
@@ -134,6 +140,17 @@ class TaintFlow(BaseModel):
     runtime_trace_ids: List[str] = Field(
         default_factory=list,
         description="Trace ids of the runtime observation(s) that confirmed this flow, if any",
+    )
+    finding_class: str = Field(
+        "taint_flow",
+        description=(
+            "'taint_flow' (default: a resolved source->sink flow) or "
+            "'dynamic_construct' (WS5: an eval/reflection/dynamic-dispatch "
+            "construct was reached; the operand's provenance could not be "
+            "proven statically, so this is surfaced as an honest "
+            "needs-review finding instead of being silently dropped -- "
+            "never treat 'unresolved' as 'safe')."
+        ),
     )
 
     class Config:
