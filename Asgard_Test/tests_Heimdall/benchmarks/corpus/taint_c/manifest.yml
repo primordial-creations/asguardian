@@ -71,6 +71,12 @@ cases:
     cwe: CWE-78
   - file: fp_pointer_alias_unaliased_safe.c
     expect: no_flow
+  # -- MAJOR-1 (adversarial review): a pointer directly reassigned to a
+  # constant literal in straight-line code, dominating the sink, must be
+  # a strong update that clears its taint -- reporting a provably-clean
+  # value as CERTAIN command injection is a trust-killer. --
+  - file: fp_pointer_alias_reassigned_constant.c
+    expect: no_flow
   # -- WS4 C format-arg generalization: `vsnprintf` (a `v`-prefixed
   # va_list variant) must resolve to the same format-string argument
   # index as its non-`v` counterpart `snprintf` and flag a tainted format

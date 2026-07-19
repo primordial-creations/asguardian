@@ -89,19 +89,17 @@ cases:
   # __import__ reached with a non-constant operand must surface a
   # needs-review dynamic_construct finding (CWE-470); a statically-constant
   # operand must not flag. --
-  # eval(code) with a tainted operand is ALSO a known normal sink
-  # ("eval_exec") independent of the WS5 dynamic-construct pass -- both
-  # findings are legitimate and neither may be muted by the other
-  # (never-mute mandate), so this fixture reports 2 flows; flows[0] is
-  # the dynamic_construct finding (WS5 runs its check first per
-  # visit_Call's ordering).
+  # eval(code) with a tainted operand ALSO matches the concrete
+  # "eval_exec" sink (CWE-95); MAJOR-2 (adversarial review) -- a call site
+  # that already produced a concrete sink finding must not ALSO emit a
+  # redundant WS5 dynamic_construct finding for the same node, so this
+  # reports exactly 1 flow (the concrete eval_exec finding), not 2.
   - file: tp_dynamic_eval_construct.py
     expect: flow
-    count: 2
+    count: 1
     severity: critical
-    bucket_in: [needs_review]
-    cwe: CWE-470
-    finding_class: dynamic_construct
+    bucket_in: [certain, probable]
+    cwe: CWE-95
   - file: fp_dynamic_eval_constant.py
     expect: no_flow
   - file: tp_dynamic_getattr_dispatch_construct.py
@@ -114,6 +112,24 @@ cases:
   - file: fp_dynamic_getattr_dispatch_constant.py
     expect: no_flow
   - file: tp_dynamic_import_construct.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  # -- ROOT CAUSE regressions (adversarial review BLOCKER-1/BLOCKER-2,
+  # reviewer's exact repros): a pure dynamic construct with NO co-located
+  # registered sink was never triggering Layer 3 at all -- see
+  # dispatch.py's `_PY_DYNAMIC_TRIGGER_NAMES`/`_layer2_triggers`. --
+  - file: tp_dynamic_getattr_dispatch_construct_adversarial.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: tp_dynamic_import_construct_adversarial.py
     expect: flow
     count: 1
     severity: high
