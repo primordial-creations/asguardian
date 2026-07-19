@@ -31,3 +31,21 @@ cases:
     expect: no_flow
   - file: fp_constant_concat.js
     expect: no_flow
+  - file: tp_path_traversal.js
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [certain, probable]
+    cwe: CWE-22
+  - file: fp_path_traversal_normalized.js
+    expect: no_flow
+  # Open redirect (CWE-601) is the closest SSRF-family sink this engine
+  # models -- see corpus/taint/manifest.yml for the same note on Python.
+  - file: tp_open_redirect.js
+    expect: flow
+    count: 1
+    severity: medium
+    bucket_in: [certain, probable]
+    cwe: CWE-601
+  - file: fp_redirect_constant.js
+    expect: no_flow
