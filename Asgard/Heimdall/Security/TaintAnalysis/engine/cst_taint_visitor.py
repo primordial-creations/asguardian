@@ -38,6 +38,7 @@ to a CST substrate):
   future summary-computation pass.
 """
 
+import re
 from dataclasses import replace
 from typing import Dict, List, Optional, Sequence, Set, Tuple
 
@@ -101,14 +102,46 @@ _FIRST_ARG_SINKS = {
     TaintSinkType.REDIRECT,
 }
 # NOTE: TaintSinkType.FORMAT_STRING (C printf/fprintf/syslog) is deliberately
-# NOT in _FIRST_ARG_SINKS. The vulnerable position varies by function
-# (printf's format string is arg 0; fprintf's/syslog's is arg 1, after the
-# stream/priority). Restricting to "first arg" would silently MISS the real
-# flow for fprintf/syslog (`fprintf(stderr, tainted)`), which violates the
-# never-mute-a-real-flow mandate. Scanning every argument over-approximates
-# instead (`printf("%s", tainted)` is flagged even though the literal format
-# string is safe) -- a false positive is acceptable here, an under-detection
-# is not. Same reasoning as the Go call-shape fix below.
+# NOT in _FIRST_ARG_SINKS. Instead of a fixed "first arg" position, the
+# FORMAT argument's index varies by function (printf's format string is
+# arg 0; fprintf's/syslog's is arg 1, after the stream/priority; snprintf's
+# is arg 2, after buf/size) -- see _C_FORMAT_ARG_INDEX below, which
+# _check_sink uses to scan ONLY the format-string argument itself, not
+# every value argument. This means `printf(tainted)` / `printf(userfmt,
+# ...)` still flags (the format literal itself is attacker-controlled --
+# the real vulnerability class), but `printf("%s", tainted)` /
+# `snprintf(buf, sizeof buf, "%s", tainted)` -- a constant format string
+# with only a VALUE argument tainted -- correctly does not, since that
+# is not a format-string vulnerability (adversarial review MAJOR-3).
+
+# C printf-family functions: index of the FORMAT-STRING argument (0-based).
+# Only this argument is taint-checked for TaintSinkType.FORMAT_STRING --
+# a tainted value argument under a constant/safe format string is not a
+# format-string vulnerability and must not flag.
+_C_FORMAT_ARG_INDEX = {
+    "printf": 0,
+    "fprintf": 1,
+    "syslog": 1,
+    "snprintf": 2,
+}
+
+# C "mutating source" functions: read untrusted input (stdin/fd/socket)
+# INTO a caller-owned output-buffer argument rather than returning it, so
+# the CST visitor's normal call-site/return-value source model misses them
+# entirely unless handled specially here (adversarial review BLOCKER).
+# Maps function name -> tuple of argument indices that receive the tainted
+# data, or None for scanf-style variadic `&var` args starting at index 1.
+_C_MUTATING_SOURCES = {
+    "fgets": (0,),   # fgets(buf, size, stream)
+    "gets": (0,),    # gets(buf) -- also inherently unsafe/deprecated
+    "read": (1,),    # read(fd, buf, count)
+    "recv": (1,),    # recv(fd, buf, len, flags)
+    "scanf": None,   # scanf(fmt, &a, &b, ...) -- all args from index 1
+}
+
+# Matches a `$1`/`$2`/... positional placeholder in a Go SQL query literal
+# (postgres-style; `?` placeholders are checked with a plain substring test).
+_RE_DOLLAR_PLACEHOLDER = re.compile(r"\$\d")
 
 _CONTAINER_MUTATORS = frozenset({
     "append", "push", "unshift", "add", "addAll", "put", "set", "offer",
@@ -435,6 +468,13 @@ class CstFunctionTaintVisitor:
             # TypeScript `expr!` (non-null assertion) -- same rationale as
             # as_expression: purely a compile-time annotation.
             return self._eval(node.named_children[0])
+        if t == "type_assertion" and node.named_children:
+            # Legacy TypeScript `<Type>expr` cast. tree-sitter-typescript's
+            # `type_assertion` node has no named fields -- the type node is
+            # the first named child, the tainted expression is the LAST
+            # named child. Same rationale as as_expression: a compile-time
+            # annotation only, must not launder taint.
+            return self._eval(node.named_children[-1])
         if t == "unary_expression":
             return self._eval(node.child_by_field_name("argument"))
         if t == "assignment_expression":
@@ -519,6 +559,42 @@ class CstFunctionTaintVisitor:
             return self._fresh_source_state(spec, node.start_point[0] + 1, chain)
 
         method_name = chain.rsplit(".", 1)[-1] if "." in chain else chain
+
+        if self.lang == "c" and method_name in _C_MUTATING_SOURCES:
+            # fgets/gets/read/recv/scanf write untrusted input INTO a
+            # caller-owned buffer argument rather than returning it -- taint
+            # that argument's identifier directly in self.env so a later
+            # `system(buf)` sees it as tainted (adversarial review BLOCKER:
+            # this class was previously silently muted entirely).
+            buf_indices = _C_MUTATING_SOURCES[method_name]
+            if buf_indices is None:
+                buf_indices = tuple(range(1, len(args)))
+            src_step = self._make_step(node.start_point[0] + 1, "source", method_name)
+            fresh = TaintState(
+                source_step=src_step, source_type=TaintSourceType.USER_INPUT, confidence=0.9,
+            )
+            for idx in buf_indices:
+                if idx >= len(args):
+                    continue
+                target = args[idx]
+                if target.type == "unary_expression":
+                    # scanf's `&var` -- unwrap the address-of to the named
+                    # variable being written into.
+                    inner = target.child_by_field_name("argument")
+                    if inner is None and target.named_children:
+                        inner = target.named_children[-1]
+                    target = inner
+                if target is not None and target.type in _C_DECLARATOR_WRAPPERS:
+                    target = _c_declarator_identifier(target)
+                if target is not None and target.type == "identifier":
+                    base_name = self.ctx.node_text(target)
+                    self.env[base_name] = self._union(self.env.get(base_name), fresh)
+            # The call itself has no useful return-value taint for these
+            # functions (fgets returns the buffer pointer or NULL, gets/
+            # scanf return int) -- fall through to the generic call handling
+            # below rather than returning early, so e.g. NULL-check idioms
+            # around the call are still walked normally.
+
         if method_name in _CONTAINER_READERS:
             obj_node = node.child_by_field_name("object")
             if obj_node is None:
@@ -774,12 +850,43 @@ class CstFunctionTaintVisitor:
         # tainted...)` binds param placeholders, not string-concat) -- the
         # JS/Java/Python "the dangerous value is always arg[0]" heuristic
         # would silently mute real Go flows, so Go always scans every
-        # argument (over-approximation, never under-detection).
+        # argument (over-approximation, never under-detection) EXCEPT for
+        # the one case below where that over-approximation is a near-100%
+        # FP on idiomatic, safe code: a genuinely parameterized Go SQL call.
+        go_sql_parameterized = False
+        if self.lang == "go" and spec.sink_type == TaintSinkType.SQL_QUERY and args:
+            first = args[0]
+            if first.type in ("interpreted_string_literal", "raw_string_literal"):
+                query_text = self.ctx.node_text(first)
+                if "?" in query_text or _RE_DOLLAR_PLACEHOLDER.search(query_text):
+                    # The query string itself is a CONSTANT containing a
+                    # `?` or `$N` placeholder -- subsequent args are
+                    # driver-bound parameters, not string-concatenated into
+                    # the query, so they are safe by construction
+                    # (adversarial review MAJOR-2). Only the query-string
+                    # argument itself can still carry taint (e.g. it was
+                    # built by concatenation despite also containing a
+                    # literal-looking `?`) so it stays in scope below.
+                    go_sql_parameterized = True
         first_arg_only = (
             spec.sink_type in _FIRST_ARG_SINKS and not custom_hit and args
             and self.lang != "go"
-        )
+        ) or go_sql_parameterized
+
         candidate_args = args[:1] if first_arg_only else args
+
+        if self.lang == "c" and spec.sink_type == TaintSinkType.FORMAT_STRING:
+            # Only the FORMAT-STRING argument itself is a format-string
+            # vulnerability; a tainted VALUE argument under a constant
+            # format literal (`printf("%s", tainted)`,
+            # `snprintf(buf, sizeof buf, "%s", tainted)`) is not one and
+            # must not flag (adversarial review MAJOR-3). `printf(tainted)`
+            # / `printf(userfmt, ...)` -- the format literal itself
+            # attacker-controlled -- still flags.
+            fmt_index = _C_FORMAT_ARG_INDEX.get(chain)
+            candidate_args = (
+                [args[fmt_index]] if fmt_index is not None and fmt_index < len(args) else []
+            )
         # Emit a finding for EACH independently-tainted argument, not just
         # the first: `logger.info(a, b)` with both `a` and `b` tainted from
         # distinct sources must report both flows, or one is silently

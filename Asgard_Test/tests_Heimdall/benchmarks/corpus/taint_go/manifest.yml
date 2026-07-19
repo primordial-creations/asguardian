@@ -34,3 +34,10 @@ cases:
     cwe: CWE-918
   - file: fp_ssrf_fixed_url.go
     expect: no_flow
+  # -- Go SQL placeholder-aware parameterized-query exemption (adversarial
+  # review MAJOR-2): a constant query literal with a `?`/`$N` placeholder
+  # and the tainted value bound as a subsequent driver parameter is safe
+  # by construction and must not flag. tp_sqli_concat.go above (string-
+  # concatenated into the query) remains the true positive. --
+  - file: fp_parameterized_query.go
+    expect: no_flow
