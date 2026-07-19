@@ -113,6 +113,48 @@ class TestSA1BranchMerge:
         assert len(report.flows) == 1
 
 
+class TestSA1ClearedNeverOverridesRootTaint:
+    """Adversarial-review regression: a `_CLEARED` marker at one specific
+    constant key/field must only suppress the root's DEFAULT-inherited
+    taint -- it must NEVER override taint the root independently acquired
+    via an earlier non-constant-index/name write, since that write could
+    have targeted this exact key/field at runtime (unknowable statically).
+    Confirmed via engine run: previously 0 findings (muted), expected 1."""
+
+    def test_dict_nonconstant_index_then_constant_clean_key_still_flags(self):
+        report = _scan(
+            "def handler(request):\n"
+            "    m = {}\n"
+            "    dyn = request.args.get('k')\n"
+            "    m[dyn] = request.args.get('cmd')\n"
+            "    m['known'] = 'safe'\n"
+            "    os.system(m['known'])\n"
+        )
+        assert len(report.flows) == 1
+
+    def test_setattr_nonconstant_name_then_constant_clean_field_still_flags(self):
+        report = _scan(
+            "def handler(request, o, fname):\n"
+            "    setattr(o, fname, request.args.get('cmd'))\n"
+            "    o.known = 'safe'\n"
+            "    os.system(o.known)\n"
+        )
+        assert len(report.flows) == 1
+
+    def test_getattr_nonconstant_name_then_constant_clean_field_still_flags(self):
+        """Same shape via the `_eval_getattr` read path rather than the
+        assignment path (`o.known = 'safe'` still exercises _read_chain,
+        but this variant reads the potentially-aliased field back out
+        through `getattr` explicitly to pin down that path too)."""
+        report = _scan(
+            "def handler(request, o, fname):\n"
+            "    setattr(o, fname, request.args.get('cmd'))\n"
+            "    o.known = 'safe'\n"
+            "    os.system(getattr(o, 'known'))\n"
+        )
+        assert len(report.flows) == 1
+
+
 class TestSA2GetattrSetattr:
     def test_getattr_setattr_const_field_flags(self):
         report = _scan(

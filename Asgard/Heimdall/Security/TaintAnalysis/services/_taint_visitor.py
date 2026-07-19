@@ -358,17 +358,29 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         return result
 
     def _read_chain(self, node: ast.AST) -> Optional[TaintState]:
-        """Field/element-sensitive read for an Attribute/Subscript node."""
+        """Field/element-sensitive read for an Attribute/Subscript node.
+
+        A ``_CLEARED`` marker at the specific key only suppresses the
+        root's *default-inherited* taint -- it must NOT override taint the
+        root independently acquired via a non-constant-index write
+        elsewhere (e.g. ``m[dyn] = tainted`` taints ``env[root]`` for real,
+        and a later ``m["known"] = "safe"`` cannot prove ``dyn != "known"``).
+        So on a ``_CLEARED`` hit we fall back to (union with) the root's
+        own non-``_CLEARED`` taint rather than returning None outright.
+        """
         root, prefixes = self._chain_info(node)
         if root is None:
             return self._eval(node.value)
+        root_value = self.env.get(root)
+        root_state = None if root_value is _CLEARED else root_value
         if prefixes:
             for path in prefixes:
                 if path in self.env:
                     value = self.env[path]
-                    return None if value is _CLEARED else value
-        base_value = self.env.get(root)
-        return None if base_value is _CLEARED else base_value
+                    if value is _CLEARED:
+                        return root_state
+                    return value
+        return root_state
 
     # ------------------------------------------------------- expression eval
 
@@ -461,13 +473,18 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         state: Optional[TaintState] = None
         if isinstance(base_node, ast.Name):
             root, _ = self._chain_info(base_node)
+            bv = self.env.get(root)
+            root_state = None if bv is _CLEARED else bv
             path = f"{root}.{field}"
             if path in self.env:
                 v = self.env[path]
-                state = None if v is _CLEARED else v
+                # A _CLEARED marker at the specific field must not override
+                # taint the root independently acquired (e.g. via
+                # setattr(o, dyn_name, tainted)) -- fall back to root state
+                # instead of asserting safety (never mute a real flow).
+                state = root_state if v is _CLEARED else v
             else:
-                bv = self.env.get(root)
-                state = None if bv is _CLEARED else bv
+                state = root_state
         else:
             state = self._eval(base_node)
         if len(node.args) >= 3:
@@ -477,14 +494,33 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
     def _eval_setattr(self, node: ast.Call) -> bool:
         """`setattr(o, "name", value)` with a determinable name -> treat
         exactly as `o.name = value` (field-sensitive strong update).
-        Returns True when handled (name was determinable)."""
+        Returns True when handled.
+
+        A NON-determinable name is also handled here (not left to fall
+        through to the generic unresolved-call path, which would drop the
+        side effect on ``o`` entirely): mirroring `_assign_target`'s
+        non-constant-index container laundering, the value taints the
+        WHOLE base object -- sound over-approximation, since the actual
+        field cannot be ruled out to be any specific known field (never
+        mute a real flow by silently forgetting the write happened)."""
+        base_node = node.args[0]
+        value_state = self._eval(node.args[2])
         field = self._getattr_field_name(node.args[1])
         if field is None:
-            return False
-        base_node = node.args[0]
+            if isinstance(base_node, ast.Name) and value_state is not None:
+                stored = replace(
+                    value_state, trace=list(value_state.trace),
+                    sanitizers=list(value_state.sanitizers),
+                )
+                stored.trace.append(
+                    self._make_step(node.lineno, "propagation", base_node.id)
+                )
+                existing = self.env.get(base_node.id)
+                existing = None if existing is _CLEARED else existing
+                self.env[base_node.id] = self._union(existing, stored)
+            return True
         if not isinstance(base_node, ast.Name):
             return True  # determinable name, but no trackable base: no-op
-        value_state = self._eval(node.args[2])
         path = f"{base_node.id}.{field}"
         if value_state is None:
             self.env[path] = _CLEARED
