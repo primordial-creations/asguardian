@@ -1,5 +1,30 @@
 # Deterministic Static-Analysis Deepening — close the gaps with static analysis
 
+> **STATUS: DELIVERED (all four workstreams merged to main).**
+> - **SA1 + SA2** (Wave 1) — field/attribute/dict-key/list-index sensitivity + static resolution of
+>   determinable dynamic constructs (getattr/setattr/eval/import with constant/foldable operands) +
+>   constant/string propagation, across Python + CST (JS/TS/Java/Go/C). `needs_review` reserved for
+>   genuinely non-determinable operands only. Adversarial review caught 1 critical mute (`_CLEARED`
+>   sentinel erasing prior non-constant-index taint) — fixed + regression-tested.
+> - **SA3** (Wave 2) — Steensgaard-style union-find C points-to: multi-level deref, struct-pointer
+>   field aliasing, array decay, unresolved-pointer over-approximation. Adversarial review caught 1
+>   critical mute (strong-update pop orphaning field taint under a stale canonical key) + 1
+>   contamination bug (allocator callee name unioning independent pointers) — both fixed.
+> - **SA4** (Wave 2) — call-site-sensitive summaries (context) + whitelist-only path-sensitive guard
+>   clearing (only provably domain-restricting predicates: str.isdigit/isalnum/isnumeric/isdecimal,
+>   isinstance(int,float), JS Number.isInteger/isFinite; joins union; unguarded keeps taint).
+>   Adversarial review clean (no mute across 20+ probes).
+>
+> Every wave: adversarial mute-hunt review + full Security/taint/benchmark suites green + real-repo
+> (Talos) scan clean. Residual `needs_review` is now only the genuinely-unbounded/attacker-controlled
+> dispatch — the honest, irreducible residue, exactly as intended.
+> Honest remaining ceilings: inter-procedural C pointer flow (intra-procedural only); SA4 guard
+> clearing is Python/JS-only (Java/Go/C get sound branch-join, no guard narrowing) — both sound
+> (never mute), just less precise; documented in code + manifests.
+
+---
+
+
 Asgard is a deterministic static tool. The prior "needs review / opt-in layers" framing over-conceded:
 most of what was punted is resolvable with established, deterministic static techniques. This plan
 pushes the taint/dataflow engine toward CodeQL/Infer/SVF-class precision. The opt-in LLM/runtime layers
