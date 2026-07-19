@@ -85,3 +85,38 @@ cases:
     cwe: CWE-918
   - file: fp_ssrf_fixed_url.py
     expect: no_flow
+  # -- WS5 dynamic-construct surfacing (Python): eval/getattr-dispatch/
+  # __import__ reached with a non-constant operand must surface a
+  # needs-review dynamic_construct finding (CWE-470); a statically-constant
+  # operand must not flag. --
+  # eval(code) with a tainted operand is ALSO a known normal sink
+  # ("eval_exec") independent of the WS5 dynamic-construct pass -- both
+  # findings are legitimate and neither may be muted by the other
+  # (never-mute mandate), so this fixture reports 2 flows; flows[0] is
+  # the dynamic_construct finding (WS5 runs its check first per
+  # visit_Call's ordering).
+  - file: tp_dynamic_eval_construct.py
+    expect: flow
+    count: 2
+    severity: critical
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: fp_dynamic_eval_constant.py
+    expect: no_flow
+  - file: tp_dynamic_getattr_dispatch_construct.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: fp_dynamic_getattr_dispatch_constant.py
+    expect: no_flow
+  - file: tp_dynamic_import_construct.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
