@@ -55,6 +55,13 @@ def test_corpus_case(case):
     )
     if case.get("cwe"):
         assert flow.cwe_id == case["cwe"]
+    if case.get("finding_class"):
+        # WS5 dynamic-construct surfacing: eval/exec/getattr-dispatch/
+        # __import__ findings are tagged with a distinct finding_class
+        # ("dynamic_construct") and needs_review confidence bucket rather
+        # than the default "taint_flow" -- never certain, since the
+        # analysis cannot statically prove what the dynamic construct does.
+        assert flow.finding_class == case["finding_class"]
 
 
 def test_corpus_determinism():
