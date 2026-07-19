@@ -164,3 +164,55 @@ cases:
     severity: critical
     bucket_in: [certain, probable]
     cwe: CWE-95
+
+  # SA1 -- field/attribute/container sensitivity (StaticDepth Wave 1)
+  - file: tp_sa1_attribute_same_field_flags.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+    finding_class: taint_flow
+  - file: fp_sa1_attribute_sibling_field_clean.py
+    expect: no_flow
+  - file: tp_sa1_dict_const_key_same_key_flags.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+    finding_class: taint_flow
+  - file: fp_sa1_dict_const_key_sibling_key_clean.py
+    expect: no_flow
+  - file: tp_sa1_dict_nonconstant_index_overapprox.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+    finding_class: taint_flow
+  - file: fp_sa1_dict_untainted_stays_clean.py
+    expect: no_flow
+
+  # SA2 -- static resolution of determinable dynamic constructs +
+  # constant/string propagation (StaticDepth Wave 1)
+  - file: tp_sa2_setattr_getattr_const_field_flags.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+    finding_class: taint_flow
+  - file: fp_sa2_setattr_getattr_const_sibling_clean.py
+    expect: no_flow
+  - file: fp_sa2_import_const_binding_not_flagged.py
+    expect: no_flow
+  - file: fp_sa2_eval_concat_const_binding_not_flagged.py
+    expect: no_flow
+  - file: tp_sa2_getattr_dynamic_name_still_needs_review.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
