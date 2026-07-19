@@ -19,3 +19,10 @@ cases:
     cwe: CWE-89
   - file: fp_parameterized_query.ts
     expect: no_flow
+  # -- TS `as`/`satisfies` cast propagation gap (must NOT launder taint) --
+  - file: tp_cast_propagation_sqli.ts
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89

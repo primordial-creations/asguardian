@@ -46,8 +46,16 @@ from Asgard.Heimdall.Security.TaintAnalysis.catalog.sanitizers import (
     SanitizerMatch,
     classify_sanitizer,
 )
-from Asgard.Heimdall.Security.TaintAnalysis.catalog.sinks import JAVA_SINK_SPECS, JS_SINK_SPECS, SinkSpec
+from Asgard.Heimdall.Security.TaintAnalysis.catalog.sinks import (
+    C_SINK_SPECS,
+    GO_SINK_SPECS,
+    JAVA_SINK_SPECS,
+    JS_SINK_SPECS,
+    SinkSpec,
+)
 from Asgard.Heimdall.Security.TaintAnalysis.catalog.sources import (
+    C_SOURCE_SPECS,
+    GO_SOURCE_SPECS,
     JAVA_SOURCE_SPECS,
     JS_SOURCE_SPECS,
     SourceSpec,
@@ -92,6 +100,15 @@ _FIRST_ARG_SINKS = {
     TaintSinkType.TEMPLATE_RENDER,
     TaintSinkType.REDIRECT,
 }
+# NOTE: TaintSinkType.FORMAT_STRING (C printf/fprintf/syslog) is deliberately
+# NOT in _FIRST_ARG_SINKS. The vulnerable position varies by function
+# (printf's format string is arg 0; fprintf's/syslog's is arg 1, after the
+# stream/priority). Restricting to "first arg" would silently MISS the real
+# flow for fprintf/syslog (`fprintf(stderr, tainted)`), which violates the
+# never-mute-a-real-flow mandate. Scanning every argument over-approximates
+# instead (`printf("%s", tainted)` is flagged even though the literal format
+# string is safe) -- a false positive is acceptable here, an under-detection
+# is not. Same reasoning as the Go call-shape fix below.
 
 _CONTAINER_MUTATORS = frozenset({
     "append", "push", "unshift", "add", "addAll", "put", "set", "offer",
@@ -110,7 +127,36 @@ _FUNCTION_TYPES_JS = frozenset({
 _FUNCTION_TYPES_JAVA = frozenset({
     "method_declaration", "constructor_declaration", "lambda_expression",
 })
-_ALL_FUNCTION_TYPES = _FUNCTION_TYPES_JS | _FUNCTION_TYPES_JAVA
+_FUNCTION_TYPES_GO = frozenset({
+    "function_declaration", "method_declaration", "func_literal",
+})
+_FUNCTION_TYPES_C = frozenset({"function_definition"})
+_ALL_FUNCTION_TYPES = (
+    _FUNCTION_TYPES_JS | _FUNCTION_TYPES_JAVA | _FUNCTION_TYPES_GO | _FUNCTION_TYPES_C
+)
+
+# C declarator wrapper node types that must be unwrapped to reach the
+# identifier they name (`*p` / `p[8]` / `(*fp)()`).
+_C_DECLARATOR_WRAPPERS = frozenset({
+    "pointer_declarator", "array_declarator", "parenthesized_declarator",
+})
+
+
+def _c_declarator_identifier(node):
+    """Unwrap C pointer/array/parenthesized declarator wrappers down to the
+    bare ``identifier`` they name, or ``None`` if the shape is unrecognized
+    (e.g. a function-pointer declarator -- out of scope for this bounded
+    first pass)."""
+    while node is not None and node.type in _C_DECLARATOR_WRAPPERS:
+        node = node.child_by_field_name("declarator")
+    if node is not None and node.type == "identifier":
+        return node
+    return None
+
+# Go statement/expression node types that wrap a list of comma-separated
+# targets/values (`a, b := f()`, `x, y = y, x`, `var a, b = f()`) -- treated
+# as a taint union across all members for RHS evaluation.
+_GO_LIST_NODE_TYPES = frozenset({"expression_list"})
 
 _DOM_SINK_PROPERTIES = frozenset({"innerHTML", "outerHTML"})
 
@@ -125,6 +171,7 @@ def _node_chain(node, ctx) -> str:
     if t in (
         "identifier", "property_identifier", "private_property_identifier",
         "type_identifier", "shorthand_property_identifier",
+        "field_identifier", "package_identifier",
     ):
         return ctx.node_text(node)
     if t == "this":
@@ -141,6 +188,13 @@ def _node_chain(node, ctx) -> str:
         if obj_chain and field_chain:
             return f"{obj_chain}.{field_chain}"
         return field_chain or obj_chain
+    if t == "selector_expression":
+        # Go `pkg.Func` / `receiver.Method` / `a.b.c` chains.
+        operand_chain = _node_chain(node.child_by_field_name("operand"), ctx)
+        field_chain = _node_chain(node.child_by_field_name("field"), ctx)
+        if operand_chain and field_chain:
+            return f"{operand_chain}.{field_chain}"
+        return field_chain or operand_chain
     if t == "call_expression":
         fn_node = node.child_by_field_name("function")
         if (
@@ -300,19 +354,43 @@ class CstFunctionTaintVisitor:
                 return self.env[name]
             resolved = resolve_chain(name, self.alias_map)
             return self._match_source_chain(resolved, node, is_call=False)
-        if t in ("member_expression", "field_access"):
+        if t in ("member_expression", "field_access", "selector_expression"):
             chain = self._chain(node)
             state = self._match_source_chain(chain, node, is_call=False)
             if state is not None:
                 return state
-            return self._eval(node.child_by_field_name("object"))
-        if t in ("subscript_expression", "array_access"):
+            fallback = (
+                node.child_by_field_name("object")
+                or node.child_by_field_name("operand")
+            )
+            return self._eval(fallback)
+        if t in ("subscript_expression", "array_access", "index_expression"):
             # Index/member access on a tainted container returns the
             # container's taint (container-granularity over-approximation,
-            # same as the Python ast engine) -- covers JS `arr[0]`/`obj['k']`
-            # and Java array-index access.
-            base = node.child_by_field_name("object") or node.child_by_field_name("array")
+            # same as the Python ast engine) -- covers JS `arr[0]`/`obj['k']`,
+            # Java array-index access, and Go `slice[i]`/`m[k]`.
+            base = (
+                node.child_by_field_name("object")
+                or node.child_by_field_name("array")
+                or node.child_by_field_name("operand")
+            )
             return self._eval(base)
+        if t == "expression_list":
+            # Go comma-separated expression list (`a, b := f()` RHS, `return
+            # x, err`) -- union across all members (over-approximation: any
+            # tainted member makes the whole list-position "could be
+            # tainted" when consumed positionally elsewhere).
+            state: Optional[TaintState] = None
+            for child in node.named_children:
+                state = self._union(state, self._eval(child))
+            return state
+        if t in ("unary_expression",) and self.lang == "go":
+            # Go `&x` (address-of) / `-x` / `!x` -- propagate operand taint;
+            # Go unary_expression has no named field, operand is the sole
+            # named child.
+            if node.named_children:
+                return self._eval(node.named_children[0])
+            return None
         if t in ("call_expression", "method_invocation", "object_creation_expression"):
             return self._eval_call(node)
         if t == "template_string":
@@ -343,6 +421,20 @@ class CstFunctionTaintVisitor:
             return self._eval(node.child_by_field_name("value"))
         if t == "cast_expression":
             return self._eval(node.child_by_field_name("value"))
+        if t in ("as_expression", "satisfies_expression"):
+            # TypeScript `expr as Type` / `expr satisfies Type` -- the cast
+            # is a compile-time-only annotation, not a runtime
+            # transformation, so it must NOT launder taint (A3 gap: `req
+            # .query.host as string` must stay tainted). The tainted
+            # expression is always the first named child; the type
+            # annotation is the second and is never evaluated.
+            if node.named_children:
+                return self._eval(node.named_children[0])
+            return None
+        if t == "non_null_expression" and node.named_children:
+            # TypeScript `expr!` (non-null assertion) -- same rationale as
+            # as_expression: purely a compile-time annotation.
+            return self._eval(node.named_children[0])
         if t == "unary_expression":
             return self._eval(node.child_by_field_name("argument"))
         if t == "assignment_expression":
@@ -510,6 +602,57 @@ class CstFunctionTaintVisitor:
                 self._walk(right)
             return
 
+        if t in ("short_var_declaration", "assignment_statement"):
+            # Go `a, b := f()` / `x = y`. `left`/`right` are each an
+            # `expression_list`; positional pairing when both sides have the
+            # same arity, else every target gets the union of all RHS values
+            # (over-approximation, never under-taints a multi-assign target).
+            left = node.child_by_field_name("left")
+            right = node.child_by_field_name("right")
+            right_state = self._eval(right) if right is not None else None
+            if left is not None:
+                targets = (
+                    left.named_children if left.type == "expression_list" else [left]
+                )
+                for target in targets:
+                    self._assign(target, right_state, node)
+            if right is not None:
+                self._walk(right)
+            return
+
+        if t == "var_declaration":
+            # Go `var a, b string = x, y` / `var a = f()` -- one or more
+            # `var_spec` children, each with its own name(s)/value.
+            for spec in node.named_children:
+                if spec.type != "var_spec":
+                    continue
+                value = spec.child_by_field_name("value")
+                value_state = self._eval(value) if value is not None else None
+                for name_node in spec.children_by_field_name("name"):
+                    self._assign(name_node, value_state, spec)
+                if value is not None:
+                    self._walk(value)
+            return
+
+        if t == "declaration":
+            # C `int x = f();` / `char *cmd = getenv(...);` / multi-declarator
+            # `int a = 1, b = 2;` -- each comma-separated entry is a repeated
+            # `declarator` field, either a bare declarator (`char buf[64];`,
+            # nothing to propagate) or an `init_declarator` wrapping
+            # `declarator`/`value`. Declarator may be pointer/array-wrapped
+            # (`char *cmd = ...`) -- unwrap via `_c_declarator_identifier`.
+            for declarator in node.children_by_field_name("declarator"):
+                if declarator.type == "init_declarator":
+                    value = declarator.child_by_field_name("value")
+                    value_state = self._eval(value) if value is not None else None
+                    name_node = _c_declarator_identifier(
+                        declarator.child_by_field_name("declarator")
+                    )
+                    self._assign(name_node, value_state, declarator)
+                    if value is not None:
+                        self._walk(value)
+            return
+
         if t in ("call_expression", "method_invocation", "object_creation_expression"):
             self._check_sink(node)
             for child in node.children:
@@ -534,12 +677,18 @@ class CstFunctionTaintVisitor:
             for child in target_node.named_children:
                 self._assign(child, state, stmt_node)
             return
-        if t in ("member_expression", "field_access", "subscript_expression", "array_access"):
+        _LVALUE_CHAIN_TYPES = (
+            "member_expression", "field_access", "subscript_expression",
+            "array_access", "selector_expression", "index_expression",
+        )
+        if t in _LVALUE_CHAIN_TYPES:
             base = target_node
-            while base is not None and base.type in (
-                "member_expression", "field_access", "subscript_expression", "array_access",
-            ):
-                nxt = base.child_by_field_name("object") or base.child_by_field_name("array")
+            while base is not None and base.type in _LVALUE_CHAIN_TYPES:
+                nxt = (
+                    base.child_by_field_name("object")
+                    or base.child_by_field_name("array")
+                    or base.child_by_field_name("operand")
+                )
                 if nxt is None:
                     break
                 base = nxt
@@ -620,7 +769,17 @@ class CstFunctionTaintVisitor:
             return
 
         args = _call_args(node)
-        candidate_args = args[:1] if (spec.sink_type in _FIRST_ARG_SINKS and not custom_hit and args) else args
+        # Go call shapes commonly put the tainted value AFTER a fixed first
+        # argument (`exec.Command("sh", "-c", tainted)`, `db.Query(query,
+        # tainted...)` binds param placeholders, not string-concat) -- the
+        # JS/Java/Python "the dangerous value is always arg[0]" heuristic
+        # would silently mute real Go flows, so Go always scans every
+        # argument (over-approximation, never under-detection).
+        first_arg_only = (
+            spec.sink_type in _FIRST_ARG_SINKS and not custom_hit and args
+            and self.lang != "go"
+        )
+        candidate_args = args[:1] if first_arg_only else args
         # Emit a finding for EACH independently-tainted argument, not just
         # the first: `logger.info(a, b)` with both `a` and `b` tainted from
         # distinct sources must report both flows, or one is silently
@@ -725,6 +884,17 @@ def _scan_functions(
         if body is None:
             continue
         name_node = fn.child_by_field_name("name")
+        if name_node is None and fn.type == "function_definition":
+            # C has no `name` field on `function_definition` -- the name
+            # lives inside the `declarator` field: `function_declarator`
+            # (itself possibly wrapped in `pointer_declarator` for a
+            # pointer-returning function) -> its own `declarator` field ->
+            # (possibly pointer-wrapped) `identifier`.
+            fdecl = fn.child_by_field_name("declarator")
+            while fdecl is not None and fdecl.type in _C_DECLARATOR_WRAPPERS:
+                fdecl = fdecl.child_by_field_name("declarator")
+            if fdecl is not None and fdecl.type == "function_declarator":
+                name_node = _c_declarator_identifier(fdecl.child_by_field_name("declarator"))
         func_name = ctx.node_text(name_node) if name_node is not None else "<anonymous>"
         visitor = CstFunctionTaintVisitor(
             file_path=file_path,
@@ -781,6 +951,66 @@ def scan_java_source(
     return _scan_functions(
         file_path, ctx, "java",
         JAVA_SOURCE_SPECS, JAVA_SINK_SPECS,
+        custom_sources, custom_sinks, custom_sanitizers, is_test_context,
+        alias_map=alias_map, call_resolver=call_resolver, alias_origins=alias_origins,
+    )
+
+
+def scan_go_source(
+    file_path: str,
+    ctx,
+    custom_sources: Optional[Set[str]] = None,
+    custom_sinks: Optional[Set[str]] = None,
+    custom_sanitizers: Optional[Set[str]] = None,
+    is_test_context: bool = False,
+    alias_map: Optional[Dict[str, str]] = None,
+    call_resolver: Optional[CallResolver] = None,
+    alias_origins: Optional[Dict[str, AliasOrigin]] = None,
+) -> List[TaintFlow]:
+    """Scan a parsed Go ``FileParseContext`` for taint flows.
+
+    Go has no import-alias ambiguity for taint purposes the way JS/Java do
+    (package selectors are unambiguous, no destructured renames of the
+    catalog's `pkg.Func` shape are idiomatic) -- ``alias_map``/
+    ``alias_origins`` are accepted for interface symmetry with the JS/Java
+    entry points (and to keep ``DispatchEngine`` generic) but are typically
+    empty for Go call sites; the catalog matches package-qualified chains
+    directly (``os.Getenv``, ``exec.Command``, ...).
+    """
+    return _scan_functions(
+        file_path, ctx, "go",
+        GO_SOURCE_SPECS, GO_SINK_SPECS,
+        custom_sources, custom_sinks, custom_sanitizers, is_test_context,
+        alias_map=alias_map, call_resolver=call_resolver, alias_origins=alias_origins,
+    )
+
+
+def scan_c_source(
+    file_path: str,
+    ctx,
+    custom_sources: Optional[Set[str]] = None,
+    custom_sinks: Optional[Set[str]] = None,
+    custom_sanitizers: Optional[Set[str]] = None,
+    is_test_context: bool = False,
+    alias_map: Optional[Dict[str, str]] = None,
+    call_resolver: Optional[CallResolver] = None,
+    alias_origins: Optional[Dict[str, AliasOrigin]] = None,
+) -> List[TaintFlow]:
+    """Scan a parsed C ``FileParseContext`` for taint flows.
+
+    Bounded first pass, intra-procedural only: no pointer-aliasing or
+    memory-layout modeling (a buffer threaded through several pointer hops
+    before reaching a sink is not tracked), and "mutating sources"
+    (``fgets``/``scanf``/``read``/``recv``/``gets`` tainting an OUTPUT
+    ARGUMENT rather than a return value) are not modeled -- see the honest
+    gap note above ``C_SOURCE_SPECS`` in ``catalog/sources.py``. C has no
+    import/alias ambiguity (``#include`` does not rename symbols), so
+    ``alias_map``/``alias_origins`` are accepted only for interface symmetry
+    with the other language entry points and are typically empty.
+    """
+    return _scan_functions(
+        file_path, ctx, "c",
+        C_SOURCE_SPECS, C_SINK_SPECS,
         custom_sources, custom_sinks, custom_sanitizers, is_test_context,
         alias_map=alias_map, call_resolver=call_resolver, alias_origins=alias_origins,
     )
