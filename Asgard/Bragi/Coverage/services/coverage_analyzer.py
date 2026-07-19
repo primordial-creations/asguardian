@@ -67,11 +67,12 @@ class CoverageAnalyzer:
 
         report = CoverageReport(scan_path=str(path))
 
-        gaps, metrics, class_coverage = self.gap_analyzer.analyze(path, test_path)
+        gaps, metrics, class_coverage, language_status = self.gap_analyzer.analyze(path, test_path)
 
         report.metrics = metrics
         report.gaps = gaps
         report.class_coverage = class_coverage
+        report.language_status = language_status
 
         suggestions = self.suggestion_engine.generate_suggestions(gaps)
         report.suggestions = suggestions
@@ -93,7 +94,7 @@ class CoverageAnalyzer:
         Returns:
             List of coverage gaps
         """
-        gaps, _, _ = self.gap_analyzer.analyze(scan_path)
+        gaps, _, _, _ = self.gap_analyzer.analyze(scan_path)
         return cast(list[Any], gaps)
 
     def get_suggestions(
@@ -111,7 +112,7 @@ class CoverageAnalyzer:
         Returns:
             List of prioritized test suggestions
         """
-        gaps, _, _ = self.gap_analyzer.analyze(scan_path)
+        gaps, _, _, _ = self.gap_analyzer.analyze(scan_path)
         suggestions = self.suggestion_engine.generate_suggestions(gaps)
         return cast(list[Any], self.suggestion_engine.prioritize_suggestions(suggestions, max_count))
 
@@ -128,7 +129,7 @@ class CoverageAnalyzer:
         Returns:
             List of class coverage metrics
         """
-        _, _, class_coverage = self.gap_analyzer.analyze(scan_path)
+        _, _, class_coverage, _ = self.gap_analyzer.analyze(scan_path)
         return cast(list[Any], class_coverage)
 
     def generate_report(
