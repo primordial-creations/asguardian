@@ -64,76 +64,124 @@ _JS_LANGS = frozenset({"javascript", "typescript", "tsx"})
 _JS_PARAM_WRAPPERS = frozenset({"required_parameter", "optional_parameter"})
 
 
-def _js_param_names(fn, ctx) -> List[str]:
+def _js_destructure_names(pattern, ctx) -> List[str]:
+    """Extract bound identifier names from a JS/TS destructuring pattern:
+    ``{a, b}`` / ``{a: renamed}`` / ``[x, y]`` (nested/rest patterns are
+    walked recursively; over-approximate by collecting every leaf
+    identifier rather than trying to model partial binding)."""
     names: List[str] = []
+    if pattern is None:
+        return names
+    t = pattern.type
+    if t == "identifier":
+        names.append(ctx.node_text(pattern))
+        return names
+    if t == "object_pattern":
+        for child in pattern.named_children:
+            if child.type == "shorthand_property_identifier_pattern":
+                names.append(ctx.node_text(child))
+            elif child.type == "pair_pattern":
+                value = child.child_by_field_name("value")
+                names.extend(_js_destructure_names(value, ctx))
+            elif child.type == "rest_pattern":
+                inner = child.named_children[0] if child.named_children else None
+                names.extend(_js_destructure_names(inner, ctx))
+            elif child.type in ("object_pattern", "array_pattern"):
+                names.extend(_js_destructure_names(child, ctx))
+        return names
+    if t == "array_pattern":
+        for child in pattern.named_children:
+            if child.type == "assignment_pattern":
+                left = child.child_by_field_name("left")
+                names.extend(_js_destructure_names(left, ctx))
+            elif child.type == "rest_pattern":
+                inner = child.named_children[0] if child.named_children else None
+                names.extend(_js_destructure_names(inner, ctx))
+            else:
+                names.extend(_js_destructure_names(child, ctx))
+        return names
+    return names
+
+
+def _js_param_names(fn, ctx) -> List[List[str]]:
+    """Returns one group of bound names per parameter POSITION -- normally
+    a singleton (``[["req"], ["res"]]``), but destructured params
+    (``{a, b}`` / ``[x, y]``) contribute multiple names at the SAME
+    position so a tainted positional argument taints all of them."""
+    groups: List[List[str]] = []
     params_node = fn.child_by_field_name("parameters")
     if params_node is None:
         # Arrow function with a single unparenthesized identifier param,
         # e.g. `x => x.trim()`.
         single = fn.child_by_field_name("parameter")
         if single is not None and single.type == "identifier":
-            return [ctx.node_text(single)]
-        return names
+            return [[ctx.node_text(single)]]
+        return groups
     for child in params_node.named_children:
         if child.type == "identifier":
-            names.append(ctx.node_text(child))
+            groups.append([ctx.node_text(child)])
         elif child.type in _JS_PARAM_WRAPPERS:
             pattern = child.child_by_field_name("pattern") or child.child_by_field_name("name")
-            if pattern is not None and pattern.type == "identifier":
-                names.append(ctx.node_text(pattern))
+            if pattern is not None:
+                names = _js_destructure_names(pattern, ctx)
+                if names:
+                    groups.append(names)
         elif child.type == "assignment_pattern":
             left = child.child_by_field_name("left")
-            if left is not None and left.type == "identifier":
-                names.append(ctx.node_text(left))
-        # Destructured params (`object_pattern`/`array_pattern`) contribute
-        # no single tracked name -- documented gap, matches the Python
-        # engine's "no keyword/complex-target param mapping" limitation.
-    return names
+            names = _js_destructure_names(left, ctx)
+            if names:
+                groups.append(names)
+        elif child.type in ("object_pattern", "array_pattern"):
+            names = _js_destructure_names(child, ctx)
+            if names:
+                groups.append(names)
+    return groups
 
 
-def _java_param_names(fn, ctx) -> List[str]:
-    names: List[str] = []
+def _java_param_names(fn, ctx) -> List[List[str]]:
+    groups: List[List[str]] = []
     params_node = fn.child_by_field_name("parameters")
     if params_node is None:
-        return names
+        return groups
     for child in params_node.named_children:
         if child.type in ("formal_parameter", "spread_parameter", "receiver_parameter"):
             name_node = child.child_by_field_name("name")
             if name_node is not None:
-                names.append(ctx.node_text(name_node))
-    return names
+                groups.append([ctx.node_text(name_node)])
+    return groups
 
 
-def _go_param_names(fn, ctx) -> List[str]:
+def _go_param_names(fn, ctx) -> List[List[str]]:
     """Go ``parameter_list``: each ``parameter_declaration`` may carry
-    MULTIPLE ``name`` fields (``func f(a, b string)``) sharing one type."""
-    names: List[str] = []
+    MULTIPLE ``name`` fields (``func f(a, b string)``) sharing one type --
+    each still gets its own POSITION for summary purposes."""
+    groups: List[List[str]] = []
     params_node = fn.child_by_field_name("parameters")
     if params_node is None:
-        return names
+        return groups
     for child in params_node.named_children:
         if child.type == "parameter_declaration":
             for name_node in child.children_by_field_name("name"):
-                names.append(ctx.node_text(name_node))
-    return names
+                groups.append([ctx.node_text(name_node)])
+    return groups
 
 
-def _c_param_names(fn, ctx) -> List[str]:
+def _c_param_names(fn, ctx) -> List[List[str]]:
     """C ``parameter_list``: each ``parameter_declaration`` names one
     parameter via its (possibly pointer/array-wrapped) ``declarator`` field.
     Bare types with no name (``void f(int)`` prototypes) contribute nothing."""
-    names: List[str] = []
+    groups: List[List[str]] = []
     params_node = fn.child_by_field_name("parameters")
     if params_node is None:
-        return names
+        return groups
     for child in params_node.named_children:
         if child.type != "parameter_declaration":
             continue
         declarator = child.child_by_field_name("declarator")
         name_node = _c_declarator_identifier(declarator)
         if name_node is not None:
-            names.append(ctx.node_text(name_node))
-    return names
+            groups.append([ctx.node_text(name_node)])
+    return groups
 
 
 def _c_function_name(fn, ctx) -> Optional[str]:
@@ -149,7 +197,7 @@ def _c_function_name(fn, ctx) -> Optional[str]:
     return ctx.node_text(name_node) if name_node is not None else None
 
 
-def _param_names(fn, ctx, lang: str) -> List[str]:
+def _param_names(fn, ctx, lang: str) -> List[List[str]]:
     if lang in _JS_LANGS:
         return _js_param_names(fn, ctx)
     if lang == "go":
@@ -193,24 +241,32 @@ def compute_cst_file_summaries(
             func_name = _c_function_name(fn, ctx) or "<anonymous>"
         else:
             func_name = "<anonymous>"
-        params = _param_names(fn, ctx, lang)
+        param_groups = _param_names(fn, ctx, lang)
 
         seed: Dict[str, TaintState] = {}
-        for idx, pname in enumerate(params):
-            step = TaintFlowStep(
-                file_path=file_path,
-                line_number=fn.start_point[0] + 1,
-                function_name=func_name,
-                step_type="param",
-                code_snippet="",
-                variable_name=pname,
-            )
-            seed[pname] = TaintState(
-                source_step=step,
-                source_type=TaintSourceType.HTTP_PARAMETER,  # placeholder; real type from caller
-                confidence=1.0,
-                param_index=idx,
-            )
+        for idx, names in enumerate(param_groups):
+            for pname in names:
+                step = TaintFlowStep(
+                    file_path=file_path,
+                    line_number=fn.start_point[0] + 1,
+                    function_name=func_name,
+                    step_type="param",
+                    code_snippet="",
+                    variable_name=pname,
+                )
+                # Destructured params (`{a, b}` / `[x, y]`) bind MULTIPLE
+                # names at the SAME positional index -- a tainted positional
+                # argument taints every bound name (over-approximate: does
+                # not distinguish which destructured key was actually
+                # tainted, matches the plan's "no reassignment tracking"
+                # scope).
+                seed[pname] = TaintState(
+                    source_step=step,
+                    source_type=TaintSourceType.HTTP_PARAMETER,  # placeholder; real type from caller
+                    confidence=1.0,
+                    param_index=idx,
+                )
+        params = [pname for names in param_groups for pname in names]
 
         visitor = CstFunctionTaintVisitor(
             file_path=file_path,

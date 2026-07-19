@@ -193,9 +193,17 @@ JAVA_SINK_SPECS: Tuple[SinkSpec, ...] = (
     SinkSpec("executeUpdate", TaintSinkType.SQL_QUERY, "critical", 0.4),
     SinkSpec("Runtime.exec", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
     SinkSpec("runtime.exec", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
-    # Covers the common Runtime.getRuntime().exec(...) chained-call idiom,
-    # which resolves to "Runtime.getRuntime.exec" (not a suffix of the
-    # exact "Runtime.exec" pattern above) -- generic name, lower confidence.
+    # The idiomatic chained call `Runtime.getRuntime().exec(...)` resolves
+    # to the dotted chain "Runtime.getRuntime.exec" (NOT a suffix of the
+    # exact "Runtime.exec" pattern above, since the intermediate
+    # `.getRuntime()` call is part of the chain) -- an explicit, unambiguous
+    # pattern for it so it lands at "certain" confidence rather than only
+    # being caught by the generic ".exec" fallback below at 0.6 (Java sink
+    # fix -- adversarial review bonus item).
+    SinkSpec("Runtime.getRuntime.exec", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
+    # Covers any OTHER `.exec` receiver form (`rt.exec(...)` on a `Runtime
+    # rt = Runtime.getRuntime()` local, or an unresolved receiver) --
+    # generic name, lower confidence.
     SinkSpec("exec", TaintSinkType.SHELL_COMMAND, "critical", 0.6),
     SinkSpec("ProcessBuilder", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
     SinkSpec("response.getWriter", TaintSinkType.HTML_OUTPUT, "medium", 0.4, match_suffix=False),
@@ -301,9 +309,19 @@ C_SINK_SPECS: Tuple[SinkSpec, ...] = (
     # Format string sinks - HIGH severity: tainted value used AS the format
     # string itself (not merely as an argument to a fixed format string).
     SinkSpec("printf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    SinkSpec("wprintf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
     SinkSpec("fprintf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    SinkSpec("fwprintf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    SinkSpec("dprintf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
     SinkSpec("snprintf", TaintSinkType.FORMAT_STRING, "high", 0.4, match_suffix=False),
+    SinkSpec("swprintf", TaintSinkType.FORMAT_STRING, "high", 0.4, match_suffix=False),
     SinkSpec("syslog", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    # `v`-prefixed va_list variants -- same argument shape/index as their
+    # non-`v` counterpart (see `_c_format_arg_index` in cst_taint_visitor.py).
+    SinkSpec("vprintf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    SinkSpec("vfprintf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    SinkSpec("vdprintf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    SinkSpec("vsnprintf", TaintSinkType.FORMAT_STRING, "high", 0.4, match_suffix=False),
     # Path traversal / file access - HIGH severity
     SinkSpec("fopen", TaintSinkType.FILE_PATH, "high", 0.8, match_suffix=False),
     SinkSpec("open", TaintSinkType.FILE_PATH, "high", 0.6, match_suffix=False),
