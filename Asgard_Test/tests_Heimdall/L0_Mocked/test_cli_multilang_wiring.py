@@ -131,24 +131,27 @@ def test_taint_surfaces_js_sqli_flow(js_sqli_project, capsys):
 
 # --------------------------------------------------- Fix 4: honest N/A labeling
 
-def test_full_scan_reports_na_not_100pct_on_non_python_tree(
+def test_full_scan_js_tree_reports_real_coverage_not_fabricated(
     js_sqli_project, capsys
 ):
+    # A JS tree must never show the old fabricated "100% coverage" green, and
+    # (now that JS coverage is supported) must report a REAL number, not N/A.
     args = create_parser().parse_args(["scan", str(js_sqli_project)])
     run_full_scan(args)
     out = capsys.readouterr().out
     assert "100.0% method coverage" not in out
-    assert "100.0%" not in out.split("Object Oriented")[1].split("\n")[0] \
-        if "Object Oriented" in out else True
     coverage_line = next(
         l for l in out.splitlines() if l.strip().startswith("Test Coverage")
     )
-    assert "N/A" in coverage_line
+    assert "N/A" not in coverage_line
+    assert "method coverage" in coverage_line
+    # OOP on a supported language is either a real result or honest N/A when the
+    # tree has no classes — never a fabricated green PASS with no data.
     oop_line = next(
         l for l in out.splitlines()
         if l.strip().startswith("Object Oriented Programming")
     )
-    assert "N/A" in oop_line
+    assert ("N/A" in oop_line) or ("violations" in oop_line)
 
 
 def test_full_scan_python_project_still_reports_real_coverage(

@@ -102,6 +102,50 @@ JAVA_SOURCE_SPECS: Tuple[SourceSpec, ...] = (
 )
 
 
+# --------------------------------------------------------------------------
+# Go (net/http) -- plan 04 multi-language extension.
+# --------------------------------------------------------------------------
+GO_SOURCE_SPECS: Tuple[SourceSpec, ...] = (
+    SourceSpec("r.URL.Query.Get", TaintSourceType.HTTP_PARAMETER, 1.0, is_call=True),
+    SourceSpec("r.URL.Query", TaintSourceType.HTTP_PARAMETER, 0.8),
+    SourceSpec("r.FormValue", TaintSourceType.HTTP_PARAMETER, 1.0, is_call=True),
+    SourceSpec("r.PostFormValue", TaintSourceType.HTTP_PARAMETER, 1.0, is_call=True),
+    SourceSpec("r.Form", TaintSourceType.HTTP_PARAMETER, 0.8),
+    SourceSpec("r.PostForm", TaintSourceType.HTTP_PARAMETER, 0.8),
+    SourceSpec("r.Header.Get", TaintSourceType.HEADER, 0.8, is_call=True),
+    SourceSpec("r.Header", TaintSourceType.HEADER, 0.6),
+    SourceSpec("r.Cookie", TaintSourceType.COOKIE, 0.8, is_call=True),
+    SourceSpec("r.URL.Path", TaintSourceType.PATH_PARAMETER, 0.8),
+    SourceSpec("r.URL.RawQuery", TaintSourceType.HTTP_PARAMETER, 0.8),
+    SourceSpec("r.Body", TaintSourceType.HTTP_PARAMETER, 0.6),
+    SourceSpec("mux.Vars", TaintSourceType.PATH_PARAMETER, 0.8, is_call=True),
+    SourceSpec("os.Getenv", TaintSourceType.ENV_VAR, 0.8, is_call=True),
+    SourceSpec("os.LookupEnv", TaintSourceType.ENV_VAR, 0.8, is_call=True),
+    SourceSpec("os.Args", TaintSourceType.COMMAND_LINE_ARG, 1.0),
+)
+
+
+# --------------------------------------------------------------------------
+# C (libc) -- bounded first pass, intra-procedural only.
+#
+# HONEST GAP: ``getenv`` is a normal return-value source ("taint the LHS of
+# ``x = getenv(...)``"), which this visitor already handles like any other
+# call-as-source. But ``fgets``/``scanf``/``read``/``recv``/``gets`` are
+# "mutating sources" -- they taint an OUTPUT ARGUMENT (a caller-owned buffer
+# pointer), not their return value. The CST visitor's source model is
+# call-site/return-value oriented and does not implement argument-mutation
+# tainting for C, so these are NOT modeled as sources in this bounded first
+# pass. This is a documented false-negative: `char buf[64]; fgets(buf, 64,
+# stdin); system(buf);` will NOT be flagged. Left as a known follow-up
+# (would need a "call taints its Nth argument, not its return" source
+# variant threaded through `_walk`'s call-statement handling).
+# --------------------------------------------------------------------------
+C_SOURCE_SPECS: Tuple[SourceSpec, ...] = (
+    SourceSpec("getenv", TaintSourceType.ENV_VAR, 1.0, is_call=True),
+    SourceSpec("secure_getenv", TaintSourceType.ENV_VAR, 1.0, is_call=True),
+)
+
+
 def lookup_source(
     chain: str,
     is_call: bool = False,

@@ -38,6 +38,7 @@ from Asgard.Bragi.OOP.services._oop_merge import (
     build_combined_class_metrics,
     build_violations_list,
 )
+from Asgard.Bragi.OOP.services._cir_oop_bridge import build_cir_file_analyses
 
 
 class OOPAnalyzer:
@@ -152,6 +153,13 @@ class OOPAnalyzer:
                     file_analysis.add_violation(combined)
 
             report.add_file_analysis(file_analysis)
+
+        # Non-Python languages: real LCOM4/CBO/RFC via the tree-sitter CIR
+        # (Asgard/Bragi/OOP/services/cir_metrics.py) rather than N/A. DIT/
+        # NOC/WMC aren't computed by the CIR path yet and stay 0 — see
+        # ClassOOPMetrics.metrics_source docstring.
+        for cir_file_analysis in build_cir_file_analyses(path, self.config):
+            report.add_file_analysis(cir_file_analysis)
 
         report.scan_duration_seconds = time.time() - start_time
 

@@ -1,0 +1,39 @@
+# TypeScript taint benchmark corpus (plan 10: dedicated TS coverage
+# alongside the existing JS-only taint_js/ corpus; DispatchEngine routes
+# .ts files through the same CST taint path as .js via the tree-sitter
+# TypeScript grammar).
+cases:
+  - file: tp_command_injection.ts
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_fixed_host.ts
+    expect: no_flow
+  - file: tp_sqli_concat.ts
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_parameterized_query.ts
+    expect: no_flow
+  # -- TS `as`/`satisfies` cast propagation gap (must NOT launder taint) --
+  - file: tp_cast_propagation_sqli.ts
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  # -- Legacy TS `<Type>expr` cast propagation (adversarial review
+  # MAJOR-1: tree-sitter-typescript emits `type_assertion` for this form,
+  # distinct from `as_expression`/`satisfies_expression`, and it was
+  # missing from the cast pass-through in `_eval`, silently laundering
+  # taint) --
+  - file: tp_legacy_angle_cast_propagation_sqli.ts
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89

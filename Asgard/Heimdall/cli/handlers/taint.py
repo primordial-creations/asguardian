@@ -14,6 +14,7 @@ from Asgard.Heimdall.cli.handlers._security_dispatch import _iter_code_files
 #: the resulting flows into the same report.
 _MULTILANG_TAINT_EXTENSIONS = frozenset({
     ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts", ".java",
+    ".go", ".c", ".h",
 })
 
 

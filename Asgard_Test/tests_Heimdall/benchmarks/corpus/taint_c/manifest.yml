@@ -1,0 +1,61 @@
+# C taint benchmark corpus (Asgard uplift: Go/C/SSRF/TS-cast slice).
+# DispatchEngine routes .c/.h files through the tree-sitter CST taint path
+# (Security/TaintAnalysis/engine/cst_taint_visitor.py::scan_c_source).
+#
+# BOUNDED FIRST PASS -- honest scope limits (see cst_taint_visitor.py's
+# scan_c_source docstring and catalog/sources.py's C_SOURCE_SPECS comment):
+#   - Intra-procedural only, no pointer-aliasing/memory-layout modeling.
+#   - "Mutating sources" (fgets/scanf/read/recv/gets tainting an OUTPUT
+#     ARGUMENT rather than a return value) ARE now modeled -- see
+#     _C_MUTATING_SOURCES in cst_taint_visitor.py (adversarial review
+#     BLOCKER fix) -- the buffer/scanf-target argument becomes tainted in
+#     the local env. This is still argument-identifier-based, not a real
+#     pointer/alias model: it does not follow the buffer through further
+#     pointer indirection or struct-field aliasing.
+cases:
+  - file: tp_command_injection.c
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_command_fixed.c
+    expect: no_flow
+  - file: tp_buffer_overflow_sprintf.c
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-120
+  - file: fp_buffer_overflow_fixed.c
+    expect: no_flow
+  - file: tp_path_traversal.c
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [possible, probable, certain]
+    cwe: CWE-22
+  - file: fp_path_fixed.c
+    expect: no_flow
+  - file: fp_int_sanitizer.c
+    expect: no_flow
+  # -- Mutating source (adversarial review BLOCKER): fgets() writes stdin
+  # data into buf; system(buf) must flag -- textbook C RCE class. --
+  - file: tp_mutating_source_stdin_command_injection.c
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  # -- FORMAT_STRING precision (adversarial review MAJOR-3): a constant
+  # format literal with only a VALUE argument tainted is not a
+  # format-string vulnerability; snprintf is bounded and must not flag
+  # as buffer_overflow either. --
+  - file: fp_format_string_constant.c
+    expect: no_flow
+  - file: tp_format_string_tainted_format.c
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [certain, probable]
+    cwe: CWE-134

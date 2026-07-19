@@ -33,17 +33,39 @@ from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import (
     build_alias_map,
     resolve_chain,
 )
+from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_alias import (
+    build_cst_alias_map,
+    build_cst_alias_map_with_origins,
+)
+from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_summaries import (
+    SummaryIndex,
+    collect_cst_imported_module_stems,
+    compute_cst_file_summaries,
+)
 from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_taint_visitor import (
+    scan_c_source,
+    scan_go_source,
     scan_java_source,
     scan_js_ts_source,
 )
 from Asgard.Heimdall.treesitter.ast_engine import is_engine_enabled
 from Asgard.Heimdall.treesitter.file_context import FileParseContext, language_for_path
 
+# Sibling-file extension groups used to bound cross-file summary resolution
+# to a single directory per scan (see cst_summaries.py module docstring for
+# why this is directory-scoped rather than whole-project).
+_JS_SIBLING_EXTS = frozenset({".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"})
+_JAVA_SIBLING_EXTS = frozenset({".java"})
+_GO_SIBLING_EXTS = frozenset({".go"})
+_C_SIBLING_EXTS = frozenset({".c", ".h"})
+_CST_SUMMARY_MAX_SIBLINGS = 40
+
 # Extensions routed through the CST taint path (plan 04 Phase 4 / plan 01
 # waves 2-3). Python keeps the ``ast``-backed path above, unchanged.
 _JS_TS_EXTENSIONS = frozenset({".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"})
 _JAVA_EXTENSIONS = frozenset({".java"})
+_GO_EXTENSIONS = frozenset({".go"})
+_C_EXTENSIONS = frozenset({".c", ".h"})
 
 # Layer-1 default sweep: unambiguous machine-issued token prefixes only
 # (low-FP by construction). Full secret scanning stays in SecretsDetection.
@@ -107,6 +129,11 @@ class DispatchEngine:
         self._forced_test_context = is_test_context
         self.is_test_context = bool(is_test_context)
         self.strict_scan_paths = tuple(strict_scan_paths)
+        # In-memory, per-engine-instance cache of directory-scoped CST
+        # summary indexes: (directory, lang) -> SummaryIndex. Keeps repeated
+        # scans of files in the same directory (e.g. a whole-repo walk) from
+        # re-parsing every sibling file per call.
+        self._cst_summary_indexes: Dict[Tuple[str, str], SummaryIndex] = {}
 
     # ------------------------------------------------------------------ API
 
@@ -127,7 +154,10 @@ class DispatchEngine:
         result.structural_findings.extend(self._layer1(source, str(file_path)))
 
         suffix = file_path.suffix.lower()
-        if suffix in _JS_TS_EXTENSIONS or suffix in _JAVA_EXTENSIONS:
+        if (
+            suffix in _JS_TS_EXTENSIONS or suffix in _JAVA_EXTENSIONS
+            or suffix in _GO_EXTENSIONS or suffix in _C_EXTENSIONS
+        ):
             result.taint_flows = self._scan_cst_language(source, file_path)
             result.taint_flows = self._dedup(result.taint_flows)
             return result
@@ -176,20 +206,91 @@ class DispatchEngine:
             return []
         if lang == "java":
             scan_fn = scan_java_source
+            sibling_exts = _JAVA_SIBLING_EXTS
         elif lang in ("javascript", "typescript", "tsx"):
             scan_fn = scan_js_ts_source
+            sibling_exts = _JS_SIBLING_EXTS
+        elif lang == "go":
+            scan_fn = scan_go_source
+            sibling_exts = _GO_SIBLING_EXTS
+        elif lang == "c":
+            scan_fn = scan_c_source
+            sibling_exts = _C_SIBLING_EXTS
         else:
             return []
+        alias_map, alias_origins = build_cst_alias_map_with_origins(ctx, lang)
+        try:
+            summary_index = self._cst_summary_index(file_path, lang, sibling_exts)
+            summary_index.set_current_file(str(file_path))
+            call_resolver = summary_index.resolve_call
+        except Exception:
+            # Summary-index construction must never block Layer 3 -- fall
+            # back to no inter-procedural resolution (still over-approximates
+            # via the intra-procedural x0.5 unknown-call decay).
+            call_resolver = None
         try:
             return scan_fn(
                 str(file_path), ctx,
                 custom_sanitizers=self.custom_sanitizers,
                 is_test_context=self.is_test_context,
+                alias_map=alias_map,
+                call_resolver=call_resolver,
+                alias_origins=alias_origins,
             )
         except Exception:
             # A CST-rule failure must never crash the scan -- degrade to
             # "no taint findings for this file" (Layer 1 still reported).
             return []
+
+    def _cst_summary_index(
+        self, file_path: Path, lang: str, sibling_exts: frozenset,
+    ) -> SummaryIndex:
+        """Build (or reuse) the directory-scoped inter-procedural summary
+        index for ``file_path`` -- see cst_summaries.py for why this is
+        bounded to same-directory siblings rather than a whole project."""
+        directory = str(file_path.parent)
+        key = (directory, lang)
+        cached = self._cst_summary_indexes.get(key)
+        if cached is not None:
+            return cached
+
+        index = SummaryIndex()
+        try:
+            siblings = sorted(
+                p for p in file_path.parent.iterdir()
+                if p.is_file() and p.suffix.lower() in sibling_exts
+            )[:_CST_SUMMARY_MAX_SIBLINGS]
+        except OSError:
+            siblings = []
+        if file_path not in siblings:
+            siblings = siblings + [file_path]
+
+        for sib in siblings:
+            sib_lang = language_for_path(sib) or lang
+            if not is_engine_enabled(sib_lang):
+                continue
+            try:
+                sib_source = sib.read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+            try:
+                sib_ctx = FileParseContext.parse(sib, sib_source.splitlines(), sib_lang)
+            except Exception:
+                continue
+            if sib_ctx.root is None:
+                continue
+            sib_alias = build_cst_alias_map(sib_ctx, sib_lang)
+            try:
+                sib_summaries = compute_cst_file_summaries(
+                    str(sib), sib_ctx, sib_lang, sib_alias, self.custom_sanitizers,
+                )
+            except Exception:
+                continue
+            imported_stems = collect_cst_imported_module_stems(sib_alias)
+            index.add_file(str(sib), sib_summaries, imported_stems, sib_source.splitlines())
+
+        self._cst_summary_indexes[key] = index
+        return index
 
     # -------------------------------------------------------------- layer 1
 

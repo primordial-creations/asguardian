@@ -123,7 +123,7 @@ from Asgard.Heimdall.cli.handlers.calibration import (
     run_calibrate,
     run_validate_rules,
 )
-from Asgard.Heimdall.cli.handlers.evaluation import run_eval
+from Asgard.Heimdall.cli.handlers.evaluation import run_eval, run_eval_corpus
 
 __all__ = [
     "_TeeStream",
@@ -214,4 +214,5 @@ __all__ = [
     "run_calibrate",
     "run_validate_rules",
     "run_eval",
+    "run_eval_corpus",
 ]

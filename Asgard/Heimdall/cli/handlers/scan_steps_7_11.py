@@ -73,28 +73,32 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         print(f"       Error: {e}")
 
     _next_step(step_state, total_steps, "OOP: Coupling/Cohesion Metrics...")
-    if not _has_python_sources(scan_path, exclude_patterns):
-        scan_results["oop"] = {
-            "status": "N/A",
-            "reason": "not analyzed (no Python sources found; OOP/cohesion "
-                      "metrics currently only support Python)",
-        }
-        print("       N/A - no Python sources found (Python-only analyzer)")
-        step_reports["oop"] = (
-            "OOP Metrics\n\nN/A - not analyzed: no Python sources found in "
-            "scan tree. OOP/cohesion metrics currently only support Python."
+    try:
+        oop_config = OOPConfig(
+            scan_path=scan_path, include_tests=include_tests,
+            exclude_patterns=exclude_patterns, verbose=verbose,
         )
-    else:
-        try:
-            oop_config = OOPConfig(
-                scan_path=scan_path, include_tests=include_tests,
-                exclude_patterns=exclude_patterns, verbose=verbose,
+        oop_analyzer = OOPAnalyzer(oop_config)
+        oop_result = oop_analyzer.analyze(scan_path)
+        classes = (getattr(oop_result, "class_metrics", None)
+                   or getattr(oop_result, "classes", None) or [])
+        if not classes:
+            # No classes found in any supported language (functional code, or a
+            # language OOP metrics don't cover) — report N/A, never a green PASS.
+            scan_results["oop"] = {
+                "status": "N/A",
+                "reason": "not analyzed (no classes found in a supported language)",
+            }
+            print("       N/A - no classes found in a supported language")
+            step_reports["oop"] = (
+                "OOP Metrics\n\nN/A - not analyzed: no classes found in a "
+                "supported language."
             )
-            oop_analyzer = OOPAnalyzer(oop_config)
-            oop_result = oop_analyzer.analyze(scan_path)
+        else:
             oop_violations = oop_result.total_violations if hasattr(oop_result, "total_violations") else 0
             scan_results["oop"] = {
                 "violations": oop_violations,
+                "classes_analyzed": len(classes),
                 "status": "PASS" if oop_violations == 0 else "FAIL",
             }
             if oop_violations > 0:
@@ -104,9 +108,9 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
                 step_reports["oop"] = oop_analyzer.generate_report(oop_result, "text")
             except Exception:
                 step_reports["oop"] = f"OOP Metrics\n\n{json.dumps(scan_results['oop'], indent=2)}"
-        except Exception as e:
-            scan_results["oop"] = {"status": "ERROR", "error": str(e)}
-            print(f"       Error: {e}")
+    except Exception as e:
+        scan_results["oop"] = {"status": "ERROR", "error": str(e)}
+        print(f"       Error: {e}")
 
     _next_step(step_state, total_steps, "Architecture: SOLID/Layer Analysis...")
     try:
@@ -154,28 +158,32 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         print(f"       Error: {e}")
 
     _next_step(step_state, total_steps, "Test Coverage: Gap Analysis...")
-    if not _has_python_sources(scan_path, exclude_patterns):
-        scan_results["test_coverage"] = {
-            "status": "N/A",
-            "reason": "not analyzed (no Python sources found; test coverage "
-                      "gap analysis currently only supports Python)",
-        }
-        print("       N/A - no Python sources found (Python-only analyzer)")
-        step_reports["test_coverage"] = (
-            "Test Coverage\n\nN/A - not analyzed: no Python sources found "
-            "in scan tree. Coverage gap analysis currently only supports "
-            "Python."
+    try:
+        coverage_config = CoverageConfig(scan_path=scan_path, exclude_patterns=exclude_patterns)
+        coverage_analyzer = CoverageAnalyzer(coverage_config)
+        coverage_result = coverage_analyzer.analyze(scan_path)
+        lang_status = getattr(coverage_result, "language_status", {}) or {}
+        # N/A only when the tree contains code but NO language the analyzer
+        # actually supports (every present language is unsupported/insufficient).
+        # An empty status dict means pure-Python (analyzed); an "ok" entry means
+        # a supported non-Python language was measured.
+        supported_analyzed = (not lang_status) or any(
+            str(s).startswith("ok") for s in lang_status.values()
         )
-    else:
-        try:
-            coverage_config = CoverageConfig(scan_path=scan_path, exclude_patterns=exclude_patterns)
-            coverage_analyzer = CoverageAnalyzer(coverage_config)
-            coverage_result = coverage_analyzer.analyze(scan_path)
+        if lang_status and not supported_analyzed:
+            reason = "; ".join(f"{l}: {s}" for l, s in sorted(lang_status.items()))
+            scan_results["test_coverage"] = {"status": "N/A", "reason": reason}
+            print(f"       N/A - not analyzed ({reason})")
+            step_reports["test_coverage"] = (
+                f"Test Coverage\n\nN/A - not analyzed: {reason}"
+            )
+        else:
             method_coverage = coverage_result.metrics.method_coverage_percent
             total_gaps = coverage_result.total_gaps
             scan_results["test_coverage"] = {
                 "method_coverage_percent": round(method_coverage, 1),
                 "total_gaps": total_gaps,
+                "language_status": lang_status,
                 "status": "PASS" if method_coverage >= coverage_config.min_method_coverage else "FAIL",
             }
             if method_coverage < coverage_config.min_method_coverage:
@@ -185,8 +193,8 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
                 step_reports["test_coverage"] = coverage_analyzer.generate_report(coverage_result, "text")
             except Exception:
                 step_reports["test_coverage"] = f"Test Coverage\n\n{json.dumps(scan_results['test_coverage'], indent=2)}"
-        except Exception as e:
-            scan_results["test_coverage"] = {"status": "ERROR", "error": str(e)}
-            print(f"       Error: {e}")
+    except Exception as e:
+        scan_results["test_coverage"] = {"status": "ERROR", "error": str(e)}
+        print(f"       Error: {e}")
 
     return overall_exit

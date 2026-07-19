@@ -47,3 +47,41 @@ cases:
     severity: critical
     bucket_in: [possible]
     cwe: CWE-89
+  - file: tp_path_traversal_open.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [certain, probable]
+    cwe: CWE-22
+  - file: fp_path_traversal_basename.py
+    expect: no_flow
+  - file: tp_pickle_deserialization.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-95
+  - file: fp_json_safe_deserialization.py
+    expect: no_flow
+  - file: tp_open_redirect.py
+    expect: flow
+    count: 1
+    severity: medium
+    bucket_in: [certain, probable]
+    cwe: CWE-601
+  - file: fp_redirect_constant.py
+    expect: no_flow
+  # SSRF (CWE-918) now has a dedicated sink type (TaintSinkType.SSRF, see
+  # Asgard/Heimdall/Security/TaintAnalysis/catalog/sinks.py SSRF entries).
+  # The prior note here ("open redirect is the closest stand-in, no
+  # dedicated SSRF sink exists") is stale as of the SSRF sink-category
+  # addition -- kept only in tp_open_redirect.py's own docstring for
+  # historical context, not repeated here.
+  - file: tp_ssrf_requests_get.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [certain, probable]
+    cwe: CWE-918
+  - file: fp_ssrf_fixed_url.py
+    expect: no_flow

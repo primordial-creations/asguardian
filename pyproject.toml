@@ -62,6 +62,7 @@ ast = [
     "tree-sitter-c-sharp",
     "tree-sitter-cpp",
     "tree-sitter-rust",
+    "tree-sitter-c",
 ]
 treesitter = [
     "tree-sitter==0.25.2",
@@ -75,6 +76,7 @@ treesitter = [
     "tree-sitter-c-sharp",
     "tree-sitter-cpp",
     "tree-sitter-rust",
+    "tree-sitter-c",
 ]
 
 [project.scripts]

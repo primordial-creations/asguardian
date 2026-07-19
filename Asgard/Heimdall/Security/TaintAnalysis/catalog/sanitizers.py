@@ -74,6 +74,37 @@ JAVA_LIBRARY_SANITIZERS = frozenset({
     "ESAPI.encoder", "Encode.forHtml", "Encode.forJavaScript",
 })
 
+# Go UNSHADOWABLE exact sanitizers: stdlib functions on package-qualified
+# names are not plausibly shadowed by a same-named local declaration in
+# idiomatic Go (the package selector makes the binding unambiguous).
+GO_EXACT_SANITIZERS = frozenset({
+    "strconv.Atoi", "strconv.ParseInt", "strconv.ParseFloat", "strconv.ParseBool",
+    "filepath.Clean", "path.Clean", "filepath.Base", "path.Base",
+    "html.EscapeString", "url.QueryEscape", "url.PathEscape",
+    "template.HTMLEscapeString", "template.JSEscapeString",
+    "uuid.Parse", "uuid.MustParse",
+})
+
+# Go SHADOWABLE library sanitizers: third-party helper packages where a
+# locally-declared same-named function could plausibly shadow the import
+# without binding resolution catching it. Downgrade only.
+GO_LIBRARY_SANITIZERS = frozenset({
+    "bluemonday.Sanitize", "bluemonday.SanitizeBytes",
+})
+
+# C UNSHADOWABLE exact sanitizers: numeric-coercion libc functions (bare
+# identifiers, C has no namespacing so these ARE plausibly shadowable by a
+# same-named local function in principle -- but redeclaring a libc symbol
+# name is rare enough in practice, and required-declaration conflicts make
+# it noisy, that we accept the small risk to match the precedent set by
+# Python's bare `int`/`float` in EXACT_SANITIZERS above). Value-domain
+# restriction: a numeric string can no longer carry a shell/SQL/format-string
+# payload once parsed.
+C_EXACT_SANITIZERS = frozenset({
+    "atoi", "atol", "atoll", "strtol", "strtoul", "strtoll", "strtoull",
+    "strtod", "strtof",
+})
+
 # Naming conventions that *suggest* a custom sanitizer.
 _HEURISTIC_PREFIXES = ("clean", "sanitize", "sanitise", "validate", "escape_", "strip_")
 _HEURISTIC_EXACT = frozenset({"re.sub", "sub"})
@@ -114,6 +145,12 @@ def classify_sanitizer(
         return SanitizerMatch(call_chain, "heuristic", HEURISTIC_SANITIZER_FACTOR)
     if call_chain in JAVA_LIBRARY_SANITIZERS or tail in JAVA_LIBRARY_SANITIZERS:
         return SanitizerMatch(call_chain, "heuristic", HEURISTIC_SANITIZER_FACTOR)
+    if call_chain in GO_EXACT_SANITIZERS or tail in GO_EXACT_SANITIZERS:
+        return SanitizerMatch(call_chain, "exact", 0.0)
+    if call_chain in GO_LIBRARY_SANITIZERS or tail in GO_LIBRARY_SANITIZERS:
+        return SanitizerMatch(call_chain, "heuristic", HEURISTIC_SANITIZER_FACTOR)
+    if call_chain in C_EXACT_SANITIZERS or tail in C_EXACT_SANITIZERS:
+        return SanitizerMatch(call_chain, "exact", 0.0)
     lowered = tail.lower()
     if lowered.startswith(_HEURISTIC_PREFIXES) or call_chain in _HEURISTIC_EXACT:
         return SanitizerMatch(call_chain, "heuristic", HEURISTIC_SANITIZER_FACTOR)

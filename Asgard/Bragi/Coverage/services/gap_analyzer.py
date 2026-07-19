@@ -18,6 +18,10 @@ from Asgard.Bragi.Coverage.services._gap_analysis_helpers import (
     analyze_class_coverage,
     analyze_gaps,
 )
+from Asgard.Bragi.Coverage.services._multilang_gap_helpers import (
+    collect_multilang_methods,
+    multilang_class_coverage,
+)
 from Asgard.Bragi.Coverage.utilities.method_extractor import (
     extract_methods,
     find_test_methods,
@@ -53,7 +57,7 @@ class GapAnalyzer:
             test_path: Path to test files
 
         Returns:
-            Tuple of (gaps, metrics, class_coverage)
+            Tuple of (gaps, metrics, class_coverage, language_status)
         """
         path = scan_path or self.config.scan_path
         path = Path(path).resolve()
@@ -65,10 +69,15 @@ class GapAnalyzer:
         source_methods = self._collect_source_methods(path)
         test_methods = self._collect_test_methods(test_paths)
 
+        ml_source, ml_tests, language_status = collect_multilang_methods(path, self.config)
+        source_methods = source_methods + ml_source
+        test_methods = test_methods + ml_tests
+
         gaps, metrics = analyze_gaps(source_methods, test_methods)
         class_cov = analyze_class_coverage(path, test_methods, self.config)
+        class_cov = class_cov + multilang_class_coverage(ml_source, test_methods)
 
-        return gaps, metrics, class_cov
+        return gaps, metrics, class_cov, language_status
 
     def _find_test_paths(
         self,
@@ -151,7 +160,7 @@ class GapAnalyzer:
         Returns:
             List of critical coverage gaps
         """
-        gaps, _, _ = self.analyze(scan_path)
+        gaps, _, _, _ = self.analyze(scan_path)
 
         return [
             g for g in gaps
@@ -173,7 +182,7 @@ class GapAnalyzer:
         Returns:
             List of poorly covered classes
         """
-        _, _, class_coverage = self.analyze(scan_path)
+        _, _, class_coverage, _ = self.analyze(scan_path)
 
         return [
             c for c in class_coverage

@@ -1,0 +1,43 @@
+# Go taint benchmark corpus (Asgard uplift: Go/C/SSRF/TS-cast slice).
+# DispatchEngine routes .go files through the tree-sitter CST taint path
+# (Security/TaintAnalysis/engine/cst_taint_visitor.py::scan_go_source).
+cases:
+  - file: tp_sqli_concat.go
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_int_sanitizer.go
+    expect: no_flow
+  - file: tp_command_injection.go
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_command_fixed_arg.go
+    expect: no_flow
+  - file: tp_path_traversal.go
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [possible, probable, certain]
+    cwe: CWE-22
+  - file: fp_path_cleaned.go
+    expect: no_flow
+  - file: tp_ssrf_http_get.go
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [certain, probable]
+    cwe: CWE-918
+  - file: fp_ssrf_fixed_url.go
+    expect: no_flow
+  # -- Go SQL placeholder-aware parameterized-query exemption (adversarial
+  # review MAJOR-2): a constant query literal with a `?`/`$N` placeholder
+  # and the tainted value bound as a subsequent driver parameter is safe
+  # by construction and must not flag. tp_sqli_concat.go above (string-
+  # concatenated into the query) remains the true positive. --
+  - file: fp_parameterized_query.go
+    expect: no_flow

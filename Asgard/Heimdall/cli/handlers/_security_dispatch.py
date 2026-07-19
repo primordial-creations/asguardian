@@ -40,6 +40,8 @@ _DISPATCH_SUPPORTED_EXTENSIONS = frozenset({
     ".py",
     ".js", ".jsx", ".mjs", ".cjs", ".ts", ".tsx", ".mts", ".cts",
     ".java",
+    ".go",
+    ".c", ".h",
 })
 
 #: Display labels for confidence buckets (qualitative only).
