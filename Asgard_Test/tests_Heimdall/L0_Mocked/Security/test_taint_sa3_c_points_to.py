@@ -159,6 +159,97 @@ class TestStructPointerFieldAliasing:
         assert result.taint_flows == []
 
 
+class TestAdversarialReviewRegressions:
+    """Two confirmed bugs found by adversarial review of the initial SA3
+    implementation, both reproduced directly against the engine before the
+    fix. Kept as permanent regressions."""
+
+    def test_bug1_strong_update_pop_migrates_field_keys_on_shrink(self):
+        """BUG-1 (CRITICAL, silent false-clean): `_add_alias` migrated
+        struct-field env entries (`old_root.field` -> `canonical.field`)
+        only when a group GREW (union). The MAJOR-1 strong-update pop
+        (`a = 0;` on a name already in a pointer-alias group) does the
+        opposite -- it SHRINKS the group by removing `a` -- with no
+        migration. `a` was the group's canonical (lexicographic-min: `a` <
+        `b` < `c`) when `a->field = getenv("X");` recorded the taint under
+        key `"a.field"`. Popping `a` changes the remaining group's
+        canonical to `b`, so a later chain-path lookup via `c` (aliased
+        with `b`) canonicalizes to `"b.field"` -- a DIFFERENT key from
+        where the taint actually lives -- and silently finds nothing.
+        Must flag CWE-78."""
+        result = _scan_c(
+            "#include <stdlib.h>\n"
+            "struct Ctx { char *field; };\n"
+            "void run(struct Ctx *a) {\n"
+            "    struct Ctx *b = a;\n"
+            "    struct Ctx *c = a;\n"
+            "    a->field = getenv(\"X\");\n"
+            "    a = 0;\n"
+            "    system(c->field);\n"
+            "}\n"
+        )
+        assert len(result.taint_flows) == 1
+        assert result.taint_flows[0].cwe_id == "CWE-78"
+
+    def test_bug1_repro_without_strong_update_also_flags(self):
+        """Sanity companion to the bug-1 repro: removing the `a = 0;`
+        strong-update pop must still flag (isolates that the pop -- not
+        the aliasing itself -- was the buggy path)."""
+        result = _scan_c(
+            "#include <stdlib.h>\n"
+            "struct Ctx { char *field; };\n"
+            "void run(struct Ctx *a) {\n"
+            "    struct Ctx *b = a;\n"
+            "    struct Ctx *c = a;\n"
+            "    a->field = getenv(\"X\");\n"
+            "    system(c->field);\n"
+            "}\n"
+        )
+        assert len(result.taint_flows) == 1
+
+    def test_bug2_call_callee_not_treated_as_alias_operand(self):
+        """BUG-2 (MEDIUM, contamination/over-fire): the unresolved-RHS
+        alias fallback's `_collect_identifiers` walked a `call_expression`'s
+        CALLEE too, so `struct Ctx *a = malloc(...)` unioned `a` with the
+        bare token `malloc` -- every pointer initialized via the SAME
+        allocator function transitively entered one bogus shared alias
+        group. `zeta` and `omega` are two INDEPENDENT `malloc(...)`
+        results that never actually alias each other; `zeta`'s tainted
+        field must not leak into `omega`'s read."""
+        result = _scan_c(
+            "#include <stdlib.h>\n"
+            "struct Ctx { char *field; };\n"
+            "void run() {\n"
+            "    struct Ctx *zeta = malloc(sizeof(struct Ctx));\n"
+            "    struct Ctx *omega = malloc(sizeof(struct Ctx));\n"
+            "    zeta->field = getenv(\"X\");\n"
+            "    system(omega->field);\n"
+            "}\n"
+        )
+        assert result.taint_flows == []
+
+    def test_bug2_call_argument_identifiers_still_collected(self):
+        """The bug-2 fix must only skip the CALLEE position, not the
+        argument list -- a genuine identifier operand inside a call's
+        arguments (still an "unresolved" pointer-typed RHS shape) must
+        still be soundly unioned. `wrap(buf)` is not a bare identifier/
+        address-of, so `p` falls into the unresolved-RHS fallback; `buf`
+        appears in the ARGUMENT list (not the callee) and must still be
+        picked up."""
+        result = _scan_c(
+            "#include <stdio.h>\n"
+            "#include <stdlib.h>\n"
+            "char *wrap(char *x) { return x; }\n"
+            "void run(void) {\n"
+            "    char buf[64];\n"
+            "    fgets(buf, 64, stdin);\n"
+            "    char *p = wrap(buf);\n"
+            "    system(p);\n"
+            "}\n"
+        )
+        assert len(result.taint_flows) == 1
+
+
 class TestArrayDecayAliasing:
     def test_array_decay_pointer_flags(self):
         result = _scan_c(

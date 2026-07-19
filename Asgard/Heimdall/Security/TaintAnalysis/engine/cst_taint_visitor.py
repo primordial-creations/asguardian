@@ -627,6 +627,28 @@ class CstFunctionTaintVisitor:
     # separately in `_walk`'s assignment_expression case, can strong-update
     # it back out of the group).
 
+    def _migrate_field_keys(self, old_root: str, canonical: str) -> None:
+        """Move any `f"{old_root}."`/`f"{old_root}["`-prefixed env entry
+        (struct-field/container taint recorded against `old_root`) to the
+        same key rooted at `canonical` instead, unioning with anything
+        already there. Shared by both directions of alias-group
+        canonical-representative churn: `_add_alias`'s union (group GROWS,
+        canonical may change) and the strong-update pop's shrink (a member
+        -- possibly the CURRENT canonical -- is removed from the group,
+        which can also change the canonical). Without this migration on
+        BOTH paths, a field-taint key keyed under a former canonical
+        becomes permanently unreachable once `_chain_path`/`_canonical_root`
+        (which always resolve to the group's CURRENT min) starts pointing
+        callers at a different key -- a silent false-clean (never-mute
+        violation)."""
+        if old_root == canonical:
+            return
+        for suffix in (".", "["):
+            prefix = f"{old_root}{suffix}"
+            for key in [k for k in self.env if k.startswith(prefix)]:
+                new_key = canonical + key[len(old_root):]
+                self.env[new_key] = self._union(self.env.get(new_key), self.env[key])
+
     def _add_alias(self, a: str, b: str) -> None:
         """Union `a` and `b` into the same pointer-alias group (C only)."""
         if self.lang != "c" or not a or not b or a == b:
@@ -646,13 +668,7 @@ class CstFunctionTaintVisitor:
         # canonicalizes its root -- see `_canonical_root`) would silently
         # miss it.
         for old_root in merged:
-            if old_root == canonical:
-                continue
-            for suffix in (".", "["):
-                prefix = f"{old_root}{suffix}"
-                for key in [k for k in self.env if k.startswith(prefix)]:
-                    new_key = canonical + key[len(old_root):]
-                    self.env[new_key] = self._union(self.env.get(new_key), self.env[key])
+            self._migrate_field_keys(old_root, canonical)
         for member in merged:
             self.ptr_aliases[member] = merged
 
@@ -685,11 +701,30 @@ class CstFunctionTaintVisitor:
 
     def _collect_identifiers(self, node, out: List[str]) -> None:
         """Depth-first collection of every bare `identifier` leaf under
-        `node` (C only, used by the unresolved-RHS alias fallback below)."""
+        `node` (C only, used by the unresolved-RHS alias fallback below).
+
+        Adversarial-review BUG-2 fix: a `call_expression`'s CALLEE
+        (`node.child_by_field_name("function")`) is deliberately skipped --
+        only the argument list is walked. Without this, `struct Ctx *a =
+        malloc(...)` unioned `a` with the bare token `malloc`, so EVERY
+        pointer initialized via the same allocator function transitively
+        entered one bogus shared alias group (and `malloc` could even
+        displace the real lexicographic-min canonical, destabilizing
+        `_canonical_root` unpredictably). The callee identifier is not a
+        value the pointer could plausibly alias -- it names the function
+        being called, not a variable in scope -- so excluding it only
+        removes spurious unions, it never narrows a genuine one (the
+        argument list, where an actual aliasing operand could appear, is
+        still fully walked)."""
         if node is None:
             return
         if node.type == "identifier":
             out.append(self.ctx.node_text(node))
+            return
+        if node.type == "call_expression":
+            args_node = node.child_by_field_name("arguments")
+            if args_node is not None:
+                self._collect_identifiers(args_node, out)
             return
         for child in node.children:
             self._collect_identifiers(child, out)
@@ -1196,8 +1231,26 @@ class CstFunctionTaintVisitor:
                 group = self.ptr_aliases.pop(name, None)
                 if group:
                     remaining = group - {name}
-                    for member in remaining:
-                        self.ptr_aliases[member] = remaining
+                    if remaining:
+                        # Adversarial-review BUG-1 fix: popping `name` out
+                        # of the group can change the group's canonical
+                        # (lexicographic-min) representative -- if `name`
+                        # WAS the old canonical and a struct-field taint is
+                        # recorded under `f"{name}.field"`, the new
+                        # canonical of `remaining` is a DIFFERENT key, and
+                        # every later chain-path lookup (which always
+                        # resolves to the group's CURRENT min via
+                        # `_canonical_root`) would silently stop finding
+                        # it -- a false clean on a real flow. Migrate
+                        # `name`'s own field/container env entries to the
+                        # new canonical BEFORE dropping `name` from the
+                        # group, mirroring `_add_alias`'s union-side
+                        # migration (`_migrate_field_keys`) but run on
+                        # shrink instead of growth.
+                        new_canonical = min(remaining)
+                        self._migrate_field_keys(name, new_canonical)
+                        for member in remaining:
+                            self.ptr_aliases[member] = remaining
             else:
                 self._assign(left, state, node)
             if self.lang == "c" and left is not None and left.type == "identifier":
