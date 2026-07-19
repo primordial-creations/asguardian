@@ -17,3 +17,11 @@ cases:
     expect: no_flow
   - file: fp_int_sanitizer.java
     expect: no_flow
+  - file: tp_path_traversal.java
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [possible, probable, certain]
+    cwe: CWE-22
+  - file: fp_file_constant.java
+    expect: no_flow

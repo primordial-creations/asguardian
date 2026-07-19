@@ -28,6 +28,7 @@ CORPUS_ROOT = Path(__file__).parent / "corpus"
 _LANG_DIRS = {
     "javascript": (CORPUS_ROOT / "taint_js", "javascript"),
     "java": (CORPUS_ROOT / "taint_java", "java"),
+    "typescript": (CORPUS_ROOT / "taint_ts", "typescript"),
 }
 
 
@@ -70,6 +71,7 @@ def _run_case(corpus_dir: Path, case: dict) -> None:
 
 _JS_CASES = _load_cases("javascript")
 _JAVA_CASES = _load_cases("java")
+_TS_CASES = _load_cases("typescript")
 
 
 @pytest.mark.skipif(
@@ -92,6 +94,17 @@ def test_js_corpus_case(case):
 )
 def test_java_corpus_case(case):
     _run_case(_LANG_DIRS["java"][0], case)
+
+
+@pytest.mark.skipif(
+    not is_engine_enabled("typescript"),
+    reason="tree-sitter-typescript grammar not installed (optional [ast] extra)",
+)
+@pytest.mark.parametrize(
+    "case", _TS_CASES, ids=[c["file"].removesuffix(".ts") for c in _TS_CASES]
+)
+def test_ts_corpus_case(case):
+    _run_case(_LANG_DIRS["typescript"][0], case)
 
 
 @pytest.mark.skipif(

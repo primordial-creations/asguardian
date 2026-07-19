@@ -1,0 +1,21 @@
+# TypeScript taint benchmark corpus (plan 10: dedicated TS coverage
+# alongside the existing JS-only taint_js/ corpus; DispatchEngine routes
+# .ts files through the same CST taint path as .js via the tree-sitter
+# TypeScript grammar).
+cases:
+  - file: tp_command_injection.ts
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_fixed_host.ts
+    expect: no_flow
+  - file: tp_sqli_concat.ts
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_parameterized_query.ts
+    expect: no_flow

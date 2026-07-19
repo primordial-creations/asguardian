@@ -125,3 +125,83 @@ def run_eval(args: argparse.Namespace, verbose: bool = False) -> int:
     if gate_result is not None:
         return 0 if gate_result.passed else 1
     return 0
+
+
+def run_eval_corpus(args: argparse.Namespace, verbose: bool = False) -> int:
+    """`heimdall eval corpus [--corpus-dir DIR]`.
+
+    Runs the real scanners (TaintAnalyzer + DispatchEngine) over the
+    vendored, hand-authored fixture corpus and reports precision/recall/
+    F-beta/alert-density/Brier honestly labeled as a vendored fixture
+    corpus (NOT a CVE holdout / real-repo sample). ``--corpus-dir`` lets a
+    user point this at their own corpus of the same shape (per-language
+    subdirectories with a ``manifest.yml``) -- see
+    ``Asgard/Heimdall/evaluation/vendored_corpus.py``.
+    """
+    from Asgard.Heimdall.evaluation.calibration import (
+        IsotonicCalibrator,
+        reliability_diagram,
+    )
+    from Asgard.Heimdall.evaluation.gate import evaluate_gate
+    from Asgard.Heimdall.evaluation.report import render_json_report, render_text_report
+    from Asgard.Heimdall.evaluation.vendored_corpus import (
+        CORPUS_LABEL,
+        evaluate_vendored_corpus,
+    )
+
+    corpus_dir = getattr(args, "corpus_dir", None)
+    if corpus_dir:
+        corpus_root = Path(corpus_dir)
+    else:
+        corpus_root = (
+            Path(__file__).resolve().parents[4]
+            / "Asgard_Test" / "tests_Heimdall" / "benchmarks" / "corpus"
+        )
+    if not corpus_root.exists():
+        print(f"Error: corpus directory not found: {corpus_root}")
+        return 1
+
+    metrics, scan = evaluate_vendored_corpus(corpus_root)
+
+    gate_result = None
+    gate_profile = getattr(args, "gate_profile", None)
+    if gate_profile:
+        gate_result = evaluate_gate(metrics, profile=gate_profile)
+
+    calibrator = IsotonicCalibrator().fit(
+        [c[0] for c in metrics.calibration_records],
+        [c[1] for c in metrics.calibration_records],
+    )
+    reliability = reliability_diagram(metrics.calibration_records)
+
+    output_format = getattr(args, "format", "text")
+    if output_format == "json":
+        payload = {
+            "corpus_label": CORPUS_LABEL,
+            "languages_scanned": scan.languages_scanned,
+            "languages_skipped": scan.languages_skipped,
+            "case_count": scan.case_count,
+            "cwe_coverage": scan.cwe_coverage,
+            "calibration_map": calibrator.to_map(),
+        }
+        report_json = render_json_report(metrics, gate=gate_result, corpus_label=CORPUS_LABEL)
+        merged = json.loads(report_json)
+        merged.update(payload)
+        print(json.dumps(merged, indent=2, sort_keys=True, default=str))
+    else:
+        print(f"Languages scanned: {', '.join(scan.languages_scanned) or 'none'}")
+        if scan.languages_skipped:
+            print(
+                f"Languages skipped (grammar not installed): "
+                f"{', '.join(scan.languages_skipped)}"
+            )
+        print(f"Cases: {scan.case_count}   CWEs covered: {', '.join(scan.cwe_coverage)}")
+        print(
+            render_text_report(
+                metrics, gate=gate_result, reliability=reliability, corpus_label=CORPUS_LABEL
+            )
+        )
+
+    if gate_result is not None:
+        return 0 if gate_result.passed else 1
+    return 0
