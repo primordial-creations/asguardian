@@ -81,6 +81,10 @@ class MethodInfo:
     parameter_count: int = 0
     is_async: bool = False
     docstring: Optional[str] = None
+    #: Source language of the method ("python", "javascript", "typescript",
+    #: "go", ...). Defaults to "python" for backward compatibility with the
+    #: original ast-only extractor.
+    language: str = "python"
 
     @property
     def full_name(self) -> str:
@@ -183,6 +187,11 @@ class CoverageReport:
     suggestions: List[TestSuggestion] = field(default_factory=list)
     class_coverage: List[ClassCoverage] = field(default_factory=list)
     scan_duration_seconds: float = 0.0
+    #: Per-language analysis status, e.g. {"go": "ok", "rust": "unsupported:
+    #: no coverage heuristics implemented"}. Populated by GapAnalyzer so
+    #: consumers can see honestly which languages were actually measured
+    #: vs. genuinely unsupported, rather than a silently-empty result.
+    language_status: Dict[str, str] = field(default_factory=dict)
 
     @property
     def total_gaps(self) -> int:
