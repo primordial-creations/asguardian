@@ -136,3 +136,31 @@ cases:
     bucket_in: [needs_review]
     cwe: CWE-470
     finding_class: dynamic_construct
+  # -- Context-coverage regressions (adversarial review, reviewer's exact
+  # repros): visit_Return/visit_If/visit_While/visit_For previously only
+  # ran `_eval` on their expression (test/value/iter), never dispatching
+  # to `visit_Call` -- a dynamic construct that ONLY ever appeared in a
+  # `return`, `if`/`while` test, or `for ... in` iterable was silently
+  # never checked. --
+  - file: tp_dynamic_getattr_dispatch_return_context.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: tp_dynamic_import_return_context.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: fp_dynamic_getattr_dispatch_return_constant.py
+    expect: no_flow
+  - file: tp_dynamic_eval_if_test_context.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-95

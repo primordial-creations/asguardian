@@ -168,3 +168,13 @@ cases:
     bucket_in: [needs_review]
     cwe: CWE-470
     finding_class: dynamic_construct
+  # -- Context-coverage regression pin (adversarial review): the CST
+  # walker's generic child-recursion already reaches call_expression
+  # nodes inside an `if` test (unlike the Python ast.NodeVisitor path,
+  # which needed an explicit fix) -- this pins that behavior. --
+  - file: tp_dynamic_eval_if_test_context.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-95

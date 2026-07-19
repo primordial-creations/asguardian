@@ -491,6 +491,17 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
 
     def visit_If(self, node: ast.If) -> None:
         self._eval(node.test)
+        # Context-coverage fix (adversarial review): `_eval` only computes
+        # a taint STATE for the test expression -- it never dispatches to
+        # `visit_Call`, so a dynamic construct used directly as (or nested
+        # in) an `if`/`while` TEST, e.g. `if eval(req.query.x):`, was
+        # silently never checked for a sink/dynamic-construct finding.
+        # `self.visit(node.test)` re-walks just the test expression: if it
+        # IS a Call, this dispatches straight to `visit_Call`; otherwise
+        # (BoolOp/Compare/...) `generic_visit` recurses into it and reaches
+        # any nested Call the same way `visit_Expr`/`visit_Assign` already
+        # do for their own RHS expressions.
+        self.visit(node.test)
         saved = dict(self.env)
         for stmt in node.body:
             self.visit(stmt)
@@ -509,6 +520,11 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
 
     def visit_For(self, node: ast.For) -> None:
         iter_state = self._eval(node.iter)
+        # Context-coverage fix (adversarial review): same rationale as
+        # visit_If's `self.visit(node.test)` -- a dynamic construct in the
+        # loop's ITER expression (`for x in getattr(o, v)():`) must still
+        # reach `visit_Call`.
+        self.visit(node.iter)
         if iter_state is not None:
             self._assign_target(node.target, iter_state, node.lineno)
         saved = dict(self.env)
@@ -522,6 +538,9 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
 
     def visit_While(self, node: ast.While) -> None:
         self._eval(node.test)
+        # Context-coverage fix (adversarial review): same rationale as
+        # visit_If's `self.visit(node.test)`.
+        self.visit(node.test)
         saved = dict(self.env)
         for stmt in list(node.body) + list(node.orelse):
             self.visit(stmt)
@@ -538,6 +557,14 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
             state = self._eval(node.value)
             if state is not None:
                 self.return_states.append(state)
+            # Context-coverage fix (adversarial review): `_eval` only
+            # computes a taint STATE -- it never dispatches to `visit_Call`,
+            # so `return eval(x)` / `return getattr(o, v)()` / `return
+            # __import__(v)` were silently never checked for a sink/
+            # dynamic-construct finding (only assignment-RHS, bare-Expr-
+            # statement, and call-argument positions were covered). Same
+            # `self.visit(...)` re-walk as visit_If/visit_While/visit_For.
+            self.visit(node.value)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         # Nested/child function bodies are analyzed separately by the
