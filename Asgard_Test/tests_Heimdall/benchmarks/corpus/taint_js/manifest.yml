@@ -31,3 +31,36 @@ cases:
     expect: no_flow
   - file: fp_constant_concat.js
     expect: no_flow
+  # -- Import/alias resolution + inter-procedural summaries (plan 04 gap) --
+  - file: tp_aliased_require_command_injection.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: tp_import_alias_command_injection.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: tp_cross_function_same_file.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: tp_cross_file_sqli.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_resolved_library_sanitizer.js
+    expect: no_flow
+  - file: tp_local_shadow_sanitizer.js
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [possible]
+    cwe: CWE-79
