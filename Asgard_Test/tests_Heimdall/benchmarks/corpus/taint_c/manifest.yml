@@ -4,14 +4,22 @@
 #
 # BOUNDED FIRST PASS -- honest scope limits (see cst_taint_visitor.py's
 # scan_c_source docstring and catalog/sources.py's C_SOURCE_SPECS comment):
-#   - Intra-procedural only, no pointer-aliasing/memory-layout modeling.
+#   - Intra-procedural only. SA3 (Wave 2) replaced the WS2 "points-to lite"
+#     with a Steensgaard-style (union-find-based) points-to: multi-level
+#     pointer dereference, struct-pointer field aliasing (including
+#     aliasing of the pointer itself, e.g. `t = s;`), array decay, and a
+#     never-mute over-approximation fallback for unresolved pointer RHS
+#     (pointer arithmetic/casts/opaque call results) are all tracked -- see
+#     the "SA3 C points-to (Steensgaard-lite)" section of
+#     cst_taint_visitor.py. Still intra-procedural only: no cross-function
+#     pointer flow, and variable identity IS the abstract location (a
+#     sound but occasionally imprecise conflation of "aliases" and "points
+#     to") -- documented residue, not silently punted.
 #   - "Mutating sources" (fgets/scanf/read/recv/gets tainting an OUTPUT
-#     ARGUMENT rather than a return value) ARE now modeled -- see
+#     ARGUMENT rather than a return value) ARE modeled -- see
 #     _C_MUTATING_SOURCES in cst_taint_visitor.py (adversarial review
 #     BLOCKER fix) -- the buffer/scanf-target argument becomes tainted in
-#     the local env. This is still argument-identifier-based, not a real
-#     pointer/alias model: it does not follow the buffer through further
-#     pointer indirection or struct-field aliasing.
+#     the local env, and now flows through the SA3 points-to graph.
 cases:
   - file: tp_command_injection.c
     expect: flow
@@ -87,3 +95,59 @@ cases:
     severity: high
     bucket_in: [possible, probable, certain]
     cwe: CWE-134
+  # -- SA3 (Wave 2): real Steensgaard-style points-to. Multi-level pointer
+  # dereference (`char **pp = &p; ...; system(*pp);`) -- before SA3,
+  # `pointer_expression` (tree-sitter-c's node type for both `&x` and
+  # `*p`) had no case in `_eval` and silently evaluated to no taint,
+  # regardless of the alias union already linking `pp`/`p`/`buf`. --
+  - file: tp_pointer_multilevel_deref.c
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_pointer_multilevel_deref_safe.c
+    expect: no_flow
+  # -- SA3: struct-pointer field aliasing. `s->field = tainted;` followed
+  # by `t = s;` (a pointer copy unioning t/s's alias groups) must make
+  # `t->field` visible as tainted -- requires the alias-group canonical
+  # root migration in `_add_alias`/`_chain_path`, not just Wave 1's
+  # single-pointer field-sensitivity. --
+  - file: tp_pointer_struct_field_alias.c
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_pointer_struct_field_alias_safe.c
+    expect: no_flow
+  # -- SA3 acceptance matrix: array decay (`char arr[N]; char *p = arr;`)
+  # explicitly asserted as part of the Steensgaard-lite points-to slice
+  # (already covered mechanically by the WS2 baseline's bare-identifier
+  # alias rule; this pins it down as a named SA3 case). --
+  - file: tp_pointer_array_decay_alias.c
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_pointer_array_decay_alias_safe.c
+    expect: no_flow
+  # -- SA3 never-mute guard: an "unresolved"/unknown pointer (pointer
+  # arithmetic `buf + 1`, outside the bare-identifier/address-of alias
+  # shape) must still over-approximate and flag, never silently assert
+  # clean -- `p` is conservatively unioned with every identifier in the
+  # RHS. Confidence is decayed (probable, not certain) since the exact
+  # aliasing is inferred rather than a direct copy. --
+  - file: tp_pointer_unknown_arithmetic_overapprox.c
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  # -- FP guard: the unresolved-RHS alias fallback is gated on
+  # `is_pointer_decl` (derived from the pointer_declarator syntax / prior
+  # pointer tracking) and must NEVER fire for plain scalar (`int`)
+  # arithmetic, nor cross-contaminate an unrelated safe pointer. --
+  - file: fp_pointer_unaliased_scalar_arithmetic_safe.c
+    expect: no_flow

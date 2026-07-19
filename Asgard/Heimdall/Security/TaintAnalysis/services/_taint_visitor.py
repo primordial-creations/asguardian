@@ -784,6 +784,90 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         new_state.trace.append(self._make_step(line, "propagation", target.id))
         self.env[target.id] = new_state
 
+    # ------------------------------------------------- SA4 path-sensitivity
+
+    # Cross-language-consistent (mirrors the CST engine's Number.isInteger/
+    # isFinite choice), GENUINE value-domain predicates: a string for which
+    # one of these returns True is PROVABLY restricted to a character class
+    # that cannot carry an injection payload (SQL/shell/HTML/path special
+    # characters are all excluded from digit/alnum/numeric/decimal charsets).
+    # This is NOT a new "semantic validator" invention -- it is the same
+    # kind of value-domain proof already used for the `int()`/`float()`
+    # EXACT_SANITIZERS entries in catalog/sanitizers.py, just expressed as a
+    # boolean predicate instead of a transform. Anything not in this set
+    # (isValid, is_safe, custom validators, `x != None`, `x is not None`,
+    # truthiness checks, ...) is deliberately NOT recognized here -- an
+    # unverified/heuristic guard must never clear taint (never mute).
+    _VALIDATOR_STR_METHODS = frozenset({"isdigit", "isalnum", "isnumeric", "isdecimal"})
+    _VALIDATOR_ISINSTANCE_SAFE_TYPES = frozenset({"int", "float"})
+
+    def _classify_guard(self, test: ast.AST) -> Optional[Tuple[str, bool]]:
+        """Detect `if <validator>(x):` / `if not <validator>(x):` where
+        <validator> is one of the whitelisted, provably value-domain-
+        restricting predicates above, with a single bare-Name argument.
+
+        Returns ``(var_name, body_is_validated_arm)`` -- the SENSE tells the
+        caller which branch (test-True/body, or test-False/else) is the one
+        where ``var_name`` is PROVEN restricted. Returns ``None`` for any
+        other test shape, including calls to functions this engine cannot
+        verify (a non-whitelisted call must not clear taint on either arm --
+        both `visit_If` arms are then processed with the ordinary sound
+        union, so an unguarded/unverified-guard path still flags).
+        """
+        negated = False
+        inner = test
+        if isinstance(inner, ast.UnaryOp) and isinstance(inner.op, ast.Not):
+            negated = True
+            inner = inner.operand
+        if not isinstance(inner, ast.Call):
+            return None
+        if (
+            isinstance(inner.func, ast.Attribute)
+            and inner.func.attr in self._VALIDATOR_STR_METHODS
+            and not inner.args
+            and isinstance(inner.func.value, ast.Name)
+        ):
+            return inner.func.value.id, not negated
+        chain = self._resolve(inner.func)
+        if chain == "isinstance" and len(inner.args) == 2:
+            target, type_arg = inner.args
+            if not isinstance(target, ast.Name):
+                return None
+            if isinstance(type_arg, ast.Name):
+                type_names = [type_arg.id]
+            elif isinstance(type_arg, ast.Tuple):
+                type_names = [t.id for t in type_arg.elts if isinstance(t, ast.Name)]
+            else:
+                return None
+            if type_names and all(
+                t in self._VALIDATOR_ISINSTANCE_SAFE_TYPES for t in type_names
+            ):
+                return target.id, not negated
+        return None
+
+    @staticmethod
+    def _is_terminal_block(stmts: List[ast.stmt]) -> bool:
+        """Conservative check: does this block ALWAYS exit the enclosing
+        function/loop (so control never falls through to code after the
+        ``if``)? Used ONLY to decide which arm's env feeds post-if code on
+        a branch join -- never to clear taint by itself. Anything not
+        recognized as certainly terminal (a bare last-statement Return/
+        Raise/Continue/Break, or a nested if/else whose BOTH arms are
+        terminal) is treated as non-terminal, i.e. the normal sound union
+        merge still applies -- this can only gain precision, never mute a
+        flow that the union would otherwise have kept."""
+        if not stmts:
+            return False
+        last = stmts[-1]
+        if isinstance(last, (ast.Return, ast.Raise, ast.Continue, ast.Break)):
+            return True
+        if isinstance(last, ast.If) and last.orelse:
+            return (
+                _FunctionTaintVisitor._is_terminal_block(last.body)
+                and _FunctionTaintVisitor._is_terminal_block(last.orelse)
+            )
+        return False
+
     def visit_If(self, node: ast.If) -> None:
         self._eval(node.test)
         # Context-coverage fix (adversarial review): `_eval` only computes
@@ -797,33 +881,79 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         # any nested Call the same way `visit_Expr`/`visit_Assign` already
         # do for their own RHS expressions.
         self.visit(node.test)
+
+        # SA4 path-sensitivity: a test that is (or negates) a call to one of
+        # the whitelisted value-domain predicates PROVES the guarded
+        # variable's value-domain on exactly the arm indicated by
+        # `_classify_guard`'s sense. Only that specific variable, only in
+        # that specific arm, is cleared before the arm's own statements are
+        # visited -- an unrecognized/unverified guard (e.g. `if is_valid(x)`
+        # where `is_valid` is not a catalog-verified predicate, or
+        # `if x != None`) returns None and nothing is cleared, so the
+        # ordinary union-only merge below still applies and an unguarded
+        # path still flags.
+        guard = self._classify_guard(node.test)
+
         saved = dict(self.env)
         saved_const = dict(self.const_env)
+        if guard is not None:
+            var, body_validated = guard
+            if body_validated:
+                self.env[var] = _CLEARED
         for stmt in node.body:
             self.visit(stmt)
         body_env = self.env
         body_const = self.const_env
+
         self.env = dict(saved)
         self.const_env = dict(saved_const)
+        if guard is not None:
+            var, body_validated = guard
+            if not body_validated:
+                self.env[var] = _CLEARED
         for stmt in node.orelse:
             self.visit(stmt)
         else_env = self.env
         else_const = self.const_env
-        # Branch union: over-approximate by keeping taint from either arm.
-        merged: Dict[str, TaintState] = {}
-        for name in set(body_env) | set(else_env):
-            merged_value = self._merge_branch_value(body_env.get(name), else_env.get(name))
-            if merged_value is not None:
-                merged[name] = merged_value
+
+        # SA4 branch-join generalization: when one arm ALWAYS exits the
+        # enclosing function/loop (early-return / guard-clause / raise),
+        # code after the `if` is only ever reached via the OTHER arm --
+        # feed the merge from that arm alone instead of unioning in the
+        # terminal arm's (irrelevant-to-what-follows) env. This is what
+        # makes the classic `if not is_valid(x): return` guard-clause
+        # pattern actually clear x for the code that follows: the
+        # terminating body arm is excluded, and the else arm (empty when
+        # there's no explicit `else`, i.e. `saved` with the guard applied)
+        # is what the merge is built from. When NEITHER arm is (verifiably)
+        # terminal, this makes no assumption and falls through to the
+        # ordinary sound union -- an unguarded path (no early return, both
+        # arms fall through) still gets its taint unioned in, still flags.
+        body_terminal = self._is_terminal_block(node.body)
+        else_terminal = self._is_terminal_block(node.orelse) if node.orelse else False
+        if body_terminal and not else_terminal:
+            merged = dict(else_env)
+            merged_const = dict(else_const)
+        elif else_terminal and not body_terminal:
+            merged = dict(body_env)
+            merged_const = dict(body_const)
+        else:
+            # Branch union: over-approximate by keeping taint from either arm.
+            merged = {}
+            for name in set(body_env) | set(else_env):
+                merged_value = self._merge_branch_value(body_env.get(name), else_env.get(name))
+                if merged_value is not None:
+                    merged[name] = merged_value
+            # Const bindings only survive the merge when BOTH arms agree on
+            # the exact same value -- a branch-dependent constant is not
+            # safely "the" constant post-merge (would risk wrongly
+            # resolving/clearing a dynamic-construct finding on the other
+            # path).
+            merged_const = {}
+            for name in set(body_const) & set(else_const):
+                if body_const[name] == else_const[name]:
+                    merged_const[name] = body_const[name]
         self.env = merged
-        # Const bindings only survive the merge when BOTH arms agree on the
-        # exact same value -- a branch-dependent constant is not safely
-        # "the" constant post-merge (would risk wrongly resolving/clearing
-        # a dynamic-construct finding on the other path).
-        merged_const: Dict[str, str] = {}
-        for name in set(body_const) & set(else_const):
-            if body_const[name] == else_const[name]:
-                merged_const[name] = body_const[name]
         self.const_env = merged_const
 
     @staticmethod

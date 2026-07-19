@@ -93,6 +93,32 @@ _MOCK_PREFIXES = ("mock_", "test_", "dummy_", "fake_", "sample_", "example_")
 
 _JS_LANGS = frozenset({"javascript", "typescript", "tsx"})
 
+# SA4 path-sensitivity: JS/TS GENUINE value-domain predicates -- receiver-
+# qualified, unshadowable stdlib checks (mirrors the JS_EXACT_SANITIZERS
+# rationale in catalog/sanitizers.py: a global-namespace-qualified builtin
+# is not plausibly redefined by application code). `Number.isInteger(x)` /
+# `Number.isFinite(x)` returning true PROVES x's runtime type/value is a
+# finite JS number -- a value class that cannot carry a SQL/shell/HTML
+# injection payload (those require a string). This is NOT a new invented
+# "isValid"-style semantic validator: it is the same kind of provable
+# value-domain restriction the catalog already grants `int()`/`float()`
+# (Python) and `parseInt`/`Number` (JS, as a transform) -- expressed here as
+# a boolean predicate for path-sensitivity guard detection instead of a
+# strong-update transform. Java/Go/C guard-based clearing is NOT
+# implemented (documented residual limitation: no catalog-verified,
+# unshadowable STRING-level boolean predicate is available for those
+# languages the way `str.isdigit()`-family is in Python) -- an unrecognized
+# guard in those languages simply clears nothing, so the ordinary sound
+# union/never-mute behavior is unaffected.
+_JS_VALIDATOR_CALLS = frozenset({"Number.isInteger", "Number.isFinite"})
+
+# Statement types that unconditionally end control flow within the current
+# function/loop -- used only to decide which arm of an if/else feeds the
+# code that follows on a branch join (SA4), never to clear taint by itself.
+_TERMINAL_STMT_TYPES = frozenset({
+    "return_statement", "throw_statement", "continue_statement", "break_statement",
+})
+
 _FIRST_ARG_SINKS = {
     TaintSinkType.SQL_QUERY,
     TaintSinkType.SHELL_COMMAND,
@@ -524,6 +550,76 @@ class CstFunctionTaintVisitor:
         step = self._make_step(line, "source", var_name or spec.pattern)
         return TaintState(source_step=step, source_type=spec.source_type, confidence=spec.confidence)
 
+    # ------------------------------------------------- SA4 path-sensitivity
+
+    def _classify_guard(self, condition) -> Optional[Tuple[str, bool]]:
+        """Detect `if (<validator>(x))` / `if (!<validator>(x))` where
+        <validator> is one of the whitelisted, provably value-domain-
+        restricting predicates (`_JS_VALIDATOR_CALLS`), with a single
+        bare-identifier argument. Returns ``(var_name, body_is_validated_arm)``
+        or ``None`` for anything else -- including calls this engine cannot
+        verify (e.g. a local `isValid(x)`) and, currently, any language
+        other than JS/TS. A ``None`` result means `_walk`'s if_statement
+        handler clears nothing and both arms are combined with the ordinary
+        sound union, so an unguarded or unverified-guard path still flags.
+        """
+        node = condition
+        if node is not None and node.type == "parenthesized_expression" and node.named_children:
+            node = node.named_children[0]
+        negated = False
+        if node is not None and node.type == "unary_expression":
+            op = node.child_by_field_name("operator")
+            if op is not None and self.ctx.node_text(op) == "!":
+                negated = True
+                node = node.child_by_field_name("argument")
+                if node is not None and node.type == "parenthesized_expression" and node.named_children:
+                    node = node.named_children[0]
+        if node is None or node.type not in ("call_expression", "method_invocation"):
+            return None
+        if self.lang not in _JS_LANGS:
+            return None
+        chain = resolve_chain(_node_chain(node, self.ctx), self.alias_map)
+        if chain not in _JS_VALIDATOR_CALLS:
+            return None
+        args = _call_args(node)
+        if len(args) != 1 or args[0].type != "identifier":
+            return None
+        return self.ctx.node_text(args[0]), not negated
+
+    def _is_terminal_block(self, node) -> bool:
+        """Conservative check: does this arm ALWAYS end control flow in the
+        enclosing function/loop? Used only to decide which arm's env feeds
+        code after the `if` on a branch join -- an unrecognized shape is
+        treated as non-terminal (falls back to the ordinary sound union,
+        never assumes a path was pruned when it wasn't)."""
+        if node is None:
+            return False
+        t = node.type
+        if t == "else_clause":
+            # JS/C wrap the else arm in an `else_clause` node whose sole
+            # child is either a block or a nested `if_statement` (`else if`).
+            children = list(node.named_children)
+            return self._is_terminal_block(children[0]) if children else False
+        if t in ("block", "compound_statement", "statement_block"):
+            children = list(node.named_children)
+            if len(children) == 1 and children[0].type == "statement_list":
+                children = list(children[0].named_children)
+            if not children:
+                return False
+            return self._is_terminal_block(children[-1])
+        if t == "statement_list":
+            children = list(node.named_children)
+            return self._is_terminal_block(children[-1]) if children else False
+        if t in _TERMINAL_STMT_TYPES:
+            return True
+        if t == "if_statement":
+            alt = node.child_by_field_name("alternative")
+            cons = node.child_by_field_name("consequence")
+            if alt is None:
+                return False
+            return self._is_terminal_block(cons) and self._is_terminal_block(alt)
+        return False
+
     @staticmethod
     def _union(a: Optional[TaintState], b: Optional[TaintState]) -> Optional[TaintState]:
         if a is None:
@@ -575,15 +671,115 @@ class CstFunctionTaintVisitor:
                 return spec
         return None
 
-    # --------------------------------------------- WS2 C pointer-alias-lite
+    # --------------------------------------------- SA3 C points-to (Steensgaard-lite)
+    #
+    # ``self.ptr_aliases[name]`` is the SET of all names known to (MAY-)
+    # reference the same storage -- a flat union-find of variable identity,
+    # in the spirit of Steensgaard's unification-based points-to: every
+    # assignment/declaration that copies a pointer VALUE (`p = buf;`,
+    # `pp = &p;`, `t = s;`) unions the two names' groups. Because MAY-alias
+    # is treated as MUST-alias-for-taint-purposes (a sound over-
+    # approximation, never a narrowing), taint applied to ANY member after
+    # the union is visible through every other member -- lookups are always
+    # dynamic against ``self.env`` (never a snapshot), so both orderings
+    # (`p = buf; fgets(buf,...); system(p);` and `fgets(buf,...); p = buf;
+    # system(p);`) are covered.
+    #
+    # SA3 additions over the Wave-1 "points-to lite":
+    #   - `_eval` now understands ``pointer_expression`` (both `&x` and the
+    #     dereference `*p`) as a value-producing node, so a MULTI-level
+    #     pointer read (`char **pp = &p; ...; system(*pp);`) actually flows
+    #     taint through `_eval` instead of silently evaluating to `None`
+    #     (that was a genuine false negative, not merely an imprecision:
+    #     `pointer_expression` matched none of `_eval`'s branches before).
+    #     Because `&`/`*` share one alias group per variable (the group
+    #     conflates "points to" with "aliases", matching the existing WS2
+    #     design), this generalizes to arbitrary levels of indirection
+    #     (`***ppp`) for free via the transitively-unioned group.
+    #   - `_maybe_alias_declaration` now also unions the LHS with every
+    #     identifier referenced in an "unresolved" pointer-typed RHS
+    #     (pointer arithmetic, a cast, a call result) rather than leaving it
+    #     completely untracked -- see the docstring below for the never-mute
+    #     rationale. Scoped (via `is_pointer_decl`) to declarations/
+    #     reassignments already known to be pointer-typed, so it cannot
+    #     spuriously entangle unrelated scalar (`int`) arithmetic.
+    #   - `_add_alias` migrates existing struct-field env entries
+    #     (`s.field`, `s[0]`, ...) recorded under a NON-canonical former root
+    #     to the union's canonical representative at union time, and
+    #     `_chain_path`/`_canonical_root` canonicalize a chain's root through
+    #     the alias group -- this is what makes struct-POINTER field
+    #     aliasing sound: `s->field = tainted; t = s; sink(t->field)` must
+    #     flag (`t` and `s` are unioned, and both chains resolve to the same
+    #     env key), not just the un-aliased `s->field` case Wave 1 already
+    #     covered.
+    #
+    # Honest residual ceiling (documented, not silently punted): this is
+    # STILL intra-procedural only -- no cross-function pointer flow, no true
+    # per-location Steensgaard graph (variable identity IS the location, so
+    # `pp`'s own value and what it points to share one taint channel -- a
+    # sound but occasionally over-eager conflation), and no strong updates
+    # across the union (once two names are aliased, only an explicit
+    # provably-constant literal reassignment to ONE of them, handled
+    # separately in `_walk`'s assignment_expression case, can strong-update
+    # it back out of the group).
+
+    def _migrate_field_keys(self, old_root: str, canonical: str) -> None:
+        """Move any `f"{old_root}."`/`f"{old_root}["`-prefixed env entry
+        (struct-field/container taint recorded against `old_root`) to the
+        same key rooted at `canonical` instead, unioning with anything
+        already there. Shared by both directions of alias-group
+        canonical-representative churn: `_add_alias`'s union (group GROWS,
+        canonical may change) and the strong-update pop's shrink (a member
+        -- possibly the CURRENT canonical -- is removed from the group,
+        which can also change the canonical). Without this migration on
+        BOTH paths, a field-taint key keyed under a former canonical
+        becomes permanently unreachable once `_chain_path`/`_canonical_root`
+        (which always resolve to the group's CURRENT min) starts pointing
+        callers at a different key -- a silent false-clean (never-mute
+        violation)."""
+        if old_root == canonical:
+            return
+        for suffix in (".", "["):
+            prefix = f"{old_root}{suffix}"
+            for key in [k for k in self.env if k.startswith(prefix)]:
+                new_key = canonical + key[len(old_root):]
+                self.env[new_key] = self._union(self.env.get(new_key), self.env[key])
 
     def _add_alias(self, a: str, b: str) -> None:
         """Union `a` and `b` into the same pointer-alias group (C only)."""
         if self.lang != "c" or not a or not b or a == b:
             return
-        group = self.ptr_aliases.get(a, {a}) | self.ptr_aliases.get(b, {b})
-        for member in group:
-            self.ptr_aliases[member] = group
+        group_a = self.ptr_aliases.get(a, {a})
+        group_b = self.ptr_aliases.get(b, {b})
+        if group_a is group_b:
+            return
+        merged = group_a | group_b
+        canonical = min(merged)
+        # SA3 never-mute fix: a struct-field taint recorded under a
+        # NON-canonical former root (e.g. `s.field` written before `s` and
+        # `t` are unioned, where `min({s, t}) == "s"` already -- but if a
+        # THIRD alias with a lexicographically-smaller name joins later, the
+        # canonical representative can change) must be migrated to the new
+        # canonical key, or a later chain-path lookup (which always
+        # canonicalizes its root -- see `_canonical_root`) would silently
+        # miss it.
+        for old_root in merged:
+            self._migrate_field_keys(old_root, canonical)
+        for member in merged:
+            self.ptr_aliases[member] = merged
+
+    def _canonical_root(self, name: str) -> str:
+        """Deterministic canonical representative of `name`'s pointer-alias
+        group (C only; a no-op identity for every other language since
+        ``ptr_aliases`` is never populated for them). Used to canonicalize a
+        struct/field chain's root so aliased pointers (`t = s;`) share the
+        same field-taint env keys as their alias-group siblings."""
+        if self.lang != "c":
+            return name
+        group = self.ptr_aliases.get(name)
+        if not group:
+            return name
+        return min(group)
 
     def _alias_state(self, name: str) -> Optional[TaintState]:
         """Taint of any OTHER member of `name`'s pointer-alias group,
@@ -599,13 +795,57 @@ class CstFunctionTaintVisitor:
                 state = self._union(state, self.env[member])
         return state
 
-    def _maybe_alias_declaration(self, name: str, value_node) -> None:
-        """`T* p = buf;` / `T* p = arr;` / `T* p = &x;` -- C only. Only bare
-        single-identifier (or address-of-identifier) RHS shapes are treated
-        as an alias; anything else (a call, arithmetic, a cast of a
-        non-identifier) is NOT aliased -- honoring the "simple pointer
-        aliases only" scope from the WS2 plan note (no offset/arithmetic
-        pointer tracking)."""
+    def _collect_identifiers(self, node, out: List[str]) -> None:
+        """Depth-first collection of every bare `identifier` leaf under
+        `node` (C only, used by the unresolved-RHS alias fallback below).
+
+        Adversarial-review BUG-2 fix: a `call_expression`'s CALLEE
+        (`node.child_by_field_name("function")`) is deliberately skipped --
+        only the argument list is walked. Without this, `struct Ctx *a =
+        malloc(...)` unioned `a` with the bare token `malloc`, so EVERY
+        pointer initialized via the same allocator function transitively
+        entered one bogus shared alias group (and `malloc` could even
+        displace the real lexicographic-min canonical, destabilizing
+        `_canonical_root` unpredictably). The callee identifier is not a
+        value the pointer could plausibly alias -- it names the function
+        being called, not a variable in scope -- so excluding it only
+        removes spurious unions, it never narrows a genuine one (the
+        argument list, where an actual aliasing operand could appear, is
+        still fully walked)."""
+        if node is None:
+            return
+        if node.type == "identifier":
+            out.append(self.ctx.node_text(node))
+            return
+        if node.type == "call_expression":
+            args_node = node.child_by_field_name("arguments")
+            if args_node is not None:
+                self._collect_identifiers(args_node, out)
+            return
+        for child in node.children:
+            self._collect_identifiers(child, out)
+
+    def _maybe_alias_declaration(
+        self, name: str, value_node, is_pointer_decl: bool = False,
+    ) -> None:
+        """`T* p = buf;` / `T* p = arr;` / `T* p = &x;` -- C only. A bare
+        single-identifier (or address-of-identifier) RHS is unioned exactly
+        (WS2 baseline: array decay and simple pointer/address-of aliasing).
+
+        SA3 addition: when `is_pointer_decl` is set (the LHS is known,
+        syntactically, to be a pointer -- either an explicit `pointer_declarator`
+        or a reassignment of a name already tracked as a pointer) and the RHS
+        is neither a bare identifier/address-of NOR a provably-constant
+        literal, the RHS is "unresolved" (pointer arithmetic `buf + off`, a
+        cast, an opaque call result, ...). Per the never-mute mandate
+        ("Unresolved/unknown pointer -> over-approximate, never assert
+        clean"), `name` is conservatively unioned with EVERY identifier
+        referenced anywhere in the RHS subtree -- so `char *p = buf + 1;`
+        still aliases `p` with `buf`, and a later taint of `buf` (or an
+        earlier one) is visible through `p`. This can over-union siblings
+        that share a compound RHS (`p = a + b` aliases `p` with both `a` and
+        `b`) -- an accepted, documented precision trade; `is_pointer_decl`
+        keeps it from ever firing on unrelated scalar (`int`) arithmetic."""
         if self.lang != "c" or value_node is None:
             return
         target = value_node
@@ -620,6 +860,13 @@ class CstFunctionTaintVisitor:
             target = inner
         if target is not None and target.type == "identifier":
             self._add_alias(name, self.ctx.node_text(target))
+            return
+        if not is_pointer_decl or _is_c_constant_literal(value_node):
+            return
+        idents: List[str] = []
+        self._collect_identifiers(value_node, idents)
+        for ident in idents:
+            self._add_alias(name, ident)
 
     # ------------------------------------------------------- expression eval
 
@@ -648,7 +895,10 @@ class CstFunctionTaintVisitor:
             return None, None
         t = node.type
         if t == "identifier":
-            return self.ctx.node_text(node), []
+            # SA3: canonicalize through the C pointer-alias group (no-op for
+            # every other language) so `s->field` and `t->field` resolve to
+            # the SAME env key once `t = s;` has unioned `s`/`t`'s groups.
+            return self._canonical_root(self.ctx.node_text(node)), []
         if t in self._CHAIN_MEMBER_TYPES:
             base = (
                 node.child_by_field_name("object")
@@ -731,7 +981,10 @@ class CstFunctionTaintVisitor:
             alias_state = self._alias_state(name)
             if alias_state is not None:
                 return alias_state
-            family = self._family_taint(name)
+            # SA3: canonicalize through the alias group before the
+            # field-family fallback so `t->field` (t aliased with s via
+            # `t = s;`) sees the taint recorded as `s.field`.
+            family = self._family_taint(self._canonical_root(name))
             if family is not None:
                 return family
             resolved = resolve_chain(name, self.alias_map)
@@ -767,6 +1020,26 @@ class CstFunctionTaintVisitor:
             for child in node.named_children:
                 state = self._union(state, self._eval(child))
             return state
+        if t == "pointer_expression" and self.lang == "c":
+            # SA3 fix: tree-sitter-c parses BOTH the dereference `*p` and
+            # the address-of `&x` as `pointer_expression` (distinguished
+            # only by the operator child, which doesn't matter here since
+            # both propagate the operand's taint). Before this branch,
+            # `pointer_expression` matched none of `_eval`'s cases and
+            # silently evaluated to `None` -- a genuine false negative on
+            # multi-level pointer reads: `char **pp = &p; ...;
+            # system(*pp);` never saw `p`'s taint because the sink argument
+            # `*pp` itself evaluated to nothing, regardless of the alias
+            # union already linking `pp` and `p`. Evaluating the operand
+            # (`pp`) routes through the normal identifier path, which
+            # consults `self.ptr_aliases` (`_alias_state`) and therefore
+            # transitively picks up taint through arbitrarily many levels
+            # of indirection (`***ppp`) since every level shares one
+            # variable-identity alias group by construction.
+            operand = node.child_by_field_name("argument")
+            if operand is None and node.named_children:
+                operand = node.named_children[-1]
+            return self._eval(operand)
         if t in ("unary_expression",) and self.lang == "go":
             # Go `&x` (address-of) / `-x` / `!x` -- propagate operand taint;
             # Go unary_expression has no named field, operand is the sole
@@ -1054,8 +1327,26 @@ class CstFunctionTaintVisitor:
                 group = self.ptr_aliases.pop(name, None)
                 if group:
                     remaining = group - {name}
-                    for member in remaining:
-                        self.ptr_aliases[member] = remaining
+                    if remaining:
+                        # Adversarial-review BUG-1 fix: popping `name` out
+                        # of the group can change the group's canonical
+                        # (lexicographic-min) representative -- if `name`
+                        # WAS the old canonical and a struct-field taint is
+                        # recorded under `f"{name}.field"`, the new
+                        # canonical of `remaining` is a DIFFERENT key, and
+                        # every later chain-path lookup (which always
+                        # resolves to the group's CURRENT min via
+                        # `_canonical_root`) would silently stop finding
+                        # it -- a false clean on a real flow. Migrate
+                        # `name`'s own field/container env entries to the
+                        # new canonical BEFORE dropping `name` from the
+                        # group, mirroring `_add_alias`'s union-side
+                        # migration (`_migrate_field_keys`) but run on
+                        # shrink instead of growth.
+                        new_canonical = min(remaining)
+                        self._migrate_field_keys(name, new_canonical)
+                        for member in remaining:
+                            self.ptr_aliases[member] = remaining
             else:
                 self._assign(left, state, node)
             if self.lang == "c" and left is not None and left.type == "identifier":
@@ -1064,8 +1355,15 @@ class CstFunctionTaintVisitor:
                 # LATER taint of either side is visible through the other.
                 # (No-op when the strong-update branch above just fired:
                 # `_maybe_alias_declaration` only aliases a bare-identifier/
-                # address-of RHS, never a literal.)
-                self._maybe_alias_declaration(self.ctx.node_text(left), right)
+                # address-of RHS, never a literal.) SA3: `is_pointer_decl`
+                # is derived from whether this name is ALREADY tracked as a
+                # pointer (no declarator info is available at a plain
+                # reassignment) -- scopes the unresolved-RHS fallback to
+                # names already known to be pointers, never a fresh scalar.
+                left_name = self.ctx.node_text(left)
+                self._maybe_alias_declaration(
+                    left_name, right, is_pointer_decl=left_name in self.ptr_aliases,
+                )
             if right is not None:
                 self._walk(right)
             return
@@ -1123,8 +1421,19 @@ class CstFunctionTaintVisitor:
                         # whether `buf` is ALREADY tainted at this point:
                         # `_alias_state` looks up the group dynamically, so
                         # a later `fgets(buf, ...)` still propagates to `p`.
+                        # SA3: `is_pointer_decl` reflects whether the
+                        # (pre-unwrap) declarator was itself a
+                        # `pointer_declarator` (`char *p = ...`) -- gates
+                        # the unresolved-RHS fallback (pointer arithmetic,
+                        # casts, opaque call results) so it never fires for
+                        # a plain `int total = a + b;`.
+                        raw_declarator = declarator.child_by_field_name("declarator")
                         self._maybe_alias_declaration(
-                            self.ctx.node_text(name_node), value
+                            self.ctx.node_text(name_node), value,
+                            is_pointer_decl=(
+                                raw_declarator is not None
+                                and raw_declarator.type == "pointer_declarator"
+                            ),
                         )
                     if value is not None:
                         self._walk(value)
@@ -1153,6 +1462,65 @@ class CstFunctionTaintVisitor:
             if state is not None:
                 self.return_states.append(state)
             self._walk(node.named_children[0])
+            return
+
+        if t == "if_statement":
+            # SA4: real branch-join (env save/restore/union) -- previously
+            # this engine had NO if/else handling at all; both arms ran
+            # sequentially into the SAME shared `self.env` (generic
+            # descent), which the sticky/never-mute assignment policy kept
+            # sound but badly imprecise (a clean else-arm reassignment could
+            # never clear taint the if-arm set). This generalizes Wave 1's
+            # straight-line strong updates to a real join: each arm is
+            # evaluated against its own cloned env, then merged.
+            condition = node.child_by_field_name("condition")
+            consequence = node.child_by_field_name("consequence")
+            alternative = node.child_by_field_name("alternative")
+            if condition is not None:
+                self._walk(condition)
+
+            # Path-sensitivity: only a whitelisted, catalog-grade validator
+            # call clears anything, and only the specific variable/specific
+            # arm it provably validates -- see `_classify_guard`.
+            guard = self._classify_guard(condition)
+
+            saved_env = dict(self.env)
+            if guard is not None:
+                var, body_validated = guard
+                if body_validated:
+                    self.env.pop(var, None)
+            if consequence is not None:
+                self._walk(consequence)
+            body_env = self.env
+
+            self.env = dict(saved_env)
+            if guard is not None:
+                var, body_validated = guard
+                if not body_validated:
+                    self.env.pop(var, None)
+            if alternative is not None:
+                self._walk(alternative)
+            else_env = self.env
+
+            # Branch-join generalization: when one arm always exits the
+            # enclosing function/loop (early-return guard clause), code
+            # after the `if` is only ever reached via the OTHER arm -- feed
+            # the merge from that arm alone. Neither/both terminal falls
+            # back to the ordinary sound union (never assumes a path was
+            # pruned when it wasn't -- an unguarded path still flags).
+            body_terminal = self._is_terminal_block(consequence)
+            else_terminal = self._is_terminal_block(alternative) if alternative is not None else False
+            if body_terminal and not else_terminal:
+                merged = dict(else_env)
+            elif else_terminal and not body_terminal:
+                merged = dict(body_env)
+            else:
+                merged = {}
+                for name in set(body_env) | set(else_env):
+                    merged_value = self._union(body_env.get(name), else_env.get(name))
+                    if merged_value is not None:
+                        merged[name] = merged_value
+            self.env = merged
             return
 
         for child in node.children:
@@ -1694,15 +2062,21 @@ def scan_c_source(
 ) -> List[TaintFlow]:
     """Scan a parsed C ``FileParseContext`` for taint flows.
 
-    Bounded first pass, intra-procedural only: no pointer-aliasing or
-    memory-layout modeling (a buffer threaded through several pointer hops
-    before reaching a sink is not tracked), and "mutating sources"
+    Intra-procedural. Pointer aliasing and struct-field taint ARE modeled:
+    SA3 (Wave 2) replaced the earlier "points-to lite" with a
+    Steensgaard-style (union-find-based) points-to -- see the
+    "SA3 C points-to (Steensgaard-lite)" section on
+    ``CstFunctionTaintVisitor`` for the full design and its honest
+    residual ceiling (still intra-procedural only; variable identity IS the
+    abstract location). "Mutating sources"
     (``fgets``/``scanf``/``read``/``recv``/``gets`` tainting an OUTPUT
-    ARGUMENT rather than a return value) are not modeled -- see the honest
-    gap note above ``C_SOURCE_SPECS`` in ``catalog/sources.py``. C has no
-    import/alias ambiguity (``#include`` does not rename symbols), so
-    ``alias_map``/``alias_origins`` are accepted only for interface symmetry
-    with the other language entry points and are typically empty.
+    ARGUMENT rather than a return value) ARE modeled -- see
+    ``_C_MUTATING_SOURCES`` above and the honest gap note above
+    ``C_SOURCE_SPECS`` in ``catalog/sources.py`` for what remains out of
+    scope. C has no import/alias ambiguity (``#include`` does not rename
+    symbols), so ``alias_map``/``alias_origins`` are accepted only for
+    interface symmetry with the other language entry points and are
+    typically empty.
     """
     return _scan_functions(
         file_path, ctx, "c",
