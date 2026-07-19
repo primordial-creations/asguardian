@@ -85,3 +85,82 @@ cases:
     cwe: CWE-918
   - file: fp_ssrf_fixed_url.py
     expect: no_flow
+  # -- WS5 dynamic-construct surfacing (Python): eval/getattr-dispatch/
+  # __import__ reached with a non-constant operand must surface a
+  # needs-review dynamic_construct finding (CWE-470); a statically-constant
+  # operand must not flag. --
+  # eval(code) with a tainted operand ALSO matches the concrete
+  # "eval_exec" sink (CWE-95); MAJOR-2 (adversarial review) -- a call site
+  # that already produced a concrete sink finding must not ALSO emit a
+  # redundant WS5 dynamic_construct finding for the same node, so this
+  # reports exactly 1 flow (the concrete eval_exec finding), not 2.
+  - file: tp_dynamic_eval_construct.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-95
+  - file: fp_dynamic_eval_constant.py
+    expect: no_flow
+  - file: tp_dynamic_getattr_dispatch_construct.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: fp_dynamic_getattr_dispatch_constant.py
+    expect: no_flow
+  - file: tp_dynamic_import_construct.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  # -- ROOT CAUSE regressions (adversarial review BLOCKER-1/BLOCKER-2,
+  # reviewer's exact repros): a pure dynamic construct with NO co-located
+  # registered sink was never triggering Layer 3 at all -- see
+  # dispatch.py's `_PY_DYNAMIC_TRIGGER_NAMES`/`_layer2_triggers`. --
+  - file: tp_dynamic_getattr_dispatch_construct_adversarial.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: tp_dynamic_import_construct_adversarial.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  # -- Context-coverage regressions (adversarial review, reviewer's exact
+  # repros): visit_Return/visit_If/visit_While/visit_For previously only
+  # ran `_eval` on their expression (test/value/iter), never dispatching
+  # to `visit_Call` -- a dynamic construct that ONLY ever appeared in a
+  # `return`, `if`/`while` test, or `for ... in` iterable was silently
+  # never checked. --
+  - file: tp_dynamic_getattr_dispatch_return_context.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: tp_dynamic_import_return_context.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: fp_dynamic_getattr_dispatch_return_constant.py
+    expect: no_flow
+  - file: tp_dynamic_eval_if_test_context.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-95

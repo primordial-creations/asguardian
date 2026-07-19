@@ -134,6 +134,25 @@ def _attr_chain(node: ast.AST) -> str:
     return ""
 
 
+def _is_constant_ast(node: ast.AST) -> bool:
+    """True only when ``node`` is a compile-time constant (a literal, or an
+    f-string/BinOp concatenation purely of literals) -- WS5's "eval('1+1')
+    must not flag" carve-out. Anything else (names, attribute/subscript
+    access, calls) is dynamic."""
+    if node is None:
+        return True
+    if isinstance(node, ast.Constant):
+        return True
+    if isinstance(node, ast.JoinedStr):
+        return all(
+            not isinstance(part, ast.FormattedValue) or _is_constant_ast(part.value)
+            for part in node.values
+        )
+    if isinstance(node, ast.BinOp):
+        return _is_constant_ast(node.left) and _is_constant_ast(node.right)
+    return False
+
+
 def _get_code_snippet(lines: List[str], line_number: int) -> str:
     idx = line_number - 1
     if 0 <= idx < len(lines):
@@ -472,6 +491,17 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
 
     def visit_If(self, node: ast.If) -> None:
         self._eval(node.test)
+        # Context-coverage fix (adversarial review): `_eval` only computes
+        # a taint STATE for the test expression -- it never dispatches to
+        # `visit_Call`, so a dynamic construct used directly as (or nested
+        # in) an `if`/`while` TEST, e.g. `if eval(req.query.x):`, was
+        # silently never checked for a sink/dynamic-construct finding.
+        # `self.visit(node.test)` re-walks just the test expression: if it
+        # IS a Call, this dispatches straight to `visit_Call`; otherwise
+        # (BoolOp/Compare/...) `generic_visit` recurses into it and reaches
+        # any nested Call the same way `visit_Expr`/`visit_Assign` already
+        # do for their own RHS expressions.
+        self.visit(node.test)
         saved = dict(self.env)
         for stmt in node.body:
             self.visit(stmt)
@@ -490,6 +520,11 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
 
     def visit_For(self, node: ast.For) -> None:
         iter_state = self._eval(node.iter)
+        # Context-coverage fix (adversarial review): same rationale as
+        # visit_If's `self.visit(node.test)` -- a dynamic construct in the
+        # loop's ITER expression (`for x in getattr(o, v)():`) must still
+        # reach `visit_Call`.
+        self.visit(node.iter)
         if iter_state is not None:
             self._assign_target(node.target, iter_state, node.lineno)
         saved = dict(self.env)
@@ -503,6 +538,9 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
 
     def visit_While(self, node: ast.While) -> None:
         self._eval(node.test)
+        # Context-coverage fix (adversarial review): same rationale as
+        # visit_If's `self.visit(node.test)`.
+        self.visit(node.test)
         saved = dict(self.env)
         for stmt in list(node.body) + list(node.orelse):
             self.visit(stmt)
@@ -519,6 +557,14 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
             state = self._eval(node.value)
             if state is not None:
                 self.return_states.append(state)
+            # Context-coverage fix (adversarial review): `_eval` only
+            # computes a taint STATE -- it never dispatches to `visit_Call`,
+            # so `return eval(x)` / `return getattr(o, v)()` / `return
+            # __import__(v)` were silently never checked for a sink/
+            # dynamic-construct finding (only assignment-RHS, bare-Expr-
+            # statement, and call-argument positions were covered). Same
+            # `self.visit(...)` re-walk as visit_If/visit_While/visit_For.
+            self.visit(node.value)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
         # Nested/child function bodies are analyzed separately by the
@@ -534,8 +580,101 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
     # ------------------------------------------------------------------ sinks
 
     def visit_Call(self, node: ast.Call) -> None:
+        # MAJOR-2 (adversarial review): a call site that already produced
+        # a concrete taint-flow sink finding (e.g. `eval(taint)` matching
+        # the `eval_exec` CWE-95 sink) must not ALSO emit a redundant WS5
+        # dynamic_construct finding for the same node -- DYNAMIC_CONSTRUCT
+        # is reserved for constructs with no concrete sink match (getattr
+        # dispatch, __import__, ...).
+        flows_before = len(self.found_flows)
         self._check_sink(node)
+        sink_hit = len(self.found_flows) > flows_before
+        if not sink_hit:
+            self._check_dynamic_construct(node)
         self.generic_visit(node)
+
+    # -------------------------------------------------- WS5 dynamic-construct
+
+    def _check_dynamic_construct(self, node: ast.Call) -> None:
+        """Surface eval/exec/getattr-dispatch/__import__ constructs reached
+        with a non-constant operand as an explicit needs-review finding,
+        independent of whether the operand resolves to a known taint
+        source (see the CST engine's mirror of this in
+        ``engine/cst_taint_visitor.py`` for the full WS5 rationale)."""
+        chain = self._resolve(node.func)
+        label = ""
+        severity = "high"
+        check_arg = None
+        always_flag = False
+
+        if chain in ("eval", "exec") and node.args:
+            label, severity, check_arg = chain, "critical", node.args[0]
+        elif chain == "__import__" and node.args:
+            label, severity, check_arg = "dynamic __import__", "high", node.args[0]
+        elif isinstance(node.func, ast.Call):
+            # `getattr(obj, user_input)(...)` -- the callee itself is a
+            # getattr() call whose attribute-name argument is dynamic.
+            inner = node.func
+            inner_chain = self._resolve(inner.func)
+            if inner_chain == "getattr" and len(inner.args) >= 2:
+                label, severity = "getattr-dispatch", "high"
+                check_arg = inner.args[1]
+                # NOT always_flag: a statically-constant attribute name
+                # (`getattr(obj, "create")(...)`) is ordinary, decidable
+                # code and must not flag (WS5 "constant arg must not
+                # flag" requirement) -- only a non-constant attribute
+                # name makes the dispatch target undecidable.
+
+        if not label:
+            return
+        if not always_flag and check_arg is not None and _is_constant_ast(check_arg):
+            return
+        self._emit_dynamic_construct(node, label, severity, check_arg)
+
+    def _emit_dynamic_construct(
+        self, node: ast.Call, label: str, severity: str, arg_node: Optional[ast.AST]
+    ) -> None:
+        pos_node = arg_node if arg_node is not None else node
+        line = getattr(pos_node, "lineno", node.lineno)
+        col = getattr(pos_node, "col_offset", node.col_offset)
+        sink_step = self._make_step(line, "sink", label, column=col)
+        confidence = 0.3
+        tainted = False
+        if arg_node is not None:
+            state = self._eval(arg_node)
+            if state is not None:
+                tainted = True
+                confidence = max(confidence, min(0.45, 0.25 + state.confidence * 0.2))
+        source_step = self._make_step(line, "source", label)
+        flow = TaintFlow(
+            source_type=TaintSourceType.USER_INPUT,
+            sink_type=TaintSinkType.DYNAMIC_CONSTRUCT,
+            severity=severity,
+            source_location=source_step,
+            sink_location=sink_step,
+            intermediate_steps=[],
+            title=f"Dynamic construct reached: {label} (needs review)",
+            description=(
+                f"A dynamic/reflective construct ({label}) was reached with "
+                "a non-constant operand"
+                + (" that may itself be tainted" if tainted else "")
+                + ". Static analysis cannot prove what code path or target "
+                "this resolves to at runtime -- this is surfaced as an "
+                "explicit needs-review finding rather than silently "
+                "skipped. Confidence is deliberately kept low/needs-review: "
+                "this is neither a confirmed vulnerability nor confirmed "
+                "safe."
+            ),
+            cwe_id="CWE-470",
+            owasp_category="A03:2021",
+            sanitizers_present=False,
+            confidence=confidence,
+            confidence_bucket="needs_review",
+            hop_count=0,
+            sanitizers_applied=[],
+            finding_class="dynamic_construct",
+        )
+        self._record_flow(flow)
 
     def _check_sink(self, node: ast.Call) -> None:
         chain = self._resolve(node.func)

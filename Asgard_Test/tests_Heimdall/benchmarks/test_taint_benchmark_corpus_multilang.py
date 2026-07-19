@@ -69,6 +69,13 @@ def _run_case(corpus_dir: Path, case: dict) -> None:
     )
     if case.get("cwe"):
         assert flow.cwe_id == case["cwe"]
+    if case.get("finding_class"):
+        # WS5 dynamic-construct surfacing: findings for eval/exec/reflection
+        # sinks are tagged with a distinct finding_class ("dynamic_construct")
+        # rather than the default "taint_flow", and always carry LOW/
+        # "needs_review" confidence -- never certain, since the analysis
+        # cannot statically prove what the dynamic construct will do.
+        assert flow.finding_class == case["finding_class"]
 
 
 _JS_CASES = _load_cases("javascript")

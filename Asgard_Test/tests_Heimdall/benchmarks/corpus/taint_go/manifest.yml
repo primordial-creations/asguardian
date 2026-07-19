@@ -41,3 +41,27 @@ cases:
   # concatenated into the query) remains the true positive. --
   - file: fp_parameterized_query.go
     expect: no_flow
+  # -- WS4 Go SQL placeholder-count precision: literal has 1 real `?` but
+  # 2 trailing args (mismatch) -- must fall through to full-arg scanning
+  # and flag the tainted trailing arg rather than trusting the bare
+  # presence of a `?` character. --
+  - file: tp_sqli_stray_placeholder_mismatch.go
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_parameterized_query_two_placeholders.go
+    expect: no_flow
+  # -- WS5 dynamic-construct surfacing (Go reflect.*): a tainted operand
+  # reaching reflect.ValueOf must surface a needs-review dynamic_construct
+  # finding (CWE-470); a constant operand must not flag. --
+  - file: tp_reflect_dynamic_construct.go
+    expect: flow
+    count: 1
+    severity: medium
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: fp_reflect_constant_arg.go
+    expect: no_flow

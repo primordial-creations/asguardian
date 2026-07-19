@@ -109,3 +109,72 @@ cases:
     cwe: CWE-918
   - file: fp_ssrf_fixed_url.js
     expect: no_flow
+  # -- WS5 dynamic-construct surfacing (JS): eval/dynamic-dispatch/dynamic
+  # require reached with a non-constant operand must surface a
+  # needs-review dynamic_construct finding (CWE-470); a statically-constant
+  # operand must not flag. --
+  # eval(code) with a tainted operand ALSO matches the concrete
+  # "eval_exec" sink (CWE-95); MAJOR-2 (adversarial review) -- a call site
+  # that already produced a concrete sink finding must not ALSO emit a
+  # redundant WS5 dynamic_construct finding for the same node, so this
+  # reports exactly 1 flow (the concrete eval_exec finding), not 2.
+  - file: tp_dynamic_eval_construct.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-95
+  - file: fp_dynamic_eval_constant.js
+    expect: no_flow
+  - file: tp_dynamic_dispatch_construct.js
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: fp_dynamic_dispatch_constant_key.js
+    expect: no_flow
+  - file: tp_dynamic_require_construct.js
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  # -- ROOT CAUSE / BLOCKER-3, BLOCKER-4 regressions (adversarial review,
+  # reviewer's exact repros). --
+  # `new Function(taint)` -- BLOCKER-3's fix (adding `new_expression`
+  # handling to `_walk`/`_node_chain`) makes this call visible; it then
+  # resolves through the PRE-EXISTING concrete "eval_exec" sink entry for
+  # `Function` (catalog/sinks.py), not the dynamic_construct path -- per
+  # MAJOR-2's rule (a call site with a concrete sink match must not ALSO
+  # emit a redundant dynamic_construct finding), this is a deliberate,
+  # correct deviation from treating it as a dynamic_construct finding.
+  - file: tp_new_function_dynamic_construct.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [probable, certain]
+    cwe: CWE-95
+  # `import(userVar)` -- a dynamic `import()` call (BLOCKER-4's fix: a
+  # `_node_chain` branch for the "import" leaf node type). No concrete
+  # sink exists for it, so it surfaces the needs-review dynamic_construct
+  # finding.
+  - file: tp_dynamic_import_call_construct.js
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  # -- Context-coverage regression pin (adversarial review): the CST
+  # walker's generic child-recursion already reaches call_expression
+  # nodes inside an `if` test (unlike the Python ast.NodeVisitor path,
+  # which needed an explicit fix) -- this pins that behavior. --
+  - file: tp_dynamic_eval_if_test_context.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-95

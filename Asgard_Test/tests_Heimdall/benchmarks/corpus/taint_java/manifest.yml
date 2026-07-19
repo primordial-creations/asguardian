@@ -13,6 +13,22 @@ cases:
     severity: critical
     bucket_in: [certain, probable]
     cwe: CWE-78
+  - file: tp_command_injection_chained_receiver.java
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  # -- adversarial-review repro: HttpServletRequest parameter under a
+  # short/non-"request" name + fully-qualified type must still be
+  # recognized as an HTTP_PARAMETER source (type-based fallback, not
+  # hardcoded to the literal name "request"). --
+  - file: tp_command_injection_short_param_name.java
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
   - file: fp_prepared_statement.java
     expect: no_flow
   - file: fp_int_sanitizer.java
@@ -25,3 +41,23 @@ cases:
     cwe: CWE-22
   - file: fp_file_constant.java
     expect: no_flow
+  # -- WS5 dynamic-construct surfacing (Java): Class.forName with a
+  # tainted class name and Method.invoke (always undecidable, regardless
+  # of operand) must surface needs-review dynamic_construct findings
+  # (CWE-470); a statically-constant class name must not flag. --
+  - file: tp_reflection_class_forname_construct.java
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct
+  - file: fp_reflection_class_forname_constant.java
+    expect: no_flow
+  - file: tp_method_invoke_construct.java
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [needs_review]
+    cwe: CWE-470
+    finding_class: dynamic_construct

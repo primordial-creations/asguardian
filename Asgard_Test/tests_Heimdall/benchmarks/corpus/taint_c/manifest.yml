@@ -59,3 +59,31 @@ cases:
     severity: high
     bucket_in: [certain, probable]
     cwe: CWE-134
+  # -- WS2 pointer aliasing (intra-procedural points-to-lite): `char *p =
+  # buf;` then `fgets(buf, ...)` taints buf as a mutating-source output
+  # argument; `system(p)` must resolve `p` back to `buf` via the alias
+  # group and flag. Without alias tracking this was a false negative. --
+  - file: tp_pointer_alias_command_injection.c
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_pointer_alias_unaliased_safe.c
+    expect: no_flow
+  # -- MAJOR-1 (adversarial review): a pointer directly reassigned to a
+  # constant literal in straight-line code, dominating the sink, must be
+  # a strong update that clears its taint -- reporting a provably-clean
+  # value as CERTAIN command injection is a trust-killer. --
+  - file: fp_pointer_alias_reassigned_constant.c
+    expect: no_flow
+  # -- WS4 C format-arg generalization: `vsnprintf` (a `v`-prefixed
+  # va_list variant) must resolve to the same format-string argument
+  # index as its non-`v` counterpart `snprintf` and flag a tainted format
+  # string. --
+  - file: tp_format_string_vsnprintf_tainted_format.c
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [possible, probable, certain]
+    cwe: CWE-134

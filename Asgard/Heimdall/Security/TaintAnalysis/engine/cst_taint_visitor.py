@@ -118,12 +118,41 @@ _FIRST_ARG_SINKS = {
 # Only this argument is taint-checked for TaintSinkType.FORMAT_STRING --
 # a tainted value argument under a constant/safe format string is not a
 # format-string vulnerability and must not flag.
+#
+# WS4 generalization: rather than a hand-maintained table of exactly the 4
+# original names, the table now also covers the `v*printf` (va_list)
+# variants (same argument shape/index as their non-`v` counterpart) and the
+# additional libc printf-family members (`dprintf`, wide-char `wprintf`/
+# `fwprintf`/`swprintf`) that share the same positional convention: the
+# format string sits at the same index as the base family member once you
+# account for a leading fd/stream/buffer argument. `_c_format_arg_index`
+# below derives the `v`-prefixed variant's index from its base name so a
+# future libc member only needs one entry, not two.
 _C_FORMAT_ARG_INDEX = {
     "printf": 0,
+    "wprintf": 0,
     "fprintf": 1,
+    "fwprintf": 1,
+    "dprintf": 1,
     "syslog": 1,
     "snprintf": 2,
+    "swprintf": 2,
 }
+
+
+def _c_format_arg_index(func_name: str) -> Optional[int]:
+    """Resolve the format-string argument index for a C printf-family
+    call, including `v`-prefixed va_list variants (`vprintf`, `vfprintf`,
+    `vdprintf`, `vsnprintf`, ...) which take the SAME argument shape as
+    their non-`v` counterpart (the `va_list` replaces the trailing `...`,
+    it does not shift the format-string position)."""
+    if func_name in _C_FORMAT_ARG_INDEX:
+        return _C_FORMAT_ARG_INDEX[func_name]
+    if func_name.startswith("v"):
+        base = func_name[1:]
+        if base in _C_FORMAT_ARG_INDEX:
+            return _C_FORMAT_ARG_INDEX[base]
+    return None
 
 # C "mutating source" functions: read untrusted input (stdin/fd/socket)
 # INTO a caller-owned output-buffer argument rather than returning it, so
@@ -142,6 +171,21 @@ _C_MUTATING_SOURCES = {
 # Matches a `$1`/`$2`/... positional placeholder in a Go SQL query literal
 # (postgres-style; `?` placeholders are checked with a plain substring test).
 _RE_DOLLAR_PLACEHOLDER = re.compile(r"\$\d")
+_RE_DOLLAR_PLACEHOLDER_NUM = re.compile(r"\$(\d+)")
+
+
+def _go_sql_placeholder_count(query_text: str) -> int:
+    """Count bind-parameter placeholders in a Go SQL query literal (WS4
+    precision hardening): postgres-style `$1..$N` count as the number of
+    DISTINCT positions referenced (a query can legitimately reuse `$1`
+    twice); MySQL/sqlite-style `?` counts as raw occurrences. A literal
+    with zero real placeholders returns 0, so any trailing bind-looking
+    argument on such a call is treated as suspicious (falls through to
+    full scanning) rather than assumed safe."""
+    dollar_nums = set(_RE_DOLLAR_PLACEHOLDER_NUM.findall(query_text))
+    if dollar_nums:
+        return len(dollar_nums)
+    return query_text.count("?")
 
 _CONTAINER_MUTATORS = frozenset({
     "append", "push", "unshift", "add", "addAll", "put", "set", "offer",
@@ -193,6 +237,51 @@ _GO_LIST_NODE_TYPES = frozenset({"expression_list"})
 
 _DOM_SINK_PROPERTIES = frozenset({"innerHTML", "outerHTML"})
 
+# ------------------------------------------------------- WS5 dynamic-construct
+# Class-B gap: reflection / dynamic dispatch / eval / dynamic require-import
+# are UNDECIDABLE for static taint -- we cannot prove what code or target
+# they resolve to at runtime. Rather than silently staying quiet (a hidden
+# blind spot), any of these constructs reached with a non-constant operand
+# is surfaced as an explicit TaintSinkType.DYNAMIC_CONSTRUCT / finding_class
+# "dynamic_construct" finding at confidence_bucket "needs_review" -- NEVER
+# certain, since we cannot prove the flow either way. A statically-constant
+# operand (`eval("1+1")`, `Class.forName("com.foo.Bar")`) is not flagged:
+# there is nothing dynamic to review.
+_JS_DYNAMIC_EVAL_NAMES = frozenset({"eval", "Function"})
+_JS_DYNAMIC_IMPORT_NAMES = frozenset({"require", "import"})
+_JAVA_DYNAMIC_INVOKE_METHODS = frozenset({"invoke"})
+_GO_REFLECT_PREFIX = "reflect."
+
+_CONST_LITERAL_TYPES = frozenset({
+    "string", "string_literal", "interpreted_string_literal", "raw_string_literal",
+    "number", "number_literal", "int_literal", "float_literal",
+    "true", "false", "null", "undefined", "nil", "character_literal",
+})
+
+
+def _is_constant_node(node) -> bool:
+    """True only when ``node`` is a compile-time constant (a literal, or a
+    concatenation/parenthesization purely of literals) -- everything else
+    (identifiers, member/index access, calls) is "dynamic" for WS5 purposes,
+    even if the normal taint engine cannot resolve it to a known source."""
+    if node is None:
+        return True
+    t = node.type
+    if t in _CONST_LITERAL_TYPES:
+        return True
+    if t == "template_string":
+        return not any(
+            c.type == "template_substitution" for c in node.named_children
+        )
+    if t == "parenthesized_expression" and node.named_children:
+        return _is_constant_node(node.named_children[0])
+    if t == "binary_expression":
+        return (
+            _is_constant_node(node.child_by_field_name("left"))
+            and _is_constant_node(node.child_by_field_name("right"))
+        )
+    return False
+
 
 # ---------------------------------------------------------------- chain util
 
@@ -217,6 +306,15 @@ def _node_chain(node, ctx) -> str:
         return prop_chain or obj_chain
     if t == "field_access":
         obj_chain = _node_chain(node.child_by_field_name("object"), ctx)
+        field_chain = _node_chain(node.child_by_field_name("field"), ctx)
+        if obj_chain and field_chain:
+            return f"{obj_chain}.{field_chain}"
+        return field_chain or obj_chain
+    if t == "field_expression":
+        # C `s.field` / `p->field` (tree-sitter-c's struct-member-access
+        # node type; the object is field "argument", not "object"/"field"
+        # like the JS/Java equivalents -- WS2 one-level struct-field taint).
+        obj_chain = _node_chain(node.child_by_field_name("argument"), ctx)
         field_chain = _node_chain(node.child_by_field_name("field"), ctx)
         if obj_chain and field_chain:
             return f"{obj_chain}.{field_chain}"
@@ -256,6 +354,21 @@ def _node_chain(node, ctx) -> str:
         return name_chain
     if t == "object_creation_expression":
         return _node_chain(node.child_by_field_name("type"), ctx)
+    if t == "new_expression":
+        # JS `new Function(taint)` / `new Foo(...)` -- tree-sitter-js's
+        # `new_expression` node uses field "constructor" (NOT "type" like
+        # Java's `object_creation_expression`, NOT "function" like a plain
+        # call) -- BLOCKER-3 (adversarial review): without this branch
+        # `new Function(taint)` resolved to chain="" and was invisible to
+        # both `_check_sink` and `_check_dynamic_construct`.
+        return _node_chain(node.child_by_field_name("constructor"), ctx)
+    if t == "import":
+        # JS dynamic `import(userVar)` -- tree-sitter-js parses the bare
+        # `import` keyword used as a call target (NOT `import ... from`
+        # static import syntax) as its own leaf node of type "import"
+        # (BLOCKER-4, adversarial review): without this branch the callee
+        # chain was "" and never matched `_JS_DYNAMIC_IMPORT_NAMES`.
+        return "import"
     if t == "parenthesized_expression" and node.named_children:
         return _node_chain(node.named_children[0], ctx)
     return ""
@@ -266,6 +379,25 @@ def _call_args(node) -> List:
     if args_node is None:
         return []
     return list(args_node.named_children)
+
+
+def _is_c_constant_literal(node) -> bool:
+    """True for a C literal (string/char/number/concatenated-string/NULL)
+    RHS, possibly wrapped in parens -- used by MAJOR-1's strong-update fix
+    (`p = "ls";`): a pointer directly reassigned to one of these in
+    straight-line code is PROVABLY clean, unlike the general "RHS evaluates
+    to no taint" case (a call, a variable, arithmetic) which stays under the
+    sticky/over-approximate policy because it isn't provably constant."""
+    if node is None:
+        return False
+    if node.type in (
+        "string_literal", "char_literal", "number_literal",
+        "concatenated_string", "null",
+    ):
+        return True
+    if node.type == "parenthesized_expression" and node.named_children:
+        return _is_c_constant_literal(node.named_children[0])
+    return False
 
 
 def _find_functions(node, out: List) -> None:
@@ -302,6 +434,51 @@ class CstFunctionTaintVisitor:
         self.ctx = ctx
         self.lang = lang
         self.env: Dict[str, TaintState] = {}
+        # WS2 -- C pointer-aliasing-lite: `self.ptr_aliases[name]` is the
+        # SET of all names known to reference the same storage (union-find
+        # groups, C-only). `char *p = buf;` / `p = &x;` / `p = arr;` union
+        # `p` with the RHS identifier. Lookups are dynamic against `self.env`
+        # (not snapshotted at alias-creation time), so taint applied to
+        # EITHER member after the alias is formed is visible through the
+        # other -- covers both orderings (`p = buf; fgets(buf,...);
+        # system(p);` and `fgets(buf,...); p = buf; system(p);`). This is
+        # intentionally NOT a full points-to/memory model: intra-procedural
+        # only, one flat union-find (no strong/weak updates, no scope exit,
+        # no distinguishing `p = buf` from `p = buf + 1`), and does not
+        # cross function boundaries -- see the module docstring/WS2 plan
+        # note for the honest ceiling.
+        self.ptr_aliases: Dict[str, Set[str]] = {}
+        # Java-only: variable names of this function's PARAMETERS whose
+        # declared type is (simple- or fully-qualified-)
+        # HttpServletRequest/HttpServletRequestWrapper. `_lookup_source`
+        # previously matched the literal identifier chain
+        # "request.getParameter" -- i.e. only worked when the parameter
+        # happened to be named `request`. That is a real source-detection
+        # gap: `void h(HttpServletRequest r) { ...; r.getParameter(...); }`
+        # (or a fully-qualified `javax.servlet.http.HttpServletRequest`
+        # parameter type, or any other variable name) was silently NOT
+        # recognized as a taint source at all -- a false negative on the
+        # most common Java web-input pattern. This set is populated by
+        # `_scan_functions` from the enclosing method's formal-parameter
+        # list before the walk starts, and is consulted by
+        # `_lookup_source` as a type-based fallback alongside the
+        # literal "request.getParameter" pattern (kept for receivers that
+        # are themselves the result of a call/field access rather than a
+        # bare declared parameter).
+        self.servlet_request_params: Set[str] = set()
+        # Java-only, MINOR (adversarial review): variable name -> declared
+        # type's simple name, for every parameter/local whose type is
+        # syntactically known. Used to gate the literal `request
+        # .getParameter` catalog pattern (catalog/sources.py) -- that
+        # pattern matches on the bare name "request" regardless of type, so
+        # `void h(String request) { ...; sink(request.getParameter(...)); }`
+        # (not real servlet code -- `getParameter` here would be some
+        # unrelated method, or wouldn't compile, but the point stands for
+        # any non-servlet-typed `request`) was a false positive. Only
+        # suppresses the fallback when the type is KNOWN and is NOT a
+        # servlet type; an unknown/absent type keeps the literal pattern
+        # active (never narrows a genuine `HttpServletRequest request`).
+        self.declared_var_types: Dict[str, str] = {}
         self.custom_sources = custom_sources or set()
         self.custom_sinks = custom_sinks or set()
         self.custom_sanitizers = custom_sanitizers or set()
@@ -360,7 +537,34 @@ class CstFunctionTaintVisitor:
             if spec.is_call and not is_call:
                 continue
             if chain == spec.pattern or chain.startswith(spec.pattern + "."):
+                if self.lang == "java" and "." in spec.pattern:
+                    # MINOR (adversarial review): the catalog's literal
+                    # `request.getParameter`/`request.getParameterValues`
+                    # patterns match on the bare name "request" -- gate them
+                    # off when THIS function's `request` is a KNOWN
+                    # non-servlet type (e.g. `String request`), now that
+                    # type-based servlet detection (below) makes the
+                    # name-based fallback unnecessary for genuine servlet
+                    # params. An unknown/absent declared type is left alone.
+                    head = spec.pattern.split(".", 1)[0]
+                    declared = self.declared_var_types.get(head)
+                    if declared is not None and declared not in _SERVLET_REQUEST_TYPE_NAMES:
+                        continue
                 return spec
+        # Java type-based fallback: any variable declared as a
+        # HttpServletRequest parameter (regardless of its name) reaching
+        # `.getParameter(...)` / `.getParameterValues(...)` is the same
+        # HTTP_PARAMETER source as the hardcoded `request.getParameter`
+        # pattern above -- see `self.servlet_request_params` docstring.
+        if self.lang == "java" and is_call and "." in chain:
+            receiver, method_name = chain.rsplit(".", 1)
+            if receiver in self.servlet_request_params and method_name in (
+                "getParameter",
+                "getParameterValues",
+            ):
+                return SourceSpec(
+                    f"{receiver}.{method_name}", TaintSourceType.HTTP_PARAMETER, 1.0, is_call=True
+                )
         return None
 
     def _lookup_sink(self, chain: str) -> Optional[SinkSpec]:
@@ -370,6 +574,52 @@ class CstFunctionTaintVisitor:
             if spec.match_suffix and chain.endswith("." + spec.pattern):
                 return spec
         return None
+
+    # --------------------------------------------- WS2 C pointer-alias-lite
+
+    def _add_alias(self, a: str, b: str) -> None:
+        """Union `a` and `b` into the same pointer-alias group (C only)."""
+        if self.lang != "c" or not a or not b or a == b:
+            return
+        group = self.ptr_aliases.get(a, {a}) | self.ptr_aliases.get(b, {b})
+        for member in group:
+            self.ptr_aliases[member] = group
+
+    def _alias_state(self, name: str) -> Optional[TaintState]:
+        """Taint of any OTHER member of `name`'s pointer-alias group,
+        looked up dynamically against the current env (never a snapshot)."""
+        if self.lang != "c":
+            return None
+        group = self.ptr_aliases.get(name)
+        if not group:
+            return None
+        state: Optional[TaintState] = None
+        for member in group:
+            if member != name and member in self.env:
+                state = self._union(state, self.env[member])
+        return state
+
+    def _maybe_alias_declaration(self, name: str, value_node) -> None:
+        """`T* p = buf;` / `T* p = arr;` / `T* p = &x;` -- C only. Only bare
+        single-identifier (or address-of-identifier) RHS shapes are treated
+        as an alias; anything else (a call, arithmetic, a cast of a
+        non-identifier) is NOT aliased -- honoring the "simple pointer
+        aliases only" scope from the WS2 plan note (no offset/arithmetic
+        pointer tracking)."""
+        if self.lang != "c" or value_node is None:
+            return
+        target = value_node
+        if target.type in ("unary_expression", "pointer_expression"):
+            # tree-sitter-c parses `&x` as `pointer_expression` (not
+            # `unary_expression`, which is tree-sitter-go's node type for
+            # `&x`/`-x`/`!x`) -- both are unwrapped here for the C alias
+            # path.
+            inner = target.child_by_field_name("argument")
+            if inner is None and target.named_children:
+                inner = target.named_children[-1]
+            target = inner
+        if target is not None and target.type == "identifier":
+            self._add_alias(name, self.ctx.node_text(target))
 
     # ------------------------------------------------------- expression eval
 
@@ -385,9 +635,12 @@ class CstFunctionTaintVisitor:
             name = self.ctx.node_text(node)
             if name in self.env:
                 return self.env[name]
+            alias_state = self._alias_state(name)
+            if alias_state is not None:
+                return alias_state
             resolved = resolve_chain(name, self.alias_map)
             return self._match_source_chain(resolved, node, is_call=False)
-        if t in ("member_expression", "field_access", "selector_expression"):
+        if t in ("member_expression", "field_access", "selector_expression", "field_expression"):
             chain = self._chain(node)
             state = self._match_source_chain(chain, node, is_call=False)
             if state is not None:
@@ -395,6 +648,7 @@ class CstFunctionTaintVisitor:
             fallback = (
                 node.child_by_field_name("object")
                 or node.child_by_field_name("operand")
+                or node.child_by_field_name("argument")
             )
             return self._eval(fallback)
         if t in ("subscript_expression", "array_access", "index_expression"):
@@ -424,7 +678,7 @@ class CstFunctionTaintVisitor:
             if node.named_children:
                 return self._eval(node.named_children[0])
             return None
-        if t in ("call_expression", "method_invocation", "object_creation_expression"):
+        if t in ("call_expression", "method_invocation", "object_creation_expression", "new_expression"):
             return self._eval_call(node)
         if t == "template_string":
             state: Optional[TaintState] = None
@@ -580,9 +834,13 @@ class CstFunctionTaintVisitor:
                 if idx >= len(args):
                     continue
                 target = args[idx]
-                if target.type == "unary_expression":
+                if target.type in ("unary_expression", "pointer_expression"):
                     # scanf's `&var` -- unwrap the address-of to the named
-                    # variable being written into.
+                    # variable being written into. tree-sitter-c parses
+                    # `&var` as `pointer_expression` (WS2 fix: this unwrap
+                    # previously only matched `unary_expression`, which C's
+                    # grammar never produces for `&x`, so scanf's `&var`
+                    # targets were silently never tainted).
                     inner = target.child_by_field_name("argument")
                     if inner is None and target.named_children:
                         inner = target.named_children[-1]
@@ -676,7 +934,42 @@ class CstFunctionTaintVisitor:
             right = node.child_by_field_name("right")
             state = self._eval(right) if right is not None else None
             self._check_dom_sink_assignment(left, state, node)
-            self._assign(left, state, node)
+            if (
+                self.lang == "c"
+                and left is not None
+                and left.type == "identifier"
+                and _is_c_constant_literal(right)
+            ):
+                # MAJOR-1 (adversarial review): `char *p = buf; fgets(buf,
+                # ...); p = "ls"; system(p);` was flagging CERTAIN CWE-78
+                # even though `p` is PROVABLY reassigned to a constant right
+                # before the sink. Unlike the general sticky/never-mute
+                # policy in `_assign` (a direct reassignment to a
+                # non-constant clean value, e.g. another variable or a call
+                # result, stays over-approximate because it ISN'T provably
+                # clean), a literal RHS on a plain identifier target is a
+                # STRONG update: clear `p`'s own taint AND drop it from its
+                # pointer-alias group so it stops transitively inheriting
+                # another member's (e.g. `buf`'s) taint. Conditional/aliased
+                # cases are untouched -- this only fires for this exact
+                # straight-line identifier-assigned-a-literal shape.
+                name = self.ctx.node_text(left)
+                self.env.pop(name, None)
+                group = self.ptr_aliases.pop(name, None)
+                if group:
+                    remaining = group - {name}
+                    for member in remaining:
+                        self.ptr_aliases[member] = remaining
+            else:
+                self._assign(left, state, node)
+            if self.lang == "c" and left is not None and left.type == "identifier":
+                # `p = buf;` / `p = &x;` (C reassignment, not a fresh
+                # declaration) -- also forms a pointer-alias union so a
+                # LATER taint of either side is visible through the other.
+                # (No-op when the strong-update branch above just fired:
+                # `_maybe_alias_declaration` only aliases a bare-identifier/
+                # address-of RHS, never a literal.)
+                self._maybe_alias_declaration(self.ctx.node_text(left), right)
             if right is not None:
                 self._walk(right)
             return
@@ -728,12 +1021,33 @@ class CstFunctionTaintVisitor:
                         declarator.child_by_field_name("declarator")
                     )
                     self._assign(name_node, value_state, declarator)
+                    if name_node is not None:
+                        # `char *p = buf;` / `char *p = arr;` / `char *p =
+                        # &x;` -- pointer-alias union (WS2), independent of
+                        # whether `buf` is ALREADY tainted at this point:
+                        # `_alias_state` looks up the group dynamically, so
+                        # a later `fgets(buf, ...)` still propagates to `p`.
+                        self._maybe_alias_declaration(
+                            self.ctx.node_text(name_node), value
+                        )
                     if value is not None:
                         self._walk(value)
             return
 
-        if t in ("call_expression", "method_invocation", "object_creation_expression"):
+        if t in ("call_expression", "method_invocation", "object_creation_expression", "new_expression"):
+            # MAJOR-2 (adversarial review): a call site that ALREADY
+            # produced a concrete taint-flow sink finding (e.g.
+            # `eval(taint)` matching the `eval_exec` CWE-95 sink) must NOT
+            # also emit a redundant WS5 dynamic_construct finding for the
+            # SAME node -- DYNAMIC_CONSTRUCT is for constructs not
+            # otherwise caught by a concrete sink. `getattr`/`new
+            # Function`/dynamic `import`/reflection calls that have no
+            # registered sink still get their needs-review finding.
+            flows_before = len(self.found_flows)
             self._check_sink(node)
+            sink_hit = len(self.found_flows) > flows_before
+            if not sink_hit:
+                self._check_dynamic_construct(node)
             for child in node.children:
                 self._walk(child)
             return
@@ -759,6 +1073,7 @@ class CstFunctionTaintVisitor:
         _LVALUE_CHAIN_TYPES = (
             "member_expression", "field_access", "subscript_expression",
             "array_access", "selector_expression", "index_expression",
+            "field_expression",
         )
         if t in _LVALUE_CHAIN_TYPES:
             base = target_node
@@ -767,6 +1082,7 @@ class CstFunctionTaintVisitor:
                     base.child_by_field_name("object")
                     or base.child_by_field_name("array")
                     or base.child_by_field_name("operand")
+                    or base.child_by_field_name("argument")
                 )
                 if nxt is None:
                     break
@@ -861,15 +1177,19 @@ class CstFunctionTaintVisitor:
             first = args[0]
             if first.type in ("interpreted_string_literal", "raw_string_literal"):
                 query_text = self.ctx.node_text(first)
-                if "?" in query_text or _RE_DOLLAR_PLACEHOLDER.search(query_text):
-                    # The query string itself is a CONSTANT containing a
-                    # `?` or `$N` placeholder -- subsequent args are
-                    # driver-bound parameters, not string-concatenated into
-                    # the query, so they are safe by construction
-                    # (adversarial review MAJOR-2). Only the query-string
-                    # argument itself can still carry taint (e.g. it was
-                    # built by concatenation despite also containing a
-                    # literal-looking `?`) so it stays in scope below.
+                placeholder_count = _go_sql_placeholder_count(query_text)
+                trailing_count = len(args) - 1
+                # WS4 precision: count placeholders vs trailing args rather
+                # than a bare substring test. A literal containing a STRAY
+                # `?` (decorative text, e.g. inside a quoted sub-string)
+                # with MORE trailing args than real placeholders is NOT
+                # genuinely parameterized -- something doesn't line up
+                # (possibly string-built taint smuggled in via an extra
+                # bind-looking argument) -- so it falls through to scanning
+                # ALL args below (over-approximate, still flags). Only when
+                # the placeholder count covers every trailing arg is the
+                # call treated as safely parameterized.
+                if placeholder_count > 0 and placeholder_count >= trailing_count:
                     go_sql_parameterized = True
         first_arg_only = (
             spec.sink_type in _FIRST_ARG_SINKS and not custom_hit and args
@@ -886,7 +1206,7 @@ class CstFunctionTaintVisitor:
             # must not flag (adversarial review MAJOR-3). `printf(tainted)`
             # / `printf(userfmt, ...)` -- the format literal itself
             # attacker-controlled -- still flags.
-            fmt_index = _C_FORMAT_ARG_INDEX.get(chain)
+            fmt_index = _c_format_arg_index(chain)
             candidate_args = (
                 [args[fmt_index]] if fmt_index is not None and fmt_index < len(args) else []
             )
@@ -936,6 +1256,111 @@ class CstFunctionTaintVisitor:
         col = pos_node.start_point[1]
         sink_step = self._make_step(line, "sink", chain, column=col)
         self.found_flows.append(self._build_flow(state, spec, sink_step, final_conf))
+
+    # -------------------------------------------------- WS5 dynamic-construct
+
+    def _check_dynamic_construct(self, node) -> None:
+        """Detect eval/reflection/dynamic-dispatch constructs that are
+        undecidable for static taint (see the module-level WS5 note) and
+        surface them as an explicit needs-review finding when the
+        risk-relevant operand is non-constant. This runs INDEPENDENTLY of
+        `_check_sink`'s normal source/sink resolution -- it must still fire
+        even when the operand cannot be matched to a known taint source, so
+        an unresolved dynamic construct is never silently dropped."""
+        raw_chain = _node_chain(node, self.ctx)
+        chain = resolve_chain(raw_chain, self.alias_map)
+        args = _call_args(node)
+        method_name = chain.rsplit(".", 1)[-1] if "." in chain else chain
+
+        label = ""
+        severity = "high"
+        check_arg = None
+        always_flag = False
+
+        if self.lang in _JS_LANGS:
+            if chain in _JS_DYNAMIC_EVAL_NAMES and args:
+                label, severity, check_arg = chain, "critical", args[0]
+            elif chain in _JS_DYNAMIC_IMPORT_NAMES and args:
+                label, severity, check_arg = f"dynamic {chain}", "high", args[0]
+        elif self.lang == "java":
+            if method_name in _JAVA_DYNAMIC_INVOKE_METHODS and "invoke" in chain:
+                label, severity, always_flag = "Method.invoke", "high", True
+            elif method_name == "forName" and args:
+                label, severity, check_arg = "Class.forName", "high", args[0]
+        elif self.lang == "go":
+            if chain.startswith(_GO_REFLECT_PREFIX):
+                label, severity = chain, "medium"
+                check_arg = args[0] if args else None
+                always_flag = check_arg is None
+
+        if not label:
+            # `obj[userKey](...)` / computed member call used AS the callee
+            # -- the function being invoked is itself dynamic, independent
+            # of any named-sink match above.
+            fn_node = node.child_by_field_name("function")
+            if fn_node is not None and fn_node.type in (
+                "subscript_expression", "index_expression",
+            ):
+                key_node = (
+                    fn_node.child_by_field_name("index")
+                    or fn_node.child_by_field_name("property")
+                )
+                if key_node is None and fn_node.named_children:
+                    key_node = fn_node.named_children[-1]
+                if key_node is not None and not _is_constant_node(key_node):
+                    label, severity, check_arg = "dynamic_dispatch", "high", key_node
+            if not label:
+                return
+
+        if not always_flag and check_arg is not None and _is_constant_node(check_arg):
+            return
+        self._emit_dynamic_construct(node, label, severity, check_arg)
+
+    def _emit_dynamic_construct(self, node, label: str, severity: str, arg_node) -> None:
+        pos_node = arg_node if arg_node is not None else node
+        line = pos_node.start_point[0] + 1
+        col = pos_node.start_point[1]
+        sink_step = self._make_step(line, "sink", label, column=col)
+        confidence = 0.3
+        tainted = False
+        if arg_node is not None:
+            state = self._eval(arg_node)
+            if state is not None:
+                tainted = True
+                confidence = max(confidence, min(0.45, 0.25 + state.confidence * 0.2))
+        source_step = self._make_step(
+            arg_node.start_point[0] + 1 if arg_node is not None else line,
+            "source", label,
+        )
+        flow = TaintFlow(
+            source_type=TaintSourceType.USER_INPUT,
+            sink_type=TaintSinkType.DYNAMIC_CONSTRUCT,
+            severity=severity,
+            source_location=source_step,
+            sink_location=sink_step,
+            intermediate_steps=[],
+            title=f"Dynamic construct reached: {label} (needs review)",
+            description=(
+                f"A dynamic/reflective construct ({label}) was reached with "
+                "a non-constant operand"
+                + (" that may itself be tainted" if tainted else "")
+                + ". Static analysis cannot prove what code path or target "
+                "this resolves to at runtime -- this is surfaced as an "
+                "explicit needs-review finding rather than silently "
+                "skipped. Confidence is deliberately kept low/needs-review: "
+                "this is neither a confirmed vulnerability nor confirmed "
+                "safe."
+            ),
+            cwe_id="CWE-470",
+            owasp_category="A03:2021",
+            sanitizers_present=False,
+            confidence=confidence,
+            confidence_bucket="needs_review",
+            hop_count=0,
+            sanitizers_applied=[],
+            finding_class="dynamic_construct",
+        )
+        self.found_flows.append(flow)
 
     def _build_flow(self, state: TaintState, spec: SinkSpec, sink_step: TaintFlowStep, confidence: float) -> TaintFlow:
         sink_type = spec.sink_type
@@ -1021,9 +1446,62 @@ def _scan_functions(
             call_resolver=call_resolver,
             alias_origins=alias_origins,
         )
+        if lang == "java":
+            _populate_servlet_request_params(fn, ctx, visitor)
         visitor._walk(body)
         flows.extend(visitor.found_flows)
     return flows
+
+
+_SERVLET_REQUEST_TYPE_NAMES = ("HttpServletRequest", "HttpServletRequestWrapper")
+
+
+def _populate_servlet_request_params(fn, ctx, visitor: "CstFunctionTaintVisitor") -> None:
+    """Scan `fn`'s formal-parameter list for parameters declared as
+    HttpServletRequest/HttpServletRequestWrapper (simple name, or
+    fully-qualified e.g. `javax.servlet.http.HttpServletRequest`) and
+    record their variable names in `visitor.servlet_request_params` --
+    see that field's docstring for why this type-based recognition is
+    needed alongside the literal `request.getParameter` pattern."""
+    params_node = fn.child_by_field_name("parameters")
+    if params_node is not None:
+        for param in params_node.named_children:
+            if param.type != "formal_parameter":
+                continue
+            type_node = param.child_by_field_name("type")
+            name_node = param.child_by_field_name("name")
+            if type_node is None or name_node is None:
+                continue
+            type_text = ctx.node_text(type_node)
+            simple_type = type_text.rsplit(".", 1)[-1]
+            var_name = ctx.node_text(name_node)
+            visitor.declared_var_types[var_name] = simple_type
+            if simple_type in _SERVLET_REQUEST_TYPE_NAMES:
+                visitor.servlet_request_params.add(var_name)
+    # MINOR (adversarial review): also record local-variable declared types
+    # (`String request = ...;`) so the same non-servlet-type gate in
+    # `_lookup_source` applies to a shadowing local, not just parameters.
+    body = fn.child_by_field_name("body")
+    if body is not None:
+        stack = [body]
+        while stack:
+            n = stack.pop()
+            if n.type == "local_variable_declaration":
+                type_node = n.child_by_field_name("type")
+                if type_node is not None:
+                    type_text = ctx.node_text(type_node)
+                    simple_type = type_text.rsplit(".", 1)[-1]
+                    for declarator in n.named_children:
+                        if declarator.type != "variable_declarator":
+                            continue
+                        name_node = declarator.child_by_field_name("name")
+                        if name_node is None:
+                            continue
+                        var_name = ctx.node_text(name_node)
+                        visitor.declared_var_types.setdefault(var_name, simple_type)
+                        if simple_type in _SERVLET_REQUEST_TYPE_NAMES:
+                            visitor.servlet_request_params.add(var_name)
+            stack.extend(n.named_children)
 
 
 def scan_js_ts_source(
