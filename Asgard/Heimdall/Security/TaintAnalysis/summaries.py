@@ -43,6 +43,7 @@ from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import (
 )
 from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import (
     RESOLVED_HOP_DECAY,
+    UNKNOWN_CALL_DECAY,
     ResolvedCall,
     TaintState,
     _FunctionTaintVisitor,
@@ -315,15 +316,32 @@ class SummaryIndex:
             for pos, state in enumerate(arg_states):
                 if state is None or state.param_index is not None:
                     continue  # synthetic seeds handled via call edges
-                for sink_ref, hops, factor in self._reachable_sinks(
+                sinks, incomplete = self._reachable_sinks_ex(
                     summary, pos, depth=1, visited=set()
-                ):
+                )
+                for sink_ref, hops, factor in sinks:
                     conf = state.confidence * factor
                     if conf <= 0.0:
                         continue
                     flows.append(self._build_flow(
                         state, sink_ref, hops, min(1.0, conf), chain, call_line
                     ))
+                if incomplete and not sinks:
+                    # The callee forwards this argument to (at least) one
+                    # further call whose summary is NOT in the index -- e.g.
+                    # a cross-directory helper never scanned into this
+                    # SummaryIndex. "resolved=True, flows=[]" here would be
+                    # read as an authoritative, provably-clean drop, but we
+                    # have NOT actually verified the transitive callee is
+                    # clean -- only that ITS immediate summary happens not to
+                    # show a sink hit locally. Treat this the same as an
+                    # unresolved/unknown call: over-approximate via the
+                    # standard unknown-call decay rather than confidently
+                    # dropping a potentially-real flow.
+                    candidate = state.decayed(UNKNOWN_CALL_DECAY)
+                    candidate.hop_count = state.hop_count + 1
+                    if ret_state is None or candidate.confidence > ret_state.confidence:
+                        ret_state = candidate
                 # returned param taint
                 ret_factor = summary.returns_params.get(pos)
                 if ret_factor:
@@ -361,18 +379,40 @@ class SummaryIndex:
         depth: int,
         visited: Set[Tuple[str, str, int]],
     ) -> List[Tuple[SinkRef, int, float]]:
+        """Back-compat wrapper around ``_reachable_sinks_ex`` (drops the
+        "incomplete" flag) -- kept for any external caller that only wants
+        the sink list."""
+        results, _incomplete = self._reachable_sinks_ex(summary, param_idx, depth, visited)
+        return results
+
+    def _reachable_sinks_ex(
+        self,
+        summary: FunctionSummary,
+        param_idx: int,
+        depth: int,
+        visited: Set[Tuple[str, str, int]],
+    ) -> Tuple[List[Tuple[SinkRef, int, float]], bool]:
         """
         Sinks reachable from ``param_idx`` of ``summary`` within the hop
-        budget. Returns (sink_ref, hops, combined_factor) where factor
-        already includes 0.85 per hop and the callee-internal path factor.
+        budget. Returns ``(sinks, incomplete)`` where ``sinks`` is a list of
+        (sink_ref, hops, combined_factor) (factor already includes 0.85 per
+        hop and the callee-internal path factor), and ``incomplete`` is True
+        when the traversal encountered a forwarding call edge whose callee
+        summary could not be found in this index (out-of-scope file, e.g. a
+        cross-directory helper never scanned into this SummaryIndex) --
+        meaning an empty ``sinks`` result here must NOT be read as a proven
+        clean drop; the caller falls back to the unknown-call decay instead
+        of a confident "no flow" (never mute a real flow the index simply
+        didn't get a chance to see).
         """
         if depth > self.max_hops:
-            return []
+            return [], False
         key = (summary.file_path, summary.qualname, param_idx)
         if key in visited:
-            return []
+            return [], False
         visited = visited | {key}
         results: List[Tuple[SinkRef, int, float]] = []
+        incomplete = False
         hop_decay = RESOLVED_HOP_DECAY ** depth
         for sink_ref in summary.param_sinks.get(param_idx, []):
             results.append((sink_ref, depth, hop_decay * sink_ref.path_factor))
@@ -380,12 +420,20 @@ class SummaryIndex:
             forwarded = [pos for pos, p_idx in mapping.items() if p_idx == param_idx]
             if not forwarded:
                 continue
-            for callee in self._candidates(callee_chain, summary.file_path):
+            callees = self._candidates(callee_chain, summary.file_path)
+            if not callees:
+                # Forwarded to a callee this index has no summary for --
+                # the param's transitive reachability cannot be proven safe.
+                incomplete = True
+                continue
+            for callee in callees:
                 for pos in forwarded:
-                    results.extend(self._reachable_sinks(
+                    sub_results, sub_incomplete = self._reachable_sinks_ex(
                         callee, pos, depth + 1, visited
-                    ))
-        return results
+                    )
+                    results.extend(sub_results)
+                    incomplete = incomplete or sub_incomplete
+        return results, incomplete
 
     def _build_flow(
         self,

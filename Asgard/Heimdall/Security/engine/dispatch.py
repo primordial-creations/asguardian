@@ -33,7 +33,10 @@ from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import (
     build_alias_map,
     resolve_chain,
 )
-from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_alias import build_cst_alias_map
+from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_alias import (
+    build_cst_alias_map,
+    build_cst_alias_map_with_origins,
+)
 from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_summaries import (
     SummaryIndex,
     collect_cst_imported_module_stems,
@@ -200,7 +203,7 @@ class DispatchEngine:
             sibling_exts = _JS_SIBLING_EXTS
         else:
             return []
-        alias_map = build_cst_alias_map(ctx, lang)
+        alias_map, alias_origins = build_cst_alias_map_with_origins(ctx, lang)
         try:
             summary_index = self._cst_summary_index(file_path, lang, sibling_exts)
             summary_index.set_current_file(str(file_path))
@@ -217,6 +220,7 @@ class DispatchEngine:
                 is_test_context=self.is_test_context,
                 alias_map=alias_map,
                 call_resolver=call_resolver,
+                alias_origins=alias_origins,
             )
         except Exception:
             # A CST-rule failure must never crash the scan -- degrade to

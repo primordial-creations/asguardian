@@ -70,6 +70,11 @@ from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import (
     TaintState,
     resolve_chain,
 )
+from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_alias import (
+    AliasOrigin,
+    is_verified_sanitizer_origin,
+    module_target,
+)
 
 PROPAGATOR_DECAY = 0.9
 UNKNOWN_CALL_DECAY = 0.5
@@ -137,7 +142,25 @@ def _node_chain(node, ctx) -> str:
             return f"{obj_chain}.{field_chain}"
         return field_chain or obj_chain
     if t == "call_expression":
-        return _node_chain(node.child_by_field_name("function"), ctx)
+        fn_node = node.child_by_field_name("function")
+        if (
+            fn_node is not None
+            and fn_node.type == "identifier"
+            and ctx.node_text(fn_node) in ("require", "import")
+        ):
+            # Inline `require('child_process').exec(cmd)` / dynamic
+            # `import('mod').then(...)` used directly as a member-expression
+            # object with no intermediate variable: resolve to the required
+            # module's name instead of the literal text "require"/"import",
+            # or the sink chain never matches (would otherwise flatten to
+            # "require.exec").
+            args_node = node.child_by_field_name("arguments")
+            if args_node is not None and args_node.named_children:
+                first_arg = args_node.named_children[0]
+                if first_arg.type == "string":
+                    spec = ctx.node_text(first_arg).strip("'\"`")
+                    return module_target(spec)
+        return _node_chain(fn_node, ctx)
     if t == "method_invocation":
         obj_chain = _node_chain(node.child_by_field_name("object"), ctx)
         name_chain = _node_chain(node.child_by_field_name("name"), ctx)
@@ -185,6 +208,7 @@ class CstFunctionTaintVisitor:
         is_test_context: bool = False,
         alias_map: Optional[Dict[str, str]] = None,
         call_resolver: Optional[CallResolver] = None,
+        alias_origins: Optional[Dict[str, AliasOrigin]] = None,
     ):
         self.file_path = file_path
         self.func_name = func_name
@@ -198,6 +222,7 @@ class CstFunctionTaintVisitor:
         self.extra_sink_specs = tuple(extra_sink_specs)
         self.is_test_context = is_test_context
         self.alias_map = alias_map or {}
+        self.alias_origins = alias_origins or {}
         self.call_resolver = call_resolver
         self.found_flows: List[TaintFlow] = []
         self._visited_calls: Set[int] = set()
@@ -339,14 +364,25 @@ class CstFunctionTaintVisitor:
         return self._fresh_source_state(spec, node.start_point[0] + 1, chain)
 
     def _sanitizer_verified(self, raw_chain: str) -> bool:
-        """True when the call's receiver/name resolves through an actual
-        import/require binding (``self.alias_map``), as opposed to a
-        same-named local declaration. A locally-defined function can never
-        appear as an alias-map key (only import/require bindings do), so
-        this distinguishes a genuine library sanitizer from a same-named
-        local shadow without needing full binding/scope resolution."""
+        """True only when the call's receiver/name resolves through an
+        import/require binding whose ORIGIN is a genuine, allow-listed
+        sanitizer package (``cst_alias.JS_SANITIZER_ALLOWED_MODULES`` /
+        ``JAVA_SANITIZER_ALLOWED_MODULES``) -- e.g. ``escape-html``,
+        ``dompurify``, ``org.owasp.encoder``.
+
+        Alias-map MEMBERSHIP alone is not sufficient evidence: a relative
+        import of a local, same-named no-op (``import { escapeHtml } from
+        './evil_local_utils'``) also creates an alias-map binding but is NOT
+        a real sanitizer -- promoting that to a full clear would mute a real
+        flow. Only a resolved binding whose raw specifier is a non-relative,
+        allow-listed package name is treated as verified; everything else
+        (relative imports, non-allow-listed bare packages, unresolved local
+        declarations) stays at the heuristic downgrade."""
         head = raw_chain.split(".", 1)[0]
-        return head in self.alias_map
+        origin = self.alias_origins.get(head)
+        if origin is None:
+            return False
+        return is_verified_sanitizer_origin(origin.raw_specifier, origin.is_relative, self.lang)
 
     def _eval_call(self, node) -> Optional[TaintState]:
         raw_chain = _node_chain(node, self.ctx)
@@ -677,6 +713,7 @@ def _scan_functions(
     is_test_context: bool,
     alias_map: Optional[Dict[str, str]] = None,
     call_resolver: Optional[CallResolver] = None,
+    alias_origins: Optional[Dict[str, AliasOrigin]] = None,
 ) -> List[TaintFlow]:
     if ctx is None or ctx.root is None:
         return []
@@ -702,6 +739,7 @@ def _scan_functions(
             is_test_context=is_test_context,
             alias_map=alias_map,
             call_resolver=call_resolver,
+            alias_origins=alias_origins,
         )
         visitor._walk(body)
         flows.extend(visitor.found_flows)
@@ -717,13 +755,14 @@ def scan_js_ts_source(
     is_test_context: bool = False,
     alias_map: Optional[Dict[str, str]] = None,
     call_resolver: Optional[CallResolver] = None,
+    alias_origins: Optional[Dict[str, AliasOrigin]] = None,
 ) -> List[TaintFlow]:
     """Scan a parsed JS/TS/TSX ``FileParseContext`` for taint flows."""
     return _scan_functions(
         file_path, ctx, ctx.language if ctx is not None else "javascript",
         JS_SOURCE_SPECS, JS_SINK_SPECS,
         custom_sources, custom_sinks, custom_sanitizers, is_test_context,
-        alias_map=alias_map, call_resolver=call_resolver,
+        alias_map=alias_map, call_resolver=call_resolver, alias_origins=alias_origins,
     )
 
 
@@ -736,11 +775,12 @@ def scan_java_source(
     is_test_context: bool = False,
     alias_map: Optional[Dict[str, str]] = None,
     call_resolver: Optional[CallResolver] = None,
+    alias_origins: Optional[Dict[str, AliasOrigin]] = None,
 ) -> List[TaintFlow]:
     """Scan a parsed Java ``FileParseContext`` for taint flows."""
     return _scan_functions(
         file_path, ctx, "java",
         JAVA_SOURCE_SPECS, JAVA_SINK_SPECS,
         custom_sources, custom_sinks, custom_sanitizers, is_test_context,
-        alias_map=alias_map, call_resolver=call_resolver,
+        alias_map=alias_map, call_resolver=call_resolver, alias_origins=alias_origins,
     )

@@ -34,14 +34,44 @@ Honest limitations:
 
 import re
 from pathlib import Path
-from typing import Dict
+from typing import Dict, NamedTuple
 
 _JS_LANGS = frozenset({"javascript", "typescript", "tsx"})
 
 _JS_KNOWN_EXTS = (".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx")
 
+# Real, well-known sanitizer *packages* (JS) / *packages-or-classes* (Java).
+# Sanitizer-verification (promoting a heuristic library sanitizer to a full
+# clear) is ONLY permitted when an alias's resolved import origin matches one
+# of these -- a relative-path import (``./...``) or any other bare package
+# name must stay at the heuristic downgrade, never a full clear. This is the
+# fix for the "sanitizer-verification full-clears a no-op imported from ANY
+# module" bug: alias-map membership alone (any import/require binding) is not
+# sufficient evidence that the callee is a *real* sanitizer.
+JS_SANITIZER_ALLOWED_MODULES = frozenset({
+    "escape-html", "dompurify", "he", "validator", "sanitize-html", "xss",
+})
+JAVA_SANITIZER_ALLOWED_MODULES = frozenset({
+    "org.owasp.encoder",
+    "org.owasp.esapi",
+    "org.apache.commons.text",
+    "org.apache.commons.lang3",
+})
 
-def _module_target(specifier: str) -> str:
+
+class AliasOrigin(NamedTuple):
+    """Provenance of one alias binding: the normalized target string (used
+    for dotted-chain matching) plus enough of the raw specifier to tell a
+    genuine external package apart from a relative/local file import -- the
+    normalized target alone collapses both shapes (``./evil_local_utils`` and
+    a real bare package ``evil_local_utils`` would normalize identically)."""
+
+    target: str
+    raw_specifier: str
+    is_relative: bool
+
+
+def module_target(specifier: str) -> str:
     """Normalize an import/require specifier to its alias-map target.
 
     Relative/local specifiers collapse to their basename (cross-file
@@ -51,6 +81,24 @@ def _module_target(specifier: str) -> str:
         stem = Path(specifier).stem or specifier
         return stem
     return specifier
+
+
+# Backwards-compatible private alias (kept in case anything still imports the
+# old private name).
+_module_target = module_target
+
+
+def is_verified_sanitizer_origin(raw_specifier: str, is_relative: bool, lang: str) -> bool:
+    """True when an alias's raw import specifier is a genuine, allow-listed
+    sanitizer package (never true for relative/local specifiers)."""
+    if is_relative:
+        return False
+    allowed = JS_SANITIZER_ALLOWED_MODULES if lang in _JS_LANGS else JAVA_SANITIZER_ALLOWED_MODULES
+    if lang in _JS_LANGS:
+        return raw_specifier in allowed
+    # Java: allow either an exact match or a fully-qualified name rooted at
+    # an allow-listed package/class prefix (e.g. "org.owasp.encoder.Encode").
+    return any(raw_specifier == pkg or raw_specifier.startswith(pkg + ".") for pkg in allowed)
 
 
 _JS_NAMESPACE_IMPORT_RE = re.compile(
@@ -78,17 +126,24 @@ _JS_REQUIRE_DESTRUCTURE_RE = re.compile(
 )
 
 
-def _parse_js_import(text: str, aliases: Dict[str, str]) -> None:
+def _record(aliases: Dict[str, str], origins: Dict[str, "AliasOrigin"],
+            alias: str, target: str, raw_specifier: str) -> None:
+    aliases[alias] = target
+    is_relative = raw_specifier.startswith(".") or "/" in raw_specifier
+    origins[alias] = AliasOrigin(target=target, raw_specifier=raw_specifier, is_relative=is_relative)
+
+
+def _parse_js_import(text: str, aliases: Dict[str, str], origins: Dict[str, "AliasOrigin"]) -> None:
     m = _JS_NAMESPACE_IMPORT_RE.search(text)
     if m:
-        aliases[m.group(1)] = _module_target(m.group(2))
+        _record(aliases, origins, m.group(1), _module_target(m.group(2)), m.group(2))
         return
     m = _JS_NAMED_IMPORT_RE.search(text)
     if m:
         default_name, named, module = m.groups()
         target = _module_target(module)
         if default_name:
-            aliases[default_name] = target
+            _record(aliases, origins, default_name, target, module)
         for part in named.split(","):
             part = part.strip()
             if not part:
@@ -97,16 +152,16 @@ def _parse_js_import(text: str, aliases: Dict[str, str]) -> None:
                 orig, alias = (p.strip() for p in part.split(" as ", 1))
             else:
                 orig = alias = part
-            aliases[alias] = f"{target}.{orig}"
+            _record(aliases, origins, alias, f"{target}.{orig}", module)
         return
     m = _JS_DEFAULT_IMPORT_RE.search(text)
     if m:
-        aliases[m.group(1)] = _module_target(m.group(2))
+        _record(aliases, origins, m.group(1), _module_target(m.group(2)), m.group(2))
         return
     # Side-effect-only import (`import './foo'`) introduces no binding.
 
 
-def _parse_js_require(text: str, aliases: Dict[str, str]) -> None:
+def _parse_js_require(text: str, aliases: Dict[str, str], origins: Dict[str, "AliasOrigin"]) -> None:
     m = _JS_REQUIRE_DESTRUCTURE_RE.search(text)
     if m:
         named, module = m.groups()
@@ -119,30 +174,30 @@ def _parse_js_require(text: str, aliases: Dict[str, str]) -> None:
                 orig, alias = (p.strip() for p in part.split(":", 1))
             else:
                 orig = alias = part
-            aliases[alias] = f"{target}.{orig}"
+            _record(aliases, origins, alias, f"{target}.{orig}", module)
         return
     m = _JS_REQUIRE_SIMPLE_RE.search(text)
     if m:
-        aliases[m.group(1)] = _module_target(m.group(2))
+        _record(aliases, origins, m.group(1), _module_target(m.group(2)), m.group(2))
 
 
 _JAVA_STATIC_IMPORT_RE = re.compile(r"import\s+static\s+([\w.]+)\.([\w]+)\s*;")
 _JAVA_IMPORT_RE = re.compile(r"import\s+([\w.]+)\s*;")
 
 
-def _parse_java_import(text: str, aliases: Dict[str, str]) -> None:
+def _parse_java_import(text: str, aliases: Dict[str, str], origins: Dict[str, "AliasOrigin"]) -> None:
     m = _JAVA_STATIC_IMPORT_RE.search(text)
     if m:
         owner, member = m.groups()
         cls = owner.rsplit(".", 1)[-1]
-        aliases[member] = f"{cls}.{member}"
+        _record(aliases, origins, member, f"{cls}.{member}", owner)
         return
     m = _JAVA_IMPORT_RE.search(text)
     if m:
         full = m.group(1)
         simple = full.rsplit(".", 1)[-1]
         if simple != "*":
-            aliases[simple] = full
+            _record(aliases, origins, simple, full, full)
 
 
 def build_cst_alias_map(ctx, lang: str) -> Dict[str, str]:
@@ -152,15 +207,27 @@ def build_cst_alias_map(ctx, lang: str) -> Dict[str, str]:
     .resolve_chain`` (language-agnostic dotted-chain canonicalization,
     reused as-is rather than reimplemented).
     """
+    aliases, _origins = build_cst_alias_map_with_origins(ctx, lang)
+    return aliases
+
+
+def build_cst_alias_map_with_origins(ctx, lang: str):
+    """Like ``build_cst_alias_map`` but also returns a parallel
+    ``Dict[str, AliasOrigin]`` carrying each binding's raw (unnormalized)
+    import specifier and whether it was a relative/local path -- needed to
+    tell a genuine external package apart from a relative import that merely
+    normalizes to the same-looking bare name (sanitizer-verification
+    allow-listing)."""
     aliases: Dict[str, str] = {}
+    origins: Dict[str, AliasOrigin] = {}
     if ctx is None or ctx.root is None:
-        return aliases
+        return aliases, origins
 
     def walk(node) -> None:
         t = node.type
         if lang in _JS_LANGS:
             if t == "import_statement":
-                _parse_js_import(ctx.node_text(node), aliases)
+                _parse_js_import(ctx.node_text(node), aliases, origins)
                 return
             if t == "variable_declarator":
                 value = node.child_by_field_name("value")
@@ -171,14 +238,14 @@ def build_cst_alias_map(ctx, lang: str) -> Dict[str, str]:
                         and fn.type == "identifier"
                         and ctx.node_text(fn) == "require"
                     ):
-                        _parse_js_require(ctx.node_text(node), aliases)
+                        _parse_js_require(ctx.node_text(node), aliases, origins)
                         return
         elif lang == "java":
             if t == "import_declaration":
-                _parse_java_import(ctx.node_text(node), aliases)
+                _parse_java_import(ctx.node_text(node), aliases, origins)
                 return
         for child in node.children:
             walk(child)
 
     walk(ctx.root)
-    return aliases
+    return aliases, origins

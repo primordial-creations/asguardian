@@ -64,3 +64,19 @@ cases:
     severity: high
     bucket_in: [possible]
     cwe: CWE-79
+  # -- Adversarial-review regressions (3 confirmed real-injection-muting
+  # bugs) -- see test_taint_cst_alias_summaries_adversarial.py for the
+  # BLOCKER-2 (cross-directory forwarding) repro, which cannot be expressed
+  # as a manifest flow-count case (see that file's docstring).
+  - file: tp_relative_import_noop_sanitizer.js
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [possible]
+    cwe: CWE-79
+  - file: tp_inline_require_command_injection.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
