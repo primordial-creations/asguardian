@@ -178,3 +178,27 @@ cases:
     severity: critical
     bucket_in: [certain, probable]
     cwe: CWE-95
+
+  # SA1 -- field/attribute/container sensitivity (StaticDepth Wave 1)
+  - file: tp_sa1_attribute_same_field_flags.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_sa1_attribute_sibling_field_clean.js
+    expect: no_flow
+  - file: tp_sa1_dict_const_key_same_key_flags.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_sa1_dict_const_key_sibling_key_clean.js
+    expect: no_flow
+  - file: tp_sa1_dict_nonconstant_index_overapprox.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89

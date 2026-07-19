@@ -61,3 +61,13 @@ cases:
     bucket_in: [needs_review]
     cwe: CWE-470
     finding_class: dynamic_construct
+
+  # SA1 -- field/attribute/container sensitivity (StaticDepth Wave 1)
+  - file: tp_sa1_field_same_field_flags.java
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_sa1_field_sibling_field_clean.java
+    expect: no_flow

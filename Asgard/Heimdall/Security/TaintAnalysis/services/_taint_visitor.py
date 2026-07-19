@@ -121,6 +121,15 @@ _CONTAINER_MUTATORS = frozenset({
     "append", "insert", "extend", "add", "update", "setdefault", "appendleft",
 })
 
+# Sentinel stored in `env` for a field/container key that was explicitly
+# strong-updated to a KNOWN-CLEAN value (`x.a = "literal"`) -- distinct from
+# "key absent" (no info recorded, defer to the base/root marker). Using a
+# distinct sentinel (rather than popping the key) lets an explicit clean
+# override at field granularity coexist with an unrelated whole-object taint
+# marker set earlier (`x = source(); x.a = "safe"; sink(x.a)` clears,
+# `sink(x.b)` still flags via the root fallback) -- SA1 field sensitivity.
+_CLEARED = object()
+
 
 def _attr_chain(node: ast.AST) -> str:
     """Flatten an attribute access chain into a dotted string."""
@@ -216,6 +225,12 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         self.func_name = func_name
         self.lines = lines
         self.env: Dict[str, TaintState] = dict(initial_taint or {})
+        # SA2 constant/string propagation: best-effort literal value of a
+        # Name binding, tracked so `eval`/`__import__`/`require`-style
+        # dynamic constructs and `getattr`/`setattr` field names can be
+        # resolved when they reference a locally-bound constant, not just a
+        # literal spelled inline. Branch-sensitive (see visit_If).
+        self.const_env: Dict[str, str] = {}
         self.custom_sources = custom_sources or set()
         self.custom_sinks = custom_sinks or set()
         self.custom_sanitizers = custom_sanitizers or set()
@@ -271,6 +286,102 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
             return a
         return a if a.confidence >= b.confidence else b
 
+    # --------------------------------------------------- SA1 field/container
+
+    @staticmethod
+    def _constant_key_repr(slice_node: Optional[ast.AST]) -> Optional[str]:
+        """Repr of a subscript's index IFF it is a compile-time constant
+        (str/int/bool literal) -- the sound gate for field/key-granularity
+        tracking. A non-constant index (a Name, call, expression, ...)
+        returns None, which callers MUST treat as "whole container tainted"
+        (never as "this key is safe to ignore")."""
+        s = slice_node
+        if s is not None and hasattr(ast, "Index") and isinstance(s, ast.Index):
+            s = s.value  # pragma: no cover - py<3.9 compat
+        if isinstance(s, ast.Constant) and isinstance(s.value, (str, int, bool)):
+            return repr(s.value)
+        return None
+
+    def _chain_info(
+        self, node: ast.AST
+    ) -> Tuple[Optional[str], Optional[List[str]]]:
+        """Walk an Attribute/Subscript chain down to its root Name.
+
+        Returns ``(root_name, prefixes)`` where ``prefixes`` lists exact
+        dotted/bracket env-keys for this chain, longest (most specific)
+        first. ``prefixes is None`` means the chain contains a non-constant
+        subscript SOMEWHERE along it -- callers must fall back to the root's
+        whole-value taint (sound over-approximation), never treat any
+        segment as a precise key. ``root_name is None`` means the chain
+        isn't rooted in a bare local Name (e.g. `f().a`) -- callers fall
+        back to plain sub-expression evaluation.
+        """
+        if isinstance(node, ast.Name):
+            return node.id, []
+        if isinstance(node, ast.Attribute):
+            root, prefixes = self._chain_info(node.value)
+            if root is None:
+                return None, None
+            if prefixes is None:
+                return root, None
+            parent = prefixes[0] if prefixes else root
+            return root, [f"{parent}.{node.attr}"] + prefixes
+        if isinstance(node, ast.Subscript):
+            root, prefixes = self._chain_info(node.value)
+            if root is None:
+                return None, None
+            if prefixes is None:
+                return root, None
+            key = self._constant_key_repr(node.slice)
+            if key is None:
+                return root, None  # non-constant index: truncate, sound
+            parent = prefixes[0] if prefixes else root
+            return root, [f"{parent}[{key}]"] + prefixes
+        return None, None
+
+    def _family_taint(self, base: str) -> Optional[TaintState]:
+        """Union of every field/element taint recorded under ``base`` --
+        used ONLY for a bare-name read (`sink(x)`), where the whole object
+        (including any tainted sub-field) flows out. Must NOT be used for a
+        specific-field read (`x.b`), which must stay scoped to that field
+        plus the root marker -- otherwise a sibling field's taint would
+        wrongly leak into an unrelated field read (muting the SA1
+        precision gain would be fine; the reverse -- inventing cross-field
+        contamination -- is a correctness bug, not a soundness necessity)."""
+        result: Optional[TaintState] = None
+        prefixes = (f"{base}.", f"{base}[")
+        for key, value in self.env.items():
+            if value is _CLEARED:
+                continue
+            if key.startswith(prefixes):
+                result = self._union(result, value)
+        return result
+
+    def _read_chain(self, node: ast.AST) -> Optional[TaintState]:
+        """Field/element-sensitive read for an Attribute/Subscript node.
+
+        A ``_CLEARED`` marker at the specific key only suppresses the
+        root's *default-inherited* taint -- it must NOT override taint the
+        root independently acquired via a non-constant-index write
+        elsewhere (e.g. ``m[dyn] = tainted`` taints ``env[root]`` for real,
+        and a later ``m["known"] = "safe"`` cannot prove ``dyn != "known"``).
+        So on a ``_CLEARED`` hit we fall back to (union with) the root's
+        own non-``_CLEARED`` taint rather than returning None outright.
+        """
+        root, prefixes = self._chain_info(node)
+        if root is None:
+            return self._eval(node.value)
+        root_value = self.env.get(root)
+        root_state = None if root_value is _CLEARED else root_value
+        if prefixes:
+            for path in prefixes:
+                if path in self.env:
+                    value = self.env[path]
+                    if value is _CLEARED:
+                        return root_state
+                    return value
+        return root_state
+
     # ------------------------------------------------------- expression eval
 
     def _eval(self, node: ast.AST) -> Optional[TaintState]:
@@ -278,15 +389,25 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         if isinstance(node, ast.Name):
             state = self.env.get(node.id)
             if state is not None:
-                return state
+                return None if state is _CLEARED else state
+            family = self._family_taint(node.id)
+            if family is not None:
+                return family
             return self._match_source_chain(node)
         if isinstance(node, ast.Attribute):
             src = self._match_source_chain(node)
             if src is not None:
                 return src
-            return self._eval(node.value)
+            return self._read_chain(node)
         if isinstance(node, ast.Subscript):
-            return self._eval(node.value)
+            # Preserve source-detection precedence: `request.args['q']`
+            # must still match the `request.args` dict-like source spec
+            # (checked on the base expression) BEFORE falling to
+            # field/element-key container tracking.
+            src = self._match_source_chain(node.value)
+            if src is not None:
+                return src
+            return self._read_chain(node)
         if isinstance(node, ast.Starred):
             return self._eval(node.value)
         if isinstance(node, ast.Call):
@@ -335,12 +456,106 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
             return None
         return self._fresh_source_state(spec, getattr(node, "lineno", 1), chain)
 
+    def _getattr_field_name(self, name_node: ast.AST) -> Optional[str]:
+        """String value of a `getattr`/`setattr` name argument IFF it is
+        statically determinable (literal or tracked const binding)."""
+        value = self._const_str_value(name_node)
+        return value
+
+    def _eval_getattr(self, node: ast.Call) -> Optional[TaintState]:
+        """`getattr(o, "name"[, default])` with a determinable name ->
+        treat exactly as `o.name` (field-sensitive read); the optional
+        default is unioned in (either could be the runtime value)."""
+        field = self._getattr_field_name(node.args[1])
+        if field is None:
+            return None
+        base_node = node.args[0]
+        state: Optional[TaintState] = None
+        if isinstance(base_node, ast.Name):
+            root, _ = self._chain_info(base_node)
+            bv = self.env.get(root)
+            root_state = None if bv is _CLEARED else bv
+            path = f"{root}.{field}"
+            if path in self.env:
+                v = self.env[path]
+                # A _CLEARED marker at the specific field must not override
+                # taint the root independently acquired (e.g. via
+                # setattr(o, dyn_name, tainted)) -- fall back to root state
+                # instead of asserting safety (never mute a real flow).
+                state = root_state if v is _CLEARED else v
+            else:
+                state = root_state
+        else:
+            state = self._eval(base_node)
+        if len(node.args) >= 3:
+            state = self._union(state, self._eval(node.args[2]))
+        return state
+
+    def _eval_setattr(self, node: ast.Call) -> bool:
+        """`setattr(o, "name", value)` with a determinable name -> treat
+        exactly as `o.name = value` (field-sensitive strong update).
+        Returns True when handled.
+
+        A NON-determinable name is also handled here (not left to fall
+        through to the generic unresolved-call path, which would drop the
+        side effect on ``o`` entirely): mirroring `_assign_target`'s
+        non-constant-index container laundering, the value taints the
+        WHOLE base object -- sound over-approximation, since the actual
+        field cannot be ruled out to be any specific known field (never
+        mute a real flow by silently forgetting the write happened)."""
+        base_node = node.args[0]
+        value_state = self._eval(node.args[2])
+        field = self._getattr_field_name(node.args[1])
+        if field is None:
+            if isinstance(base_node, ast.Name) and value_state is not None:
+                stored = replace(
+                    value_state, trace=list(value_state.trace),
+                    sanitizers=list(value_state.sanitizers),
+                )
+                stored.trace.append(
+                    self._make_step(node.lineno, "propagation", base_node.id)
+                )
+                existing = self.env.get(base_node.id)
+                existing = None if existing is _CLEARED else existing
+                self.env[base_node.id] = self._union(existing, stored)
+            return True
+        if not isinstance(base_node, ast.Name):
+            return True  # determinable name, but no trackable base: no-op
+        path = f"{base_node.id}.{field}"
+        if value_state is None:
+            self.env[path] = _CLEARED
+        else:
+            stored = replace(
+                value_state, trace=list(value_state.trace),
+                sanitizers=list(value_state.sanitizers),
+            )
+            stored.trace.append(self._make_step(node.lineno, "propagation", path))
+            self.env[path] = stored
+        return True
+
     def _eval_call(self, node: ast.Call) -> Optional[TaintState]:
         chain = self._resolve(node.func)
         arg_nodes = list(node.args) + [kw.value for kw in node.keywords]
         arg_state: Optional[TaintState] = None
         for arg in arg_nodes:
             arg_state = self._union(arg_state, self._eval(arg))
+
+        # 0. SA2: `getattr(o, "name")` / `setattr(o, "name", v)` with a
+        #    LITERAL/CONST attribute name resolve to plain attribute
+        #    access/assignment (`o.name`) at full field-sensitive fidelity
+        #    -- no artificial decay, no dynamic-construct finding (that
+        #    residue is reserved for a genuinely non-constant name, handled
+        #    separately by `_check_dynamic_construct`'s getattr-dispatch
+        #    check). A non-constant name falls through unchanged to the
+        #    normal unresolved-call handling below.
+        if chain == "getattr" and len(node.args) >= 2:
+            resolved = self._eval_getattr(node)
+            if resolved is not None or self._is_determinable(node.args[1]):
+                return resolved
+        if chain == "setattr" and len(node.args) >= 3:
+            handled = self._eval_setattr(node)
+            if handled:
+                return None
 
         # 1. Exact sanitizer (known-complete neutralizer): taint dropped.
         #    Heuristic (name-based) matches are held back: if the callee
@@ -433,7 +648,54 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         state = self._eval(node.value)
         for target in node.targets:
             self._assign_target(target, state, node.lineno)
+        # SA2 constant/string propagation: remember simple Name bindings to
+        # a compile-time-foldable string/literal value so a later
+        # `eval`/`__import__`/`getattr` reference to that Name can be
+        # resolved instead of staying an undecidable "needs review".
+        if len(node.targets) == 1 and isinstance(node.targets[0], ast.Name):
+            const_value = self._const_str_value(node.value)
+            if const_value is not None:
+                self.const_env[node.targets[0].id] = const_value
+            else:
+                self.const_env.pop(node.targets[0].id, None)
         self.generic_visit(node)
+
+    def _const_str_value(self, node: ast.AST) -> Optional[str]:
+        """Best-effort compile-time constant-fold to a string, else None.
+        Covers literal concatenation (`"a" + "b"`), f-strings/JoinedStr of
+        constants, and references to a Name already known-constant in
+        ``const_env`` (simple const-binding propagation)."""
+        if node is None:
+            return ""
+        if isinstance(node, ast.Constant):
+            return node.value if isinstance(node.value, str) else str(node.value)
+        if isinstance(node, ast.Name):
+            return self.const_env.get(node.id)
+        if isinstance(node, ast.JoinedStr):
+            parts: List[str] = []
+            for part in node.values:
+                value = self._const_str_value(
+                    part.value if isinstance(part, ast.FormattedValue) else part
+                )
+                if value is None:
+                    return None
+                parts.append(value)
+            return "".join(parts)
+        if isinstance(node, ast.BinOp) and isinstance(node.op, ast.Add):
+            left = self._const_str_value(node.left)
+            right = self._const_str_value(node.right)
+            if left is None or right is None:
+                return None
+            return left + right
+        return None
+
+    def _is_determinable(self, node: Optional[ast.AST]) -> bool:
+        """True when ``node`` is statically resolvable to a known value --
+        either a pure-literal constant (``_is_constant_ast``) or a
+        constant-foldable expression through tracked const bindings
+        (``const_env``). Used to gate SA2 dynamic-construct resolution:
+        only a genuinely NON-determinable operand stays needs-review."""
+        return _is_constant_ast(node) or self._const_str_value(node) is not None
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         if node.value is not None:
@@ -450,6 +712,15 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
                 self.env[node.target.id] = combined
         self.generic_visit(node)
 
+    def _clear_family(self, base: str) -> None:
+        """A fresh whole-value reassignment (`x = ...`) invalidates every
+        previously-recorded field/element key for ``x`` -- it now refers to
+        a brand-new value, so stale `x.a`/`x["k"]` entries from the old
+        value must not linger and produce stale findings/stale clears."""
+        prefixes = (f"{base}.", f"{base}[")
+        for key in [k for k in self.env if k.startswith(prefixes)]:
+            del self.env[key]
+
     def _assign_target(
         self, target: ast.AST, state: Optional[TaintState], line: int
     ) -> None:
@@ -458,28 +729,52 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
                 self._assign_target(elt, state, line)
             return
         if isinstance(target, (ast.Subscript, ast.Attribute)):
-            # Container laundering: t['x'] = tainted (or obj.field = tainted)
-            # taints the base container. Over-approximation at container
-            # granularity: a clean element store does NOT clear the
-            # container (other elements may still be tainted).
-            base = target
-            while isinstance(base, (ast.Subscript, ast.Attribute)):
-                base = base.value
-            if isinstance(base, ast.Name) and state is not None:
+            # SA1 field/container sensitivity: a constant-key chain
+            # (`x.a = ...` / `x["a"] = ...`) is a STRONG update at that
+            # exact key -- it does not touch sibling fields, and an
+            # explicit clean store records a CLEARED override so a stale
+            # whole-object taint marker doesn't leak into this one known
+            # field. A non-constant index anywhere in the chain (`x[i] = `)
+            # is undecidable -- sound over-approximation taints the WHOLE
+            # base object (never narrows to "safe"), matching the prior
+            # one-level behavior generalized across chain depth.
+            root, prefixes = self._chain_info(target)
+            if root is None:
+                return
+            if prefixes:
+                path = prefixes[0]
+                if state is None:
+                    self.env[path] = _CLEARED
+                else:
+                    stored = replace(
+                        state, trace=list(state.trace),
+                        sanitizers=list(state.sanitizers),
+                    )
+                    stored.trace.append(self._make_step(line, "propagation", path))
+                    self.env[path] = stored
+                return
+            # Non-constant index somewhere in the chain: container laundering
+            # taints the base container. A clean element store does NOT
+            # clear the container (other elements may still be tainted).
+            if state is not None:
                 stored = replace(
                     state, trace=list(state.trace),
                     sanitizers=list(state.sanitizers),
                 )
-                stored.trace.append(
-                    self._make_step(line, "propagation", base.id)
-                )
-                self.env[base.id] = self._union(self.env.get(base.id), stored)
+                stored.trace.append(self._make_step(line, "propagation", root))
+                existing = self.env.get(root)
+                existing = None if existing is _CLEARED else existing
+                self.env[root] = self._union(existing, stored)
             return
         if not isinstance(target, ast.Name):
             return
+        # Whole-variable reassignment: the name now refers to a fresh value,
+        # so any previously-tracked field/element sub-state is stale.
+        self._clear_family(target.id)
         if state is None:
             # Assignment kills taint when the RHS is clean.
             self.env.pop(target.id, None)
+            self.const_env.pop(target.id, None)
             return
         new_state = replace(
             state, trace=list(state.trace), sanitizers=list(state.sanitizers)
@@ -503,20 +798,52 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         # do for their own RHS expressions.
         self.visit(node.test)
         saved = dict(self.env)
+        saved_const = dict(self.const_env)
         for stmt in node.body:
             self.visit(stmt)
         body_env = self.env
+        body_const = self.const_env
         self.env = dict(saved)
+        self.const_env = dict(saved_const)
         for stmt in node.orelse:
             self.visit(stmt)
         else_env = self.env
+        else_const = self.const_env
         # Branch union: over-approximate by keeping taint from either arm.
         merged: Dict[str, TaintState] = {}
         for name in set(body_env) | set(else_env):
-            merged_state = self._union(body_env.get(name), else_env.get(name))
-            if merged_state is not None:
-                merged[name] = merged_state
+            merged_value = self._merge_branch_value(body_env.get(name), else_env.get(name))
+            if merged_value is not None:
+                merged[name] = merged_value
         self.env = merged
+        # Const bindings only survive the merge when BOTH arms agree on the
+        # exact same value -- a branch-dependent constant is not safely
+        # "the" constant post-merge (would risk wrongly resolving/clearing
+        # a dynamic-construct finding on the other path).
+        merged_const: Dict[str, str] = {}
+        for name in set(body_const) & set(else_const):
+            if body_const[name] == else_const[name]:
+                merged_const[name] = body_const[name]
+        self.const_env = merged_const
+
+    @staticmethod
+    def _merge_branch_value(a, b):
+        """3-state branch-merge for an env entry: a real TaintState, the
+        ``_CLEARED`` sentinel (explicit known-clean strong update), or
+        absent (no info -- defers to the root/base marker elsewhere).
+        Sound rule: a real taint from EITHER arm always survives (never
+        mute a real flow); an explicit clean override only survives when
+        BOTH arms agree; a clean override facing "no info" from the other
+        arm is dropped back to absent rather than promoted to CLEARED,
+        since the other arm's true status is unknown and must not be
+        asserted safe."""
+        a_state = None if a is _CLEARED else a
+        b_state = None if b is _CLEARED else b
+        if a_state is not None or b_state is not None:
+            return _FunctionTaintVisitor._union(a_state, b_state)
+        if a is _CLEARED and b is _CLEARED:
+            return _CLEARED
+        return None
 
     def visit_For(self, node: ast.For) -> None:
         iter_state = self._eval(node.iter)
@@ -528,13 +855,21 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         if iter_state is not None:
             self._assign_target(node.target, iter_state, node.lineno)
         saved = dict(self.env)
+        saved_const = dict(self.const_env)
         for stmt in list(node.body) + list(node.orelse):
             self.visit(stmt)
         for name, st in saved.items():
             if name not in self.env:
                 self.env[name] = st
             else:
-                self.env[name] = self._union(self.env[name], st)
+                self.env[name] = self._merge_branch_value(self.env[name], st)
+        # Const bindings set/mutated inside a loop body may vary across
+        # iterations -- conservative: only a const known BEFORE the loop
+        # and left untouched (or reaffirmed identically) survives.
+        self.const_env = {
+            k: v for k, v in saved_const.items()
+            if self.const_env.get(k, v) == v
+        }
 
     def visit_While(self, node: ast.While) -> None:
         self._eval(node.test)
@@ -542,11 +877,18 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
         # visit_If's `self.visit(node.test)`.
         self.visit(node.test)
         saved = dict(self.env)
+        saved_const = dict(self.const_env)
         for stmt in list(node.body) + list(node.orelse):
             self.visit(stmt)
         for name, st in saved.items():
             if name not in self.env:
                 self.env[name] = st
+            else:
+                self.env[name] = self._merge_branch_value(self.env[name], st)
+        self.const_env = {
+            k: v for k, v in saved_const.items()
+            if self.const_env.get(k, v) == v
+        }
 
     def visit_Expr(self, node: ast.Expr) -> None:
         self._eval(node.value)
@@ -627,7 +969,7 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
 
         if not label:
             return
-        if not always_flag and check_arg is not None and _is_constant_ast(check_arg):
+        if not always_flag and check_arg is not None and self._is_determinable(check_arg):
             return
         self._emit_dynamic_construct(node, label, severity, check_arg)
 
