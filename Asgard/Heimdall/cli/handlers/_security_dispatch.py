@@ -50,6 +50,7 @@ BUCKET_LABELS = {
     "probable": "Probable",
     "possible": "Possible",
     "unlikely": "Unlikely",
+    "needs_review": "Needs Review",
 }
 
 
@@ -169,6 +170,10 @@ def run_dispatch_scan(
                 message=f"Tainted {src} data reaches {snk} sink",
                 cwe=getattr(flow, "cwe_id", ""), context_tag=tag_value,
                 modifier=modifier,
+                # Preserve the epistemic "needs review" bucket for dynamic
+                # constructs (eval/reflection/dynamic dispatch) instead of
+                # re-bucketing it to "possible" by the confidence float.
+                bucket_override=getattr(flow, "confidence_bucket", None),
             ))
 
     entries.sort(key=lambda e: (-e["priority"], e["file_path"], e["line"]))
@@ -176,8 +181,8 @@ def run_dispatch_scan(
 
 
 def _entry(rule_id, severity, confidence, file_path, line, message, cwe,
-           context_tag, modifier) -> Dict[str, Any]:
-    bucket = confidence_bucket(confidence)
+           context_tag, modifier, bucket_override=None) -> Dict[str, Any]:
+    bucket = bucket_override if bucket_override in BUCKET_LABELS else confidence_bucket(confidence)
     return {
         "rule_id": rule_id,
         "severity": str(severity).lower(),
