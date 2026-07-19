@@ -18,17 +18,19 @@ to a CST substrate):
   *safe* over-approximation for a security tool (more false positives are
   acceptable; muting a real flow is not) but is coarser than the Python
   engine's precise branch union -- documented deviation.
-- No inter-procedural summaries yet for JS/TS/Java (Phase 4 ships
-  intra-procedural coverage first; cross-function/cross-file summaries are
-  future work, matching plan 04's phased P1->P4 rollout applied per
-  language).
-- Import/require aliasing is NOT resolved (unlike Python's mandatory alias
-  map) -- ``const ex = require('child_process').exec`` will not currently
-  canonicalize to ``child_process.exec``. Catalog patterns are written
-  against the *conventional* receiver names (``req``, ``request``, ``res``,
-  ``db``, ``connection``, ``statement``, ``request`` (Java Servlet)) which
-  cover the overwhelming majority of real Express/Servlet/Spring code;
-  unconventional receiver names are a documented false-negative source.
+- Inter-procedural resolution (cross-function, cross-file) is now available
+  via an optional ``call_resolver`` (``engine/cst_summaries.py``'s
+  ``CstSummaryIndex``, mirroring ``TaintAnalysis/summaries.py``'s Python
+  design). Without a resolver, unresolved calls fall back to the x0.5
+  "unknown call" decay (over-approximate, never dropped).
+- Import/require aliasing IS resolved via an optional ``alias_map``
+  (``engine/cst_alias.py``, built once per file) using the same
+  language-agnostic ``resolve_chain`` dotted-string canonicalization as the
+  Python engine: ``const cp = require('child_process'); cp.exec(x)`` and
+  ``import {exec as run} from 'child_process'; run(x)`` both canonicalize to
+  ``child_process.exec``. Catalog patterns also still match the
+  *conventional* receiver names directly (``req``, ``db``, ...) as a
+  fallback when no alias map is supplied or the receiver isn't imported.
 - Java generics/annotations/lambdas are walked structurally; Spring
   ``@RequestMapping``-style route parameter seeding is not yet implemented
   (Java params are only tainted via explicit ``request.getParameter(...)``
@@ -37,10 +39,13 @@ to a CST substrate):
 """
 
 from dataclasses import replace
-from typing import Dict, List, Optional, Sequence, Set
+from typing import Dict, List, Optional, Sequence, Set, Tuple
 
 from Asgard.Heimdall.Security.normalization.priority import confidence_bucket
-from Asgard.Heimdall.Security.TaintAnalysis.catalog.sanitizers import classify_sanitizer
+from Asgard.Heimdall.Security.TaintAnalysis.catalog.sanitizers import (
+    SanitizerMatch,
+    classify_sanitizer,
+)
 from Asgard.Heimdall.Security.TaintAnalysis.catalog.sinks import JAVA_SINK_SPECS, JS_SINK_SPECS, SinkSpec
 from Asgard.Heimdall.Security.TaintAnalysis.catalog.sources import (
     JAVA_SOURCE_SPECS,
@@ -59,7 +64,17 @@ from Asgard.Heimdall.Security.TaintAnalysis.services._taint_patterns import (
     SINK_OWASP,
     SINK_TITLES,
 )
-from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import TaintState
+from Asgard.Heimdall.Security.TaintAnalysis.services._taint_visitor import (
+    CallResolver,
+    ResolvedCall,
+    TaintState,
+    resolve_chain,
+)
+from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_alias import (
+    AliasOrigin,
+    is_verified_sanitizer_origin,
+    module_target,
+)
 
 PROPAGATOR_DECAY = 0.9
 UNKNOWN_CALL_DECAY = 0.5
@@ -127,7 +142,25 @@ def _node_chain(node, ctx) -> str:
             return f"{obj_chain}.{field_chain}"
         return field_chain or obj_chain
     if t == "call_expression":
-        return _node_chain(node.child_by_field_name("function"), ctx)
+        fn_node = node.child_by_field_name("function")
+        if (
+            fn_node is not None
+            and fn_node.type == "identifier"
+            and ctx.node_text(fn_node) in ("require", "import")
+        ):
+            # Inline `require('child_process').exec(cmd)` / dynamic
+            # `import('mod').then(...)` used directly as a member-expression
+            # object with no intermediate variable: resolve to the required
+            # module's name instead of the literal text "require"/"import",
+            # or the sink chain never matches (would otherwise flatten to
+            # "require.exec").
+            args_node = node.child_by_field_name("arguments")
+            if args_node is not None and args_node.named_children:
+                first_arg = args_node.named_children[0]
+                if first_arg.type == "string":
+                    spec = ctx.node_text(first_arg).strip("'\"`")
+                    return module_target(spec)
+        return _node_chain(fn_node, ctx)
     if t == "method_invocation":
         obj_chain = _node_chain(node.child_by_field_name("object"), ctx)
         name_chain = _node_chain(node.child_by_field_name("name"), ctx)
@@ -173,6 +206,9 @@ class CstFunctionTaintVisitor:
         extra_source_specs: Sequence[SourceSpec] = (),
         extra_sink_specs: Sequence[SinkSpec] = (),
         is_test_context: bool = False,
+        alias_map: Optional[Dict[str, str]] = None,
+        call_resolver: Optional[CallResolver] = None,
+        alias_origins: Optional[Dict[str, AliasOrigin]] = None,
     ):
         self.file_path = file_path
         self.func_name = func_name
@@ -185,8 +221,17 @@ class CstFunctionTaintVisitor:
         self.extra_source_specs = tuple(extra_source_specs)
         self.extra_sink_specs = tuple(extra_sink_specs)
         self.is_test_context = is_test_context
+        self.alias_map = alias_map or {}
+        self.alias_origins = alias_origins or {}
+        self.call_resolver = call_resolver
         self.found_flows: List[TaintFlow] = []
         self._visited_calls: Set[int] = set()
+        # Inter-procedural summary-mode bookkeeping (populated regardless of
+        # mode, mirroring the Python visitor; only consumed when this
+        # visitor is invoked from ``cst_summaries.compute_cst_file_summaries``).
+        self.param_sink_hits: List[Tuple[int, SinkSpec, int, float]] = []
+        self.param_call_edges: List[Tuple[str, Dict[int, int], int]] = []
+        self.return_states: List[TaintState] = []
         try:
             self._lines = ctx.source_bytes.decode("utf-8", errors="replace").splitlines()
         except Exception:
@@ -241,6 +286,10 @@ class CstFunctionTaintVisitor:
 
     # ------------------------------------------------------- expression eval
 
+    def _chain(self, node) -> str:
+        """Flattened, alias-resolved dotted chain for a node."""
+        return resolve_chain(_node_chain(node, self.ctx), self.alias_map)
+
     def _eval(self, node) -> Optional[TaintState]:
         if node is None:
             return None
@@ -249,9 +298,10 @@ class CstFunctionTaintVisitor:
             name = self.ctx.node_text(node)
             if name in self.env:
                 return self.env[name]
-            return self._match_source_chain(name, node, is_call=False)
+            resolved = resolve_chain(name, self.alias_map)
+            return self._match_source_chain(resolved, node, is_call=False)
         if t in ("member_expression", "field_access"):
-            chain = _node_chain(node, self.ctx)
+            chain = self._chain(node)
             state = self._match_source_chain(chain, node, is_call=False)
             if state is not None:
                 return state
@@ -313,16 +363,59 @@ class CstFunctionTaintVisitor:
             return None
         return self._fresh_source_state(spec, node.start_point[0] + 1, chain)
 
-    def _eval_call(self, node) -> Optional[TaintState]:
-        chain = _node_chain(node, self.ctx)
-        args = _call_args(node)
-        arg_state: Optional[TaintState] = None
-        for a in args:
-            arg_state = self._union(arg_state, self._eval(a))
+    def _sanitizer_verified(self, raw_chain: str) -> bool:
+        """True only when the call's receiver/name resolves through an
+        import/require binding whose ORIGIN is a genuine, allow-listed
+        sanitizer package (``cst_alias.JS_SANITIZER_ALLOWED_MODULES`` /
+        ``JAVA_SANITIZER_ALLOWED_MODULES``) -- e.g. ``escape-html``,
+        ``dompurify``, ``org.owasp.encoder``.
 
-        sanitizer = classify_sanitizer(chain, tuple(self.custom_sanitizers))
+        Alias-map MEMBERSHIP alone is not sufficient evidence: a relative
+        import of a local, same-named no-op (``import { escapeHtml } from
+        './evil_local_utils'``) also creates an alias-map binding but is NOT
+        a real sanitizer -- promoting that to a full clear would mute a real
+        flow. Only a resolved binding whose raw specifier is a non-relative,
+        allow-listed package name is treated as verified; everything else
+        (relative imports, non-allow-listed bare packages, unresolved local
+        declarations) stays at the heuristic downgrade."""
+        head = raw_chain.split(".", 1)[0]
+        origin = self.alias_origins.get(head)
+        if origin is None:
+            return False
+        return is_verified_sanitizer_origin(origin.raw_specifier, origin.is_relative, self.lang)
+
+    def _eval_call(self, node) -> Optional[TaintState]:
+        raw_chain = _node_chain(node, self.ctx)
+        chain = resolve_chain(raw_chain, self.alias_map)
+        args = _call_args(node)
+        arg_states: List[Optional[TaintState]] = [self._eval(a) for a in args]
+        arg_state: Optional[TaintState] = None
+        for st in arg_states:
+            arg_state = self._union(arg_state, st)
+
+        sanitizer = classify_sanitizer(raw_chain, tuple(self.custom_sanitizers))
+        if sanitizer is None and chain != raw_chain:
+            sanitizer = classify_sanitizer(chain, tuple(self.custom_sanitizers))
+        if (
+            sanitizer is not None
+            and sanitizer.kind == "heuristic"
+            and self._sanitizer_verified(raw_chain)
+        ):
+            # Alias/import resolution lets a shadowable "library" sanitizer
+            # (JS_LIBRARY_SANITIZERS / JAVA_LIBRARY_SANITIZERS) become a real
+            # decision: the name resolves through an actual import binding,
+            # not a locally-declared no-op of the same name -- clear taint.
+            sanitizer = SanitizerMatch(sanitizer.name, "library-resolved", 0.0)
         if sanitizer is not None and sanitizer.factor == 0.0:
             return None
+
+        mapping = {
+            pos: st.param_index
+            for pos, st in enumerate(arg_states)
+            if st is not None and st.param_index is not None
+        }
+        if mapping:
+            self.param_call_edges.append((chain, mapping, node.start_point[0] + 1))
 
         spec = self._lookup_source(chain, is_call=True)
         if spec is None:
@@ -367,6 +460,20 @@ class CstFunctionTaintVisitor:
             downgraded.trace.append(self._make_step(node.start_point[0] + 1, "sanitizer", chain))
             return downgraded
 
+        # Inter-procedural resolution (cross-function/cross-file summaries):
+        # only attempted for calls carrying at least one real (non-param-seed)
+        # tainted argument, or a param-forwarding edge already recorded above
+        # for summary purposes. A resolved callee is authoritative: a clean
+        # return (no param taint reaches a sink, no fresh source returned) is
+        # a genuine drop, NOT the x0.5 unknown-call over-approximation.
+        if self.call_resolver is not None and any(
+            st is not None and st.param_index is None for st in arg_states
+        ):
+            resolved = self.call_resolver(chain, arg_states, node.start_point[0] + 1)
+            if resolved.resolved:
+                self.found_flows.extend(resolved.flows)
+                return resolved.return_state
+
         if arg_state is not None:
             return arg_state.decayed(UNKNOWN_CALL_DECAY)
         return None
@@ -407,6 +514,13 @@ class CstFunctionTaintVisitor:
             self._check_sink(node)
             for child in node.children:
                 self._walk(child)
+            return
+
+        if t == "return_statement" and node.named_children:
+            state = self._eval(node.named_children[0])
+            if state is not None:
+                self.return_states.append(state)
+            self._walk(node.named_children[0])
             return
 
         for child in node.children:
@@ -493,7 +607,7 @@ class CstFunctionTaintVisitor:
         # `ids.get(0)` read sees an untainted receiver -- run it here for
         # its env side effects regardless of the return value.
         self._eval_call(node)
-        chain = _node_chain(node, self.ctx)
+        chain = self._chain(node)
         spec = self._lookup_sink(chain)
         custom_hit = False
         if spec is None:
@@ -514,6 +628,17 @@ class CstFunctionTaintVisitor:
         for arg in candidate_args:
             state = self._eval(arg)
             if state is None:
+                continue
+            if state.param_index is not None and state.source_step.step_type == "param":
+                # Summary-computation mode (see cst_summaries.py): a
+                # synthetic parameter seed reaching a sink is a
+                # param->sink reachability fact for the summary, not a
+                # reportable finding in this pass.
+                path_factor = state.confidence * spec.confidence
+                if path_factor > 0.0:
+                    self.param_sink_hits.append(
+                        (state.param_index, spec, node.start_point[0] + 1, path_factor)
+                    )
                 continue
             self._emit_finding(state, spec, node, chain, arg_node=arg)
 
@@ -586,6 +711,9 @@ def _scan_functions(
     custom_sinks: Optional[Set[str]],
     custom_sanitizers: Optional[Set[str]],
     is_test_context: bool,
+    alias_map: Optional[Dict[str, str]] = None,
+    call_resolver: Optional[CallResolver] = None,
+    alias_origins: Optional[Dict[str, AliasOrigin]] = None,
 ) -> List[TaintFlow]:
     if ctx is None or ctx.root is None:
         return []
@@ -609,6 +737,9 @@ def _scan_functions(
             extra_source_specs=extra_source_specs,
             extra_sink_specs=extra_sink_specs,
             is_test_context=is_test_context,
+            alias_map=alias_map,
+            call_resolver=call_resolver,
+            alias_origins=alias_origins,
         )
         visitor._walk(body)
         flows.extend(visitor.found_flows)
@@ -622,12 +753,16 @@ def scan_js_ts_source(
     custom_sinks: Optional[Set[str]] = None,
     custom_sanitizers: Optional[Set[str]] = None,
     is_test_context: bool = False,
+    alias_map: Optional[Dict[str, str]] = None,
+    call_resolver: Optional[CallResolver] = None,
+    alias_origins: Optional[Dict[str, AliasOrigin]] = None,
 ) -> List[TaintFlow]:
     """Scan a parsed JS/TS/TSX ``FileParseContext`` for taint flows."""
     return _scan_functions(
         file_path, ctx, ctx.language if ctx is not None else "javascript",
         JS_SOURCE_SPECS, JS_SINK_SPECS,
         custom_sources, custom_sinks, custom_sanitizers, is_test_context,
+        alias_map=alias_map, call_resolver=call_resolver, alias_origins=alias_origins,
     )
 
 
@@ -638,10 +773,14 @@ def scan_java_source(
     custom_sinks: Optional[Set[str]] = None,
     custom_sanitizers: Optional[Set[str]] = None,
     is_test_context: bool = False,
+    alias_map: Optional[Dict[str, str]] = None,
+    call_resolver: Optional[CallResolver] = None,
+    alias_origins: Optional[Dict[str, AliasOrigin]] = None,
 ) -> List[TaintFlow]:
     """Scan a parsed Java ``FileParseContext`` for taint flows."""
     return _scan_functions(
         file_path, ctx, "java",
         JAVA_SOURCE_SPECS, JAVA_SINK_SPECS,
         custom_sources, custom_sinks, custom_sanitizers, is_test_context,
+        alias_map=alias_map, call_resolver=call_resolver, alias_origins=alias_origins,
     )
