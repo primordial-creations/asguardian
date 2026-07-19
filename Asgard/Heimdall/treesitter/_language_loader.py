@@ -25,6 +25,10 @@ def _try_load_all() -> None:
         ("csharp", "tree_sitter_c_sharp", "language"),
         ("cpp", "tree_sitter_cpp", "language"),
         ("rust", "tree_sitter_rust", "language"),
+        # "c" is a separate optional extra from "cpp" (different PyPI
+        # package, ``tree-sitter-c``) -- absence must not affect any other
+        # language load, hence its own try/except entry in this list.
+        ("c", "tree_sitter_c", "language"),
     ]
 
     for lang_name, module_name, fn_name in _candidates:
