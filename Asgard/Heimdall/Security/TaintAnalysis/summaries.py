@@ -241,10 +241,17 @@ class SummaryIndex:
         self.max_hops = max(0, int(max_hops))
         # file -> {func_name -> summary}
         self._by_file: Dict[str, Dict[str, FunctionSummary]] = {}
-        # module stem -> file path
-        self._module_files: Dict[str, str] = {}
+        # module stem -> list of file paths sharing that bare stem (there can
+        # legitimately be several -- e.g. two unrelated "util.js" files in
+        # different directories -- so this is a union, never last-write-wins).
+        self._module_files: Dict[str, List[str]] = {}
         # file -> set of module stems it imports
         self._file_imports: Dict[str, Set[str]] = {}
+        # file -> {module_stem: specific resolved target file path}, built
+        # from the caller's actual (relative) import specifier when the
+        # indexer can resolve it unambiguously to one file on disk. Used to
+        # disambiguate module-stem collisions instead of guessing.
+        self._file_resolved_imports: Dict[str, Dict[str, str]] = {}
         self._current_file: str = ""
         self._lines_by_file: Dict[str, List[str]] = {}
 
@@ -254,11 +261,16 @@ class SummaryIndex:
         summaries: Dict[str, FunctionSummary],
         imported_modules: Set[str],
         lines: List[str],
+        resolved_imports: Optional[Dict[str, str]] = None,
     ) -> None:
         self._by_file[file_path] = summaries
-        self._module_files[Path(file_path).stem] = file_path
+        self._module_files.setdefault(Path(file_path).stem, [])
+        if file_path not in self._module_files[Path(file_path).stem]:
+            self._module_files[Path(file_path).stem].append(file_path)
         self._file_imports[file_path] = set(imported_modules)
         self._lines_by_file[file_path] = lines
+        if resolved_imports:
+            self._file_resolved_imports[file_path] = dict(resolved_imports)
 
     def set_current_file(self, file_path: str) -> None:
         self._current_file = file_path
@@ -273,24 +285,45 @@ class SummaryIndex:
         # module.function (alias-resolved 'from x import f' or 'import x; x.f')
         if len(parts) >= 2:
             module_stem = parts[-2]
-            target = self._module_files.get(module_stem)
-            if target is not None:
-                summary = self._by_file.get(target, {}).get(tail)
+            # 1. Precise: the caller's own resolved import specifier maps this
+            #    stem to one specific file on disk (disambiguates same-stem
+            #    collisions, e.g. two different "util.js" files).
+            resolved = self._file_resolved_imports.get(from_file, {}).get(module_stem)
+            if resolved is not None:
+                summary = self._by_file.get(resolved, {}).get(tail)
                 if summary is not None:
                     return [summary]
+                # Resolved to a real file but no matching function in it --
+                # do NOT fall through to the ambiguous bare-stem map, that
+                # would silently substitute an unrelated same-stem file.
+            else:
+                candidates_files = self._module_files.get(module_stem, [])
+                if len(candidates_files) == 1:
+                    summary = self._by_file.get(candidates_files[0], {}).get(tail)
+                    if summary is not None:
+                        return [summary]
+                # len == 0 -> nothing indexed under that stem.
+                # len > 1  -> genuinely ambiguous (stem collision) with no
+                #             caller-specific resolution available: do NOT
+                #             guess a single winner. Fall through so the
+                #             CHA-scoped union below (and ultimately the
+                #             unresolved/unknown-call decay) takes over,
+                #             over-approximating across all same-stem
+                #             candidates rather than muting the real one.
         # same-file function
         local = self._by_file.get(from_file, {}).get(tail)
         if local is not None:
             return [local]
-        # CHA-style method resolution scoped to imported files
+        # CHA-style method resolution scoped to imported files (also the
+        # fallback path for ambiguous same-stem collisions above: unions
+        # every same-stem candidate the caller is known to import from,
+        # rather than picking one arbitrarily).
         if len(parts) >= 2:
             for stem in self._file_imports.get(from_file, set()):
-                target = self._module_files.get(stem)
-                if target is None:
-                    continue
-                summary = self._by_file.get(target, {}).get(tail)
-                if summary is not None:
-                    results.append(summary)
+                for target in self._module_files.get(stem, []):
+                    summary = self._by_file.get(target, {}).get(tail)
+                    if summary is not None:
+                        results.append(summary)
         return results[:5]  # cap union size to bound over-approximation
 
     def resolve_call(
