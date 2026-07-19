@@ -226,6 +226,17 @@ class ClassOOPMetrics:
 
     violations: List[str] = field(default_factory=list)
 
+    #: Source language ("python", "javascript", "go", ...). Defaults to
+    #: "python" for backward compatibility with the original ast-only path.
+    language: str = "python"
+    #: Which metric engine produced this entry: "ast" (Python's
+    #: cohesion/coupling/inheritance/rfc analyzers) or "cir" (the
+    #: multi-language tree-sitter CIR path in cir_metrics.py). CIR-sourced
+    #: entries only populate cbo/lcom4/rfc/method_count honestly — dit/noc/
+    #: wmc are not computed by the CIR path yet and stay at 0 rather than
+    #: being fabricated.
+    metrics_source: str = "ast"
+
     @property
     def qualified_name(self) -> str:
         """Get the qualified class name with file location."""
