@@ -627,6 +627,99 @@ class CstFunctionTaintVisitor:
         """Flattened, alias-resolved dotted chain for a node."""
         return resolve_chain(_node_chain(node, self.ctx), self.alias_map)
 
+    # --------------------------------------------------- SA1 field/container
+
+    _CHAIN_MEMBER_TYPES = (
+        "member_expression", "field_access", "selector_expression", "field_expression",
+    )
+    _CHAIN_SUBSCRIPT_TYPES = ("subscript_expression", "array_access", "index_expression")
+
+    def _chain_path(self, node) -> Tuple[Optional[str], Optional[List[str]]]:
+        """Walk a member/subscript access chain down to its root identifier.
+
+        Returns ``(root_name, prefixes)`` where ``prefixes`` lists exact
+        dotted/bracket env-keys, most-specific first. ``prefixes is None``
+        means a non-constant subscript sits SOMEWHERE along the chain --
+        callers must fall back to the root's whole-value taint (sound
+        over-approximation). ``root_name is None`` means the chain isn't
+        rooted in a bare identifier (e.g. `f().a`) -- callers fall back to
+        plain sub-expression evaluation."""
+        if node is None:
+            return None, None
+        t = node.type
+        if t == "identifier":
+            return self.ctx.node_text(node), []
+        if t in self._CHAIN_MEMBER_TYPES:
+            base = (
+                node.child_by_field_name("object")
+                or node.child_by_field_name("operand")
+                or node.child_by_field_name("argument")
+            )
+            field = (
+                node.child_by_field_name("property")
+                or node.child_by_field_name("field")
+                or node.child_by_field_name("name")
+            )
+            if base is None or field is None:
+                return None, None
+            root, prefixes = self._chain_path(base)
+            if root is None:
+                return None, None
+            if prefixes is None:
+                return root, None
+            parent = prefixes[0] if prefixes else root
+            return root, [f"{parent}.{self.ctx.node_text(field)}"] + prefixes
+        if t in self._CHAIN_SUBSCRIPT_TYPES:
+            base = (
+                node.child_by_field_name("object")
+                or node.child_by_field_name("array")
+                or node.child_by_field_name("operand")
+                or node.child_by_field_name("argument")
+            )
+            if base is None:
+                return None, None
+            root, prefixes = self._chain_path(base)
+            if root is None:
+                return None, None
+            if prefixes is None:
+                return root, None
+            index = node.child_by_field_name("index")
+            if index is None or index.type not in _CONST_LITERAL_TYPES:
+                return root, None  # non-constant index: truncate, sound
+            parent = prefixes[0] if prefixes else root
+            return root, [f"{parent}[{self.ctx.node_text(index)}]"] + prefixes
+        return None, None
+
+    def _family_taint(self, base: str) -> Optional[TaintState]:
+        """Union of every field/element taint recorded under ``base`` --
+        used ONLY for a bare-identifier read (the whole object, including
+        any tainted sub-field, flows out). A specific-field read must stay
+        scoped to that field plus the root marker (see ``_read_chain``) to
+        avoid a sibling field's taint leaking into an unrelated field."""
+        result: Optional[TaintState] = None
+        prefixes = (f"{base}.", f"{base}[")
+        for key, value in self.env.items():
+            if key.startswith(prefixes):
+                result = self._union(result, value)
+        return result
+
+    def _read_chain(self, node) -> Optional[TaintState]:
+        """Field/element-sensitive read for a member/subscript node."""
+        root, prefixes = self._chain_path(node)
+        if root is None:
+            fallback = (
+                node.child_by_field_name("object")
+                or node.child_by_field_name("array")
+                or node.child_by_field_name("operand")
+                or node.child_by_field_name("argument")
+            )
+            return self._eval(fallback)
+        if prefixes:
+            for path in prefixes:
+                if path in self.env:
+                    return self.env[path]
+        return self.env.get(root)
+
     def _eval(self, node) -> Optional[TaintState]:
         if node is None:
             return None
@@ -638,30 +731,33 @@ class CstFunctionTaintVisitor:
             alias_state = self._alias_state(name)
             if alias_state is not None:
                 return alias_state
+            family = self._family_taint(name)
+            if family is not None:
+                return family
             resolved = resolve_chain(name, self.alias_map)
             return self._match_source_chain(resolved, node, is_call=False)
-        if t in ("member_expression", "field_access", "selector_expression", "field_expression"):
+        if t in self._CHAIN_MEMBER_TYPES:
             chain = self._chain(node)
             state = self._match_source_chain(chain, node, is_call=False)
             if state is not None:
                 return state
-            fallback = (
-                node.child_by_field_name("object")
-                or node.child_by_field_name("operand")
-                or node.child_by_field_name("argument")
-            )
-            return self._eval(fallback)
-        if t in ("subscript_expression", "array_access", "index_expression"):
+            return self._read_chain(node)
+        if t in self._CHAIN_SUBSCRIPT_TYPES:
             # Index/member access on a tainted container returns the
-            # container's taint (container-granularity over-approximation,
-            # same as the Python ast engine) -- covers JS `arr[0]`/`obj['k']`,
-            # Java array-index access, and Go `slice[i]`/`m[k]`.
+            # container's taint (container-granularity over-approximation)
+            # UNLESS the index is a constant, in which case field/element
+            # -sensitive tracking narrows this to the specific key -- covers
+            # JS `arr[0]`/`obj['k']`, Java array-index access, and Go
+            # `slice[i]`/`m[k]`.
             base = (
                 node.child_by_field_name("object")
                 or node.child_by_field_name("array")
                 or node.child_by_field_name("operand")
             )
-            return self._eval(base)
+            src = self._match_source_chain(self._chain(base), base, is_call=False) if base is not None else None
+            if src is not None:
+                return src
+            return self._read_chain(node)
         if t == "expression_list":
             # Go comma-separated expression list (`a, b := f()` RHS, `return
             # x, err`) -- union across all members (over-approximation: any
@@ -1076,22 +1172,34 @@ class CstFunctionTaintVisitor:
             "field_expression",
         )
         if t in _LVALUE_CHAIN_TYPES:
-            base = target_node
-            while base is not None and base.type in _LVALUE_CHAIN_TYPES:
-                nxt = (
-                    base.child_by_field_name("object")
-                    or base.child_by_field_name("array")
-                    or base.child_by_field_name("operand")
-                    or base.child_by_field_name("argument")
-                )
-                if nxt is None:
-                    break
-                base = nxt
-            if base is not None and base.type == "identifier" and state is not None:
-                name = self.ctx.node_text(base)
+            # SA1 field/container sensitivity: a constant-key chain
+            # (`x.a = ...` / `x["a"] = ...`) is a STRONG update at that
+            # exact key -- it does not touch sibling fields. A non-constant
+            # index anywhere in the chain (`x[i] = ...`) is undecidable --
+            # sound over-approximation taints the WHOLE base object (never
+            # narrows to "safe"), same as the prior one-level-only
+            # behavior, now generalized across chain depth and languages.
+            # No CLEAR-on-clean here: the engine's sticky/never-mute policy
+            # (see the identifier branch below) applies at field
+            # granularity too -- a clean element/field store never removes
+            # taint, it just skips adding new taint at that key.
+            root, prefixes = self._chain_path(target_node)
+            if root is None:
+                return
+            if prefixes and state is not None:
+                path = prefixes[0]
                 stored = replace(state, trace=list(state.trace), sanitizers=list(state.sanitizers))
-                stored.trace.append(self._make_step(stmt_node.start_point[0] + 1, "propagation", name))
-                self.env[name] = self._union(self.env.get(name), stored)
+                stored.trace.append(self._make_step(stmt_node.start_point[0] + 1, "propagation", path))
+                self.env[path] = self._union(self.env.get(path), stored)
+                return
+            if prefixes:
+                return  # constant-key clean store: sticky, no-op
+            # Non-constant index somewhere in the chain: container
+            # laundering taints the base container.
+            if state is not None:
+                stored = replace(state, trace=list(state.trace), sanitizers=list(state.sanitizers))
+                stored.trace.append(self._make_step(stmt_node.start_point[0] + 1, "propagation", root))
+                self.env[root] = self._union(self.env.get(root), stored)
             return
         if t != "identifier":
             return

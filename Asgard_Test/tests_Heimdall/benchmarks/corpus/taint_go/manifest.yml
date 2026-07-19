@@ -65,3 +65,13 @@ cases:
     finding_class: dynamic_construct
   - file: fp_reflect_constant_arg.go
     expect: no_flow
+
+  # SA1 -- field/attribute/container sensitivity (StaticDepth Wave 1)
+  - file: tp_sa1_map_const_key_same_key_flags.go
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_sa1_map_const_key_sibling_key_clean.go
+    expect: no_flow
