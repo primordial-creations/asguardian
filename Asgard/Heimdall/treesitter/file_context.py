@@ -40,6 +40,8 @@ EXTENSION_LANGUAGE_MAP = {
     ".hpp": "cpp",
     ".hh": "cpp",
     ".rs": "rust",
+    ".c": "c",
+    ".h": "c",
 }
 
 

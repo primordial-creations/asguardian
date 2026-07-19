@@ -29,6 +29,8 @@ _LANG_DIRS = {
     "javascript": (CORPUS_ROOT / "taint_js", "javascript"),
     "java": (CORPUS_ROOT / "taint_java", "java"),
     "typescript": (CORPUS_ROOT / "taint_ts", "typescript"),
+    "go": (CORPUS_ROOT / "taint_go", "go"),
+    "c": (CORPUS_ROOT / "taint_c", "c"),
 }
 
 
@@ -72,6 +74,8 @@ def _run_case(corpus_dir: Path, case: dict) -> None:
 _JS_CASES = _load_cases("javascript")
 _JAVA_CASES = _load_cases("java")
 _TS_CASES = _load_cases("typescript")
+_GO_CASES = _load_cases("go")
+_C_CASES = _load_cases("c")
 
 
 @pytest.mark.skipif(
@@ -108,6 +112,28 @@ def test_ts_corpus_case(case):
 
 
 @pytest.mark.skipif(
+    not is_engine_enabled("go"),
+    reason="tree-sitter-go grammar not installed (optional [ast] extra)",
+)
+@pytest.mark.parametrize(
+    "case", _GO_CASES, ids=[c["file"].removesuffix(".go") for c in _GO_CASES]
+)
+def test_go_corpus_case(case):
+    _run_case(_LANG_DIRS["go"][0], case)
+
+
+@pytest.mark.skipif(
+    not is_engine_enabled("c"),
+    reason="tree-sitter-c grammar not installed (optional [ast] extra)",
+)
+@pytest.mark.parametrize(
+    "case", _C_CASES, ids=[c["file"].removesuffix(".c") for c in _C_CASES]
+)
+def test_c_corpus_case(case):
+    _run_case(_LANG_DIRS["c"][0], case)
+
+
+@pytest.mark.skipif(
     not (is_engine_enabled("javascript") and is_engine_enabled("java")),
     reason="tree-sitter JS/Java grammars not installed (optional [ast] extra)",
 )
@@ -116,6 +142,24 @@ def test_corpus_determinism_multilang():
     for corpus_dir, cases in (
         (_LANG_DIRS["javascript"][0], _JS_CASES),
         (_LANG_DIRS["java"][0], _JAVA_CASES),
+    ):
+        for case in cases[:2]:
+            r1 = _scan_fixture(corpus_dir, case["file"])
+            r2 = _scan_fixture(corpus_dir, case["file"])
+            f1 = [f.model_dump() for f in r1.taint_flows]
+            f2 = [f.model_dump() for f in r2.taint_flows]
+            assert f1 == f2
+
+
+@pytest.mark.skipif(
+    not (is_engine_enabled("go") and is_engine_enabled("c")),
+    reason="tree-sitter Go/C grammars not installed (optional [ast] extra)",
+)
+def test_corpus_determinism_go_c():
+    """Two consecutive scans on identical input yield identical findings."""
+    for corpus_dir, cases in (
+        (_LANG_DIRS["go"][0], _GO_CASES),
+        (_LANG_DIRS["c"][0], _C_CASES),
     ):
         for case in cases[:2]:
             r1 = _scan_fixture(corpus_dir, case["file"])

@@ -43,6 +43,8 @@ from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_summaries import (
     compute_cst_file_summaries,
 )
 from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_taint_visitor import (
+    scan_c_source,
+    scan_go_source,
     scan_java_source,
     scan_js_ts_source,
 )
@@ -54,12 +56,16 @@ from Asgard.Heimdall.treesitter.file_context import FileParseContext, language_f
 # why this is directory-scoped rather than whole-project).
 _JS_SIBLING_EXTS = frozenset({".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"})
 _JAVA_SIBLING_EXTS = frozenset({".java"})
+_GO_SIBLING_EXTS = frozenset({".go"})
+_C_SIBLING_EXTS = frozenset({".c", ".h"})
 _CST_SUMMARY_MAX_SIBLINGS = 40
 
 # Extensions routed through the CST taint path (plan 04 Phase 4 / plan 01
 # waves 2-3). Python keeps the ``ast``-backed path above, unchanged.
 _JS_TS_EXTENSIONS = frozenset({".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"})
 _JAVA_EXTENSIONS = frozenset({".java"})
+_GO_EXTENSIONS = frozenset({".go"})
+_C_EXTENSIONS = frozenset({".c", ".h"})
 
 # Layer-1 default sweep: unambiguous machine-issued token prefixes only
 # (low-FP by construction). Full secret scanning stays in SecretsDetection.
@@ -148,7 +154,10 @@ class DispatchEngine:
         result.structural_findings.extend(self._layer1(source, str(file_path)))
 
         suffix = file_path.suffix.lower()
-        if suffix in _JS_TS_EXTENSIONS or suffix in _JAVA_EXTENSIONS:
+        if (
+            suffix in _JS_TS_EXTENSIONS or suffix in _JAVA_EXTENSIONS
+            or suffix in _GO_EXTENSIONS or suffix in _C_EXTENSIONS
+        ):
             result.taint_flows = self._scan_cst_language(source, file_path)
             result.taint_flows = self._dedup(result.taint_flows)
             return result
@@ -201,6 +210,12 @@ class DispatchEngine:
         elif lang in ("javascript", "typescript", "tsx"):
             scan_fn = scan_js_ts_source
             sibling_exts = _JS_SIBLING_EXTS
+        elif lang == "go":
+            scan_fn = scan_go_source
+            sibling_exts = _GO_SIBLING_EXTS
+        elif lang == "c":
+            scan_fn = scan_c_source
+            sibling_exts = _C_SIBLING_EXTS
         else:
             return []
         alias_map, alias_origins = build_cst_alias_map_with_origins(ctx, lang)
