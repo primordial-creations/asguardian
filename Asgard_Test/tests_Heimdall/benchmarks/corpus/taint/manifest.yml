@@ -63,11 +63,6 @@ cases:
     cwe: CWE-95
   - file: fp_json_safe_deserialization.py
     expect: no_flow
-  # Open redirect (CWE-601) is the closest SSRF-family sink this engine
-  # models -- there is no dedicated "attacker-controlled outbound request
-  # URL" (SSRF) sink in the current catalog (see
-  # Asgard/Heimdall/Security/TaintAnalysis/catalog/sinks.py); this pair is
-  # the honest stand-in for the SSRF category called for by plan 10.
   - file: tp_open_redirect.py
     expect: flow
     count: 1
@@ -75,4 +70,18 @@ cases:
     bucket_in: [certain, probable]
     cwe: CWE-601
   - file: fp_redirect_constant.py
+    expect: no_flow
+  # SSRF (CWE-918) now has a dedicated sink type (TaintSinkType.SSRF, see
+  # Asgard/Heimdall/Security/TaintAnalysis/catalog/sinks.py SSRF entries).
+  # The prior note here ("open redirect is the closest stand-in, no
+  # dedicated SSRF sink exists") is stale as of the SSRF sink-category
+  # addition -- kept only in tp_open_redirect.py's own docstring for
+  # historical context, not repeated here.
+  - file: tp_ssrf_requests_get.py
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [certain, probable]
+    cwe: CWE-918
+  - file: fp_ssrf_fixed_url.py
     expect: no_flow

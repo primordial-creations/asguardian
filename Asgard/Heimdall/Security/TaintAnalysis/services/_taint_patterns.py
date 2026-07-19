@@ -158,6 +158,9 @@ SINK_CWE: Dict[TaintSinkType, str] = {
     TaintSinkType.LDAP_QUERY: "CWE-90",
     TaintSinkType.LOG_OUTPUT: "CWE-117",
     TaintSinkType.REDIRECT: "CWE-601",
+    TaintSinkType.SSRF: "CWE-918",
+    TaintSinkType.BUFFER_OVERFLOW: "CWE-120",
+    TaintSinkType.FORMAT_STRING: "CWE-134",
 }
 
 SINK_OWASP: Dict[TaintSinkType, str] = {
@@ -171,6 +174,9 @@ SINK_OWASP: Dict[TaintSinkType, str] = {
     TaintSinkType.LDAP_QUERY: "A03:2021",
     TaintSinkType.LOG_OUTPUT: "A09:2021",
     TaintSinkType.REDIRECT: "A01:2021",
+    TaintSinkType.SSRF: "A10:2021",
+    TaintSinkType.BUFFER_OVERFLOW: "A03:2021",
+    TaintSinkType.FORMAT_STRING: "A03:2021",
 }
 
 SINK_TITLES: Dict[TaintSinkType, str] = {
@@ -184,4 +190,7 @@ SINK_TITLES: Dict[TaintSinkType, str] = {
     TaintSinkType.LDAP_QUERY: "LDAP Injection",
     TaintSinkType.LOG_OUTPUT: "Log Injection",
     TaintSinkType.REDIRECT: "Open Redirect",
+    TaintSinkType.SSRF: "Server-Side Request Forgery (SSRF)",
+    TaintSinkType.BUFFER_OVERFLOW: "Buffer Overflow",
+    TaintSinkType.FORMAT_STRING: "Uncontrolled Format String",
 }

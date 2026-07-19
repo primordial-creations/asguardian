@@ -99,6 +99,23 @@ SINK_SPECS: Tuple[SinkSpec, ...] = (
     SinkSpec("logging.debug", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
     SinkSpec("logging.warning", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
     SinkSpec("logging.error", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    # SSRF sinks - HIGH severity: tainted URL/host reaching an outbound
+    # HTTP request. First-argument-only (the URL), see _FIRST_ARG_SINKS in
+    # the CST visitor / equivalent Python-side handling in _taint_visitor.py.
+    SinkSpec("requests.get", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("requests.post", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("requests.put", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("requests.delete", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("requests.request", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("requests.Session.get", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("session.get", TaintSinkType.SSRF, "high", 0.4),
+    SinkSpec("urllib.request.urlopen", TaintSinkType.SSRF, "high", 1.0),
+    SinkSpec("urlopen", TaintSinkType.SSRF, "high", 0.6, match_suffix=False),
+    SinkSpec("urllib2.urlopen", TaintSinkType.SSRF, "high", 1.0),
+    SinkSpec("httpx.get", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("httpx.post", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("httpx.Client.get", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("aiohttp.ClientSession.get", TaintSinkType.SSRF, "high", 0.8),
 )
 
 
@@ -145,6 +162,18 @@ JS_SINK_SPECS: Tuple[SinkSpec, ...] = (
     SinkSpec("logger.info", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
     SinkSpec("logger.warn", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
     SinkSpec("logger.error", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    # SSRF sinks
+    SinkSpec("fetch", TaintSinkType.SSRF, "high", 0.8, match_suffix=False),
+    SinkSpec("axios.get", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("axios.post", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("axios.request", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("axios", TaintSinkType.SSRF, "high", 0.6, match_suffix=False),
+    SinkSpec("http.request", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("https.request", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("http.get", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("https.get", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("got", TaintSinkType.SSRF, "high", 0.6, match_suffix=False),
+    SinkSpec("request", TaintSinkType.SSRF, "high", 0.4, match_suffix=False),
 )
 
 # --------------------------------------------------------------------------
@@ -182,6 +211,105 @@ JAVA_SINK_SPECS: Tuple[SinkSpec, ...] = (
     SinkSpec("logger.error", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
     SinkSpec("log.info", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
     SinkSpec("log.error", TaintSinkType.LOG_OUTPUT, "medium", 0.8),
+    # SSRF sinks
+    SinkSpec("HttpClient.send", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("client.send", TaintSinkType.SSRF, "high", 0.4),
+    SinkSpec("URL.openConnection", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("url.openConnection", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("URL.openStream", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("RestTemplate.getForObject", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("restTemplate.getForObject", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("RestTemplate.postForObject", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("restTemplate.postForObject", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("WebClient.get", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("HttpGet", TaintSinkType.SSRF, "high", 0.6, match_suffix=False),
+    SinkSpec("HttpPost", TaintSinkType.SSRF, "high", 0.6, match_suffix=False),
+)
+
+
+# --------------------------------------------------------------------------
+# Go (net/http, os/exec, database/sql) -- plan 04 multi-language extension.
+# --------------------------------------------------------------------------
+GO_SINK_SPECS: Tuple[SinkSpec, ...] = (
+    # SQL sinks
+    SinkSpec("db.Query", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("db.QueryContext", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("db.QueryRow", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("db.QueryRowContext", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("db.Exec", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("db.ExecContext", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("tx.Query", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("tx.Exec", TaintSinkType.SQL_QUERY, "critical", 0.8),
+    SinkSpec("Query", TaintSinkType.SQL_QUERY, "critical", 0.4, match_suffix=False),
+    SinkSpec("Exec", TaintSinkType.SQL_QUERY, "critical", 0.4, match_suffix=False),
+    # Command injection
+    SinkSpec("exec.Command", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
+    SinkSpec("exec.CommandContext", TaintSinkType.SHELL_COMMAND, "critical", 1.0),
+    # Path traversal / file access
+    SinkSpec("os.Open", TaintSinkType.FILE_PATH, "high", 0.8),
+    SinkSpec("os.OpenFile", TaintSinkType.FILE_PATH, "high", 0.8),
+    SinkSpec("os.Create", TaintSinkType.FILE_PATH, "high", 0.6),
+    SinkSpec("ioutil.ReadFile", TaintSinkType.FILE_PATH, "high", 0.8),
+    SinkSpec("os.ReadFile", TaintSinkType.FILE_PATH, "high", 0.8),
+    SinkSpec("ioutil.WriteFile", TaintSinkType.FILE_WRITE, "medium", 0.6),
+    SinkSpec("os.WriteFile", TaintSinkType.FILE_WRITE, "medium", 0.6),
+    # XSS / HTML output
+    SinkSpec("template.HTML", TaintSinkType.HTML_OUTPUT, "high", 0.8, match_suffix=False),
+    SinkSpec("w.Write", TaintSinkType.HTML_OUTPUT, "medium", 0.4),
+    SinkSpec("Fprintf", TaintSinkType.HTML_OUTPUT, "medium", 0.4, match_suffix=False),
+    # Redirect
+    SinkSpec("http.Redirect", TaintSinkType.REDIRECT, "medium", 0.8),
+    # Log
+    SinkSpec("log.Printf", TaintSinkType.LOG_OUTPUT, "medium", 0.4),
+    SinkSpec("log.Println", TaintSinkType.LOG_OUTPUT, "medium", 0.4),
+    # SSRF -- tainted URL reaching an outbound HTTP client call
+    SinkSpec("http.Get", TaintSinkType.SSRF, "high", 1.0),
+    SinkSpec("http.Post", TaintSinkType.SSRF, "high", 1.0),
+    SinkSpec("http.PostForm", TaintSinkType.SSRF, "high", 1.0),
+    SinkSpec("http.Head", TaintSinkType.SSRF, "high", 1.0),
+    SinkSpec("http.NewRequest", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("http.NewRequestWithContext", TaintSinkType.SSRF, "high", 0.8),
+    SinkSpec("client.Get", TaintSinkType.SSRF, "high", 0.4),
+    SinkSpec("client.Do", TaintSinkType.SSRF, "high", 0.4),
+)
+
+
+# --------------------------------------------------------------------------
+# C (libc) -- bounded first pass, intra-procedural only.  No pointer-aliasing
+# or memory-layout modeling: a buffer passed through several pointer hops
+# before reaching sprintf/strcpy will not be tracked (false-negative,
+# documented).  All patterns are bare identifiers (C has no method-call
+# receiver syntax), hence ``match_suffix=False`` throughout.
+# --------------------------------------------------------------------------
+C_SINK_SPECS: Tuple[SinkSpec, ...] = (
+    # Shell / process sinks - CRITICAL severity
+    SinkSpec("system", TaintSinkType.SHELL_COMMAND, "critical", 1.0, match_suffix=False),
+    SinkSpec("popen", TaintSinkType.SHELL_COMMAND, "critical", 1.0, match_suffix=False),
+    SinkSpec("execl", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
+    SinkSpec("execlp", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
+    SinkSpec("execle", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
+    SinkSpec("execv", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
+    SinkSpec("execvp", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
+    SinkSpec("execve", TaintSinkType.SHELL_COMMAND, "critical", 0.8, match_suffix=False),
+    # Buffer overflow sinks - CRITICAL severity: tainted data copied into a
+    # fixed-size buffer with no bounds check.
+    SinkSpec("strcpy", TaintSinkType.BUFFER_OVERFLOW, "critical", 1.0, match_suffix=False),
+    SinkSpec("strcat", TaintSinkType.BUFFER_OVERFLOW, "critical", 1.0, match_suffix=False),
+    SinkSpec("sprintf", TaintSinkType.BUFFER_OVERFLOW, "critical", 1.0, match_suffix=False),
+    SinkSpec("vsprintf", TaintSinkType.BUFFER_OVERFLOW, "critical", 0.8, match_suffix=False),
+    SinkSpec("gets", TaintSinkType.BUFFER_OVERFLOW, "critical", 1.0, match_suffix=False),
+    # Format string sinks - HIGH severity: tainted value used AS the format
+    # string itself (not merely as an argument to a fixed format string).
+    SinkSpec("printf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    SinkSpec("fprintf", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    SinkSpec("snprintf", TaintSinkType.FORMAT_STRING, "high", 0.4, match_suffix=False),
+    SinkSpec("syslog", TaintSinkType.FORMAT_STRING, "high", 0.6, match_suffix=False),
+    # Path traversal / file access - HIGH severity
+    SinkSpec("fopen", TaintSinkType.FILE_PATH, "high", 0.8, match_suffix=False),
+    SinkSpec("open", TaintSinkType.FILE_PATH, "high", 0.6, match_suffix=False),
+    SinkSpec("freopen", TaintSinkType.FILE_PATH, "high", 0.6, match_suffix=False),
+    SinkSpec("unlink", TaintSinkType.FILE_PATH, "high", 0.6, match_suffix=False),
+    SinkSpec("remove", TaintSinkType.FILE_PATH, "high", 0.6, match_suffix=False),
 )
 
 

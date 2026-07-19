@@ -41,6 +41,9 @@ class TaintSinkType(str, Enum):
     LDAP_QUERY = "ldap_query"           # ldap search operations
     LOG_OUTPUT = "log_output"           # log.info/debug with user data (log injection)
     REDIRECT = "redirect"               # redirect(url) with user-controlled url
+    SSRF = "ssrf"                       # outbound HTTP request (requests.get, fetch, HttpClient) with tainted URL/host
+    BUFFER_OVERFLOW = "buffer_overflow" # C: sprintf/strcpy/strcat/gets into a fixed-size buffer with tainted data
+    FORMAT_STRING = "format_string"     # C: printf/fprintf/syslog with a tainted (non-literal) format string
 
 
 class TaintFlowStep(BaseModel):

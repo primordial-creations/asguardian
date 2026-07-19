@@ -98,3 +98,14 @@ cases:
     severity: critical
     bucket_in: [certain, probable]
     cwe: CWE-78
+  # -- SSRF (CWE-918) -- a dedicated sink type now exists (see
+  # TaintSinkType.SSRF); the "no dedicated SSRF sink" note above
+  # (tp_open_redirect.js) predates this and only applies to open-redirect.
+  - file: tp_ssrf_fetch.js
+    expect: flow
+    count: 1
+    severity: high
+    bucket_in: [certain, probable]
+    cwe: CWE-918
+  - file: fp_ssrf_fixed_url.js
+    expect: no_flow
