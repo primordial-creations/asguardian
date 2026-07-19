@@ -28,10 +28,22 @@ unknown-call decay, same as an unresolved call.
 from pathlib import Path
 from typing import Dict, List, Optional, Set
 
-from Asgard.Heimdall.Security.TaintAnalysis.catalog.sinks import JAVA_SINK_SPECS, JS_SINK_SPECS
-from Asgard.Heimdall.Security.TaintAnalysis.catalog.sources import JAVA_SOURCE_SPECS, JS_SOURCE_SPECS
+from Asgard.Heimdall.Security.TaintAnalysis.catalog.sinks import (
+    C_SINK_SPECS,
+    GO_SINK_SPECS,
+    JAVA_SINK_SPECS,
+    JS_SINK_SPECS,
+)
+from Asgard.Heimdall.Security.TaintAnalysis.catalog.sources import (
+    C_SOURCE_SPECS,
+    GO_SOURCE_SPECS,
+    JAVA_SOURCE_SPECS,
+    JS_SOURCE_SPECS,
+)
 from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_taint_visitor import (
+    _C_DECLARATOR_WRAPPERS,
     CstFunctionTaintVisitor,
+    _c_declarator_identifier,
     _find_functions,
 )
 from Asgard.Heimdall.Security.TaintAnalysis.models.taint_models import TaintFlowStep, TaintSourceType
@@ -92,9 +104,58 @@ def _java_param_names(fn, ctx) -> List[str]:
     return names
 
 
+def _go_param_names(fn, ctx) -> List[str]:
+    """Go ``parameter_list``: each ``parameter_declaration`` may carry
+    MULTIPLE ``name`` fields (``func f(a, b string)``) sharing one type."""
+    names: List[str] = []
+    params_node = fn.child_by_field_name("parameters")
+    if params_node is None:
+        return names
+    for child in params_node.named_children:
+        if child.type == "parameter_declaration":
+            for name_node in child.children_by_field_name("name"):
+                names.append(ctx.node_text(name_node))
+    return names
+
+
+def _c_param_names(fn, ctx) -> List[str]:
+    """C ``parameter_list``: each ``parameter_declaration`` names one
+    parameter via its (possibly pointer/array-wrapped) ``declarator`` field.
+    Bare types with no name (``void f(int)`` prototypes) contribute nothing."""
+    names: List[str] = []
+    params_node = fn.child_by_field_name("parameters")
+    if params_node is None:
+        return names
+    for child in params_node.named_children:
+        if child.type != "parameter_declaration":
+            continue
+        declarator = child.child_by_field_name("declarator")
+        name_node = _c_declarator_identifier(declarator)
+        if name_node is not None:
+            names.append(ctx.node_text(name_node))
+    return names
+
+
+def _c_function_name(fn, ctx) -> Optional[str]:
+    """C ``function_definition`` has no ``name`` field -- unwrap
+    ``declarator`` -> (possibly pointer-wrapped) ``function_declarator`` ->
+    its own ``declarator`` field -> (possibly pointer-wrapped) identifier."""
+    fdecl = fn.child_by_field_name("declarator")
+    while fdecl is not None and fdecl.type in _C_DECLARATOR_WRAPPERS:
+        fdecl = fdecl.child_by_field_name("declarator")
+    if fdecl is None or fdecl.type != "function_declarator":
+        return None
+    name_node = _c_declarator_identifier(fdecl.child_by_field_name("declarator"))
+    return ctx.node_text(name_node) if name_node is not None else None
+
+
 def _param_names(fn, ctx, lang: str) -> List[str]:
     if lang in _JS_LANGS:
         return _js_param_names(fn, ctx)
+    if lang == "go":
+        return _go_param_names(fn, ctx)
+    if lang == "c":
+        return _c_param_names(fn, ctx)
     return _java_param_names(fn, ctx)
 
 
@@ -109,8 +170,14 @@ def compute_cst_file_summaries(
     JS/TS/Java file. Mirrors ``summaries.compute_file_summaries``."""
     if ctx is None or ctx.root is None:
         return {}
-    source_specs = JAVA_SOURCE_SPECS if lang == "java" else JS_SOURCE_SPECS
-    sink_specs = JAVA_SINK_SPECS if lang == "java" else JS_SINK_SPECS
+    if lang == "java":
+        source_specs, sink_specs = JAVA_SOURCE_SPECS, JAVA_SINK_SPECS
+    elif lang == "go":
+        source_specs, sink_specs = GO_SOURCE_SPECS, GO_SINK_SPECS
+    elif lang == "c":
+        source_specs, sink_specs = C_SOURCE_SPECS, C_SINK_SPECS
+    else:
+        source_specs, sink_specs = JS_SOURCE_SPECS, JS_SINK_SPECS
 
     functions: List = []
     _find_functions(ctx.root, functions)
@@ -120,7 +187,12 @@ def compute_cst_file_summaries(
         if body is None:
             continue
         name_node = fn.child_by_field_name("name")
-        func_name = ctx.node_text(name_node) if name_node is not None else "<anonymous>"
+        if name_node is not None:
+            func_name = ctx.node_text(name_node)
+        elif fn.type == "function_definition":
+            func_name = _c_function_name(fn, ctx) or "<anonymous>"
+        else:
+            func_name = "<anonymous>"
         params = _param_names(fn, ctx, lang)
 
         seed: Dict[str, TaintState] = {}
