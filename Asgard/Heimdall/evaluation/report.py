@@ -13,9 +13,9 @@ from Asgard.Heimdall.evaluation.gate import GateResult
 from Asgard.Heimdall.evaluation.runner import CorpusMetrics
 
 
-def metrics_to_dict(metrics: CorpusMetrics) -> Dict[str, Any]:
+def metrics_to_dict(metrics: CorpusMetrics, corpus_label: Optional[str] = None) -> Dict[str, Any]:
     brier = brier_score(metrics.calibration_records)
-    return {
+    d: Dict[str, Any] = {
         "tp": metrics.tp,
         "fp": metrics.fp,
         "fn": metrics.fn,
@@ -27,17 +27,23 @@ def metrics_to_dict(metrics: CorpusMetrics) -> Dict[str, Any]:
         "alert_density_per_10k_loc": metrics.alert_density,
         "brier_score": brier,
     }
+    if corpus_label:
+        d["corpus_label"] = corpus_label
+    return d
 
 
 def render_text_report(
     metrics: CorpusMetrics,
     gate: Optional[GateResult] = None,
     reliability: Optional[List[ReliabilityBin]] = None,
+    corpus_label: Optional[str] = None,
 ) -> str:
     lines: List[str] = []
     lines.append("Heimdall evaluation report")
     lines.append("=" * 27)
-    d = metrics_to_dict(metrics)
+    if corpus_label:
+        lines.append(f"Corpus: {corpus_label}")
+    d = metrics_to_dict(metrics, corpus_label=corpus_label)
     lines.append(f"TP={d['tp']}  FP={d['fp']}  FN={d['fn']}  LOC={d['total_loc']}")
     lines.append(f"precision={d['precision']:.3f}  recall={d['recall']:.3f}")
     lines.append(f"F0.5={d['f_0.5']:.3f}  F2={d['f_2']:.3f}")
@@ -66,8 +72,9 @@ def render_text_report(
 def render_json_report(
     metrics: CorpusMetrics,
     gate: Optional[GateResult] = None,
+    corpus_label: Optional[str] = None,
 ) -> str:
-    payload: Dict[str, Any] = {"metrics": metrics_to_dict(metrics)}
+    payload: Dict[str, Any] = {"metrics": metrics_to_dict(metrics, corpus_label=corpus_label)}
     if gate is not None:
         payload["gate"] = {"passed": gate.passed, "reasons": gate.reasons}
     return json.dumps(payload, indent=2, sort_keys=True)

@@ -24,6 +24,7 @@ from Asgard.Heimdall.cli.handlers import (
     run_calibrate,
     run_validate_rules,
     run_eval,
+    run_eval_corpus,
 )
 
 
@@ -119,11 +120,14 @@ def dispatch_management(args, verbose: bool) -> None:
     elif args.command == "eval":
         if not hasattr(args, "eval_command") or args.eval_command is None:
             print("Error: Please specify an eval subcommand. Available subcommands:")
-            print("  run  Compute corpus precision/recall/F-scores against ground truth")
+            print("  run     Compute corpus precision/recall/F-scores against ground truth")
+            print("  corpus  Scan the vendored fixture corpus with the real scanners")
             print("\nUse 'heimdall eval <subcommand> -h' for help on a specific subcommand.")
             sys.exit(1)
         if args.eval_command == "run":
             sys.exit(run_eval(args, verbose))
+        elif args.eval_command == "corpus":
+            sys.exit(run_eval_corpus(args, verbose))
         else:
             print(f"Unknown eval command: {args.eval_command}")
             sys.exit(1)

@@ -110,3 +110,28 @@ def setup_eval_command(subparsers) -> None:
         "--gate-profile", type=str, default=None,
         help="Acceptance-profile name to gate the run against (skips gating if omitted)",
     )
+
+    corpus_parser = eval_subparsers.add_parser(
+        "corpus",
+        help=(
+            "Scan the vendored fixture corpus with the real scanners and report "
+            "precision/recall/F-beta/Brier (honestly labeled -- see --help)"
+        ),
+    )
+    corpus_parser.add_argument(
+        "--corpus-dir", type=str, default=None,
+        help=(
+            "Path to a corpus directory shaped like "
+            "Asgard_Test/tests_Heimdall/benchmarks/corpus (per-language "
+            "subdirectories with a manifest.yml). Defaults to the vendored "
+            "corpus shipped in this repo."
+        ),
+    )
+    corpus_parser.add_argument(
+        "--format", "-f", choices=["text", "json"], default="text",
+        help="Output format (default: text)",
+    )
+    corpus_parser.add_argument(
+        "--gate-profile", type=str, default=None,
+        help="Acceptance-profile name to gate the run against (skips gating if omitted)",
+    )
