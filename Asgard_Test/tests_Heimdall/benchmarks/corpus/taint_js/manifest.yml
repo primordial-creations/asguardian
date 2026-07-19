@@ -202,3 +202,27 @@ cases:
     severity: critical
     bucket_in: [certain, probable]
     cwe: CWE-89
+  # SA4 context-sensitivity + path-sensitivity (deterministic static-analysis
+  # deepening plan, SA4).
+  - file: fp_sa4_guard_clause_validator_clears.js
+    expect: no_flow
+  - file: tp_sa4_nonvalidator_guard_still_flags.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: tp_sa4_branch_join_unions.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: tp_sa4_helper_call_site_sensitivity.js
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-89
+  - file: fp_sa4_helper_clean_call_site_only.js
+    expect: no_flow

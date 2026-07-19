@@ -93,6 +93,32 @@ _MOCK_PREFIXES = ("mock_", "test_", "dummy_", "fake_", "sample_", "example_")
 
 _JS_LANGS = frozenset({"javascript", "typescript", "tsx"})
 
+# SA4 path-sensitivity: JS/TS GENUINE value-domain predicates -- receiver-
+# qualified, unshadowable stdlib checks (mirrors the JS_EXACT_SANITIZERS
+# rationale in catalog/sanitizers.py: a global-namespace-qualified builtin
+# is not plausibly redefined by application code). `Number.isInteger(x)` /
+# `Number.isFinite(x)` returning true PROVES x's runtime type/value is a
+# finite JS number -- a value class that cannot carry a SQL/shell/HTML
+# injection payload (those require a string). This is NOT a new invented
+# "isValid"-style semantic validator: it is the same kind of provable
+# value-domain restriction the catalog already grants `int()`/`float()`
+# (Python) and `parseInt`/`Number` (JS, as a transform) -- expressed here as
+# a boolean predicate for path-sensitivity guard detection instead of a
+# strong-update transform. Java/Go/C guard-based clearing is NOT
+# implemented (documented residual limitation: no catalog-verified,
+# unshadowable STRING-level boolean predicate is available for those
+# languages the way `str.isdigit()`-family is in Python) -- an unrecognized
+# guard in those languages simply clears nothing, so the ordinary sound
+# union/never-mute behavior is unaffected.
+_JS_VALIDATOR_CALLS = frozenset({"Number.isInteger", "Number.isFinite"})
+
+# Statement types that unconditionally end control flow within the current
+# function/loop -- used only to decide which arm of an if/else feeds the
+# code that follows on a branch join (SA4), never to clear taint by itself.
+_TERMINAL_STMT_TYPES = frozenset({
+    "return_statement", "throw_statement", "continue_statement", "break_statement",
+})
+
 _FIRST_ARG_SINKS = {
     TaintSinkType.SQL_QUERY,
     TaintSinkType.SHELL_COMMAND,
@@ -523,6 +549,76 @@ class CstFunctionTaintVisitor:
     def _fresh_source_state(self, spec: SourceSpec, line: int, var_name: str) -> TaintState:
         step = self._make_step(line, "source", var_name or spec.pattern)
         return TaintState(source_step=step, source_type=spec.source_type, confidence=spec.confidence)
+
+    # ------------------------------------------------- SA4 path-sensitivity
+
+    def _classify_guard(self, condition) -> Optional[Tuple[str, bool]]:
+        """Detect `if (<validator>(x))` / `if (!<validator>(x))` where
+        <validator> is one of the whitelisted, provably value-domain-
+        restricting predicates (`_JS_VALIDATOR_CALLS`), with a single
+        bare-identifier argument. Returns ``(var_name, body_is_validated_arm)``
+        or ``None`` for anything else -- including calls this engine cannot
+        verify (e.g. a local `isValid(x)`) and, currently, any language
+        other than JS/TS. A ``None`` result means `_walk`'s if_statement
+        handler clears nothing and both arms are combined with the ordinary
+        sound union, so an unguarded or unverified-guard path still flags.
+        """
+        node = condition
+        if node is not None and node.type == "parenthesized_expression" and node.named_children:
+            node = node.named_children[0]
+        negated = False
+        if node is not None and node.type == "unary_expression":
+            op = node.child_by_field_name("operator")
+            if op is not None and self.ctx.node_text(op) == "!":
+                negated = True
+                node = node.child_by_field_name("argument")
+                if node is not None and node.type == "parenthesized_expression" and node.named_children:
+                    node = node.named_children[0]
+        if node is None or node.type not in ("call_expression", "method_invocation"):
+            return None
+        if self.lang not in _JS_LANGS:
+            return None
+        chain = resolve_chain(_node_chain(node, self.ctx), self.alias_map)
+        if chain not in _JS_VALIDATOR_CALLS:
+            return None
+        args = _call_args(node)
+        if len(args) != 1 or args[0].type != "identifier":
+            return None
+        return self.ctx.node_text(args[0]), not negated
+
+    def _is_terminal_block(self, node) -> bool:
+        """Conservative check: does this arm ALWAYS end control flow in the
+        enclosing function/loop? Used only to decide which arm's env feeds
+        code after the `if` on a branch join -- an unrecognized shape is
+        treated as non-terminal (falls back to the ordinary sound union,
+        never assumes a path was pruned when it wasn't)."""
+        if node is None:
+            return False
+        t = node.type
+        if t == "else_clause":
+            # JS/C wrap the else arm in an `else_clause` node whose sole
+            # child is either a block or a nested `if_statement` (`else if`).
+            children = list(node.named_children)
+            return self._is_terminal_block(children[0]) if children else False
+        if t in ("block", "compound_statement", "statement_block"):
+            children = list(node.named_children)
+            if len(children) == 1 and children[0].type == "statement_list":
+                children = list(children[0].named_children)
+            if not children:
+                return False
+            return self._is_terminal_block(children[-1])
+        if t == "statement_list":
+            children = list(node.named_children)
+            return self._is_terminal_block(children[-1]) if children else False
+        if t in _TERMINAL_STMT_TYPES:
+            return True
+        if t == "if_statement":
+            alt = node.child_by_field_name("alternative")
+            cons = node.child_by_field_name("consequence")
+            if alt is None:
+                return False
+            return self._is_terminal_block(cons) and self._is_terminal_block(alt)
+        return False
 
     @staticmethod
     def _union(a: Optional[TaintState], b: Optional[TaintState]) -> Optional[TaintState]:
@@ -1366,6 +1462,65 @@ class CstFunctionTaintVisitor:
             if state is not None:
                 self.return_states.append(state)
             self._walk(node.named_children[0])
+            return
+
+        if t == "if_statement":
+            # SA4: real branch-join (env save/restore/union) -- previously
+            # this engine had NO if/else handling at all; both arms ran
+            # sequentially into the SAME shared `self.env` (generic
+            # descent), which the sticky/never-mute assignment policy kept
+            # sound but badly imprecise (a clean else-arm reassignment could
+            # never clear taint the if-arm set). This generalizes Wave 1's
+            # straight-line strong updates to a real join: each arm is
+            # evaluated against its own cloned env, then merged.
+            condition = node.child_by_field_name("condition")
+            consequence = node.child_by_field_name("consequence")
+            alternative = node.child_by_field_name("alternative")
+            if condition is not None:
+                self._walk(condition)
+
+            # Path-sensitivity: only a whitelisted, catalog-grade validator
+            # call clears anything, and only the specific variable/specific
+            # arm it provably validates -- see `_classify_guard`.
+            guard = self._classify_guard(condition)
+
+            saved_env = dict(self.env)
+            if guard is not None:
+                var, body_validated = guard
+                if body_validated:
+                    self.env.pop(var, None)
+            if consequence is not None:
+                self._walk(consequence)
+            body_env = self.env
+
+            self.env = dict(saved_env)
+            if guard is not None:
+                var, body_validated = guard
+                if not body_validated:
+                    self.env.pop(var, None)
+            if alternative is not None:
+                self._walk(alternative)
+            else_env = self.env
+
+            # Branch-join generalization: when one arm always exits the
+            # enclosing function/loop (early-return guard clause), code
+            # after the `if` is only ever reached via the OTHER arm -- feed
+            # the merge from that arm alone. Neither/both terminal falls
+            # back to the ordinary sound union (never assumes a path was
+            # pruned when it wasn't -- an unguarded path still flags).
+            body_terminal = self._is_terminal_block(consequence)
+            else_terminal = self._is_terminal_block(alternative) if alternative is not None else False
+            if body_terminal and not else_terminal:
+                merged = dict(else_env)
+            elif else_terminal and not body_terminal:
+                merged = dict(body_env)
+            else:
+                merged = {}
+                for name in set(body_env) | set(else_env):
+                    merged_value = self._union(body_env.get(name), else_env.get(name))
+                    if merged_value is not None:
+                        merged[name] = merged_value
+            self.env = merged
             return
 
         for child in node.children:
