@@ -553,8 +553,17 @@ class _FunctionTaintVisitor(ast.NodeVisitor):
     # ------------------------------------------------------------------ sinks
 
     def visit_Call(self, node: ast.Call) -> None:
+        # MAJOR-2 (adversarial review): a call site that already produced
+        # a concrete taint-flow sink finding (e.g. `eval(taint)` matching
+        # the `eval_exec` CWE-95 sink) must not ALSO emit a redundant WS5
+        # dynamic_construct finding for the same node -- DYNAMIC_CONSTRUCT
+        # is reserved for constructs with no concrete sink match (getattr
+        # dispatch, __import__, ...).
+        flows_before = len(self.found_flows)
         self._check_sink(node)
-        self._check_dynamic_construct(node)
+        sink_hit = len(self.found_flows) > flows_before
+        if not sink_hit:
+            self._check_dynamic_construct(node)
         self.generic_visit(node)
 
     # -------------------------------------------------- WS5 dynamic-construct

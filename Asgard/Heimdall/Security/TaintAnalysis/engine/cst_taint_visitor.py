@@ -354,6 +354,21 @@ def _node_chain(node, ctx) -> str:
         return name_chain
     if t == "object_creation_expression":
         return _node_chain(node.child_by_field_name("type"), ctx)
+    if t == "new_expression":
+        # JS `new Function(taint)` / `new Foo(...)` -- tree-sitter-js's
+        # `new_expression` node uses field "constructor" (NOT "type" like
+        # Java's `object_creation_expression`, NOT "function" like a plain
+        # call) -- BLOCKER-3 (adversarial review): without this branch
+        # `new Function(taint)` resolved to chain="" and was invisible to
+        # both `_check_sink` and `_check_dynamic_construct`.
+        return _node_chain(node.child_by_field_name("constructor"), ctx)
+    if t == "import":
+        # JS dynamic `import(userVar)` -- tree-sitter-js parses the bare
+        # `import` keyword used as a call target (NOT `import ... from`
+        # static import syntax) as its own leaf node of type "import"
+        # (BLOCKER-4, adversarial review): without this branch the callee
+        # chain was "" and never matched `_JS_DYNAMIC_IMPORT_NAMES`.
+        return "import"
     if t == "parenthesized_expression" and node.named_children:
         return _node_chain(node.named_children[0], ctx)
     return ""
@@ -364,6 +379,25 @@ def _call_args(node) -> List:
     if args_node is None:
         return []
     return list(args_node.named_children)
+
+
+def _is_c_constant_literal(node) -> bool:
+    """True for a C literal (string/char/number/concatenated-string/NULL)
+    RHS, possibly wrapped in parens -- used by MAJOR-1's strong-update fix
+    (`p = "ls";`): a pointer directly reassigned to one of these in
+    straight-line code is PROVABLY clean, unlike the general "RHS evaluates
+    to no taint" case (a call, a variable, arithmetic) which stays under the
+    sticky/over-approximate policy because it isn't provably constant."""
+    if node is None:
+        return False
+    if node.type in (
+        "string_literal", "char_literal", "number_literal",
+        "concatenated_string", "null",
+    ):
+        return True
+    if node.type == "parenthesized_expression" and node.named_children:
+        return _is_c_constant_literal(node.named_children[0])
+    return False
 
 
 def _find_functions(node, out: List) -> None:
@@ -432,6 +466,19 @@ class CstFunctionTaintVisitor:
         # are themselves the result of a call/field access rather than a
         # bare declared parameter).
         self.servlet_request_params: Set[str] = set()
+        # Java-only, MINOR (adversarial review): variable name -> declared
+        # type's simple name, for every parameter/local whose type is
+        # syntactically known. Used to gate the literal `request
+        # .getParameter` catalog pattern (catalog/sources.py) -- that
+        # pattern matches on the bare name "request" regardless of type, so
+        # `void h(String request) { ...; sink(request.getParameter(...)); }`
+        # (not real servlet code -- `getParameter` here would be some
+        # unrelated method, or wouldn't compile, but the point stands for
+        # any non-servlet-typed `request`) was a false positive. Only
+        # suppresses the fallback when the type is KNOWN and is NOT a
+        # servlet type; an unknown/absent type keeps the literal pattern
+        # active (never narrows a genuine `HttpServletRequest request`).
+        self.declared_var_types: Dict[str, str] = {}
         self.custom_sources = custom_sources or set()
         self.custom_sinks = custom_sinks or set()
         self.custom_sanitizers = custom_sanitizers or set()
@@ -490,6 +537,19 @@ class CstFunctionTaintVisitor:
             if spec.is_call and not is_call:
                 continue
             if chain == spec.pattern or chain.startswith(spec.pattern + "."):
+                if self.lang == "java" and "." in spec.pattern:
+                    # MINOR (adversarial review): the catalog's literal
+                    # `request.getParameter`/`request.getParameterValues`
+                    # patterns match on the bare name "request" -- gate them
+                    # off when THIS function's `request` is a KNOWN
+                    # non-servlet type (e.g. `String request`), now that
+                    # type-based servlet detection (below) makes the
+                    # name-based fallback unnecessary for genuine servlet
+                    # params. An unknown/absent declared type is left alone.
+                    head = spec.pattern.split(".", 1)[0]
+                    declared = self.declared_var_types.get(head)
+                    if declared is not None and declared not in _SERVLET_REQUEST_TYPE_NAMES:
+                        continue
                 return spec
         # Java type-based fallback: any variable declared as a
         # HttpServletRequest parameter (regardless of its name) reaching
@@ -618,7 +678,7 @@ class CstFunctionTaintVisitor:
             if node.named_children:
                 return self._eval(node.named_children[0])
             return None
-        if t in ("call_expression", "method_invocation", "object_creation_expression"):
+        if t in ("call_expression", "method_invocation", "object_creation_expression", "new_expression"):
             return self._eval_call(node)
         if t == "template_string":
             state: Optional[TaintState] = None
@@ -874,11 +934,41 @@ class CstFunctionTaintVisitor:
             right = node.child_by_field_name("right")
             state = self._eval(right) if right is not None else None
             self._check_dom_sink_assignment(left, state, node)
-            self._assign(left, state, node)
+            if (
+                self.lang == "c"
+                and left is not None
+                and left.type == "identifier"
+                and _is_c_constant_literal(right)
+            ):
+                # MAJOR-1 (adversarial review): `char *p = buf; fgets(buf,
+                # ...); p = "ls"; system(p);` was flagging CERTAIN CWE-78
+                # even though `p` is PROVABLY reassigned to a constant right
+                # before the sink. Unlike the general sticky/never-mute
+                # policy in `_assign` (a direct reassignment to a
+                # non-constant clean value, e.g. another variable or a call
+                # result, stays over-approximate because it ISN'T provably
+                # clean), a literal RHS on a plain identifier target is a
+                # STRONG update: clear `p`'s own taint AND drop it from its
+                # pointer-alias group so it stops transitively inheriting
+                # another member's (e.g. `buf`'s) taint. Conditional/aliased
+                # cases are untouched -- this only fires for this exact
+                # straight-line identifier-assigned-a-literal shape.
+                name = self.ctx.node_text(left)
+                self.env.pop(name, None)
+                group = self.ptr_aliases.pop(name, None)
+                if group:
+                    remaining = group - {name}
+                    for member in remaining:
+                        self.ptr_aliases[member] = remaining
+            else:
+                self._assign(left, state, node)
             if self.lang == "c" and left is not None and left.type == "identifier":
                 # `p = buf;` / `p = &x;` (C reassignment, not a fresh
                 # declaration) -- also forms a pointer-alias union so a
                 # LATER taint of either side is visible through the other.
+                # (No-op when the strong-update branch above just fired:
+                # `_maybe_alias_declaration` only aliases a bare-identifier/
+                # address-of RHS, never a literal.)
                 self._maybe_alias_declaration(self.ctx.node_text(left), right)
             if right is not None:
                 self._walk(right)
@@ -944,9 +1034,20 @@ class CstFunctionTaintVisitor:
                         self._walk(value)
             return
 
-        if t in ("call_expression", "method_invocation", "object_creation_expression"):
+        if t in ("call_expression", "method_invocation", "object_creation_expression", "new_expression"):
+            # MAJOR-2 (adversarial review): a call site that ALREADY
+            # produced a concrete taint-flow sink finding (e.g.
+            # `eval(taint)` matching the `eval_exec` CWE-95 sink) must NOT
+            # also emit a redundant WS5 dynamic_construct finding for the
+            # SAME node -- DYNAMIC_CONSTRUCT is for constructs not
+            # otherwise caught by a concrete sink. `getattr`/`new
+            # Function`/dynamic `import`/reflection calls that have no
+            # registered sink still get their needs-review finding.
+            flows_before = len(self.found_flows)
             self._check_sink(node)
-            self._check_dynamic_construct(node)
+            sink_hit = len(self.found_flows) > flows_before
+            if not sink_hit:
+                self._check_dynamic_construct(node)
             for child in node.children:
                 self._walk(child)
             return
@@ -1363,19 +1464,44 @@ def _populate_servlet_request_params(fn, ctx, visitor: "CstFunctionTaintVisitor"
     see that field's docstring for why this type-based recognition is
     needed alongside the literal `request.getParameter` pattern."""
     params_node = fn.child_by_field_name("parameters")
-    if params_node is None:
-        return
-    for param in params_node.named_children:
-        if param.type != "formal_parameter":
-            continue
-        type_node = param.child_by_field_name("type")
-        name_node = param.child_by_field_name("name")
-        if type_node is None or name_node is None:
-            continue
-        type_text = ctx.node_text(type_node)
-        simple_type = type_text.rsplit(".", 1)[-1]
-        if simple_type in _SERVLET_REQUEST_TYPE_NAMES:
-            visitor.servlet_request_params.add(ctx.node_text(name_node))
+    if params_node is not None:
+        for param in params_node.named_children:
+            if param.type != "formal_parameter":
+                continue
+            type_node = param.child_by_field_name("type")
+            name_node = param.child_by_field_name("name")
+            if type_node is None or name_node is None:
+                continue
+            type_text = ctx.node_text(type_node)
+            simple_type = type_text.rsplit(".", 1)[-1]
+            var_name = ctx.node_text(name_node)
+            visitor.declared_var_types[var_name] = simple_type
+            if simple_type in _SERVLET_REQUEST_TYPE_NAMES:
+                visitor.servlet_request_params.add(var_name)
+    # MINOR (adversarial review): also record local-variable declared types
+    # (`String request = ...;`) so the same non-servlet-type gate in
+    # `_lookup_source` applies to a shadowing local, not just parameters.
+    body = fn.child_by_field_name("body")
+    if body is not None:
+        stack = [body]
+        while stack:
+            n = stack.pop()
+            if n.type == "local_variable_declaration":
+                type_node = n.child_by_field_name("type")
+                if type_node is not None:
+                    type_text = ctx.node_text(type_node)
+                    simple_type = type_text.rsplit(".", 1)[-1]
+                    for declarator in n.named_children:
+                        if declarator.type != "variable_declarator":
+                            continue
+                        name_node = declarator.child_by_field_name("name")
+                        if name_node is None:
+                            continue
+                        var_name = ctx.node_text(name_node)
+                        visitor.declared_var_types.setdefault(var_name, simple_type)
+                        if simple_type in _SERVLET_REQUEST_TYPE_NAMES:
+                            visitor.servlet_request_params.add(var_name)
+            stack.extend(n.named_children)
 
 
 def scan_js_ts_source(

@@ -61,6 +61,14 @@ from Asgard.Heimdall.treesitter.file_context import FileParseContext, language_f
 # index is now PROJECT-ROOTED, not directory-scoped: every same-language
 # file under the discovered project root is a candidate, not just the
 # immediate directory's siblings).
+# WS5 dynamic-construct trigger names (adversarial review ROOT CAUSE fix):
+# these builtins are never registered TaintAnalysis sources/sinks (they ARE
+# the undecidable-dynamic-dispatch case WS5 exists to surface), so a
+# function whose only interesting call is one of these must still be
+# triggered into Layer 3 for `_check_dynamic_construct` to run at all --
+# see `_layer2_triggers`/`_layer3` below.
+_PY_DYNAMIC_TRIGGER_NAMES = frozenset({"eval", "exec", "__import__", "getattr"})
+
 _JS_SIBLING_EXTS = frozenset({".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"})
 _JAVA_SIBLING_EXTS = frozenset({".java"})
 _GO_SIBLING_EXTS = frozenset({".go"})
@@ -626,6 +634,7 @@ class DispatchEngine:
         def scan_body(func_name: str, body: Sequence[ast.stmt]) -> None:
             sources: List[str] = []
             sinks: List[str] = []
+            dynamic: List[str] = []
             for stmt in body:
                 for node in ast.walk(stmt):
                     if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) \
@@ -642,8 +651,23 @@ class DispatchEngine:
                             sinks.append(chain)
                         if chain and lookup_source(chain, is_call=True) is not None:
                             sources.append(chain)
-            if sources or sinks:
-                index[func_name] = {"sources": sources, "sinks": sinks}
+                        # WS5 dynamic-construct surfacing (adversarial review
+                        # ROOT CAUSE fix): eval/exec/__import__/getattr are
+                        # NOT registered sinks or sources in the catalog --
+                        # they are the whole POINT of WS5 (undecidable
+                        # reflective/dynamic dispatch), so a function whose
+                        # ONLY interesting call is e.g. `getattr(o, x)(...)`
+                        # was never triggered into Layer 3 at all and
+                        # `_check_dynamic_construct` never ran on it. Track
+                        # these as a separate "dynamic" trigger category so
+                        # such a function is triggered even with zero
+                        # registered sinks/sources.
+                        if chain in _PY_DYNAMIC_TRIGGER_NAMES:
+                            dynamic.append(chain)
+            if sources or sinks or dynamic:
+                index[func_name] = {
+                    "sources": sources, "sinks": sinks, "dynamic": dynamic,
+                }
 
         scan_body("<module>", [
             s for s in tree.body
@@ -664,10 +688,15 @@ class DispatchEngine:
         file_path: str,
         trigger_index: Dict[str, Dict[str, List[str]]],
     ) -> List[TaintFlow]:
-        """Build taint state ONLY for trigger-indexed scopes with a sink."""
+        """Build taint state ONLY for trigger-indexed scopes with a sink OR
+        a WS5 dynamic-construct call (see `_layer2_triggers`'s "dynamic"
+        category -- a pure dynamic construct with no registered sink, e.g.
+        `getattr(o, x)(...)`, must still trigger Layer 3 or
+        `_check_dynamic_construct` never runs)."""
         flows: List[TaintFlow] = []
         triggered = {
-            name for name, hits in trigger_index.items() if hits.get("sinks")
+            name for name, hits in trigger_index.items()
+            if hits.get("sinks") or hits.get("dynamic")
         }
         if not triggered:
             return flows
