@@ -112,6 +112,29 @@ class TaintFlow(BaseModel):
         False,
         description="Whether a sanitizer was detected in the flow (reduces confidence)"
     )
+    origin: str = Field(
+        "static",
+        description=(
+            "Provenance of this finding: 'static' (found by static taint "
+            "analysis, the default) or 'runtime' (added from a runtime/IAST "
+            "observation with no static counterpart, e.g. a dynamic-dispatch "
+            "or reflection path static analysis could not resolve)."
+        ),
+    )
+    confirmed_at_runtime: bool = Field(
+        False,
+        description=(
+            "Whether a runtime observation (see Security/runtime/) matched "
+            "this static finding, raising it out of the possible/needs-review "
+            "bucket to a runtime-confirmed verdict. Never set False->True "
+            "based on absence of an observation -- absence is not evidence "
+            "of safety, only of non-observation."
+        ),
+    )
+    runtime_trace_ids: List[str] = Field(
+        default_factory=list,
+        description="Trace ids of the runtime observation(s) that confirmed this flow, if any",
+    )
 
     class Config:
         use_enum_values = True
