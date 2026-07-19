@@ -216,3 +216,35 @@ cases:
     bucket_in: [needs_review]
     cwe: CWE-470
     finding_class: dynamic_construct
+  # SA4 context-sensitivity + path-sensitivity (deterministic static-analysis
+  # deepening plan, SA4).
+  - file: fp_sa4_guard_clause_validator_clears.py
+    expect: no_flow
+  - file: fp_sa4_then_arm_validator_clears.py
+    expect: no_flow
+  - file: tp_sa4_nonvalidator_guard_still_flags.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain]
+    cwe: CWE-78
+  - file: tp_sa4_unguarded_still_flags.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain]
+    cwe: CWE-78
+  - file: tp_sa4_branch_join_unions.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain]
+    cwe: CWE-78
+  - file: tp_sa4_helper_call_site_sensitivity.py
+    expect: flow
+    count: 1
+    severity: critical
+    bucket_in: [certain, probable]
+    cwe: CWE-78
+  - file: fp_sa4_helper_clean_call_site_only.py
+    expect: no_flow
