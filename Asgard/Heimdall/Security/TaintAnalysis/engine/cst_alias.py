@@ -93,7 +93,8 @@ class _WildcardOriginMap(dict):
         if self._wildcard_packages and key and key[0].isupper():
             pkg = self._wildcard_packages[0]
             return AliasOrigin(
-                target=f"{pkg}.{key}", raw_specifier=f"{pkg}.{key}", is_relative=False
+                target=f"{pkg}.{key}", raw_specifier=f"{pkg}.{key}", is_relative=False,
+                is_wildcard=True,
             )
         return default
 
@@ -108,6 +109,15 @@ class AliasOrigin(NamedTuple):
     target: str
     raw_specifier: str
     is_relative: bool
+    # True when this origin was synthesized from a Java wildcard import
+    # (``import pkg.*;``) rather than an explicit, unambiguous import of the
+    # exact class. Wildcard resolution is a heuristic guess (any capitalized
+    # bare name in scope, not proof the name actually comes from that
+    # package) -- it must NEVER be treated as strong-enough evidence to
+    # upgrade a heuristic sanitizer to a full clear (see
+    # ``is_verified_sanitizer_origin``); it can only ever stay at the
+    # over-approximated/heuristic tier.
+    is_wildcard: bool = False
 
 
 def module_target(specifier: str) -> str:
@@ -127,10 +137,17 @@ def module_target(specifier: str) -> str:
 _module_target = module_target
 
 
-def is_verified_sanitizer_origin(raw_specifier: str, is_relative: bool, lang: str) -> bool:
+def is_verified_sanitizer_origin(
+    raw_specifier: str, is_relative: bool, lang: str, is_wildcard: bool = False,
+) -> bool:
     """True when an alias's raw import specifier is a genuine, allow-listed
-    sanitizer package (never true for relative/local specifiers)."""
-    if is_relative:
+    sanitizer package (never true for relative/local specifiers, and never
+    true for a Java wildcard-import-resolved origin: ``import pkg.*;``
+    guessing that a bare capitalized name came from ``pkg`` is not proof it
+    is the REAL sanitizer class from that package -- a locally-declared
+    no-op with the same simple name under a wildcard-imported sanitizer
+    package must stay at the heuristic downgrade, not a full clear)."""
+    if is_relative or is_wildcard:
         return False
     allowed = JS_SANITIZER_ALLOWED_MODULES if lang in _JS_LANGS else JAVA_SANITIZER_ALLOWED_MODULES
     if lang in _JS_LANGS:
@@ -221,7 +238,10 @@ def _parse_js_require(text: str, aliases: Dict[str, str], origins: Dict[str, "Al
 
 
 _JAVA_STATIC_IMPORT_RE = re.compile(r"import\s+static\s+([\w.]+)\.([\w]+)\s*;")
-_JAVA_IMPORT_RE = re.compile(r"import\s+([\w.]+)\s*;")
+# Note: [\w.*] includes '*' so `import java.util.*;` matches (the trailing
+# ".*" wildcard suffix) -- previously `[\w.]+` silently never matched
+# wildcard imports at all, making the wildcard-expansion feature dead code.
+_JAVA_IMPORT_RE = re.compile(r"import\s+([\w.*]+)\s*;")
 
 
 def _parse_java_import(

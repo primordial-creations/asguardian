@@ -514,7 +514,10 @@ class CstFunctionTaintVisitor:
         origin = self.alias_origins.get(head)
         if origin is None:
             return False
-        return is_verified_sanitizer_origin(origin.raw_specifier, origin.is_relative, self.lang)
+        return is_verified_sanitizer_origin(
+            origin.raw_specifier, origin.is_relative, self.lang,
+            is_wildcard=getattr(origin, "is_wildcard", False),
+        )
 
     def _eval_call(self, node) -> Optional[TaintState]:
         raw_chain = _node_chain(node, self.ctx)

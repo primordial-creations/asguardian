@@ -127,6 +127,33 @@ def _discover_project_files(
     return found[:max_files], truncated
 
 
+def _resolve_relative_import(
+    from_file: Path, raw_specifier: str, sibling_exts: frozenset,
+    path_lookup: Dict[str, Path],
+) -> Optional[str]:
+    """Resolve a relative import/require specifier (e.g. ``"../b/sub/util"``)
+    written in ``from_file`` to the specific project file it names, using
+    ``path_lookup`` (resolved-absolute-path -> Path for every indexed file).
+    Returns ``None`` when it cannot be resolved unambiguously to exactly one
+    file already in the index (bare/package specifiers, missing files, etc.)
+    -- callers must treat ``None`` as "cannot disambiguate", never guess."""
+    if not raw_specifier or not raw_specifier.startswith("."):
+        return None
+    try:
+        base = (from_file.parent / raw_specifier).resolve()
+    except OSError:
+        return None
+    candidates = [base]
+    for ext in sibling_exts:
+        candidates.append(Path(str(base) + ext))
+        candidates.append(base / f"index{ext}")
+    for cand in candidates:
+        hit = path_lookup.get(str(cand))
+        if hit is not None:
+            return str(hit)
+    return None
+
+
 class _PersistentSummaryCache:
     """On-disk JSON cache of per-file base summaries, keyed by the file's
     content hash, stored under ``<project_root>/.asgard_cache/``.
@@ -221,6 +248,13 @@ class DispatchResult:
     # func name -> ("sources"/"sinks") -> resolved chains found
     trigger_index: Dict[str, Dict[str, List[str]]] = field(default_factory=dict)
     parse_failed: bool = False
+    # True when the project-rooted CST summary index for this file's
+    # language was truncated at ``max_files`` -- i.e. some project files
+    # were NOT indexed, so calls into them could only over-approximate
+    # (unknown-call decay), never be proven clean. Zero taint_flows on a
+    # truncated scan must NOT be read as "no vulnerabilities" -- it may
+    # mean "vulnerabilities live in the files we didn't get to index."
+    analysis_truncated: bool = False
 
 
 class DispatchEngine:
@@ -246,7 +280,7 @@ class DispatchEngine:
         # summary indexes: (directory, lang) -> SummaryIndex. Keeps repeated
         # scans of files in the same directory (e.g. a whole-repo walk) from
         # re-parsing every sibling file per call.
-        self._cst_summary_indexes: Dict[Tuple[str, str], SummaryIndex] = {}
+        self._cst_summary_indexes: Dict[Tuple[str, str, int], SummaryIndex] = {}
 
     # ------------------------------------------------------------------ API
 
@@ -271,7 +305,9 @@ class DispatchEngine:
             suffix in _JS_TS_EXTENSIONS or suffix in _JAVA_EXTENSIONS
             or suffix in _GO_EXTENSIONS or suffix in _C_EXTENSIONS
         ):
-            result.taint_flows = self._scan_cst_language(source, file_path)
+            result.taint_flows, result.analysis_truncated = self._scan_cst_language(
+                source, file_path
+            )
             result.taint_flows = self._dedup(result.taint_flows)
             return result
 
@@ -300,7 +336,9 @@ class DispatchEngine:
 
     # ------------------------------------------------ CST path (JS/TS/Java)
 
-    def _scan_cst_language(self, source: str, file_path: Path) -> List[TaintFlow]:
+    def _scan_cst_language(
+        self, source: str, file_path: Path,
+    ) -> Tuple[List[TaintFlow], bool]:
         """Route JS/TS/Java files through the tree-sitter CST taint engine.
 
         Behind ``@with_ast_fallback``'s spirit (graceful degradation): when
@@ -313,10 +351,10 @@ class DispatchEngine:
         """
         lang = language_for_path(file_path)
         if lang is None or not is_engine_enabled(lang):
-            return []
+            return [], False
         ctx = FileParseContext.parse(file_path, source.splitlines(), lang)
         if ctx.root is None:
-            return []
+            return [], False
         if lang == "java":
             scan_fn = scan_java_source
             sibling_exts = _JAVA_SIBLING_EXTS
@@ -330,19 +368,21 @@ class DispatchEngine:
             scan_fn = scan_c_source
             sibling_exts = _C_SIBLING_EXTS
         else:
-            return []
+            return [], False
         alias_map, alias_origins = build_cst_alias_map_with_origins(ctx, lang)
+        truncated = False
         try:
             summary_index = self._cst_summary_index(file_path, lang, sibling_exts)
             summary_index.set_current_file(str(file_path))
             call_resolver = summary_index.resolve_call
+            truncated = bool(getattr(summary_index, "truncated", False))
         except Exception:
             # Summary-index construction must never block Layer 3 -- fall
             # back to no inter-procedural resolution (still over-approximates
             # via the intra-procedural x0.5 unknown-call decay).
             call_resolver = None
         try:
-            return scan_fn(
+            flows = scan_fn(
                 str(file_path), ctx,
                 custom_sanitizers=self.custom_sanitizers,
                 is_test_context=self.is_test_context,
@@ -353,7 +393,8 @@ class DispatchEngine:
         except Exception:
             # A CST-rule failure must never crash the scan -- degrade to
             # "no taint findings for this file" (Layer 1 still reported).
-            return []
+            flows = []
+        return flows, truncated
 
     def _cst_summary_index(
         self, file_path: Path, lang: str, sibling_exts: frozenset,
@@ -374,7 +415,7 @@ class DispatchEngine:
         target wasn't indexed.
         """
         project_root = _find_project_root(file_path)
-        key = (str(project_root), lang)
+        key = (str(project_root), lang, max_files)
         cached = self._cst_summary_indexes.get(key)
         if cached is not None:
             return cached
@@ -383,6 +424,19 @@ class DispatchEngine:
         file_path_resolved = file_path.resolve() if file_path.exists() else file_path
         if file_path_resolved not in {f.resolve() for f in files}:
             files = sorted(files + [file_path])
+
+        # Path lookup used to disambiguate module-stem collisions: maps a
+        # file's resolved absolute path (as a string) back to itself, so a
+        # caller's relative import specifier (e.g. "../b/sub/util") can be
+        # resolved to the *specific* file it names, instead of falling back
+        # to a project-global bare-stem guess (BLOCKER-1: same-stem files in
+        # different directories must not be silently conflated).
+        path_lookup: Dict[str, Path] = {}
+        for f in files:
+            try:
+                path_lookup[str(f.resolve())] = f
+            except OSError:
+                path_lookup[str(f)] = f
 
         no_cache = bool(os.environ.get("ASGARD_NO_CACHE"))
         cache = None if no_cache else _PersistentSummaryCache(
@@ -418,6 +472,29 @@ class DispatchEngine:
                     except (KeyError, TypeError, ValueError):
                         summaries = None
 
+            # Resolved-imports mapping is recomputed live every build (cheap:
+            # a handful of regex passes over already-in-memory source) rather
+            # than cached, since it depends on the *set of files currently in
+            # the index* (path_lookup), not just this file's own content.
+            resolved_imports: Dict[str, str] = {}
+            try:
+                f_ctx_ri = FileParseContext.parse(f, source.splitlines(), f_lang)
+                if f_ctx_ri.root is not None:
+                    _, f_origins = build_cst_alias_map_with_origins(f_ctx_ri, f_lang)
+                    for origin in f_origins.values():
+                        if not origin.is_relative:
+                            continue
+                        stem = origin.target.split(".", 1)[0]
+                        if stem in resolved_imports:
+                            continue
+                        target_path = _resolve_relative_import(
+                            f, origin.raw_specifier, sibling_exts, path_lookup,
+                        )
+                        if target_path is not None:
+                            resolved_imports[stem] = target_path
+            except Exception:
+                resolved_imports = {}
+
             if summaries is None:
                 try:
                     f_ctx = FileParseContext.parse(f, source.splitlines(), f_lang)
@@ -436,7 +513,10 @@ class DispatchEngine:
                 if cache is not None:
                     cache.put(rel, content_hash, summaries, imported_stems)
 
-            index.add_file(str(f), summaries, imported_stems or set(), source.splitlines())
+            index.add_file(
+                str(f), summaries, imported_stems or set(), source.splitlines(),
+                resolved_imports=resolved_imports,
+            )
 
         index.truncated = truncated
         index.indexed_file_count = len(files)

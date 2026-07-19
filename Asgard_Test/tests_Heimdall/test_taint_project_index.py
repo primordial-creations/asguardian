@@ -22,8 +22,10 @@ import pytest
 
 from Asgard.Heimdall.Security.engine.dispatch import (
     DispatchEngine,
+    _CST_PROJECT_MAX_FILES_DEFAULT,
     _find_project_root,
 )
+from Asgard.Heimdall.Security.TaintAnalysis.summaries import SummaryIndex
 from Asgard.Heimdall.treesitter.ast_engine import is_engine_enabled
 
 FIXTURES_ROOT = Path(__file__).parent / "project_index_fixtures"
@@ -198,6 +200,65 @@ def test_destructured_param_cross_function_flow_resolves():
     assert result.taint_flows[0].cwe_id == "CWE-89"
 
 
+@_JS_SKIP
+def test_module_stem_collision_resolves_callers_specific_import():
+    """BLOCKER-1 regression: two files named ``util.js`` exist in different
+    directories -- ``b/sub/util.js`` (a real SQLi sink) and
+    ``z/other/util.js`` (clean, sorts *after* b/sub so a last-write-wins
+    bare-stem map would silently pick the WRONG, clean file for every
+    caller). ``a/main.js`` imports the sinking one specifically via
+    ``require('../b/sub/util')``; the caller's own resolved import path
+    must be used to disambiguate, not a project-global stem guess -- the
+    real vulnerability must be flagged, not muted."""
+    proj = FIXTURES_ROOT / "proj_stem_collision"
+    _clear_cache(proj)
+    engine = DispatchEngine()
+    result = engine.scan_file(proj / "a" / "main.js")
+    assert len(result.taint_flows) == 1, (
+        f"expected the same-stem-collision SQLi flow to resolve to the "
+        f"caller's actually-imported file, got "
+        f"{[(f.sink_type, f.confidence) for f in result.taint_flows]}"
+    )
+    assert result.taint_flows[0].cwe_id == "CWE-89"
+
+
+@_JS_SKIP
+def test_dispatch_result_surfaces_index_truncation(monkeypatch):
+    """BLOCKER-2 regression: when the project-rooted summary index is
+    truncated, that must be surfaced on the RETURNED ``DispatchResult``
+    (``analysis_truncated``), not just a log line -- a caller reading
+    ``taint_flows`` alone cannot otherwise distinguish "truly clean" from
+    "some project files were never indexed, so calls into them could not
+    be analyzed."""
+    proj1 = FIXTURES_ROOT / "proj1"
+    _clear_cache(proj1)
+    engine = DispatchEngine()
+
+    def _fake_truncated_index(self, file_path, lang, sibling_exts,
+                               max_files=_CST_PROJECT_MAX_FILES_DEFAULT):
+        idx = SummaryIndex()
+        idx.truncated = True
+        idx.indexed_file_count = 1
+        idx.project_root = str(proj1)
+        return idx
+
+    monkeypatch.setattr(DispatchEngine, "_cst_summary_index", _fake_truncated_index)
+    result = engine.scan_file(proj1 / "a" / "main.js")
+    assert result.analysis_truncated is True, (
+        "a truncated summary index must be surfaced via "
+        "DispatchResult.analysis_truncated, not only logged"
+    )
+
+
+@_JS_SKIP
+def test_dispatch_result_not_truncated_for_small_project():
+    proj1 = FIXTURES_ROOT / "proj1"
+    _clear_cache(proj1)
+    engine = DispatchEngine()
+    result = engine.scan_file(proj1 / "a" / "main.js")
+    assert result.analysis_truncated is False
+
+
 @_JAVA_SKIP
 def test_java_wildcard_import_member_sink_resolves():
     """``import java.util.*;`` -- a wildcard-resolved class's method
@@ -212,6 +273,36 @@ def test_java_wildcard_import_member_sink_resolves():
         f"{[(f.sink_type, f.confidence) for f in result.taint_flows]}"
     )
     assert result.taint_flows[0].cwe_id == "CWE-78"
+
+
+@_JAVA_SKIP
+def test_java_wildcard_local_shadow_not_fully_cleared():
+    """MAJOR-3 regression: a locally-declared no-op class/method sharing a
+    name with a real, allow-listed sanitizer (``Encode.forHtml``), in a
+    file that ALSO wildcard-imports the genuine sanitizer package
+    (``import org.owasp.encoder.*;``), must NOT be promoted to a full
+    clear just because the wildcard-resolved origin superficially matches
+    the allow-listed package prefix. A wildcard-resolved origin can never
+    prove which concrete class a bare name came from, so it must stay at
+    the heuristic/partial-confidence tier -- the flow must still be
+    reported (not silently dropped to zero flows)."""
+    proj = FIXTURES_ROOT / "proj_java_wildcard_shadow"
+    _clear_cache(proj)
+    engine = DispatchEngine()
+    result = engine.scan_file(proj / "Handler.java")
+    assert len(result.taint_flows) == 1, (
+        f"expected the shell-command flow through the wildcard-shadowed "
+        f"no-op sanitizer to still be reported (heuristic, not muted), "
+        f"got {[(f.sink_type, f.confidence) for f in result.taint_flows]}"
+    )
+    flow = result.taint_flows[0]
+    assert flow.cwe_id == "CWE-78"
+    assert flow.sanitizers_present is True
+    assert 0.0 < flow.confidence < 1.0, (
+        f"a wildcard-resolved origin must not fully clear the sanitizer "
+        f"(confidence should reflect the heuristic downgrade, not a full "
+        f"clear or an unaffected 1.0), got confidence={flow.confidence}"
+    )
 
 
 @_JS_SKIP
@@ -250,7 +341,11 @@ def test_bound_default_not_truncated_for_small_project():
     _clear_cache(proj1)
     engine = DispatchEngine()
     engine.scan_file(proj1 / "a" / "main.js")
-    key = (str(_find_project_root(proj1 / "a" / "main.js")), "javascript")
+    key = (
+        str(_find_project_root(proj1 / "a" / "main.js")),
+        "javascript",
+        _CST_PROJECT_MAX_FILES_DEFAULT,
+    )
     index = engine._cst_summary_indexes[key]
     assert index.truncated is False
     assert index.indexed_file_count >= 2
