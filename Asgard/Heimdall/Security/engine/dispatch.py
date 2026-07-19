@@ -17,6 +17,10 @@ through it) is deferred to the CLI-owning change.
 """
 
 import ast
+import hashlib
+import json
+import logging
+import os
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -42,6 +46,7 @@ from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_summaries import (
     collect_cst_imported_module_stems,
     compute_cst_file_summaries,
 )
+from Asgard.Heimdall.Security.TaintAnalysis.summaries import FunctionSummary
 from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_taint_visitor import (
     scan_c_source,
     scan_go_source,
@@ -51,14 +56,122 @@ from Asgard.Heimdall.Security.TaintAnalysis.engine.cst_taint_visitor import (
 from Asgard.Heimdall.treesitter.ast_engine import is_engine_enabled
 from Asgard.Heimdall.treesitter.file_context import FileParseContext, language_for_path
 
-# Sibling-file extension groups used to bound cross-file summary resolution
-# to a single directory per scan (see cst_summaries.py module docstring for
-# why this is directory-scoped rather than whole-project).
+# Sibling-file extension groups used to scope the inter-procedural summary
+# index to same-language files (see ``_cst_summary_index`` below -- the
+# index is now PROJECT-ROOTED, not directory-scoped: every same-language
+# file under the discovered project root is a candidate, not just the
+# immediate directory's siblings).
 _JS_SIBLING_EXTS = frozenset({".js", ".jsx", ".mjs", ".cjs", ".ts", ".mts", ".cts", ".tsx"})
 _JAVA_SIBLING_EXTS = frozenset({".java"})
 _GO_SIBLING_EXTS = frozenset({".go"})
 _C_SIBLING_EXTS = frozenset({".c", ".h"})
-_CST_SUMMARY_MAX_SIBLINGS = 40
+
+# Bound on the number of files indexed into a single project-rooted
+# SummaryIndex (deterministic: sorted path order, truncation is logged --
+# never silent). Real-world projects rarely exceed this for one language;
+# when they do, cross-directory resolution simply degrades to the
+# unresolved-call x0.5 decay for files past the bound (never a confident
+# "clean").
+_CST_PROJECT_MAX_FILES_DEFAULT = 5000
+
+# Directory names never descended into while discovering project files --
+# vendored/generated/VCS-internal trees that would otherwise blow the file
+# budget with content that isn't first-party source.
+_CST_VENDOR_DIRS = frozenset({
+    ".git", ".hg", ".svn", "node_modules", "__pycache__", ".venv", "venv",
+    "dist", "build", "target", ".asgard_cache", ".tox", ".mypy_cache",
+    ".pytest_cache", "vendor", ".idea", ".vscode",
+})
+
+# Ancestor-directory markers used to discover the project root (WS1 point 1).
+_PROJECT_ROOT_MARKERS = (".git", "package.json", "go.mod", "pom.xml", "tsconfig.json")
+
+_ASGARD_CACHE_DIRNAME = ".asgard_cache"
+
+logger = logging.getLogger(__name__)
+
+
+def _find_project_root(scan_root: Path) -> Path:
+    """Nearest ancestor of ``scan_root`` containing a project marker
+    (``.git``, ``package.json``, ``go.mod``, ``pom.xml``, ``tsconfig.json``);
+    falls back to ``scan_root`` itself (or its parent, if it's a file) when
+    no marker is found anywhere up the tree."""
+    start = scan_root if scan_root.is_dir() else scan_root.parent
+    try:
+        start = start.resolve()
+    except OSError:
+        pass
+    for candidate in (start, *start.parents):
+        if any((candidate / marker).exists() for marker in _PROJECT_ROOT_MARKERS):
+            return candidate
+    return start
+
+
+def _discover_project_files(
+    root: Path, exts: frozenset, max_files: int,
+) -> Tuple[List[Path], bool]:
+    """Every same-extension-group file under ``root`` (recursive, vendor
+    dirs pruned), sorted for determinism and capped at ``max_files``.
+    Returns ``(files, truncated)``."""
+    found: List[Path] = []
+    for dirpath, dirnames, filenames in os.walk(root):
+        dirnames[:] = sorted(
+            d for d in dirnames
+            if d not in _CST_VENDOR_DIRS and not d.startswith(".")
+        )
+        for fname in filenames:
+            if Path(fname).suffix.lower() in exts:
+                found.append(Path(dirpath) / fname)
+    found.sort()
+    truncated = len(found) > max_files
+    return found[:max_files], truncated
+
+
+class _PersistentSummaryCache:
+    """On-disk JSON cache of per-file base summaries, keyed by the file's
+    content hash, stored under ``<project_root>/.asgard_cache/``.
+
+    Cache correctness is security-critical: an entry is only reused when
+    the STORED hash matches the file's CURRENT content hash, so editing a
+    file (e.g. removing a sanitizer call) always invalidates its cached
+    summary on the next scan -- there is no mtime/path-only staleness path.
+    """
+
+    def __init__(self, cache_dir: Path, lang: str):
+        self.path = cache_dir / f"cst_summaries_{lang}.json"
+        self._data: Dict[str, dict] = {}
+        self.hits = 0
+        self.misses = 0
+        try:
+            if self.path.exists():
+                self._data = json.loads(self.path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            self._data = {}
+
+    def get(self, rel_path: str, content_hash: str) -> Optional[dict]:
+        entry = self._data.get(rel_path)
+        if entry is not None and entry.get("hash") == content_hash:
+            self.hits += 1
+            return entry
+        self.misses += 1
+        return None
+
+    def put(
+        self, rel_path: str, content_hash: str,
+        summaries: Dict[str, FunctionSummary], imported_stems: Set[str],
+    ) -> None:
+        self._data[rel_path] = {
+            "hash": content_hash,
+            "summaries": {k: v.to_json() for k, v in summaries.items()},
+            "imports": sorted(imported_stems),
+        }
+
+    def save(self) -> None:
+        try:
+            self.path.parent.mkdir(parents=True, exist_ok=True)
+            self.path.write_text(json.dumps(self._data), encoding="utf-8")
+        except OSError:
+            pass  # cache is a pure optimization -- never block a scan
 
 # Extensions routed through the CST taint path (plan 04 Phase 4 / plan 01
 # waves 2-3). Python keeps the ``ast``-backed path above, unchanged.
@@ -244,50 +357,100 @@ class DispatchEngine:
 
     def _cst_summary_index(
         self, file_path: Path, lang: str, sibling_exts: frozenset,
+        max_files: int = _CST_PROJECT_MAX_FILES_DEFAULT,
     ) -> SummaryIndex:
-        """Build (or reuse) the directory-scoped inter-procedural summary
-        index for ``file_path`` -- see cst_summaries.py for why this is
-        bounded to same-directory siblings rather than a whole project."""
-        directory = str(file_path.parent)
-        key = (directory, lang)
+        """Build (or reuse) the PROJECT-ROOTED inter-procedural summary
+        index covering ``file_path`` -- every same-language-group file
+        under the discovered project root (WS1), not just same-directory
+        siblings, so a call from ``a/main.js`` into a helper defined in
+        ``b/sub/util.js`` resolves regardless of subdirectory nesting.
+
+        Bounded at ``max_files`` (deterministic: sorted path order,
+        truncation logged -- never silent, see ``_discover_project_files``).
+        Calls into files that fall outside the bound, or that remain
+        genuinely unresolved, over-approximate via the existing
+        unknown-call x0.5 decay in ``SummaryIndex.resolve_call`` -- this
+        method never claims a call is "resolved, clean" just because its
+        target wasn't indexed.
+        """
+        project_root = _find_project_root(file_path)
+        key = (str(project_root), lang)
         cached = self._cst_summary_indexes.get(key)
         if cached is not None:
             return cached
 
-        index = SummaryIndex()
-        try:
-            siblings = sorted(
-                p for p in file_path.parent.iterdir()
-                if p.is_file() and p.suffix.lower() in sibling_exts
-            )[:_CST_SUMMARY_MAX_SIBLINGS]
-        except OSError:
-            siblings = []
-        if file_path not in siblings:
-            siblings = siblings + [file_path]
+        files, truncated = _discover_project_files(project_root, sibling_exts, max_files)
+        file_path_resolved = file_path.resolve() if file_path.exists() else file_path
+        if file_path_resolved not in {f.resolve() for f in files}:
+            files = sorted(files + [file_path])
 
-        for sib in siblings:
-            sib_lang = language_for_path(sib) or lang
-            if not is_engine_enabled(sib_lang):
+        no_cache = bool(os.environ.get("ASGARD_NO_CACHE"))
+        cache = None if no_cache else _PersistentSummaryCache(
+            project_root / _ASGARD_CACHE_DIRNAME, lang
+        )
+
+        index = SummaryIndex()
+        for f in files:
+            f_lang = language_for_path(f) or lang
+            if not is_engine_enabled(f_lang):
                 continue
             try:
-                sib_source = sib.read_text(encoding="utf-8", errors="ignore")
+                source = f.read_text(encoding="utf-8", errors="ignore")
             except OSError:
                 continue
+            content_hash = hashlib.sha256(source.encode("utf-8", "replace")).hexdigest()
             try:
-                sib_ctx = FileParseContext.parse(sib, sib_source.splitlines(), sib_lang)
-            except Exception:
-                continue
-            if sib_ctx.root is None:
-                continue
-            sib_alias = build_cst_alias_map(sib_ctx, sib_lang)
-            try:
-                sib_summaries = compute_cst_file_summaries(
-                    str(sib), sib_ctx, sib_lang, sib_alias, self.custom_sanitizers,
-                )
-            except Exception:
-                continue
-            imported_stems = collect_cst_imported_module_stems(sib_alias)
-            index.add_file(str(sib), sib_summaries, imported_stems, sib_source.splitlines())
+                rel = str(f.resolve().relative_to(project_root))
+            except (OSError, ValueError):
+                rel = str(f)
+
+            summaries: Optional[Dict[str, FunctionSummary]] = None
+            imported_stems: Optional[Set[str]] = None
+            if cache is not None:
+                entry = cache.get(rel, content_hash)
+                if entry is not None:
+                    try:
+                        summaries = {
+                            k: FunctionSummary.from_json(v)
+                            for k, v in entry["summaries"].items()
+                        }
+                        imported_stems = set(entry.get("imports", []))
+                    except (KeyError, TypeError, ValueError):
+                        summaries = None
+
+            if summaries is None:
+                try:
+                    f_ctx = FileParseContext.parse(f, source.splitlines(), f_lang)
+                except Exception:
+                    continue
+                if f_ctx.root is None:
+                    continue
+                f_alias = build_cst_alias_map(f_ctx, f_lang)
+                try:
+                    summaries = compute_cst_file_summaries(
+                        str(f), f_ctx, f_lang, f_alias, self.custom_sanitizers,
+                    )
+                except Exception:
+                    continue
+                imported_stems = collect_cst_imported_module_stems(f_alias)
+                if cache is not None:
+                    cache.put(rel, content_hash, summaries, imported_stems)
+
+            index.add_file(str(f), summaries, imported_stems or set(), source.splitlines())
+
+        index.truncated = truncated
+        index.indexed_file_count = len(files)
+        index.project_root = str(project_root)
+        if truncated:
+            logger.warning(
+                "CST summary index truncated at %d files for project root "
+                "%s (lang=%s) -- calls into un-indexed files over-approximate "
+                "via the unknown-call decay rather than being treated as clean.",
+                len(files), project_root, lang,
+            )
+
+        if cache is not None:
+            cache.save()
 
         self._cst_summary_indexes[key] = index
         return index

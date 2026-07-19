@@ -34,7 +34,7 @@ Honest limitations:
 
 import re
 from pathlib import Path
-from typing import Dict, NamedTuple
+from typing import Dict, NamedTuple, Optional
 
 _JS_LANGS = frozenset({"javascript", "typescript", "tsx"})
 
@@ -57,6 +57,45 @@ JAVA_SANITIZER_ALLOWED_MODULES = frozenset({
     "org.apache.commons.text",
     "org.apache.commons.lang3",
 })
+
+
+class _WildcardAliasMap(dict):
+    """dict that additionally resolves bare, capitalized class-name heads
+    through Java wildcard-import packages (``import pkg.*;``) when no
+    explicit alias exists. Deterministic: when multiple wildcard packages
+    are in scope, the lexicographically-first is used (over-approximation
+    is acceptable per plan; never silently drops the possibility)."""
+
+    def __init__(self, wildcard_packages=()):
+        super().__init__()
+        self._wildcard_packages = sorted(set(wildcard_packages))
+
+    def get(self, key, default=None):
+        if key in self:
+            return dict.get(self, key)
+        if self._wildcard_packages and key and key[0].isupper():
+            return f"{self._wildcard_packages[0]}.{key}"
+        return default
+
+
+class _WildcardOriginMap(dict):
+    """Origin-map counterpart to ``_WildcardAliasMap``: synthesizes an
+    ``AliasOrigin`` for wildcard-resolved class names so sanitizer-origin
+    verification also benefits from wildcard expansion."""
+
+    def __init__(self, wildcard_packages=()):
+        super().__init__()
+        self._wildcard_packages = sorted(set(wildcard_packages))
+
+    def get(self, key, default=None):
+        if key in self:
+            return dict.get(self, key)
+        if self._wildcard_packages and key and key[0].isupper():
+            pkg = self._wildcard_packages[0]
+            return AliasOrigin(
+                target=f"{pkg}.{key}", raw_specifier=f"{pkg}.{key}", is_relative=False
+            )
+        return default
 
 
 class AliasOrigin(NamedTuple):
@@ -185,7 +224,10 @@ _JAVA_STATIC_IMPORT_RE = re.compile(r"import\s+static\s+([\w.]+)\.([\w]+)\s*;")
 _JAVA_IMPORT_RE = re.compile(r"import\s+([\w.]+)\s*;")
 
 
-def _parse_java_import(text: str, aliases: Dict[str, str], origins: Dict[str, "AliasOrigin"]) -> None:
+def _parse_java_import(
+    text: str, aliases: Dict[str, str], origins: Dict[str, "AliasOrigin"],
+    wildcard_packages: Optional[set] = None,
+) -> None:
     m = _JAVA_STATIC_IMPORT_RE.search(text)
     if m:
         owner, member = m.groups()
@@ -198,6 +240,13 @@ def _parse_java_import(text: str, aliases: Dict[str, str], origins: Dict[str, "A
         simple = full.rsplit(".", 1)[-1]
         if simple != "*":
             _record(aliases, origins, simple, full, full)
+        elif wildcard_packages is not None:
+            # `import pkg.*;` -- record the package prefix so bare class
+            # names used elsewhere in the file resolve to `pkg.ClassName`
+            # (see _WildcardAliasMap / _WildcardOriginMap above).
+            pkg = full.rsplit(".", 1)[0]
+            if pkg:
+                wildcard_packages.add(pkg)
 
 
 def build_cst_alias_map(ctx, lang: str) -> Dict[str, str]:
@@ -218,8 +267,10 @@ def build_cst_alias_map_with_origins(ctx, lang: str):
     tell a genuine external package apart from a relative import that merely
     normalizes to the same-looking bare name (sanitizer-verification
     allow-listing)."""
-    aliases: Dict[str, str] = {}
-    origins: Dict[str, AliasOrigin] = {}
+    wildcard_packages: set = set()
+    is_java = lang == "java"
+    aliases: Dict[str, str] = _WildcardAliasMap(wildcard_packages) if is_java else {}
+    origins: Dict[str, AliasOrigin] = _WildcardOriginMap(wildcard_packages) if is_java else {}
     if ctx is None or ctx.root is None:
         return aliases, origins
 
@@ -242,10 +293,16 @@ def build_cst_alias_map_with_origins(ctx, lang: str):
                         return
         elif lang == "java":
             if t == "import_declaration":
-                _parse_java_import(ctx.node_text(node), aliases, origins)
+                _parse_java_import(ctx.node_text(node), aliases, origins, wildcard_packages)
                 return
         for child in node.children:
             walk(child)
 
     walk(ctx.root)
+    # wildcard_packages is populated during the walk above; since the
+    # _Wildcard*Map instances hold a *reference* to the same set object,
+    # re-sort their cached view now that parsing is complete.
+    if is_java:
+        aliases._wildcard_packages = sorted(wildcard_packages)
+        origins._wildcard_packages = sorted(wildcard_packages)
     return aliases, origins
