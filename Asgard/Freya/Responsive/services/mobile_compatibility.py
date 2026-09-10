@@ -5,12 +5,14 @@ Tests mobile device compatibility including performance,
 feature detection, and common mobile issues.
 """
 
-import time
 import math
+import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from playwright.async_api import async_playwright, Page
+
+from Asgard.Freya.Responsive.services._hover_evidence import assess_hover_dependencies
 
 from Asgard.Freya.Responsive.models.responsive_models import (
     Breakpoint,
@@ -66,7 +68,7 @@ class MobileCompatibilityTester:
         page_size_bytes = 0
         resource_count = 0
 
-        check_outcomes = {}
+        check_outcomes: dict[str, dict[str, MobileCheckOutcome]] = {}
         async with async_playwright() as p:
             browser = await p.chromium.launch(headless=True)
             try:
@@ -98,9 +100,18 @@ class MobileCompatibilityTester:
                                             ("text", check_small_text),
                                             ("fixed", check_fixed_positioning)):
                             try:
-                                observed = await check(page)
+                                if name == "hover":
+                                    assessment = await assess_hover_dependencies(page)
+                                    observed = assessment.issues
+                                    outcomes[name] = MobileCheckOutcome(
+                                        status="incomplete" if assessment.limitations else "succeeded",
+                                        limitations=assessment.limitations,
+                                        diagnostic="Hover coverage is limited" if assessment.limitations else None,
+                                    )
+                                else:
+                                    observed = await check(page)
+                                    outcomes[name] = MobileCheckOutcome(status="succeeded")
                                 device_issues.extend(observed)
-                                outcomes[name] = MobileCheckOutcome(status="succeeded")
                             except Exception:
                                 outcomes[name] = MobileCheckOutcome(
                                     status="failed", diagnostic="Browser check execution or output validation failed")
