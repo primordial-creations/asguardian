@@ -147,6 +147,7 @@ def iter_confined_regular_files(
     root: Path,
     *,
     exclude_patterns: Optional[Sequence[str]] = None,
+    strict_io: bool = False,
 ) -> Iterator[Path]:
     """Yield regular files under *root* without following symlinks."""
     patterns = list(exclude_patterns or ())
@@ -154,40 +155,60 @@ def iter_confined_regular_files(
     try:
         root_resolved = start.resolve()
     except (OSError, RuntimeError):
+        if strict_io:
+            raise
         return
 
     if start.is_symlink():
+        if strict_io:
+            raise OSError("Scan root is a symlink")
         return
     if start.is_file():
         if _is_confined(start, root_resolved) and not matches_exclude(start, patterns):
             yield start
         return
     if not start.is_dir():
+        if strict_io:
+            raise OSError("Scan root is not a directory or regular file")
         return
 
-    for dirpath, dirnames, filenames in os.walk(start, followlinks=False):
+    def on_error(error: OSError) -> None:
+        if strict_io:
+            raise error
+
+    for dirpath, dirnames, filenames in os.walk(start, followlinks=False, onerror=on_error):
         current = Path(dirpath)
         keep: List[str] = []
         for name in dirnames:
             child = current / name
-            if child.is_symlink():
-                continue
             if matches_exclude(child, patterns):
                 continue
+            if child.is_symlink():
+                if strict_io:
+                    raise OSError("Scan includes a directory symlink")
+                continue
             if not _is_confined(child, root_resolved):
+                if strict_io:
+                    raise OSError("Directory confinement could not be established")
                 continue
             keep.append(name)
         dirnames[:] = keep
 
         for name in filenames:
             path = current / name
-            if path.is_symlink():
-                continue
             if matches_exclude(path, patterns):
                 continue
+            if path.is_symlink():
+                if strict_io:
+                    raise OSError("Scan includes a file symlink")
+                continue
             if not _is_confined(path, root_resolved):
+                if strict_io:
+                    raise OSError("File confinement could not be established")
                 continue
             if not path.is_file():
+                if strict_io:
+                    raise OSError("Scan entry is not a regular file")
                 continue
             yield path
 

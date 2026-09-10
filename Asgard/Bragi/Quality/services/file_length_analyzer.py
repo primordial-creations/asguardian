@@ -45,7 +45,7 @@ class FileAnalyzer:
         """
         self.config = config or AnalysisConfig()
 
-    def analyze(self, scan_path: Optional[Path] = None) -> AnalysisResult:
+    def analyze(self, scan_path: Optional[Path] = None, *, strict_io: bool = False) -> AnalysisResult:
         """
         Perform file length analysis on the specified path.
 
@@ -59,6 +59,8 @@ class FileAnalyzer:
             AnalysisResult containing all findings
         """
         path = scan_path or self.config.scan_path
+        if strict_io and (Path(path).is_symlink() or not Path(path).is_dir()):
+            raise ValueError("Strict file-length scans require a non-symlink directory")
         path = Path(path).resolve()
 
         if not path.exists():
@@ -71,19 +73,31 @@ class FileAnalyzer:
             extension_thresholds=self.config.extension_thresholds.copy(),
             scan_path=str(path),
             skipped_patterns=self.config.exclude_patterns,
+            io_completeness_checked=strict_io,
         )
 
+        def files():
+            try:
+                yield from scan_directory(
+                    path,
+                    exclude_patterns=self.config.exclude_patterns,
+                    include_extensions=self.config.include_extensions,
+                    strict_io=strict_io,
+                )
+            except (OSError, RuntimeError) as error:
+                if not strict_io:
+                    raise
+                result.analysis_errors.append(f"discovery: {type(error).__name__}: {error}")
+
         # Scan all files
-        for file_path in scan_directory(
-            path,
-            exclude_patterns=self.config.exclude_patterns,
-            include_extensions=self.config.include_extensions,
-        ):
+        for file_path in files():
             result.increment_files_scanned()
 
             try:
-                line_count = count_lines(file_path)
-            except IOError:
+                line_count = count_lines(file_path, strict_io=strict_io)
+            except OSError as error:
+                if strict_io:
+                    result.analysis_errors.append(f"read: {type(error).__name__}: {error}")
                 # Skip files we can't read
                 continue
 
