@@ -1,34 +1,41 @@
-"""
-Asgard Reporting Module
+"""Report generators and optional reporting adapters.
 
-Provides various output formatters and report generators for analysis results,
-as well as metrics history tracking and PR decoration services.
-
-Subpackages:
-- History: SQLite-backed metrics snapshot store with trend computation.
-- PRDecoration: Post analysis results to GitHub PRs and GitLab MRs.
+Public names are resolved lazily so importing a narrow port below
+``Asgard.Reporting`` does not initialize unrelated HTML, PR, or SQLite
+adapters as a parent-package side effect.
 """
 
-from Asgard.Reporting.html_generator import HTMLReportGenerator
-from Asgard.Reporting.github_formatter import GitHubActionsFormatter
-from Asgard.Reporting import History
-from Asgard.Reporting import PRDecoration
-from Asgard.Reporting.History import (
-    AnalysisSnapshot,
-    HistoryStore,
-    MetricSnapshot,
-    MetricTrend,
-    TrendDirection,
-    TrendReport,
-)
-from Asgard.Reporting.PRDecoration import (
-    GitHubDecorator,
-    GitLabDecorator,
-    IssueComment,
-    PRDecorationConfig,
-    PRDecorationResult,
-    PRPlatform,
-)
+from importlib import import_module
+from typing import Any
+
+_EXPORT_MODULES = {
+    "HTMLReportGenerator": "Asgard.Reporting.html_generator",
+    "GitHubActionsFormatter": "Asgard.Reporting.github_formatter",
+    "History": "Asgard.Reporting.History",
+    "AnalysisSnapshot": "Asgard.Reporting.History",
+    "HistoryStore": "Asgard.Reporting.History",
+    "MetricSnapshot": "Asgard.Reporting.History",
+    "MetricTrend": "Asgard.Reporting.History",
+    "TrendDirection": "Asgard.Reporting.History",
+    "TrendReport": "Asgard.Reporting.History",
+    "PRDecoration": "Asgard.Reporting.PRDecoration",
+    "GitHubDecorator": "Asgard.Reporting.PRDecoration",
+    "GitLabDecorator": "Asgard.Reporting.PRDecoration",
+    "IssueComment": "Asgard.Reporting.PRDecoration",
+    "PRDecorationConfig": "Asgard.Reporting.PRDecoration",
+    "PRDecorationResult": "Asgard.Reporting.PRDecoration",
+    "PRPlatform": "Asgard.Reporting.PRDecoration",
+}
+
+
+def __getattr__(name: str) -> Any:
+    module_name = _EXPORT_MODULES.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    module = import_module(module_name)
+    value = module if name in {"History", "PRDecoration"} else getattr(module, name)
+    globals()[name] = value
+    return value
 
 __all__ = [
     "HTMLReportGenerator",

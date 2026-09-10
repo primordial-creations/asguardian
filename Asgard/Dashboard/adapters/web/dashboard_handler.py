@@ -19,7 +19,9 @@ from Asgard.Dashboard.models.dashboard_models import DashboardConfig
 from Asgard.Dashboard.services.data_collector import DataCollector
 from Asgard.Dashboard.services.html_renderer import HtmlRenderer
 from Asgard.Shared.Issues.services._issue_repository import SQLiteIssueRepository
-from Asgard.Reporting.History.services._history_repository import SQLiteHistoryRepository
+from Asgard.Reporting.History.infrastructure.persistence.sqlite_history_repository import (
+    SQLiteHistoryRepository,
+)
 
 
 def _build_repositories(config: DashboardConfig):

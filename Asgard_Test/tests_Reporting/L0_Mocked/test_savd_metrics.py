@@ -11,7 +11,7 @@ import tempfile
 import uuid
 from pathlib import Path
 
-from Asgard.Reporting.History.infrastructure.persistence.history_schema import (
+from Asgard.Reporting.History.models.metric_policy import (
     get_lower_is_better_metrics,
 )
 from Asgard.Reporting.History.models.history_models import AnalysisSnapshot

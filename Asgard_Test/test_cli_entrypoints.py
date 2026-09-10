@@ -76,8 +76,12 @@ def test_unified_entrypoint_forwards_module_arguments(name, tmp_path):
 
 
 @pytest.mark.parametrize("name", ["asguardian", "asgard"])
-def test_alias_does_not_claim_hercules_scan_protocol(name, tmp_path):
-    result = run_entrypoint(name, ["scan", "--target", str(tmp_path)], tmp_path)
-    assert result.returncode == 2, result.stdout + result.stderr
-    assert "invalid choice: 'scan'" in result.stderr
+def test_alias_exposes_versioned_hercules_scan_protocol(name, tmp_path):
+    result = run_entrypoint(name, ["scan", "--help"], tmp_path)
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "hercules-l13/v1" in result.stdout
+    assert "--target" in result.stdout
+    assert "--output" in result.stdout
+    assert "--severity" in result.stdout
+    assert "--exclude" not in result.stdout
     assert not list(tmp_path.iterdir())

@@ -22,6 +22,7 @@ from Asgard.Freya.cli import main as freya_main
 from Asgard.Heimdall.cli import main as heimdall_main
 from Asgard.Verdandi.cli import main as verdandi_main
 from Asgard.Volundr.cli import main as volundr_main
+from Asgard.hercules_l13 import add_scan_parser, run_scan
 from Asgard._cli_handlers import (
     COMPREHENSIVE_HELP,
     handle_init,
@@ -64,6 +65,7 @@ def main(args: Optional[list] = None) -> int:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Subcommands:
+  scan              Run the versioned external security-scanner contract
   init              Initialize Asgard configuration file
   init-backend      Scaffold a standard backend project structure
   setup-hooks       Install pre-commit git hooks (add --vscode for editor config)
@@ -75,6 +77,7 @@ Subcommands:
   volundr           Infrastructure generation
 
 Examples:
+  asgard scan --contract-version hercules-l13/v1 --target ./src --output findings.jsonl
   asguardian init --format yaml
   asguardian init-backend my_service
   asguardian setup-hooks --pre-push --vscode  # Hooks + VS Code config
@@ -104,6 +107,8 @@ Examples:
         title="modules",
         description="Available Asgard modules",
     )
+
+    add_scan_parser(subparsers)
 
     # Init subcommand
     init_parser = subparsers.add_parser(
@@ -249,6 +254,9 @@ Examples:
     if parsed_args.module is None:
         parser.print_help()
         return 0
+
+    if parsed_args.module == "scan":
+        return run_scan(parsed_args)
 
     # Handle init command directly
     if parsed_args.module == "init":

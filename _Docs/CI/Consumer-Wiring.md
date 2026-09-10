@@ -10,16 +10,43 @@ Use `asguardian` for the unified CLI, `asguardian-dashboard` for the dashboard,
 and `asguardian-mcp` for the MCP server. The `asgard`, `asgard-dashboard`, and
 `asgard-mcp` spellings are compatibility aliases to the same package entrypoints.
 Module commands such as `heimdall` remain supported. The reusable gate invokes
-`python -m Asgard.cli` from its selected interpreter; no executable rename is
-needed in that workflow.
+the unified CLI with its own Python interpreter, explicitly importing Asgard
+from the verified checkout containing the gate helper. It does not resolve a
+`heimdall` console script through PATH. Python environment overrides and implicit
+working-directory imports are disabled for that subprocess; installed runtime
+dependencies remain available, including the interpreter's user site.
 
 The source tests load the declared entrypoints and exercise real help and
 argument parsing without starting servers or analyzers. Trusted push CI also
 checks the installed console scripts outside the repository directory. Actual
-consumer installation and execution on arc-x86 remain required. An alias does
-not add a new command protocol: Hercules L13's `scan --target ... --output ...`
-invocation still needs a separate adapter to the supported module commands and
-report format.
+consumer installation and execution on arc-x86 remain required.
+
+The unified aliases expose the local-source Hercules adapter as
+`scan --contract-version hercules-l13/v1 --target DIR --output FILE`. The
+version flag is required. The target must be an existing local directory;
+URLs and system names fail with scanner execution code 3. Hercules must inject
+its checked-out repository directory for this provider. `--severity` applies
+a final minimum threshold to normalized findings from every domain. The
+adapter does not advertise custom exclusions because Heimdall's aggregate
+domains do not implement them consistently.
+
+Successful v1 output is UTF-8 JSONL with zero to 500
+`HERCULES_FINDINGS:` objects followed by one `HERCULES_SCAN:` completion
+object. The producer enforces Hercules's document, record, and string routing
+bounds against both compact provider output and Hercules's reserialized
+records, with headroom for the captured test log, before atomically replacing
+the output. It fails instead of truncating findings. It also refuses missing
+domain reports, inconsistent native counts, symlinked or unreadable analyzer
+inputs, and inputs that hit Heimdall's injection-analysis byte or line caps,
+so `clean` means all enabled local static domains completed within those
+limits. Dependency advisories use the bundled local database only; the adapter
+disables network lookups.
+
+The older unversioned/legacy invocation shapes used by language packages are
+not implemented by this provider. Deploy the Asgard adapter only with a
+Hercules revision that injects `HERCULES_ASGUARDIAN_CONTRACT_VERSION` as
+`hercules-l13/v1`, passes a local checkout directory as the target, validates
+the same bounds, and routes all accepted records without truncation.
 
 ## Source identity
 
@@ -59,6 +86,8 @@ cross-language, empty-list entries and duplicate checks fail configuration.
 Requested checks cannot report missing tools/configuration as a passing result.
 The runner checks report identity, errors, unavailable tools, subprocess status
 and JSON validity, and attempts every selected check before failing the job.
+The scan path must be a nonempty string and the error count an integer; JSON
+booleans or floating-point zero cannot stand in for a valid zero-error report.
 Finding limits remain bounded: reaching a Node, Rust, Go vulnerability or Go formatting finding cap marks the
 remaining output unverified and fails the gate, including warnings-only output.
 Nonzero TypeScript/Clippy results without parsed errors also fail; startup or

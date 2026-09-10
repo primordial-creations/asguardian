@@ -102,6 +102,91 @@ class TestNodeEslintAnalyzerParsing:
         assert report.total_findings == 0
         assert report.tools_unavailable
 
+    @pytest.mark.parametrize(
+        "returncode,payload",
+        [
+            (1, []),
+            (2, []),
+            (0, {}),
+            (0, None),
+            (0, [{"filePath": "index.js"}]),
+            (0, [{"filePath": "index.js", "messages": [None]}]),
+            (0, [{"filePath": "index.js", "messages": [{"severity": 2, "message": 7}]}]),
+            (0, [{"filePath": "index.js", "messages": [{"severity": True, "message": "bad severity"}]}]),
+        ],
+    )
+    def test_empty_or_incomplete_json_cannot_report_a_clean_scan(
+        self, tmp_path: Path, monkeypatch, returncode: int, payload
+    ):
+        project_dir = _project(tmp_path)
+        monkeypatch.setattr(node_eslint_analyzer, "resolve_node_tool", lambda *a, **k: ["/usr/bin/eslint"])
+        monkeypatch.setattr(
+            node_eslint_analyzer,
+            "run_tool",
+            lambda cmd, cwd, timeout: ToolRunResult(returncode=returncode, stdout=json.dumps(payload), stderr=""),
+        )
+        report = NodeEslintAnalyzer(NodeLintConfig(scan_path=project_dir)).analyze()
+        assert report.total_findings == 0
+        assert report.tool_failed
+        assert report.tools_unavailable
+
+    def test_successful_empty_result_is_clean(self, tmp_path: Path, monkeypatch):
+        project_dir = _project(tmp_path)
+        monkeypatch.setattr(node_eslint_analyzer, "resolve_node_tool", lambda *a, **k: ["/usr/bin/eslint"])
+        monkeypatch.setattr(
+            node_eslint_analyzer,
+            "run_tool",
+            lambda cmd, cwd, timeout: ToolRunResult(returncode=0, stdout="[]", stderr=""),
+        )
+        report = NodeEslintAnalyzer(NodeLintConfig(scan_path=project_dir)).analyze()
+        assert report.total_findings == 0
+        assert not report.tool_failed
+        assert not report.tools_unavailable
+
+    def test_fatal_exit_keeps_valid_findings_but_marks_report_incomplete(self, tmp_path: Path, monkeypatch):
+        project_dir = _project(tmp_path)
+        eslint_output = json.dumps([
+            {
+                "filePath": str(project_dir / "index.js"),
+                "messages": [{"ruleId": "no-eval", "severity": 2, "message": "eval is bad"}],
+            }
+        ])
+        monkeypatch.setattr(node_eslint_analyzer, "resolve_node_tool", lambda *a, **k: ["/usr/bin/eslint"])
+        monkeypatch.setattr(
+            node_eslint_analyzer,
+            "run_tool",
+            lambda cmd, cwd, timeout: ToolRunResult(returncode=2, stdout=eslint_output, stderr="fatal"),
+        )
+        report = NodeEslintAnalyzer(NodeLintConfig(scan_path=project_dir)).analyze()
+        assert report.total_findings == 1
+        assert report.findings[0].rule_id == "no-eval"
+        assert report.tool_failed
+        assert any("exit 2" in note for note in report.tools_unavailable)
+
+    def test_partial_envelope_keeps_valid_findings_and_fails_closed(self, tmp_path: Path, monkeypatch):
+        project_dir = _project(tmp_path)
+        eslint_output = json.dumps([
+            {
+                "filePath": str(project_dir / "index.js"),
+                "messages": [
+                    {"ruleId": "eqeqeq", "severity": 1, "message": "use ==="},
+                    {"ruleId": "broken", "message": "missing severity"},
+                    {"ruleId": "broken-line", "severity": 2, "message": "bad line", "line": "abc"},
+                    {"ruleId": "broken-column", "severity": 2, "message": "bad column", "column": True},
+                ],
+            }
+        ])
+        monkeypatch.setattr(node_eslint_analyzer, "resolve_node_tool", lambda *a, **k: ["/usr/bin/eslint"])
+        monkeypatch.setattr(
+            node_eslint_analyzer,
+            "run_tool",
+            lambda cmd, cwd, timeout: ToolRunResult(returncode=1, stdout=eslint_output, stderr=""),
+        )
+        report = NodeEslintAnalyzer(NodeLintConfig(scan_path=project_dir)).analyze()
+        assert [finding.rule_id for finding in report.findings] == ["eqeqeq"]
+        assert report.tool_failed
+        assert any("malformed or unsupported" in note for note in report.tools_unavailable)
+
 
 _NPM_AUDIT_JSON = json.dumps({
     "vulnerabilities": {
@@ -160,6 +245,92 @@ class TestNodeAuditAnalyzerParsing:
         assert finding.category == "dependency"
         assert "Prototype Pollution" in finding.description
         assert "4.18.1" in finding.fix_suggestion
+
+    @pytest.mark.parametrize(
+        "returncode,payload",
+        [
+            (1, {"vulnerabilities": {}}),
+            (2, {"vulnerabilities": {}}),
+            (0, {}),
+            (0, []),
+            (0, None),
+            (0, {"vulnerabilities": []}),
+            (1, {"vulnerabilities": {"broken": {}}}),
+            (1, {"vulnerabilities": {"broken": {"severity": "high", "via": {}}}}),
+        ],
+    )
+    def test_empty_or_incomplete_json_cannot_report_a_clean_scan(
+        self, tmp_path: Path, monkeypatch, returncode: int, payload
+    ):
+        project_dir = _project(tmp_path)
+        monkeypatch.setattr(node_audit_analyzer, "require_executable", lambda *a, **k: "/usr/bin/npm")
+        monkeypatch.setattr(
+            node_audit_analyzer,
+            "run_tool",
+            lambda cmd, cwd, timeout: ToolRunResult(returncode=returncode, stdout=json.dumps(payload), stderr=""),
+        )
+        report = NodeAuditAnalyzer(NodeAuditConfig(scan_path=project_dir)).analyze()
+        assert report.total_findings == 0
+        assert report.tool_failed
+        assert report.tools_unavailable
+
+    def test_successful_empty_result_is_clean(self, tmp_path: Path, monkeypatch):
+        project_dir = _project(tmp_path)
+        monkeypatch.setattr(node_audit_analyzer, "require_executable", lambda *a, **k: "/usr/bin/npm")
+        monkeypatch.setattr(
+            node_audit_analyzer,
+            "run_tool",
+            lambda cmd, cwd, timeout: ToolRunResult(
+                returncode=0,
+                stdout=json.dumps({"vulnerabilities": {}}),
+                stderr="",
+            ),
+        )
+        report = NodeAuditAnalyzer(NodeAuditConfig(scan_path=project_dir)).analyze()
+        assert report.total_findings == 0
+        assert not report.tool_failed
+        assert not report.tools_unavailable
+
+    @pytest.mark.parametrize(
+        "returncode,error",
+        [
+            (2, None),
+            (1, {"code": "ENOAUDIT", "summary": "registry stopped after partial output"}),
+        ],
+    )
+    def test_failed_or_partial_audit_keeps_valid_findings(
+        self, tmp_path: Path, monkeypatch, returncode: int, error
+    ):
+        project_dir = _project(tmp_path)
+        payload = json.loads(_NPM_AUDIT_JSON)
+        if error is not None:
+            payload["error"] = error
+        monkeypatch.setattr(node_audit_analyzer, "require_executable", lambda *a, **k: "/usr/bin/npm")
+        monkeypatch.setattr(
+            node_audit_analyzer,
+            "run_tool",
+            lambda cmd, cwd, timeout: ToolRunResult(returncode=returncode, stdout=json.dumps(payload), stderr="fatal"),
+        )
+        report = NodeAuditAnalyzer(NodeAuditConfig(scan_path=project_dir)).analyze()
+        assert report.total_findings == 1
+        assert report.findings[0].rule_id == "npm-audit::lodash"
+        assert report.tool_failed
+        assert report.tools_unavailable
+
+    def test_malformed_entry_does_not_discard_valid_vulnerability(self, tmp_path: Path, monkeypatch):
+        project_dir = _project(tmp_path)
+        payload = json.loads(_NPM_AUDIT_JSON)
+        payload["vulnerabilities"]["broken"] = {"severity": "high", "via": None}
+        monkeypatch.setattr(node_audit_analyzer, "require_executable", lambda *a, **k: "/usr/bin/npm")
+        monkeypatch.setattr(
+            node_audit_analyzer,
+            "run_tool",
+            lambda cmd, cwd, timeout: ToolRunResult(returncode=1, stdout=json.dumps(payload), stderr=""),
+        )
+        report = NodeAuditAnalyzer(NodeAuditConfig(scan_path=project_dir)).analyze()
+        assert [finding.rule_id for finding in report.findings] == ["npm-audit::lodash"]
+        assert report.tool_failed
+        assert any("malformed or unsupported" in note for note in report.tools_unavailable)
 
 
 class TestNodeTypecheckAnalyzerParsing:

@@ -212,6 +212,10 @@ Score = max(0, Score)  # Floor at 0
 ### CLI Usage
 
 ```bash
+# Stable external-orchestrator contract (installed Asgard package)
+asgard scan --contract-version hercules-l13/v1 \
+  --target ./src --output findings.jsonl
+
 # Full security scan
 python -m Heimdall security scan ./src
 
@@ -225,6 +229,13 @@ python -m Heimdall security crypto ./src
 python -m Heimdall security scan ./src --severity medium --format json
 python -m Heimdall security scan ./src --exclude "test_*" --format markdown
 ```
+
+The root `asgard scan` adapter invokes `StaticSecurityService`, normalizes all
+domain findings to stable IDs and locations, and atomically writes zero or more
+`HERCULES_FINDINGS:` JSON objects followed by one `HERCULES_SCAN:` completion
+object. Clean and findings results both exit 0; any domain or execution failure
+exits 3. `legacy-v0` remains available for a controlled consumer transition by
+omitting `--contract-version`; unknown versions are rejected by the CLI.
 
 ### Programmatic Usage
 

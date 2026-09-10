@@ -4,7 +4,7 @@ Baseline System Models
 Pydantic models for managing baseline violations.
 """
 
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -36,7 +36,11 @@ class BaselineEntry(BaseModel):
         """Check if this baseline entry has expired."""
         if self.expires_at is None:
             return False
-        return datetime.now() > self.expires_at
+        expires_at = self.expires_at
+        if expires_at.tzinfo is not None and expires_at.utcoffset() is not None:
+            expires_at = expires_at.astimezone(timezone.utc)
+            return datetime.now(timezone.utc) > expires_at
+        return datetime.now() > expires_at
 
     def matches(
         self,

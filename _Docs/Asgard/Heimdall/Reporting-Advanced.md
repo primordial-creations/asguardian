@@ -34,32 +34,38 @@ Lower values are considered better for: duplication, complexity, debt, vulnerabi
 ### Programmatic Usage
 
 ```python
-from Asgard.Reporting.History import HistoryStore
-from Asgard.Reporting.History.models import AnalysisSnapshot
+from Asgard.Reporting.History import (
+    AnalysisSnapshot,
+    HistoryStore,
+    MetricSnapshot,
+    ReportingAnalyzerService,
+)
 
 store = HistoryStore()
+analyzer = ReportingAnalyzerService(repository=store)
 
 # Save a snapshot after running analysis
 snapshot = AnalysisSnapshot(
+    snapshot_id="",  # The SQLite adapter assigns an ID when this is empty.
     project_path="./src",
     git_commit="abc123",
     git_branch="main",
-    quality_gate_status="PASSED",
+    quality_gate_status="passed",
     ratings={"overall": "B", "security": "A", "reliability": "B", "maintainability": "C"},
-    metrics={
-        "duplication_percentage": 2.3,
-        "technical_debt_hours": 14.5,
-        "critical_vulnerabilities": 0,
-        "high_vulnerabilities": 2,
-        "comment_density": 15.2,
-    },
+    metrics=[
+        MetricSnapshot(metric_name="duplication_percentage", value=2.3, unit="%"),
+        MetricSnapshot(metric_name="technical_debt_hours", value=14.5, unit="hours"),
+        MetricSnapshot(metric_name="critical_vulnerabilities", value=0),
+        MetricSnapshot(metric_name="high_vulnerabilities", value=2),
+        MetricSnapshot(metric_name="comment_density", value=15.2, unit="%"),
+    ],
 )
 store.save_snapshot(snapshot)
 
 # Get trend report for a project
-trend_report = store.get_trend_report("./src", last_n=10)
+trend_report = analyzer.get_trend_report("./src")
 
-for metric_trend in trend_report.trends:
+for metric_trend in trend_report.metric_trends:
     print(f"{metric_trend.metric_name}: {metric_trend.direction} "
           f"(current={metric_trend.current_value}, previous={metric_trend.previous_value})")
 
@@ -68,6 +74,19 @@ snapshots = store.get_snapshots("./src")
 for snap in snapshots:
     print(f"{snap.scan_timestamp}: gate={snap.quality_gate_status}, overall={snap.ratings.get('overall')}")
 ```
+
+### Persistence Boundary
+
+Application analysis depends on `IHistoryRepository`; the SQLite implementation
+is an infrastructure adapter. `HistoryStore()` remains the compatibility
+composition facade for callers that rely on the historical no-argument SQLite
+default, while tests and alternate hosts can inject any repository satisfying
+the same save, ordering, limit, latest-record and project-isolation contract.
+Importing the port alone does not initialise SQLite or create filesystem state.
+
+The on-disk SQLite schema and JSON fields are unchanged. If a rollout exposes a
+consumer incompatibility, revert the History boundary files together and retain
+the existing database; no data migration or rollback is required.
 
 ### CLI Usage
 

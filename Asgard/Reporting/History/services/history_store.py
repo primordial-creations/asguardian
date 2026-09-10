@@ -14,10 +14,10 @@ from pathlib import Path
 from typing import List, Optional
 
 from Asgard.Reporting.History.models.history_models import AnalysisSnapshot
-from Asgard.Reporting.History.services._history_repository import (
-    IHistoryRepository,
+from Asgard.Reporting.History.infrastructure.persistence.sqlite_history_repository import (
     SQLiteHistoryRepository,
 )
+from Asgard.Reporting.History.ports.history_repository import IHistoryRepository
 
 
 class HistoryStore:
@@ -27,9 +27,9 @@ class HistoryStore:
     Uses a SQLite database at ~/.asgard/history.db by default. The database
     is created automatically on first use.
 
-    This class delegates all persistence operations to SQLiteHistoryRepository
-    and satisfies the IHistoryRepository interface, allowing it to be injected
-    wherever IHistoryRepository is expected.
+    This compatibility facade is also a composition boundary: it preserves the
+    historical no-argument SQLite default while application services depend on
+    the separate ``IHistoryRepository`` port.
 
     Usage:
         store = HistoryStore()

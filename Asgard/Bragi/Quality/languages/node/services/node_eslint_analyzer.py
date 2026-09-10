@@ -87,22 +87,60 @@ class NodeEslintAnalyzer:
             report.scan_duration_seconds = (datetime.now() - start).total_seconds()
             return report
 
-        report.files_analyzed = len(file_results)
+        if not isinstance(file_results, list):
+            report.tools_unavailable.append(
+                "eslint produced an invalid JSON envelope (expected a list of file results)"
+            )
+            report.tool_failed = True
+            report.scan_duration_seconds = (datetime.now() - start).total_seconds()
+            return report
+
+        diagnostics_found = 0
+        incomplete_output = False
+        report.files_analyzed = 0
         for file_result in file_results:
+            if not isinstance(file_result, dict):
+                incomplete_output = True
+                continue
             file_path = file_result.get("filePath", "")
+            messages = file_result.get("messages")
+            if not isinstance(file_path, str) or not file_path or not isinstance(messages, list):
+                incomplete_output = True
+                continue
+            report.files_analyzed += 1
             try:
                 relative_path = str(Path(file_path).resolve().relative_to(path))
             except ValueError:
                 relative_path = file_path
-            for message in file_result.get("messages", []):
+            for message in messages:
+                if not self._is_supported_message(message):
+                    incomplete_output = True
+                    continue
                 finding = self._finding_from_message(message, relative_path)
                 if finding is not None:
                     report.add_finding(finding)
+                    diagnostics_found += 1
                     if self._config.max_findings and report.total_findings >= self._config.max_findings:
                         report.tool_failed = True
                         report.tools_unavailable.append("eslint finding limit reached; remaining diagnostics are unverified")
                         report.scan_duration_seconds = (datetime.now() - start).total_seconds()
                         return report
+                else:
+                    incomplete_output = True
+
+        if incomplete_output:
+            report.tools_unavailable.append("eslint output contained malformed or unsupported diagnostic entries")
+            report.tool_failed = True
+
+        if result.returncode not in (0, 1):
+            report.tools_unavailable.append(f"eslint failed to complete (exit {result.returncode})")
+            report.tool_failed = True
+        elif result.returncode == 1 and diagnostics_found == 0:
+            report.tools_unavailable.append("eslint exited nonzero without reporting any diagnostics")
+            report.tool_failed = True
+        elif result.returncode == 0 and report.error_count:
+            report.tools_unavailable.append("eslint reported error diagnostics despite a successful exit status")
+            report.tool_failed = True
 
         report.scan_duration_seconds = (datetime.now() - start).total_seconds()
         return report
@@ -120,6 +158,25 @@ class NodeEslintAnalyzer:
                 return False
             return "eslintConfig" in data
         return False
+
+    @staticmethod
+    def _is_supported_message(message: object) -> bool:
+        if not isinstance(message, dict):
+            return False
+        severity = message.get("severity")
+        if isinstance(severity, bool) or not isinstance(severity, int) or severity not in _SEVERITY_MAP:
+            return False
+        if not isinstance(message.get("message"), str):
+            return False
+        if message.get("ruleId") is not None and not isinstance(message.get("ruleId"), str):
+            return False
+        for field in ("line", "column"):
+            value = message.get(field, 0)
+            if value is not None and (
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+            ):
+                return False
+        return True
 
     @staticmethod
     def _finding_from_message(message: dict, relative_path: str) -> Optional[ToolFinding]:

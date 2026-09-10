@@ -34,22 +34,40 @@ Usage:
 __version__ = "1.0.0"
 __author__ = "Asgard Contributors"
 
-from Asgard.Reporting.History.models.history_models import (
-    AnalysisSnapshot,
-    MetricSnapshot,
-    MetricTrend,
-    TrendDirection,
-    TrendReport,
-)
-from Asgard.Reporting.History.services.history_store import HistoryStore
-from Asgard.Reporting.History.services.reporting_analyzer import ReportingAnalyzerService
+from importlib import import_module
+from typing import Any
+
+_EXPORT_MODULES = {
+    "AnalysisSnapshot": "Asgard.Reporting.History.models.history_models",
+    "MetricSnapshot": "Asgard.Reporting.History.models.history_models",
+    "MetricTrend": "Asgard.Reporting.History.models.history_models",
+    "TrendDirection": "Asgard.Reporting.History.models.history_models",
+    "TrendReport": "Asgard.Reporting.History.models.history_models",
+    "IHistoryRepository": "Asgard.Reporting.History.ports.history_repository",
+    "SQLiteHistoryRepository": (
+        "Asgard.Reporting.History.infrastructure.persistence.sqlite_history_repository"
+    ),
+    "HistoryStore": "Asgard.Reporting.History.services.history_store",
+    "ReportingAnalyzerService": "Asgard.Reporting.History.services.reporting_analyzer",
+}
+
+
+def __getattr__(name: str) -> Any:
+    module_name = _EXPORT_MODULES.get(name)
+    if module_name is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    value = getattr(import_module(module_name), name)
+    globals()[name] = value
+    return value
 
 __all__ = [
     "AnalysisSnapshot",
     "HistoryStore",
+    "IHistoryRepository",
     "MetricSnapshot",
     "MetricTrend",
     "ReportingAnalyzerService",
+    "SQLiteHistoryRepository",
     "TrendDirection",
     "TrendReport",
 ]
