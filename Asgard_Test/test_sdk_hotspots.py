@@ -65,3 +65,29 @@ def test_configuration_link_rejected_and_legacy_loader_compatible(tmp_path):
     assert load_heimdall_yml(tmp_path) == {'test_context_enabled': False}
     report, _ = respond(request(tmp_path))
     assert not report['complete'] and report['errors'][0]['code'] == 'scan_configuration_error'
+
+
+def test_snapshot_logical_paths_preserve_context_without_reading_logical_tree(tmp_path):
+    logical = '/tests/nonexistent-asgard-logical-fixture'
+    (tmp_path / '.heimdall.yml').write_text('strict_scan_paths: ["^/tests/nonexistent-asgard-logical-fixture/"]\n')
+    (tmp_path / 'main.py').write_text(SOURCE)
+    report, code = respond({**request(tmp_path), 'logical_root': logical})
+    assert code == 1 and report['complete']
+    assert report['findings'][0]['file_path'] == logical + '/main.py'
+    assert report['findings'][0]['review_priority'] == 'medium'
+    assert report['findings'][0]['context_tag'] == 'production'
+    (tmp_path / 'broken.py').write_text('def broken(:\n')
+    report, code = respond({**request(tmp_path), 'logical_root': logical})
+    assert code == 1 and not report['complete']
+    assert report['errors'][0]['file_path'] == logical + '/broken.py'
+
+
+@pytest.mark.parametrize('label', ['', 'relative', '/a/../b', None, 12, '/bad\0path'])
+def test_invalid_logical_path_labels_are_rejected(tmp_path, label):
+    report, code = respond({**request(tmp_path), 'logical_root': label})
+    assert code == 2 and report['errors'][0]['code'] == 'invalid_request'
+
+
+def test_logical_paths_are_not_silently_accepted_by_other_profiles(tmp_path):
+    report, code = respond({**request(tmp_path), 'profile': 'quality.file-length', 'logical_root': '/original'})
+    assert code == 2 and report['errors'][0]['code'] == 'unsupported_operation'

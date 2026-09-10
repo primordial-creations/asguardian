@@ -179,7 +179,7 @@ class Client:
 
     def scan(self, *, authorized_root: str, target: str, profile: str = "quality.file-length",
              max_findings: int = 1000, correlation_id: str | None = None,
-             cancel: threading.Event | None = None):
+             cancel: threading.Event | None = None, logical_root: str | None = None):
         deadline = time.monotonic() + self._timeout
         correlation = str(uuid.uuid4()) if correlation_id is None else correlation_id
         if not isinstance(correlation, str) or not 1 <= len(correlation) <= 256:
@@ -188,6 +188,11 @@ class Client:
             correlation_id=correlation), deadline, cancel)
         if profile not in hello["capabilities"]["profiles"]:
             raise ScanError("unsupported_operation")
-        return self._invoke(dict(protocol_version=1, operation="scan", correlation_id=correlation,
-            profile=profile, authorized_root=authorized_root, target=target,
-            max_findings=max_findings), deadline, cancel)
+        payload = dict(protocol_version=1, operation="scan", correlation_id=correlation,
+            profile=profile, authorized_root=authorized_root, target=target, max_findings=max_findings)
+        if logical_root is not None:
+            supported = hello["capabilities"].get("logical_paths", [])
+            if not isinstance(supported, list) or profile not in supported:
+                raise ScanError("unsupported_operation")
+            payload["logical_root"] = logical_root
+        return self._invoke(payload, deadline, cancel)

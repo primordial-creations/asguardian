@@ -41,6 +41,7 @@ type Options struct {
 	MaxOutputBytes int
 }
 type Request struct {
+	LogicalRoot    *string
 	AuthorizedRoot string
 	Target         string
 	Profile        string
@@ -142,7 +143,21 @@ func (c *Client) Scan(ctx context.Context, request Request) (Response, error) {
 	if !supported {
 		return nil, fail("unsupported_operation")
 	}
-	return c.invoke(ctx, map[string]any{"protocol_version": 1, "operation": "scan", "correlation_id": request.CorrelationID, "profile": request.Profile, "authorized_root": request.AuthorizedRoot, "target": request.Target, "max_findings": maxFindings})
+	payload := map[string]any{"protocol_version": 1, "operation": "scan", "correlation_id": request.CorrelationID, "profile": request.Profile, "authorized_root": request.AuthorizedRoot, "target": request.Target, "max_findings": maxFindings}
+	if request.LogicalRoot != nil {
+		profiles, _ := hello["capabilities"].(map[string]any)["logical_paths"].([]any)
+		supported := false
+		for _, profile := range profiles {
+			if profile == request.Profile {
+				supported = true
+			}
+		}
+		if !supported {
+			return nil, fail("unsupported_operation")
+		}
+		payload["logical_root"] = *request.LogicalRoot
+	}
+	return c.invoke(ctx, payload)
 }
 
 type bounded struct {

@@ -132,6 +132,26 @@ func main() {
 	hotinvalid := scan(hotrequest)
 	check(hotinvalid["complete"] == false)
 	observations["hotspot_config"] = hotinvalid["errors"].([]any)[0].(map[string]any)["code"]
+	logical := "/tests/nonexistent-asgard-logical-fixture"
+	must(os.Remove(filepath.Join(hotroot, "broken.py")))
+	must(os.WriteFile(config, []byte("strict_scan_paths: [\"^/tests/nonexistent-asgard-logical-fixture/\"]\n"), 0600))
+	hotrequest.LogicalRoot = &logical
+	mapped := scan(hotrequest)
+	check(mapped["complete"] == true && len(mapped["findings"].([]any)) == 1)
+	mappedItem := mapped["findings"].([]any)[0].(map[string]any)
+	check(mappedItem["context_tag"] == "production")
+	observations["logical_context"] = map[string]any{"priority": mappedItem["review_priority"], "path": mappedItem["file_path"] == logical+"/main.py"}
+	invalidLabel := "relative"
+	hotrequest.LogicalRoot = &invalidLabel
+	_, err = c.Scan(ctx, hotrequest)
+	var logicalError *asgard.Error
+	check(errors.As(err, &logicalError) && logicalError.Code == "engine_error")
+	observations["logical_invalid"] = logicalError.Response["errors"].([]any)[0].(map[string]any)["code"]
+	hotrequest.LogicalRoot = &logical
+	hotrequest.Profile = "quality.file-length"
+	_, err = c.Scan(ctx, hotrequest)
+	check(errors.As(err, &logicalError))
+	observations["logical_unsupported"] = logicalError.Code
 	result, err := json.Marshal(observations)
 	must(err)
 	fmt.Println(string(result))

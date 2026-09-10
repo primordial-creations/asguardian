@@ -2,7 +2,7 @@
 from pathlib import Path
 
 
-def scan_hotspots(target: Path, limit: int):
+def scan_hotspots(target: Path, limit: int, *, logical_root: Path | None = None):
     from Asgard.Heimdall.Security.Hotspots.models.hotspot_models import HotspotConfig
     from Asgard.Heimdall.Security.Hotspots.services.hotspot_detector import HotspotDetector
     from Asgard.Heimdall.cli.handlers._security_dispatch import load_heimdall_yml
@@ -16,7 +16,7 @@ def scan_hotspots(target: Path, limit: int):
     config = HotspotConfig(scan_path=target,
                           test_context_enabled=settings.get("test_context_enabled", True),
                           strict_scan_paths=settings.get("strict_scan_paths", []))
-    report = HotspotDetector(config).scan(target, strict_io=True)
+    report = HotspotDetector(config).scan(target, strict_io=True, logical_root=logical_root)
     truncated = len(report.hotspots) > limit
     complete = report.analysis_complete and not truncated
     return dict(state="complete" if complete else "incomplete", complete=complete,

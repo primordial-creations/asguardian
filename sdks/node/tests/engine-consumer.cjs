@@ -33,6 +33,11 @@ const {Client}=require('@gaia/asgard-sdk');
   await fs.writeFile(path.join(hotroot,'broken.py'),'def broken(:\n');const hotpartial=await c.scan(hotoptions);assert.equal(hotpartial.complete,false);assert.equal(hotpartial.findings.length,1);assert.equal(hotpartial.errors[0].stage,'parse');observations.hotspot_parse=hotpartial.state;
   await fs.writeFile(path.join(hotroot,'broken.py'),Buffer.from([255]));const hotread=await c.scan(hotoptions);assert.equal(hotread.complete,false);assert.equal(hotread.findings.length,1);assert.equal(hotread.errors[0].error_type,'UnicodeDecodeError');observations.hotspot_read=hotread.state;
   await fs.writeFile(config,'test_context_enabled: []\n');const hotinvalid=await c.scan(hotoptions);assert.equal(hotinvalid.complete,false);observations.hotspot_config=hotinvalid.errors[0].code;
+  const logical='/tests/nonexistent-asgard-logical-fixture';await fs.unlink(path.join(hotroot,'broken.py'));await fs.writeFile(config,'strict_scan_paths: ["^/tests/nonexistent-asgard-logical-fixture/"]\n');
+  const mapped=await c.scan({...hotoptions,logicalRoot:logical});assert.equal(mapped.complete,true);assert.equal(mapped.findings.length,1);assert.equal(mapped.findings[0].context_tag,'production');
+  observations.logical_context={priority:mapped.findings[0].review_priority,path:mapped.findings[0].file_path===logical+'/main.py'};
+  await assert.rejects(c.scan({...hotoptions,logicalRoot:'relative'}),e=>{observations.logical_invalid=e.response?.errors[0].code;return e.code==='engine_error'&&observations.logical_invalid==='invalid_request';});
+  await assert.rejects(c.scan({...hotoptions,profile:'quality.file-length',logicalRoot:logical}),e=>{observations.logical_unsupported=e.code;return e.code==='unsupported_operation';});
   console.log(JSON.stringify(observations));
  }finally{await c.close();await fs.rm(root,{recursive:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

@@ -20,6 +20,6 @@ export class ScanError extends Error {
 export class Client {
   constructor(command: readonly string[], options: {engineVersion: string; timeoutMs?: number; maxOutputBytes?: number});
   handshake(options?: {signal?: AbortSignal}): Promise<Response>;
-  scan(options: {authorizedRoot: string; target: string; profile?: string; maxFindings?: number; correlationId?: string; signal?: AbortSignal}): Promise<Response>;
+  scan(options: {authorizedRoot: string; target: string; profile?: string; maxFindings?: number; correlationId?: string; logicalRoot?: string; signal?: AbortSignal}): Promise<Response>;
   close(): Promise<void>;
 }

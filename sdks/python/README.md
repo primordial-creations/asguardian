@@ -42,3 +42,8 @@ security.hotspots reports manual review candidates, preserving owner priority,
 review status and guidance; it does not turn them into confirmed vulnerabilities.
 Strict parse/read/configuration failures stay incomplete. Additional operations
 used by Kairos/Hercules still require qualification and migration.
+
+Optional logical_root supplies an original absolute path label for a physical snapshot.
+Only advertised logical_paths profiles support it; unsupported mappings fail.
+The label affects findings/context matching only, never filesystem access.
+Omission preserves existing scan behavior. Host authorization/capture remain required.
