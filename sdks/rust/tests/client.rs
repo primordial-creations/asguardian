@@ -179,8 +179,22 @@ async fn dropped_future_cleans_child_group() {
         .await
         .unwrap();
     let pid = std::fs::read_to_string(&marker).unwrap();
-    if let Ok(stat) = std::fs::read_to_string(format!("/proc/{pid}/stat")) {
-        assert_eq!(stat.split_whitespace().nth(2), Some("Z"));
+    // SIGKILL delivery to the group is asynchronous. close reaps the direct
+    // child; its orphaned grandchild must also stop within a bounded interval.
+    let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
+    loop {
+        match std::fs::read_to_string(format!("/proc/{pid}/stat")) {
+            Ok(stat) if stat.split_whitespace().nth(2) != Some("Z") => {
+                assert!(
+                    tokio::time::Instant::now() < deadline,
+                    "grandchild survived group cleanup"
+                );
+                tokio::time::sleep(Duration::from_millis(10)).await;
+            }
+            Ok(_) => break,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error) => panic!("could not verify grandchild cleanup: {error}"),
+        }
     }
     std::fs::remove_file(marker).unwrap();
 }
