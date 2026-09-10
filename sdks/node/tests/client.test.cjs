@@ -66,6 +66,15 @@ test('timeout terminates child processes in the group',async()=>{
  try{
   await assert.rejects(c.handshake(),code('timeout'));
   const pid=fs.readFileSync(marker,'utf8'),stat=`/proc/${pid}/stat`;
-  if(process.platform==='linux')assert.ok(!fs.existsSync(stat)||fs.readFileSync(stat,'utf8').split(' ')[2]==='Z');
+  if(process.platform==='linux'){
+   // Group SIGKILL delivery is asynchronous; orphan termination must be bounded.
+   const deadline=Date.now()+2000;
+   for(;;){
+    try{if(fs.readFileSync(stat,'utf8').split(' ')[2]==='Z')break;}
+    catch(error){if(error.code==='ENOENT')break;throw error;}
+    assert.ok(Date.now()<deadline,'descendant survived group cleanup');
+    await new Promise(resolve=>setTimeout(resolve,10));
+   }
+  }
  }finally{await c.close();fs.rmSync(dir,{recursive:true});}
 });
