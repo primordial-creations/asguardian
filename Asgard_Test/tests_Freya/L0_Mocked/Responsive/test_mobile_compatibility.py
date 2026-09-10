@@ -19,6 +19,7 @@ from Asgard.Freya.Responsive.models.responsive_models import (
     MOBILE_DEVICES,
 )
 from Asgard.Freya.Responsive.services.mobile_compatibility import MobileCompatibilityTester
+from Asgard.Freya.Responsive.services._mobile_compatibility_checks import MobileCheckError
 
 
 # =============================================================================
@@ -256,9 +257,8 @@ class TestCheckFlashContent:
         """Test that Flash check handles exceptions gracefully."""
         mock_page.evaluate = AsyncMock(side_effect=Exception("JavaScript error"))
 
-        issues = await tester._check_flash_content(mock_page)
-
-        assert len(issues) == 0
+        with pytest.raises(MobileCheckError):
+            await tester._check_flash_content(mock_page)
 
 
 class TestCheckHoverDependencies:
@@ -295,9 +295,8 @@ class TestCheckHoverDependencies:
         """Test that hover check handles exceptions gracefully."""
         mock_page.evaluate = AsyncMock(side_effect=Exception("JavaScript error"))
 
-        issues = await tester._check_hover_dependencies(mock_page)
-
-        assert len(issues) == 0
+        with pytest.raises(MobileCheckError):
+            await tester._check_hover_dependencies(mock_page)
 
 
 class TestCheckSmallText:
@@ -335,9 +334,8 @@ class TestCheckSmallText:
         """Test that small text check handles exceptions gracefully."""
         mock_page.evaluate = AsyncMock(side_effect=Exception("JavaScript error"))
 
-        issues = await tester._check_small_text(mock_page)
-
-        assert len(issues) == 0
+        with pytest.raises(MobileCheckError):
+            await tester._check_small_text(mock_page)
 
 
 class TestCheckFixedPositioning:
@@ -374,9 +372,8 @@ class TestCheckFixedPositioning:
         """Test that fixed positioning check handles exceptions gracefully."""
         mock_page.evaluate = AsyncMock(side_effect=Exception("JavaScript error"))
 
-        issues = await tester._check_fixed_positioning(mock_page)
-
-        assert len(issues) == 0
+        with pytest.raises(MobileCheckError):
+            await tester._check_fixed_positioning(mock_page)
 
 
 # =============================================================================

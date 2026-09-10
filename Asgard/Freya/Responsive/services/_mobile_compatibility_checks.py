@@ -14,6 +14,10 @@ from Asgard.Freya.Responsive.models.responsive_models import (
 )
 
 
+class MobileCheckError(Exception):
+    """A required browser check did not produce a valid observation."""
+
+
 async def check_flash_content(page: Page) -> List[MobileCompatibilityIssue]:
     """Check for Flash content."""
     issues = []
@@ -39,7 +43,7 @@ async def check_flash_content(page: Page) -> List[MobileCompatibilityIssue]:
             ))
 
     except Exception:
-        pass
+        raise MobileCheckError("Browser check execution or output validation failed") from None
 
     return issues
 
@@ -101,7 +105,7 @@ async def check_hover_dependencies(page: Page) -> List[MobileCompatibilityIssue]
             ))
 
     except Exception:
-        pass
+        raise MobileCheckError("Browser check execution or output validation failed") from None
 
     return issues
 
@@ -150,7 +154,7 @@ async def check_small_text(page: Page) -> List[MobileCompatibilityIssue]:
             ))
 
     except Exception:
-        pass
+        raise MobileCheckError("Browser check execution or output validation failed") from None
 
     return issues
 
@@ -202,7 +206,7 @@ async def check_fixed_positioning(page: Page) -> List[MobileCompatibilityIssue]:
             ))
 
     except Exception:
-        pass
+        raise MobileCheckError("Browser check execution or output validation failed") from None
 
     return issues
 
