@@ -113,7 +113,7 @@ func main() {
 	cleanhot := scan(hotrequest)
 	check(cleanhot["complete"] == true && len(cleanhot["findings"].([]any)) == 0)
 	observations["hotspot_clean"] = cleanhot["state"]
-	must(os.WriteFile(filepath.Join(hotroot, "main.py"), saved))
+	must(os.WriteFile(filepath.Join(hotroot, "main.py"), saved, 0600))
 	hot := scan(hotrequest)
 	check(hot["complete"] == true && len(hot["findings"].([]any)) == 1)
 	item := hot["findings"].([]any)[0].(map[string]any)
