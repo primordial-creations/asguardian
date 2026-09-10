@@ -28,7 +28,7 @@ def request(tmp_path, **changes):
 def test_handshake_without_engine_import():
     code, result = invoke(dict(protocol_version=1, correlation_id="handshake", operation="handshake"))
     assert code == 0 and result["state"] == "ready"
-    assert result["capabilities"]["profiles"] == ["quality.file-length"]
+    assert result["capabilities"]["profiles"] == ["quality.file-length", "security.hotspots"]
     assert result["capabilities"]["remote"] is False
 
 

@@ -88,7 +88,7 @@ def main():
     result = dict(fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(), revision=revision, sdk_revision=sdk['revision'], sdk_artifacts=sdk['artifacts'],
                   engine_artifacts={item.name: hashlib.sha256(item.read_bytes()).hexdigest() for item in artifacts},
                   engines=engines, reports=reports, result='passed',
-                  classification='four installed engine/SDK artifact combinations, actual file-length engine; other profiles, languages, CI/channel and migrations pending')
+                  classification='four installed engine/SDK artifact combinations, actual file-length and hotspot engine; other profiles, languages, CI/channel and migrations pending')
     (output / 'verification.json').write_text(json.dumps(result, indent=2) + '\n')
     print('All four installed engine/SDK combinations passed')
 

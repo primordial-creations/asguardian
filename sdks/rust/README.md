@@ -25,3 +25,8 @@ output limits, owner and process failures; Error.response retains owner errors.
 Crate publication is disabled until distribution approval/configuration. Controlled
 registry qualification is not the durable channel. Full profile coverage, shared
 four-language conformance, Lexicon bridges and application migrations are pending.
+
+security.hotspots reports manual review candidates, preserving owner priority,
+review status and guidance; it does not turn them into confirmed vulnerabilities.
+Strict parse/read/configuration failures stay incomplete. Additional operations
+used by Kairos/Hercules still require qualification and migration.

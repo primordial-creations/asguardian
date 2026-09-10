@@ -18,7 +18,7 @@ stderr is discarded. Children must stay in their process group; escaping hostile
 processes require host supervision. Hosts authorize targets and supply quiescent
 snapshots; this is not an authorization service or filesystem sandbox.
 
-Initial profile quality.file-length only. Other audited profiles, bridges and
+Initial profiles: quality.file-length and security.hotspots. Other audited profiles, bridges and
 application migrations remain pending. Immutable local module proxy qualification
 is not proof of publication or the intended durable distribution channel.
 
@@ -26,3 +26,8 @@ Request.MaxFindings is optional (*int): nil selects 1000, while explicit zero is
 sent to the engine and rejected. This corrects the unreleased candidate API;
 existing candidate users must take an int address when supplying a limit.
 Pipe draining uses the same operation deadline, not a separate shorter cutoff.
+
+security.hotspots reports manual review candidates, preserving owner priority,
+review status and guidance; it does not turn them into confirmed vulnerabilities.
+Strict parse/read/configuration failures stay incomplete. Additional operations
+used by Kairos/Hercules still require qualification and migration.

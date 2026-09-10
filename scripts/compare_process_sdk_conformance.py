@@ -21,5 +21,5 @@ for language,report in reports.items():
  for result in report['reports']:
   if result['engine'] not in engines or result['observations']!=expected:raise RuntimeError('Observation mismatch: '+language)
 a.output.parent.mkdir(parents=True,exist_ok=True)
-a.output.write_text(json.dumps(dict(result='passed',revision=revision,fixture_sha256=digest,engine_artifacts=engines,observations=expected,artifact_combinations=10,classification='seven actual-engine cases plus closed/cancel precedence and controlled delayed-pipe fixture; not full protocol/profile/lifecycle/bridge parity'),indent=2)+'\n')
+a.output.write_text(json.dumps(dict(result='passed',revision=revision,fixture_sha256=digest,engine_artifacts=engines,observations=expected,artifact_combinations=10,classification='twelve actual-engine cases plus closed/cancel precedence and controlled delayed-pipe fixture; not full protocol/profile/lifecycle/bridge parity'),indent=2)+'\n')
 print('All four installed SDKs match the shared process fixture')

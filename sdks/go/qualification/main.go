@@ -101,6 +101,37 @@ func main() {
 	must(err)
 	must(pipes.Close())
 	observations["pipe_drain"] = drained["state"]
+	hotroot := filepath.Join(root, "hotspot scope")
+	must(os.Mkdir(hotroot, 0700))
+	config := filepath.Join(hotroot, ".heimdall.yml")
+	must(os.WriteFile(config, []byte("test_context_enabled: false\n"), 0600))
+	must(os.WriteFile(filepath.Join(hotroot, "main.py"), []byte("import hashlib\nhashlib.md5(b'x')\n"), 0600))
+	hotrequest := asgard.Request{AuthorizedRoot: hotroot, Target: hotroot, Profile: "security.hotspots"}
+	saved, err := os.ReadFile(filepath.Join(hotroot, "main.py"))
+	must(err)
+	must(os.WriteFile(filepath.Join(hotroot, "main.py"), []byte("value = 1\n"), 0600))
+	cleanhot := scan(hotrequest)
+	check(cleanhot["complete"] == true && len(cleanhot["findings"].([]any)) == 0)
+	observations["hotspot_clean"] = cleanhot["state"]
+	must(os.WriteFile(filepath.Join(hotroot, "main.py"), saved))
+	hot := scan(hotrequest)
+	check(hot["complete"] == true && len(hot["findings"].([]any)) == 1)
+	item := hot["findings"].([]any)[0].(map[string]any)
+	observations["hotspot"] = map[string]any{"kind": hot["finding_kind"], "category": item["category"], "priority": item["review_priority"], "review_status": item["review_status"]}
+	must(os.WriteFile(filepath.Join(hotroot, "broken.py"), []byte("def broken(:\n"), 0600))
+	hotpartial := scan(hotrequest)
+	check(hotpartial["complete"] == false && len(hotpartial["findings"].([]any)) == 1)
+	check(hotpartial["errors"].([]any)[0].(map[string]any)["stage"] == "parse")
+	observations["hotspot_parse"] = hotpartial["state"]
+	must(os.WriteFile(filepath.Join(hotroot, "broken.py"), []byte{255}, 0600))
+	hotread := scan(hotrequest)
+	check(hotread["complete"] == false && len(hotread["findings"].([]any)) == 1)
+	check(hotread["errors"].([]any)[0].(map[string]any)["error_type"] == "UnicodeDecodeError")
+	observations["hotspot_read"] = hotread["state"]
+	must(os.WriteFile(config, []byte("test_context_enabled: []\n"), 0600))
+	hotinvalid := scan(hotrequest)
+	check(hotinvalid["complete"] == false)
+	observations["hotspot_config"] = hotinvalid["errors"].([]any)[0].(map[string]any)["code"]
 	result, err := json.Marshal(observations)
 	must(err)
 	fmt.Println(string(result))

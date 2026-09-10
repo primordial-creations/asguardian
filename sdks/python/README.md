@@ -19,7 +19,7 @@ with Client(["/opt/asgard/bin/python", "-m", "Asgard.sdk_protocol"],
 
 The host must authorize targets and provide a quiescent snapshot; containment
 checks do not replace authorization or a filesystem sandbox. Only the engine's
-advertised profiles are supported. Currently quality.file-length is implemented;
+advertised profiles are supported. Currently quality.file-length and security.hotspots are implemented;
 remaining audited scans and consumer migrations are pending. No remote service,
 implicit executable search, shell interpolation or automatic retry is used.
 
@@ -37,3 +37,8 @@ and signal cancellation explicitly when an async host is cancelled.
 Source-execution engines with null version metadata are rejected. Candidate
 artifacts are not released; intended channel and engine compatibility pins must
 be qualified before rollout. Existing CLI consumers remain unchanged.
+
+security.hotspots reports manual review candidates, preserving owner priority,
+review status and guidance; it does not turn them into confirmed vulnerabilities.
+Strict parse/read/configuration failures stay incomplete. Additional operations
+used by Kairos/Hercules still require qualification and migration.
