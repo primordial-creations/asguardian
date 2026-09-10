@@ -86,6 +86,7 @@ class CryptographicValidationService:
             path,
             exclude_patterns=self.config.exclude_patterns,
             include_extensions=self.config.include_extensions,
+            **({"analysis_errors": report.analysis_errors} if self.config.strict_io else {}),
         ):
             if str(file_path) in self.config.ignore_paths:
                 continue

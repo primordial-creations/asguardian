@@ -109,6 +109,7 @@ class InjectionDetectionService:
             path,
             exclude_patterns=self.config.exclude_patterns,
             include_extensions=self.config.include_extensions,
+            **({"analysis_errors": report.analysis_errors} if self.config.strict_io else {}),
         ):
             if str(file_path) in self.config.ignore_paths:
                 continue
@@ -154,6 +155,8 @@ class InjectionDetectionService:
 
         try:
             if file_path.stat().st_size > MAX_INJECTION_FILE_BYTES:
+                if self.config.strict_io:
+                    raise OSError("source exceeds injection analysis size limit")
                 return findings
             with open(file_path, "r", encoding="utf-8", errors="strict" if self.config.strict_io else "ignore") as f:
                 content = f.read()
