@@ -227,4 +227,4 @@ async def run_mobile_test(args: argparse.Namespace, verbose: bool = False) -> in
     else:
         print(output)
 
-    return 1 if result.issues else 0
+    return 1 if not result.is_complete or result.issues else 0

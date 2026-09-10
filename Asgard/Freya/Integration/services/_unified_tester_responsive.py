@@ -147,7 +147,16 @@ async def run_responsive_tests(
                 details={"devices": issue.affected_devices},
             ))
 
-        if not mobile_report.issues:
+        if not mobile_report.is_complete:
+            results.append(UnifiedTestResult(
+                category=TestCategory.RESPONSIVE,
+                test_name="Mobile Compatibility",
+                passed=False,
+                severity=TestSeverity.CRITICAL,
+                message="Mobile compatibility observations are incomplete",
+                details={"is_complete": False},
+            ))
+        elif not mobile_report.issues:
             results.append(UnifiedTestResult(
                 category=TestCategory.RESPONSIVE,
                 test_name="Mobile Compatibility",
