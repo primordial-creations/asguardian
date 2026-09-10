@@ -1,0 +1,46 @@
+PROPRIETARY SOFTWARE LICENSE
+
+Copyright (c) 2026 Jake Druett. All rights reserved.
+
+This software and its associated documentation, design documents, research
+notes, benchmarks, and all other materials in this repository (collectively,
+the "Software") are the proprietary and confidential property of Jake Druett
+(the "Owner").
+
+NO LICENSE IS GRANTED.
+
+No person or entity is granted any right to use, copy, modify, merge, publish,
+distribute, sublicense, sell, host, reverse engineer, or create derivative
+works of the Software, in whole or in part, in source or binary form, except
+under a separate written commercial licensing agreement signed by the Owner.
+
+Possession of a copy of the Software, whether obtained with or without the
+Owner's consent, confers no license and no rights of use.
+
+Unauthorized use, reproduction, or distribution of the Software, or of any
+portion of it, is a violation of applicable copyright and trade secret law and
+may result in civil and criminal penalties.
+
+To obtain a commercial license, contact: jakedruett@gmail.com
+
+THIRD-PARTY COMPONENTS
+
+This repository may vendor third-party dependencies under directories such as
+`vendor/`, `node_modules/`, or `third_party/`. Those components remain the
+property of their respective copyright holders and are governed exclusively by
+their own license files, which are retained alongside them as those licenses
+require. Nothing in this file alters, supersedes, or revokes the terms of any
+third-party license, and nothing in those third-party licenses grants any
+right to the Software.
+
+Where present, attribution for those components -- each one's name, version,
+declared license, and full license text -- is collected in
+THIRD-PARTY-NOTICES.md at the root of this repository. That file must
+accompany any distribution of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+OWNER BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER IN AN
+ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN CONNECTION
+WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
