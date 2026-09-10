@@ -57,7 +57,7 @@ def main():
         observations=json.loads(run(['node','engine-consumer.cjs',python,installed['version']],consumer))
         if observations!=expected:raise RuntimeError('Node/Python engine observations disagree')
         reports.append(dict(engine=installed['artifact'],observations=observations))
-    evidence=dict(fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),revision=run(['git','rev-parse','HEAD'],root),engine_revision=engine['revision'],engine_artifacts=engine['engine_artifacts'],artifact=artifact.name,sha256=hashlib.sha256(artifact.read_bytes()).hexdigest(),consumer=str(consumer),reports=reports,result='passed',classification='Node CJS/ESM/types/lifecycle and installed file-length engines; Python observation equality; other profiles/languages/bridges/migrations/channel pending')
+    evidence=dict(fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),revision=run(['git','rev-parse','HEAD'],root),engine_revision=engine['revision'],engine_artifacts=engine['engine_artifacts'],artifact=artifact.name,sha256=hashlib.sha256(artifact.read_bytes()).hexdigest(),consumer=str(consumer),reports=reports,result='passed',classification='Node CJS/ESM/types/lifecycle and installed file-length/hotspot engines; Python observation equality; other profiles/languages/bridges/migrations/channel pending')
     (output/'verification.json').write_text(json.dumps(evidence,indent=2)+'\n');print('Node SDK artifact and both installed engines passed')
 
 if __name__=='__main__':main()

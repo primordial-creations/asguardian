@@ -3,12 +3,12 @@
 Entry point: `python -m Asgard.sdk_protocol`, using the separately installed
 `asguardian` engine's Python executable. One bounded JSON request on stdin, EOF,
 one JSON response on stdout, then process exit. Engine logs go to stderr.
-No remote service is assumed. This is the first WP05 profile, not the complete
+No remote service is assumed. These are initial WP05 profiles, not the complete
 scan API or a replacement for the concurrent Hercules L13 contract integration.
 
 Every request requires integer `protocol_version: 1`, a nonempty string
 `correlation_id` (maximum 256 characters) and `operation`. `handshake` returns
-explicit capabilities. `scan` currently accepts `profile: "quality.file-length"`,
+explicit capabilities. `scan` accepts `profile: "quality.file-length"` or `"security.hotspots"`,
 absolute `authorized_root` and `target` directories and optional `max_findings`
 (1–10000, default 1000). Unknown scan fields fail; fix/mutation flags are not
 accepted. Requests are limited to 65536 bytes. The finding limit bounds returned
@@ -51,7 +51,24 @@ arguments. Future profiles must be advertised explicitly and preserve their
 own incomplete/tool-failure semantics. Protocol-breaking changes require a new
 major protocol version; callers must reject unsupported versions.
 
-Pending: four lightweight SDK artifacts, process lifecycle/timeout/output bounds,
+Four lightweight owner SDKs and isolated artifact/process gates are implemented
+under `sdks/` and `scripts/`. Intended channels and CI execution remain pending.
+
+Pending: full process/input parity,
 remaining Heimdall/Forseti/Freya operation inventory and profiles, missing-tool
 fixtures, installed engine pin/qualification, Lexicon Scanning, Kairos/Hercules
 migrations, release jobs and intended distribution-channel checks.
+
+The security.hotspots profile reuses HotspotDetector and the CLI's .heimdall.yml
+settings (test_context_enabled and strict_scan_paths), with strict validation.
+Its finding_kind is security_hotspot: review_priority/review_status/guidance are
+manual-review information, not confirmed vulnerability severity. Existing CLI
+exit policy is unchanged; the process protocol consistently uses exit1 for any
+returned findings and for incomplete analysis. SDKs parse those valid responses.
+
+Strict hotspot scans retain successfully detected hotspots when another file
+cannot be read or parsed. Invalid configuration, excluded-scope escape links and
+truncation never become clean empty scans. Default language/test-context/exclusion
+rules remain owner rules. No target tool execution or review-state mutation is
+introduced. Legacy detector traversal/fallback compatibility remains available;
+its report does not assert strict completeness. Protocol clients always opt in.

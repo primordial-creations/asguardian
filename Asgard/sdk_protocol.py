@@ -17,6 +17,7 @@ import uuid
 PROTOCOL_VERSION = 1
 MAX_REQUEST_BYTES = 65536
 PROFILE = "quality.file-length"
+PROFILES = (PROFILE, "security.hotspots")
 
 
 def engine_version():
@@ -71,12 +72,12 @@ def respond(request):
         operation = request.get("operation")
         if operation == "handshake":
             response.update(state="ready", complete=True, capabilities={
-                "profiles": [PROFILE], "transport": "single-request-stdio",
+                "profiles": list(PROFILES), "transport": "single-request-stdio",
                 "progress": False, "remote": False, "max_request_bytes": MAX_REQUEST_BYTES,
                 "target_policy": "host-authorized-quiescent-directory-no-symlinks",
             })
             return response, 0
-        if operation != "scan" or request.get("profile") != PROFILE:
+        if operation != "scan" or request.get("profile") not in PROFILES:
             response["errors"] = [{"code": "unsupported_operation"}]
             return response, 2
         if set(request) - {"protocol_version", "correlation_id", "operation", "profile",
@@ -86,6 +87,11 @@ def respond(request):
         if type(limit) is not int or not 1 <= limit <= 10000:
             raise ValueError("max_findings must be an integer from 1 to 10000")
         target = target_path(request)
+        if request["profile"] == "security.hotspots":
+            from Asgard.sdk_hotspots import scan_hotspots
+            result, code = scan_hotspots(target, limit)
+            response.update(result)
+            return response, code
         # Lazy engine import keeps handshake independent from optional engine tools.
         from Asgard.Bragi.Quality.services.file_length_analyzer import FileAnalyzer
 

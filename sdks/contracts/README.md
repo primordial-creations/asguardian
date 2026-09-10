@@ -22,3 +22,9 @@ Existing per-language transport/lifecycle tests run in addition. Full malformed
 wire/optional-value/error and cancellation-race parity remains open, as do other
 profiles, neutral Scanning, host migrations and durable distribution. This gate
 must not be presented as complete WP05 or arbitrary scanning-provider parity.
+
+Five additional actual-engine observations cover security.hotspots: clean scan,
+manual-review finding (kind/category/priority/status), Python parse failure,
+unreadable UTF-8 input, and invalid configuration. Parse/read failures retain the
+other successfully detected hotspot while marking the result incomplete. These
+bring the shared fixture to14observations (12actual-engine plus2lifecycle cases).

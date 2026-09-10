@@ -31,7 +31,7 @@ async fn main() {
     assert_eq!(hello["engine_version"], version.as_str());
     assert_eq!(
         hello["capabilities"]["profiles"],
-        json!(["quality.file-length"])
+        json!(["quality.file-length", "security.hotspots"])
     );
     let mut clean_request = request();
     clean_request.correlation_id = "clean".into();
@@ -89,6 +89,44 @@ async fn main() {
     let error = wrong.handshake(&token).await.unwrap_err();
     assert_eq!(error.code, "engine_version_mismatch");
     wrong.close().await;
+    let hotroot = root.join("hotspot scope");
+    std::fs::create_dir(&hotroot).unwrap();
+    let config = hotroot.join(".heimdall.yml");
+    std::fs::write(&config, "test_context_enabled: false\n").unwrap();
+    std::fs::write(
+        hotroot.join("main.py"),
+        "import hashlib\nhashlib.md5(b'x')\n",
+    )
+    .unwrap();
+    let hotrequest = || {
+        let mut r = Request::new(hotroot.to_str().unwrap(), hotroot.to_str().unwrap());
+        r.profile = "security.hotspots".into();
+        r
+    };
+    let saved = std::fs::read(hotroot.join("main.py")).unwrap();
+    std::fs::write(hotroot.join("main.py"), "value = 1\n").unwrap();
+    let cleanhot = c.scan(hotrequest(), &token).await.unwrap();
+    assert_eq!(cleanhot["complete"], true);
+    assert_eq!(cleanhot["findings"], json!([]));
+    std::fs::write(hotroot.join("main.py"), saved).unwrap();
+    let hot = c.scan(hotrequest(), &token).await.unwrap();
+    assert_eq!(hot["complete"], true);
+    assert_eq!(hot["findings"].as_array().unwrap().len(), 1);
+    let item = &hot["findings"][0];
+    let hotspot = json!({"kind":hot["finding_kind"],"category":item["category"],"priority":item["review_priority"],"review_status":item["review_status"]});
+    std::fs::write(hotroot.join("broken.py"), "def broken(:\n").unwrap();
+    let hotpartial = c.scan(hotrequest(), &token).await.unwrap();
+    assert_eq!(hotpartial["complete"], false);
+    assert_eq!(hotpartial["findings"].as_array().unwrap().len(), 1);
+    assert_eq!(hotpartial["errors"][0]["stage"], "parse");
+    std::fs::write(hotroot.join("broken.py"), [255]).unwrap();
+    let hotread = c.scan(hotrequest(), &token).await.unwrap();
+    assert_eq!(hotread["complete"], false);
+    assert_eq!(hotread["findings"].as_array().unwrap().len(), 1);
+    assert_eq!(hotread["errors"][0]["error_type"], "UnicodeDecodeError");
+    std::fs::write(config, "test_context_enabled: []\n").unwrap();
+    let hotinvalid = c.scan(hotrequest(), &token).await.unwrap();
+    assert_eq!(hotinvalid["complete"], false);
     c.close().await;
     let closed = Client::new(command, Options::new(version)).unwrap();
     closed.close().await;
@@ -115,6 +153,6 @@ async fn main() {
     std::fs::remove_dir_all(root).unwrap();
     println!(
         "{}",
-        json!({"clean":clean["state"],"finding":finding["findings"][0]["lines_over"],"truncated":capped["state"],"invalid_target":"invalid_request","symlink":partial["state"],"mismatch":error.code,"zero_limit":zero_code,"closed_cancel":closed_code,"pipe_drain":drained["state"]})
+        json!({"clean":clean["state"],"finding":finding["findings"][0]["lines_over"],"truncated":capped["state"],"invalid_target":"invalid_request","symlink":partial["state"],"mismatch":error.code,"zero_limit":zero_code,"closed_cancel":closed_code,"pipe_drain":drained["state"],"hotspot":hotspot,"hotspot_clean":cleanhot["state"],"hotspot_read":hotread["state"],"hotspot_parse":hotpartial["state"],"hotspot_config":hotinvalid["errors"][0]["code"]})
     );
 }

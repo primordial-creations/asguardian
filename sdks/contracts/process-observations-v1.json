@@ -7,5 +7,15 @@
   "truncated": "incomplete",
   "zero_limit": "invalid_request",
   "closed_cancel": "closed",
-  "pipe_drain": "ready"
+  "pipe_drain": "ready",
+  "hotspot": {
+    "kind": "security_hotspot",
+    "category": "weak_hashing",
+    "priority": "medium",
+    "review_status": "to_review"
+  },
+  "hotspot_parse": "incomplete",
+  "hotspot_config": "scan_configuration_error",
+  "hotspot_clean": "complete",
+  "hotspot_read": "incomplete"
 }

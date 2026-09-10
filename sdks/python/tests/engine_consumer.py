@@ -18,7 +18,7 @@ with tempfile.TemporaryDirectory(prefix='scan fixtures ') as temporary:
     with Client(command, engine_version=version) as client:
         hello = client.handshake()
         assert hello['engine_version'] == version
-        assert hello['capabilities']['profiles'] == ['quality.file-length']
+        assert hello['capabilities']['profiles'] == ['quality.file-length', 'security.hotspots']
         clean = client.scan(authorized_root=str(root), target=str(source), correlation_id='clean')
         assert clean['complete'] and not clean['findings'] and clean['correlation_id'] == 'clean'
         observations['clean'] = clean['state']
@@ -61,6 +61,34 @@ with tempfile.TemporaryDirectory(prefix='scan fixtures ') as temporary:
         except ScanError as error:
             assert error.code == 'engine_version_mismatch'
             observations['mismatch'] = error.code
+
+with tempfile.TemporaryDirectory(prefix='hotspot fixtures ') as temporary:
+    root = Path(temporary).resolve()
+    (root / '.heimdall.yml').write_text('test_context_enabled: false\n')
+    (root / 'main.py').write_text("import hashlib\nhashlib.md5(b'x')\n")
+    with Client(command, engine_version=version) as hotspots:
+        options = dict(authorized_root=str(root), target=str(root), profile='security.hotspots')
+        saved = (root / 'main.py').read_text(); (root / 'main.py').write_text('value = 1\n')
+        clean_hotspots = hotspots.scan(**options); assert clean_hotspots['complete'] and not clean_hotspots['findings']
+        observations['hotspot_clean'] = clean_hotspots['state']; (root / 'main.py').write_text(saved)
+        result = hotspots.scan(**options)
+        assert result['complete'] and len(result['findings']) == 1
+        item = result['findings'][0]
+        observations['hotspot'] = dict(kind=result['finding_kind'], category=item['category'],
+                                       priority=item['review_priority'], review_status=item['review_status'])
+        (root / 'broken.py').write_text('def broken(:\n')
+        partial = hotspots.scan(**options)
+        assert not partial['complete'] and len(partial['findings']) == 1
+        assert partial['errors'][0]['stage'] == 'parse'
+        observations['hotspot_parse'] = partial['state']
+        (root / 'broken.py').write_bytes(b'\xff')
+        unreadable = hotspots.scan(**options); assert not unreadable['complete'] and len(unreadable['findings']) == 1
+        assert unreadable['errors'][0]['error_type'] == 'UnicodeDecodeError'
+        observations['hotspot_read'] = unreadable['state']
+        (root / '.heimdall.yml').write_text('test_context_enabled: []\n')
+        invalid = hotspots.scan(**options)
+        assert not invalid['complete']
+        observations['hotspot_config'] = invalid['errors'][0]['code']
 
 closed = Client(command, engine_version=version)
 closed.close()

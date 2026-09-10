@@ -163,6 +163,14 @@ class HotspotReport(BaseModel):
         0, description="Hotspots suppressed by the test-context engine (retained, not scored)"
     )
 
+    analysis_errors: List[Dict[str, str]] = Field(default_factory=list)
+    strict_analysis_checked: bool = False
+    files_analyzed: Optional[int] = Field(None, description="Processed files in strict mode; unknown for legacy scans")
+
+    @property
+    def analysis_complete(self) -> bool:
+        return self.strict_analysis_checked and not self.analysis_errors
+
     # Metadata
     scan_path: str = Field("", description="Root path that was scanned")
     scan_duration_seconds: float = Field(0.0, description="Time taken for the scan")

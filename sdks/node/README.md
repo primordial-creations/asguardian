@@ -16,7 +16,7 @@ try {
 ```
 
 The host authorizes the target and supplies a quiescent snapshot. Path checks
-are not a filesystem sandbox. Initial protocol1 supports quality.file-length;
+are not a filesystem sandbox. Protocol1 supports quality.file-length and security.hotspots;
 full audited scan profiles and application migrations remain pending.
 
 scan negotiates capabilities and executes under one timeoutMs budget. Optional
@@ -31,3 +31,8 @@ version_mismatch, engine_version_mismatch, unsupported_operation and engine_erro
 (with owner response). Transport/cleanup failures remain explicit errors.
 Valid exit1 findings and incomplete results are returned without converting them
 to clean defaults. Candidate artifact/channel and consumer rollout remain gated.
+
+security.hotspots reports manual review candidates, preserving owner priority,
+review status and guidance; it does not turn them into confirmed vulnerabilities.
+Strict parse/read/configuration failures stay incomplete. Additional operations
+used by Kairos/Hercules still require qualification and migration.
