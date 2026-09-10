@@ -44,7 +44,7 @@ type Request struct {
 	AuthorizedRoot string
 	Target         string
 	Profile        string
-	MaxFindings    int
+	MaxFindings    *int
 	CorrelationID  string
 }
 
@@ -125,8 +125,9 @@ func (c *Client) Scan(ctx context.Context, request Request) (Response, error) {
 	if request.Profile == "" {
 		request.Profile = "quality.file-length"
 	}
-	if request.MaxFindings == 0 {
-		request.MaxFindings = 1000
+	maxFindings := 1000
+	if request.MaxFindings != nil {
+		maxFindings = *request.MaxFindings
 	}
 	hello, err := c.invoke(ctx, map[string]any{"protocol_version": 1, "operation": "handshake", "correlation_id": request.CorrelationID})
 	if err != nil {
@@ -141,7 +142,7 @@ func (c *Client) Scan(ctx context.Context, request Request) (Response, error) {
 	if !supported {
 		return nil, fail("unsupported_operation")
 	}
-	return c.invoke(ctx, map[string]any{"protocol_version": 1, "operation": "scan", "correlation_id": request.CorrelationID, "profile": request.Profile, "authorized_root": request.AuthorizedRoot, "target": request.Target, "max_findings": request.MaxFindings})
+	return c.invoke(ctx, map[string]any{"protocol_version": 1, "operation": "scan", "correlation_id": request.CorrelationID, "profile": request.Profile, "authorized_root": request.AuthorizedRoot, "target": request.Target, "max_findings": maxFindings})
 }
 
 type bounded struct {
@@ -187,12 +188,10 @@ func (c *Client) invoke(parent context.Context, request map[string]any) (Respons
 	}
 	ctx, cancel := context.WithCancelCause(parent)
 	defer cancel(nil)
-	cmd := exec.CommandContext(ctx, c.command[0], c.command[1:]...)
+	cmd := exec.Command(c.command[0], c.command[1:]...)
 	if err = configure(cmd); err != nil {
 		return nil, err
 	}
-	cmd.Cancel = func() error { return killGroup(cmd) }
-	cmd.WaitDelay = 200 * time.Millisecond
 	stdout := &bounded{limit: c.options.MaxOutputBytes, retain: true, cancel: cancel}
 	stderr := &bounded{limit: c.options.MaxOutputBytes, cancel: cancel}
 	cmd.Stdin = bytes.NewReader(raw)
@@ -217,7 +216,18 @@ func (c *Client) invoke(parent context.Context, request map[string]any) (Respons
 		}
 		return nil, fail("engine_unavailable")
 	}
+	done, watched := make(chan struct{}), make(chan struct{})
+	go func() {
+		defer close(watched)
+		select {
+		case <-ctx.Done():
+			_ = killGroup(cmd)
+		case <-done:
+		}
+	}()
 	err = cmd.Wait()
+	close(done)
+	<-watched
 	cleanup := killGroup(cmd)
 	if cause := contextError(ctx); cause != nil {
 		return nil, cause

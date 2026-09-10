@@ -52,7 +52,8 @@ func main() {
 	check(detail["relative_path"] == "sample.py" && detail["lines_over"] == json.Number("1"))
 	observations["finding"] = detail["lines_over"]
 	must(os.WriteFile(filepath.Join(target, "second.py"), []byte(strings.Repeat("value = 1\n", 302)), 0600))
-	request.MaxFindings = 1
+	limit := 1
+	request.MaxFindings = &limit
 	capped := scan(request)
 	check(capped["complete"] == false && capped["truncated"] == true && len(capped["findings"].([]any)) == 1)
 	check(capped["summary"].(map[string]any)["files_exceeding_threshold"] == json.Number("2"))
@@ -64,6 +65,11 @@ func main() {
 		check(sdk.Response["errors"].([]any)[0].(map[string]any)["code"] == "invalid_request")
 	}
 	observations["invalid_target"] = "invalid_request"
+	zero := 0
+	_, zeroErr := c.Scan(ctx, asgard.Request{AuthorizedRoot: root, Target: target, MaxFindings: &zero})
+	var zeroSDK *asgard.Error
+	check(errors.As(zeroErr, &zeroSDK) && zeroSDK.Code == "engine_error")
+	observations["zero_limit"] = zeroSDK.Response["errors"].([]any)[0].(map[string]any)["code"]
 	linked := filepath.Join(root, "linked")
 	must(os.Mkdir(linked, 0700))
 	must(os.Symlink(source, filepath.Join(linked, "escape.py")))
@@ -78,6 +84,23 @@ func main() {
 	var sdk *asgard.Error
 	check(errors.As(err, &sdk) && sdk.Code == "engine_version_mismatch")
 	observations["mismatch"] = sdk.Code
+	closed, err := asgard.New(command, asgard.Options{EngineVersion: version})
+	must(err)
+	must(closed.Close())
+	cancelled, cancel := context.WithCancel(ctx)
+	cancel()
+	_, err = closed.Handshake(cancelled)
+	var closedSDK *asgard.Error
+	check(errors.As(err, &closedSDK))
+	observations["closed_cancel"] = closedSDK.Code
+	fixture, err := filepath.Abs("pipe_fixture.py")
+	must(err)
+	pipes, err := asgard.New([]string{os.Args[1], "-I", fixture, version}, asgard.Options{EngineVersion: version})
+	must(err)
+	drained, err := pipes.Handshake(ctx)
+	must(err)
+	must(pipes.Close())
+	observations["pipe_drain"] = drained["state"]
 	result, err := json.Marshal(observations)
 	must(err)
 	fmt.Println(string(result))

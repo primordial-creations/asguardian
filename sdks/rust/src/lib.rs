@@ -176,13 +176,13 @@ impl Client {
         deadline: Instant,
         cancel: &CancellationToken,
     ) -> Result<Value, Error> {
-        if cancel.is_cancelled() {
-            return Err(fail("cancelled"));
-        }
         {
             let gate = self.inner.gate.lock().expect("client lock poisoned");
             if *gate || self.inner.closed.is_cancelled() {
                 return Err(fail("closed"));
+            }
+            if cancel.is_cancelled() {
+                return Err(fail("cancelled"));
             }
             self.inner.count.send_modify(|n| *n += 1);
         }

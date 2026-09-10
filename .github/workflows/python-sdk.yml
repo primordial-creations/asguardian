@@ -38,6 +38,8 @@ jobs:
         run: cargo fetch --locked --manifest-path sdks/rust/Cargo.toml
       - name: Qualify Rust crate against installed engines
         run: python scripts/qualify_rust_sdk.py --engine-evidence "$RUNNER_TEMP/asgard-engine-artifacts/verification.json" --consumer "$RUNNER_TEMP/asgard-rust-consumer" --output "$RUNNER_TEMP/asgard-rust-artifacts" --target "$RUNNER_TEMP/asgard-rust-target"
+      - name: Compare common four-language conformance
+        run: python scripts/compare_process_sdk_conformance.py --python "$RUNNER_TEMP/asgard-engine-artifacts/verification.json" --node "$RUNNER_TEMP/asgard-node-artifacts/verification.json" --go "$RUNNER_TEMP/asgard-go-artifacts/verification.json" --rust "$RUNNER_TEMP/asgard-rust-artifacts/verification.json" --output "$RUNNER_TEMP/asgard-process-conformance.json"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: asgard-process-sdk-candidates
@@ -47,4 +49,5 @@ jobs:
             ${{ runner.temp }}/asgard-node-artifacts
             ${{ runner.temp }}/asgard-go-artifacts
             ${{ runner.temp }}/asgard-rust-artifacts
+            ${{ runner.temp }}/asgard-process-conformance.json
           if-no-files-found: error

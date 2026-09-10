@@ -21,3 +21,8 @@ snapshots; this is not an authorization service or filesystem sandbox.
 Initial profile quality.file-length only. Other audited profiles, bridges and
 application migrations remain pending. Immutable local module proxy qualification
 is not proof of publication or the intended durable distribution channel.
+
+Request.MaxFindings is optional (*int): nil selects 1000, while explicit zero is
+sent to the engine and rejected. This corrects the unreleased candidate API;
+existing candidate users must take an int address when supplying a limit.
+Pipe draining uses the same operation deadline, not a separate shorter cutoff.

@@ -59,14 +59,16 @@ source=a.engine_evidence.resolve();engine=json.loads(source.read_text())
 if engine['result']!='passed' or len(engine['engines'])!=2:raise RuntimeError('Qualified engine pair required')
 for name,digest in engine['engine_artifacts'].items():
  if hashlib.sha256((source.parent/name).read_bytes()).hexdigest()!=digest:raise RuntimeError('Engine artifact digest mismatch')
+fixture=root/'sdks/contracts/process-observations-v1.json';expected=json.loads(fixture.read_text())
+shutil.copy(root/'sdks/contracts/pipe_fixture.py',consumer/'pipe_fixture.py')
 reports=[]
 for item in engine['engines']:
  python=Path(item['path'])/'venv/bin/python'
  origin=json.loads(run([python,'-I','-c',"import importlib.metadata as m; print(m.distribution('asguardian').read_text('direct_url.json'))"],consumer,env))
  if origin['archive_info']['hashes']['sha256']!=engine['engine_artifacts'][item['artifact']]:raise RuntimeError('Engine install provenance mismatch')
  observations=json.loads(run([binary,python,item['version']],consumer,env))
- if observations!=engine['reports'][0]['observations']:raise RuntimeError('Go/Python observations disagree')
+ if observations!=expected:raise RuntimeError('Go/Python observations disagree')
  reports.append(dict(engine=item['artifact'],observations=observations))
 artifacts={str(path.relative_to(output)):hashlib.sha256(path.read_bytes()).hexdigest() for path in versions.iterdir() if path.is_file()}
-(output/'verification.json').write_text(json.dumps(dict(revision=revision,dirty=run(['git','status','--porcelain'],root),module=module,version=version,artifacts=artifacts,engine_revision=engine['revision'],engine_artifacts=engine['engine_artifacts'],reports=reports,consumer=str(consumer),toolchain=run(['go','version'],consumer,env).strip(),result='passed',classification='immutable local file proxy with race tests; both installed file-length engine artifacts match Python observations; other profiles/languages/bridges/migrations and durable channel pending'),indent=2)+'\n')
+(output/'verification.json').write_text(json.dumps(dict(fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),revision=revision,dirty=run(['git','status','--porcelain'],root),module=module,version=version,artifacts=artifacts,engine_revision=engine['revision'],engine_artifacts=engine['engine_artifacts'],reports=reports,consumer=str(consumer),toolchain=run(['go','version'],consumer,env).strip(),result='passed',classification='immutable local file proxy with race tests; both installed file-length engine artifacts match Python observations; other profiles/languages/bridges/migrations and durable channel pending'),indent=2)+'\n')
 print('PASS immutable Go module, race tests and both installed Asgard engines')
