@@ -63,6 +63,13 @@ class AnalysisResult(BaseModel):
     longest_file: Optional[FileAnalysis] = Field(None, description="The longest file found")
     skipped_directories: List[str] = Field(default_factory=list, description="Directories that were skipped")
     skipped_patterns: List[str] = Field(default_factory=list, description="File patterns that were skipped")
+    analysis_errors: List[str] = Field(default_factory=list, description="Observed I/O failures in strict analysis")
+    io_completeness_checked: bool = Field(False, description="Strict I/O reporting was requested")
+
+    @property
+    def analysis_complete(self) -> bool:
+        """Only strict scans without observed I/O failures assert completion."""
+        return self.io_completeness_checked and not self.analysis_errors
 
     class Config:
         use_enum_values = True
