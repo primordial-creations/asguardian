@@ -17,6 +17,7 @@ from Asgard.Bragi.Performance.models._performance_findings import (
     PerformanceSeverity,
 )
 from Asgard.Bragi.Performance.models._performance_reports import (
+    AnalyzerOutcome,
     CacheReport,
     CpuReport,
     DatabaseReport,
@@ -26,6 +27,7 @@ from Asgard.Bragi.Performance.models._performance_reports import (
 )
 
 __all__ = [
+    "AnalyzerOutcome",
     "PerformanceSeverity",
     "MemoryIssueType",
     "CpuIssueType",

@@ -60,12 +60,14 @@ def _run_scan_steps_7_to_11(scan_path, exclude_patterns, include_tests, verbose,
         )
         perf_service = StaticPerformanceService(perf_config)
         perf_result = perf_service.scan(scan_path)
-        perf_total = perf_result.total_findings if hasattr(perf_result, "total_findings") else 0
+        perf_total = perf_result.total_issues
         scan_results["performance"] = {
             "total_findings": perf_total,
-            "status": "PASS" if perf_total == 0 else "FAIL",
+            "status": "INCOMPLETE" if not perf_result.is_complete else ("PASS" if perf_total == 0 else "FAIL"),
+            "is_complete": perf_result.is_complete,
+            "performance_score": perf_result.performance_score,
         }
-        if perf_total > 0:
+        if not perf_result.is_complete or perf_total > 0:
             overall_exit = 1
         print(f"       {perf_total} findings")
         try:
