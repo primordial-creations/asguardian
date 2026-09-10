@@ -198,7 +198,12 @@ async fn dropped_future_cleans_child_group() {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
             Ok(_) => break,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error)
+                if error.kind() == std::io::ErrorKind::NotFound
+                    || error.raw_os_error() == Some(3) =>
+            {
+                break
+            }
             Err(error) => panic!("could not verify grandchild cleanup: {error}"),
         }
     }

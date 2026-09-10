@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 )
@@ -28,7 +29,13 @@ func TestHelper(t *testing.T) {
 		if err := cmd.Start(); err != nil {
 			os.Exit(3)
 		}
-		os.WriteFile(strings.TrimPrefix(mode, "child="), []byte(strconv.Itoa(cmd.Process.Pid)), 0600)
+		marker := strings.TrimPrefix(mode, "child=")
+		if err := os.WriteFile(marker+".pending", []byte(strconv.Itoa(cmd.Process.Pid)), 0600); err != nil {
+			panic(err)
+		}
+		if err := os.Rename(marker+".pending", marker); err != nil {
+			panic(err)
+		}
 		time.Sleep(time.Minute)
 		os.Exit(0)
 	}
@@ -196,8 +203,25 @@ func TestChildCleanup(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	stat, err := os.ReadFile("/proc/" + string(pid) + "/stat")
-	if err == nil && strings.Fields(string(stat))[2] != "Z" {
-		t.Fatal("child still running")
+	number, err := strconv.Atoi(string(pid))
+	if err != nil || number <= 0 {
+		t.Fatal("invalid child PID")
+	}
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		stat, err := os.ReadFile("/proc/" + string(pid) + "/stat")
+		if errors.Is(err, os.ErrNotExist) || errors.Is(err, syscall.ESRCH) {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Fields(string(stat))[2] == "Z" {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("descendant survived group cleanup")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }

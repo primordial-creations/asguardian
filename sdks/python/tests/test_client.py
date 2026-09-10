@@ -24,7 +24,8 @@ if mode == 'malformed':
     print('{}'); sys.exit(0)
 if mode == 'child':
     child = subprocess.Popen([sys.executable, '-c', 'import time; time.sleep(60)'])
-    with open(sys.argv[2], 'w') as f: f.write(str(child.pid))
+    with open(sys.argv[2]+'.pending', 'w') as f: f.write(str(child.pid))
+    os.replace(sys.argv[2]+'.pending', sys.argv[2])
     time.sleep(60)
 response = dict(protocol_version=1, engine_version='fixture-1',
     scan_id='scan-1', correlation_id=request['correlation_id'], state='ready',
@@ -108,12 +109,17 @@ class ClientTests(unittest.TestCase):
                         engine_version='fixture-1', timeout=.5) as client:
                 with self.assertRaises(ScanError): self.scan(client)
             pid = int(marker.read_text())
+            self.assertGreater(pid, 0)
             # Linux can briefly retain a terminated orphan as a zombie.
             stat = Path(f'/proc/{pid}/stat')
             deadline = time.monotonic() + 2
-            while stat.exists() and stat.read_text().split()[2] != 'Z' and time.monotonic() < deadline:
+            while True:
+                try:
+                    if stat.read_text().split()[2] == 'Z': break
+                except (FileNotFoundError, ProcessLookupError):
+                    break
+                self.assertLess(time.monotonic(), deadline, 'descendant survived group cleanup')
                 time.sleep(.01)
-            self.assertTrue(not stat.exists() or stat.read_text().split()[2] == 'Z')
 
     def test_unsupported_and_missing_executable(self):
         with self.client() as client, self.assertRaises(ScanError) as caught:

@@ -61,17 +61,18 @@ test('invalid cancellation input fails before starting a process',async()=>{
 test('timeout terminates child processes in the group',async()=>{
  const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asgard-child-')),marker=path.join(dir,'pid');
- const script=`const fs=require('node:fs');const child=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)']);fs.writeFileSync(process.argv[1],String(child.pid));setInterval(()=>{},1000);`;
+ const script=`const fs=require('node:fs');const child=require('node:child_process').spawn(process.execPath,['-e','setInterval(()=>{},1000)']);fs.writeFileSync(process.argv[1]+'.pending',String(child.pid));fs.renameSync(process.argv[1]+'.pending',process.argv[1]);setInterval(()=>{},1000);`;
  const c=new Client([process.execPath,'-e',script,marker],{engineVersion:'fixture',timeoutMs:500});
  try{
   await assert.rejects(c.handshake(),code('timeout'));
   const pid=fs.readFileSync(marker,'utf8'),stat=`/proc/${pid}/stat`;
+  assert.match(pid,/^[1-9][0-9]*$/);
   if(process.platform==='linux'){
    // Group SIGKILL delivery is asynchronous; orphan termination must be bounded.
    const deadline=Date.now()+2000;
    for(;;){
     try{if(fs.readFileSync(stat,'utf8').split(' ')[2]==='Z')break;}
-    catch(error){if(error.code==='ENOENT')break;throw error;}
+    catch(error){if(error.code==='ENOENT'||error.code==='ESRCH')break;throw error;}
     assert.ok(Date.now()<deadline,'descendant survived group cleanup');
     await new Promise(resolve=>setTimeout(resolve,10));
    }
