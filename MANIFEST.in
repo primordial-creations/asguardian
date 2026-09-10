@@ -7,6 +7,7 @@ include pyproject.toml
 recursive-include Asgard *.py *.pyi *.yaml *.yml *.json *.md
 recursive-exclude Asgard_Test *
 recursive-exclude build *
+recursive-exclude sdks *
 recursive-exclude *.egg-info *
 
 global-exclude __pycache__
