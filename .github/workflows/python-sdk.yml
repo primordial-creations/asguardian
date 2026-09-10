@@ -21,6 +21,10 @@ jobs:
         with:
           go-version: '1.22'
           cache: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: '1.96.0'
+          components: clippy
       - run: python -m pip install build
       - name: Qualify wheel and sdist outside checkout
         run: python scripts/qualify_python_sdk.py --scratch-root "$RUNNER_TEMP/asgard-consumers" --output "$RUNNER_TEMP/asgard-sdk-artifacts"
@@ -30,6 +34,10 @@ jobs:
         run: python scripts/qualify_node_sdk.py --engine-evidence "$RUNNER_TEMP/asgard-engine-artifacts/verification.json" --scratch-root "$RUNNER_TEMP/asgard-consumers" --output "$RUNNER_TEMP/asgard-node-artifacts"
       - name: Qualify immutable Go module against installed engines
         run: python scripts/qualify_go_sdk.py --engine-evidence "$RUNNER_TEMP/asgard-engine-artifacts/verification.json" --consumer "$RUNNER_TEMP/asgard-go-consumer" --output "$RUNNER_TEMP/asgard-go-artifacts"
+      - name: Fetch pinned Rust dependencies
+        run: cargo fetch --locked --manifest-path sdks/rust/Cargo.toml
+      - name: Qualify Rust crate against installed engines
+        run: python scripts/qualify_rust_sdk.py --engine-evidence "$RUNNER_TEMP/asgard-engine-artifacts/verification.json" --consumer "$RUNNER_TEMP/asgard-rust-consumer" --output "$RUNNER_TEMP/asgard-rust-artifacts" --target "$RUNNER_TEMP/asgard-rust-target"
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: asgard-process-sdk-candidates
@@ -38,4 +46,5 @@ jobs:
             ${{ runner.temp }}/asgard-engine-artifacts
             ${{ runner.temp }}/asgard-node-artifacts
             ${{ runner.temp }}/asgard-go-artifacts
+            ${{ runner.temp }}/asgard-rust-artifacts
           if-no-files-found: error
