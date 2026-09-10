@@ -109,7 +109,14 @@ class SecretsDetectionService:
                 continue
 
             report.total_files_scanned += 1
-            findings = self._scan_file(file_path, path)
+            try:
+                findings = self._scan_file(file_path, path)
+            except (OSError, UnicodeError) as error:
+                if not self.config.strict_io:
+                    raise
+                report.analysis_errors.append({"stage": "read", "file_path": str(file_path),
+                                               "error_type": type(error).__name__})
+                continue
 
             for finding in findings:
                 if severity_meets_threshold(finding.severity, self.config.min_severity):
@@ -141,9 +148,11 @@ class SecretsDetectionService:
         findings: List[SecretFinding] = []
 
         try:
-            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(file_path, "r", encoding="utf-8", errors="strict" if self.config.strict_io else "ignore") as f:
                 content = f.read()
         except (IOError, OSError):
+            if self.config.strict_io:
+                raise
             return findings
 
         lines = content.split("\n")

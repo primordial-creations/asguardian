@@ -18,6 +18,7 @@ from Asgard.Heimdall.Security.models.security_models_base import (
 
 class SecretsReport(BaseModel):
     """Report from secrets detection scan."""
+    analysis_errors: List[dict] = Field(default_factory=list)
     scan_path: str = Field(..., description="Root path that was scanned")
     total_files_scanned: int = Field(0, description="Number of files scanned")
     secrets_found: int = Field(0, description="Total secrets detected")
@@ -60,6 +61,7 @@ class SecretsReport(BaseModel):
 
 class VulnerabilityReport(BaseModel):
     """Report from vulnerability scanning."""
+    analysis_errors: List[dict] = Field(default_factory=list)
     scan_path: str = Field(..., description="Root path that was scanned")
     total_files_scanned: int = Field(0, description="Number of files scanned")
     vulnerabilities_found: int = Field(0, description="Total vulnerabilities detected")
@@ -162,6 +164,7 @@ class DependencyReport(BaseModel):
 
 class CryptoReport(BaseModel):
     """Report from cryptographic implementation analysis."""
+    analysis_errors: List[dict] = Field(default_factory=list)
     scan_path: str = Field(..., description="Root path that was scanned")
     total_files_scanned: int = Field(0, description="Number of files scanned")
     issues_found: int = Field(0, description="Total cryptographic issues detected")
