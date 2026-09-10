@@ -162,6 +162,8 @@ def format_mobile_text(result) -> str:
         for name, outcome in checks.items():
             if outcome.status != "succeeded":
                 lines.append(f"  {device}/{name}: {outcome.status} — {outcome.diagnostic or 'coverage incomplete'}")
+                if outcome.limitations:
+                    lines.append("    Coverage limits: " + ", ".join(outcome.limitations))
 
     if result.issues:
         lines.append("-" * 70)
