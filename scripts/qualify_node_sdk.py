@@ -47,15 +47,17 @@ def main():
     for mode in ('cts','mts'):(consumer/f'smoke.{mode}').write_text(smoke)
     run([consumer/'node_modules/.bin/tsc','--strict','--noEmit','--module','NodeNext','--moduleResolution','NodeNext','--target','ES2022','smoke.cts','smoke.mts'],consumer)
     shutil.copy(root/'sdks/node/tests/engine-consumer.cjs',consumer/'engine-consumer.cjs')
+    fixture=root/'sdks/contracts/process-observations-v1.json';expected=json.loads(fixture.read_text())
+    shutil.copy(root/'sdks/contracts/pipe_fixture.py',consumer/'pipe_fixture.py')
     reports=[]
     for installed in engine['engines']:
         python=Path(installed['path'])/'venv/bin/python'
         origin=json.loads(run([python,'-I','-c',"import importlib.metadata as m; print(m.distribution('asguardian').read_text('direct_url.json'))"],consumer))
         if origin['archive_info']['hashes']['sha256']!=engine['engine_artifacts'][installed['artifact']]:raise RuntimeError('Installed engine provenance mismatch')
         observations=json.loads(run(['node','engine-consumer.cjs',python,installed['version']],consumer))
-        if observations!=engine['reports'][0]['observations']:raise RuntimeError('Node/Python engine observations disagree')
+        if observations!=expected:raise RuntimeError('Node/Python engine observations disagree')
         reports.append(dict(engine=installed['artifact'],observations=observations))
-    evidence=dict(revision=run(['git','rev-parse','HEAD'],root),engine_revision=engine['revision'],engine_artifacts=engine['engine_artifacts'],artifact=artifact.name,sha256=hashlib.sha256(artifact.read_bytes()).hexdigest(),consumer=str(consumer),reports=reports,result='passed',classification='Node CJS/ESM/types/lifecycle and installed file-length engines; Python observation equality; other profiles/languages/bridges/migrations/channel pending')
+    evidence=dict(fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),revision=run(['git','rev-parse','HEAD'],root),engine_revision=engine['revision'],engine_artifacts=engine['engine_artifacts'],artifact=artifact.name,sha256=hashlib.sha256(artifact.read_bytes()).hexdigest(),consumer=str(consumer),reports=reports,result='passed',classification='Node CJS/ESM/types/lifecycle and installed file-length engines; Python observation equality; other profiles/languages/bridges/migrations/channel pending')
     (output/'verification.json').write_text(json.dumps(evidence,indent=2)+'\n');print('Node SDK artifact and both installed engines passed')
 
 if __name__=='__main__':main()

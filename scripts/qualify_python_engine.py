@@ -26,6 +26,8 @@ def main():
     scratch = args.scratch_root.resolve(); scratch.mkdir(parents=True, exist_ok=True)
     if scratch.is_relative_to(root):
         raise RuntimeError('Consumers must be outside repository')
+    fixture = root / 'sdks/contracts/process-observations-v1.json'
+    expected = json.loads(fixture.read_text())
     sdk_evidence = args.sdk_evidence.resolve()
     sdk = json.loads(sdk_evidence.read_text())
     if sdk['result'] != 'passed' or len(sdk['consumers']) != 2:
@@ -77,11 +79,13 @@ def main():
             if origin['archive_info']['hashes']['sha256'] != sdk['artifacts'][client['artifact']]:
                 raise RuntimeError('Installed SDK provenance mismatch')
             shutil.copy(root / 'sdks/python/tests/engine_consumer.py', client_root / 'engine_consumer.py')
+            shutil.copy(root / 'sdks/contracts/pipe_fixture.py', client_root / 'pipe_fixture.py')
             observations = json.loads(run([client_python, '-I', client_root / 'engine_consumer.py', python, version], client_root))
+            if observations != expected: raise RuntimeError('Shared process conformance mismatch')
             reports.append(dict(engine=artifact.name, sdk=client['artifact'], observations=observations))
     if any(report['observations'] != reports[0]['observations'] for report in reports):
         raise RuntimeError('Artifact combinations disagree')
-    result = dict(revision=revision, sdk_revision=sdk['revision'], sdk_artifacts=sdk['artifacts'],
+    result = dict(fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(), revision=revision, sdk_revision=sdk['revision'], sdk_artifacts=sdk['artifacts'],
                   engine_artifacts={item.name: hashlib.sha256(item.read_bytes()).hexdigest() for item in artifacts},
                   engines=engines, reports=reports, result='passed',
                   classification='four installed engine/SDK artifact combinations, actual file-length engine; other profiles, languages, CI/channel and migrations pending')

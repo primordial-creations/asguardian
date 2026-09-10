@@ -1,0 +1,11 @@
+{
+  "clean": "complete",
+  "finding": 1,
+  "invalid_target": "invalid_request",
+  "mismatch": "engine_version_mismatch",
+  "symlink": "incomplete",
+  "truncated": "incomplete",
+  "zero_limit": "invalid_request",
+  "closed_cancel": "closed",
+  "pipe_drain": "ready"
+}

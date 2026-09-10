@@ -184,3 +184,12 @@ async fn dropped_future_cleans_child_group() {
     }
     std::fs::remove_file(marker).unwrap();
 }
+
+#[tokio::test]
+async fn closed_takes_precedence_over_precancelled() {
+    let c = client("sleep", 3000);
+    let cancel = CancellationToken::new();
+    cancel.cancel();
+    c.close().await;
+    assert_eq!(c.handshake(&cancel).await.unwrap_err().code, "closed");
+}

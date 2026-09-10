@@ -67,6 +67,11 @@ async fn main() {
             "invalid_request"
         );
     }
+    let mut zero = request();
+    zero.max_findings = 0;
+    let zero_error = c.scan(zero, &token).await.unwrap_err();
+    assert_eq!(zero_error.code, "engine_error");
+    let zero_code = zero_error.response.unwrap()["errors"][0]["code"].clone();
     let linked = root.join("linked");
     std::fs::create_dir(&linked).unwrap();
     std::os::unix::fs::symlink(&source, linked.join("escape.py")).unwrap();
@@ -80,14 +85,36 @@ async fn main() {
     assert_eq!(partial["complete"], false);
     assert_eq!(partial["findings"], json!([]));
     assert_eq!(partial["errors"][0]["code"], "scan_io_failure");
-    let wrong = Client::new(command, Options::new(format!("{version}-wrong"))).unwrap();
+    let wrong = Client::new(command.clone(), Options::new(format!("{version}-wrong"))).unwrap();
     let error = wrong.handshake(&token).await.unwrap_err();
     assert_eq!(error.code, "engine_version_mismatch");
     wrong.close().await;
     c.close().await;
+    let closed = Client::new(command, Options::new(version)).unwrap();
+    closed.close().await;
+    let cancelled = CancellationToken::new();
+    cancelled.cancel();
+    let closed_code = closed.handshake(&cancelled).await.unwrap_err().code;
+    let pipes = Client::new(
+        vec![
+            args[1].clone(),
+            "-I".into(),
+            std::env::current_dir()
+                .unwrap()
+                .join("pipe_fixture.py")
+                .to_str()
+                .unwrap()
+                .into(),
+            version.clone(),
+        ],
+        Options::new(version),
+    )
+    .unwrap();
+    let drained = pipes.handshake(&token).await.unwrap();
+    pipes.close().await;
     std::fs::remove_dir_all(root).unwrap();
     println!(
         "{}",
-        json!({"clean":clean["state"],"finding":finding["findings"][0]["lines_over"],"truncated":capped["state"],"invalid_target":"invalid_request","symlink":partial["state"],"mismatch":error.code})
+        json!({"clean":clean["state"],"finding":finding["findings"][0]["lines_over"],"truncated":capped["state"],"invalid_target":"invalid_request","symlink":partial["state"],"mismatch":error.code,"zero_limit":zero_code,"closed_cancel":closed_code,"pipe_drain":drained["state"]})
     );
 }

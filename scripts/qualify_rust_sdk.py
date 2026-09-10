@@ -90,16 +90,18 @@ try:
  if engine['result']!='passed' or len(engine['engines'])!=2:raise RuntimeError('Qualified engine pair required')
  for filename,expected in engine['engine_artifacts'].items():
   if hashlib.sha256((source.parent/filename).read_bytes()).hexdigest()!=expected:raise RuntimeError('Engine artifact mismatch')
+ fixture=root/'sdks/contracts/process-observations-v1.json';expected=json.loads(fixture.read_text())
+ shutil.copy(root/'sdks/contracts/pipe_fixture.py',project/'pipe_fixture.py')
  reports=[]
  for item in engine['engines']:
   python=Path(item['path'])/'venv/bin/python'
   origin=json.loads(run([python,'-I','-c',"import importlib.metadata as m; print(m.distribution('asguardian').read_text('direct_url.json'))"],project))
   if origin['archive_info']['hashes']['sha256']!=engine['engine_artifacts'][item['artifact']]:raise RuntimeError('Engine install mismatch')
   observations=json.loads(run([target/'debug/asgard-sdk-qualification',python,item['version']],project))
-  if observations!=engine['reports'][0]['observations']:raise RuntimeError('Rust/Python observations disagree')
+  if observations!=expected:raise RuntimeError('Rust/Python observations disagree')
   reports.append(dict(engine=item['artifact'],observations=observations))
  shutil.copy(project/'Cargo.lock',output/'consumer-Cargo.lock')
 finally:
  server.shutdown();server.server_close();thread.join(5)
-(output/'verification.json').write_text(json.dumps(dict(revision=revision,dirty=run(['git','status','--porcelain'],root),artifact=artifact.name,sha256=digest,engine_revision=engine['revision'],engine_artifacts=engine['engine_artifacts'],reports=reports,consumer=str(project),toolchain=run(['rustc','--version'],project).strip(),result='passed',classification='version/checksum-installed crate from controlled sparse registry; lifecycle fixtures and both installed file-length engines match Python observations; full profiles/parity/bridges/migrations and durable channel pending'),indent=2)+'\n')
+(output/'verification.json').write_text(json.dumps(dict(fixture_sha256=hashlib.sha256(fixture.read_bytes()).hexdigest(),revision=revision,dirty=run(['git','status','--porcelain'],root),artifact=artifact.name,sha256=digest,engine_revision=engine['revision'],engine_artifacts=engine['engine_artifacts'],reports=reports,consumer=str(project),toolchain=run(['rustc','--version'],project).strip(),result='passed',classification='version/checksum-installed crate from controlled sparse registry; lifecycle fixtures and both installed file-length engines match Python observations; full profiles/parity/bridges/migrations and durable channel pending'),indent=2)+'\n')
 print('PASS independent Rust crate, lifecycle fixtures and both installed Asgard engines')

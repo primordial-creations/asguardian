@@ -20,9 +20,12 @@ const {Client}=require('@gaia/asgard-sdk');
   const capped=await scan({maxFindings:1});assert.equal(capped.complete,false);assert.equal(capped.truncated,true);assert.equal(capped.findings.length,1);assert.equal(capped.summary.files_exceeding_threshold,2);observations.truncated=capped.state;
   for(const invalid of [path.join(root,'missing'),path.dirname(root)])await assert.rejects(scan({target:invalid}),e=>e.code==='engine_error'&&e.response.errors[0].code==='invalid_request');
   observations.invalid_target='invalid_request';
+  await assert.rejects(scan({maxFindings:0}),e=>{observations.zero_limit=e.response?.errors[0].code;return e.code==='engine_error'&&observations.zero_limit==='invalid_request';});
   const linked=path.join(root,'linked');await fs.mkdir(linked);await fs.symlink(source,path.join(linked,'escape.py'));
   const partial=await scan({authorizedRoot:linked,target:linked});assert.equal(partial.complete,false);assert.equal(partial.findings.length,0);assert.equal(partial.errors[0].code,'scan_io_failure');observations.symlink=partial.state;
   const wrong=new Client(command,{engineVersion:engineVersion+'-wrong'});try{await assert.rejects(wrong.handshake(),e=>{observations.mismatch=e.code;return e.code==='engine_version_mismatch';});}finally{await wrong.close();}
+  const closed=new Client(command,{engineVersion});await closed.close();const cancelled=new AbortController();cancelled.abort();await assert.rejects(closed.handshake({signal:cancelled.signal}),e=>{observations.closed_cancel=e.code;return e.code==='closed';});
+  const pipes=new Client([process.argv[2],'-I',path.resolve('pipe_fixture.py'),engineVersion],{engineVersion});try{observations.pipe_drain=(await pipes.handshake()).state;}finally{await pipes.close();}
   console.log(JSON.stringify(observations));
  }finally{await c.close();await fs.rm(root,{recursive:true});}
 })().catch(error=>{console.error(error);process.exitCode=1;});

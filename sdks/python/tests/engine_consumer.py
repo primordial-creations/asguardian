@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 import sys
 import tempfile
+import threading
 from asgard_sdk import Client, ScanError
 
 command = [sys.argv[1], '-I', '-m', 'Asgard.sdk_protocol']
@@ -40,6 +41,13 @@ with tempfile.TemporaryDirectory(prefix='scan fixtures ') as temporary:
                 assert error.code == 'engine_error'
                 assert error.response['errors'][0]['code'] == 'invalid_request'
         observations['invalid_target'] = 'invalid_request'
+        try:
+            client.scan(authorized_root=str(root), target=str(source), max_findings=0)
+            raise AssertionError('explicit zero limit accepted')
+        except ScanError as error:
+            assert error.code == 'engine_error'
+            observations['zero_limit'] = error.response['errors'][0]['code']
+
         linked = root / 'linked'; linked.mkdir()
         (linked / 'escape.py').symlink_to(file)
         partial = client.scan(authorized_root=str(linked), target=str(linked))
@@ -53,4 +61,15 @@ with tempfile.TemporaryDirectory(prefix='scan fixtures ') as temporary:
         except ScanError as error:
             assert error.code == 'engine_version_mismatch'
             observations['mismatch'] = error.code
+
+closed = Client(command, engine_version=version)
+closed.close()
+cancel = threading.Event(); cancel.set()
+try:
+    closed.handshake(cancel=cancel)
+    raise AssertionError('closed client accepted')
+except ScanError as error:
+    observations['closed_cancel'] = error.code
+with Client([sys.argv[1], '-I', str(Path('pipe_fixture.py').resolve()), version], engine_version=version) as pipes:
+    observations['pipe_drain'] = pipes.handshake()['state']
 print(json.dumps(observations, sort_keys=True))
