@@ -7,9 +7,9 @@ comprehensive performance scan results.
 
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field
 
 from Asgard.Bragi.Performance.models._performance_findings import (
     CacheFinding,
@@ -165,6 +165,13 @@ class CacheReport(BaseModel):
         return self.issues_found > 0
 
 
+class AnalyzerOutcome(BaseModel):
+    """Completion of one configured analyzer, separate from its findings."""
+    status: Literal["succeeded", "failed", "unavailable", "skipped"]
+    required: bool
+    diagnostic: Optional[str] = None
+
+
 class PerformanceReport(BaseModel):
     """Comprehensive performance analysis report."""
     scan_path: str = Field(..., description="Root path that was scanned")
@@ -178,7 +185,7 @@ class PerformanceReport(BaseModel):
     high_issues: int = Field(0, description="High severity issues")
     medium_issues: int = Field(0, description="Medium severity issues")
     low_issues: int = Field(0, description="Low severity issues")
-    performance_score: float = Field(100.0, ge=0.0, le=100.0, description="Overall performance score (0-100)")
+    analyzer_outcomes: Dict[str, AnalyzerOutcome] = Field(default_factory=dict)
     scan_duration_seconds: float = Field(0.0, description="Total duration of all scans")
     scanned_at: datetime = Field(default_factory=datetime.now, description="When the scan was performed")
 
@@ -219,16 +226,32 @@ class PerformanceReport(BaseModel):
             elif severity == PerformanceSeverity.LOW.value:
                 self.low_issues += 1
 
-        self._calculate_performance_score()
+    @computed_field
+    @property
+    def is_complete(self) -> bool:
+        """Missing required results cannot become a clean empty scan."""
+        for name in ("memory", "cpu", "database", "cache"):
+            if not getattr(self.scan_config, "scan_" + name):
+                continue
+            outcome = self.analyzer_outcomes.get(name)
+            if getattr(self, name + "_report") is None:
+                return False
+            if outcome is not None and outcome.status != "succeeded":
+                return False
+        return True
 
-    def _calculate_performance_score(self) -> None:
-        """Calculate the overall performance score."""
+    @computed_field
+    @property
+    def performance_score(self) -> Optional[float]:
+        """Incomplete reports have no comparable numerical score."""
+        if not self.is_complete:
+            return None
         score = 100.0
         score -= self.critical_issues * 20
         score -= self.high_issues * 10
         score -= self.medium_issues * 5
         score -= self.low_issues * 2
-        self.performance_score = max(0.0, score)
+        return max(0.0, score)
 
     @property
     def has_issues(self) -> bool:
@@ -238,4 +261,4 @@ class PerformanceReport(BaseModel):
     @property
     def is_healthy(self) -> bool:
         """Check if the performance is healthy (no critical or high issues)."""
-        return self.critical_issues == 0 and self.high_issues == 0
+        return self.is_complete and self.critical_issues == 0 and self.high_issues == 0

@@ -28,7 +28,8 @@ def run_performance_analysis(args: argparse.Namespace, verbose: bool = False, an
 
     config = PerformanceScanConfig(
         scan_path=scan_path,
-        scan_type=analysis_type,
+        **{"scan_" + name: analysis_type in ("all", name)
+           for name in ("memory", "cpu", "database", "cache")},
         min_severity=min_severity,
         exclude_patterns=exclude_patterns,
         output_format=args.format,
@@ -40,7 +41,7 @@ def run_performance_analysis(args: argparse.Namespace, verbose: bool = False, an
         result = service.analyze(scan_path)
         report = service.generate_report(result, args.format)
         print(report)
-        return 1 if result.has_issues else 0
+        return 1 if not result.is_complete or result.has_issues else 0
 
     except FileNotFoundError as e:
         print(f"Error: {e}")

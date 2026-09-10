@@ -575,7 +575,7 @@ class TestPerformanceReport:
         assert report.scan_path == "/test/path"
         assert report.scan_config == config
         assert report.total_issues == 0
-        assert report.performance_score == 100.0
+        assert report.performance_score is None
 
     def test_calculate_totals_empty(self):
         """Test calculating totals with no findings."""
@@ -592,7 +592,7 @@ class TestPerformanceReport:
         assert report.high_issues == 0
         assert report.medium_issues == 0
         assert report.low_issues == 0
-        assert report.performance_score == 100.0
+        assert report.performance_score is None
 
     def test_calculate_totals_with_findings(self):
         """Test calculating totals with various findings."""
@@ -633,7 +633,7 @@ class TestPerformanceReport:
 
     def test_performance_score_calculation(self):
         """Test performance score calculation."""
-        config = PerformanceScanConfig()
+        config = PerformanceScanConfig(scan_cpu=False, scan_database=False, scan_cache=False)
         report = PerformanceReport(
             scan_path="/test",
             scan_config=config,
@@ -656,7 +656,7 @@ class TestPerformanceReport:
 
     def test_performance_score_minimum_zero(self):
         """Test that performance score doesn't go below zero."""
-        config = PerformanceScanConfig()
+        config = PerformanceScanConfig(scan_cpu=False, scan_database=False, scan_cache=False)
         report = PerformanceReport(
             scan_path="/test",
             scan_config=config,
@@ -705,10 +705,11 @@ class TestPerformanceReport:
 
     def test_is_healthy_property(self):
         """Test is_healthy property."""
-        config = PerformanceScanConfig()
+        config = PerformanceScanConfig(scan_cpu=False, scan_database=False, scan_cache=False)
         report = PerformanceReport(
             scan_path="/test",
             scan_config=config,
+            memory_report=MemoryReport(scan_path="/test"),
         )
 
         report.calculate_totals()
@@ -731,7 +732,7 @@ class TestPerformanceReport:
 
     def test_is_healthy_with_low_severity(self):
         """Test is_healthy property with only low severity issues."""
-        config = PerformanceScanConfig()
+        config = PerformanceScanConfig(scan_cpu=False, scan_database=False, scan_cache=False)
         report = PerformanceReport(
             scan_path="/test",
             scan_config=config,

@@ -11,7 +11,9 @@ from pathlib import Path
 from typing import Optional
 
 from Asgard.Bragi.Performance.models.performance_models import (
+    AnalyzerOutcome,
     PerformanceReport,
+    MemoryReport, CpuReport, DatabaseReport, CacheReport,
     PerformanceScanConfig,
 )
 from Asgard.Bragi.Performance.services._static_performance_reporter import generate_summary
@@ -59,7 +61,10 @@ class StaticPerformanceService:
         Returns:
             PerformanceReport containing all findings from all services
         """
-        path = scan_path or self.config.scan_path
+        return self._scan(scan_path, self.config)
+
+    def _scan(self, scan_path: Optional[Path], config: PerformanceScanConfig) -> PerformanceReport:
+        path = scan_path or config.scan_path
         path = Path(path).resolve()
 
         if not path.exists():
@@ -69,32 +74,29 @@ class StaticPerformanceService:
 
         report = PerformanceReport(
             scan_path=str(path),
-            scan_config=self.config,
+            scan_config=config,
         )
 
-        if self.config.scan_memory:
+        for name, expected in (("memory", MemoryReport), ("cpu", CpuReport),
+                               ("database", DatabaseReport), ("cache", CacheReport)):
+            required = getattr(config, "scan_" + name)
+            if not required:
+                report.analyzer_outcomes[name] = AnalyzerOutcome(status="skipped", required=False)
+                continue
             try:
-                report.memory_report = self.memory_service.scan(path)
+                result = getattr(self, name + "_service").scan(path)
+                if not isinstance(result, expected):
+                    raise TypeError("invalid analyzer result")
+                setattr(report, name + "_report", result)
+                outcome = AnalyzerOutcome(status="succeeded", required=True)
+            except (ImportError, FileNotFoundError):
+                outcome = AnalyzerOutcome(status="unavailable", required=True,
+                                          diagnostic="Required analyzer input or dependency unavailable")
             except Exception:
-                pass
-
-        if self.config.scan_cpu:
-            try:
-                report.cpu_report = self.cpu_service.scan(path)
-            except Exception:
-                pass
-
-        if self.config.scan_database:
-            try:
-                report.database_report = self.database_service.scan(path)
-            except Exception:
-                pass
-
-        if self.config.scan_cache:
-            try:
-                report.cache_report = self.cache_service.scan(path)
-            except Exception:
-                pass
+                # Raw analyzer exceptions can include source text or credentials.
+                outcome = AnalyzerOutcome(status="failed", required=True,
+                                          diagnostic="Analyzer execution or result validation failed")
+            report.analyzer_outcomes[name] = outcome
 
         report.scan_duration_seconds = time.time() - start_time
         report.scanned_at = datetime.now()
@@ -103,109 +105,27 @@ class StaticPerformanceService:
 
         return report
 
+    def _scan_only(self, name: str, scan_path: Optional[Path]) -> PerformanceReport:
+        config = self.config.model_copy(update={
+            "scan_" + domain: domain == name for domain in ("memory", "cpu", "database", "cache")
+        })
+        return self._scan(scan_path, config)
+
     def scan_memory_only(self, scan_path: Optional[Path] = None) -> PerformanceReport:
-        """
-        Scan only for memory issues.
-
-        Args:
-            scan_path: Root path to scan
-
-        Returns:
-            PerformanceReport with memory findings only
-        """
-        path = scan_path or self.config.scan_path
-        path = Path(path).resolve()
-
-        start_time = time.time()
-
-        report = PerformanceReport(
-            scan_path=str(path),
-            scan_config=self.config,
-        )
-
-        report.memory_report = self.memory_service.scan(path)
-        report.scan_duration_seconds = time.time() - start_time
-        report.calculate_totals()
-
-        return report
+        """Scan memory with other analyzers explicitly skipped."""
+        return self._scan_only("memory", scan_path)
 
     def scan_cpu_only(self, scan_path: Optional[Path] = None) -> PerformanceReport:
-        """
-        Scan only for CPU/complexity issues.
-
-        Args:
-            scan_path: Root path to scan
-
-        Returns:
-            PerformanceReport with CPU findings only
-        """
-        path = scan_path or self.config.scan_path
-        path = Path(path).resolve()
-
-        start_time = time.time()
-
-        report = PerformanceReport(
-            scan_path=str(path),
-            scan_config=self.config,
-        )
-
-        report.cpu_report = self.cpu_service.scan(path)
-        report.scan_duration_seconds = time.time() - start_time
-        report.calculate_totals()
-
-        return report
+        """Scan cpu with other analyzers explicitly skipped."""
+        return self._scan_only("cpu", scan_path)
 
     def scan_database_only(self, scan_path: Optional[Path] = None) -> PerformanceReport:
-        """
-        Scan only for database issues.
-
-        Args:
-            scan_path: Root path to scan
-
-        Returns:
-            PerformanceReport with database findings only
-        """
-        path = scan_path or self.config.scan_path
-        path = Path(path).resolve()
-
-        start_time = time.time()
-
-        report = PerformanceReport(
-            scan_path=str(path),
-            scan_config=self.config,
-        )
-
-        report.database_report = self.database_service.scan(path)
-        report.scan_duration_seconds = time.time() - start_time
-        report.calculate_totals()
-
-        return report
+        """Scan database with other analyzers explicitly skipped."""
+        return self._scan_only("database", scan_path)
 
     def scan_cache_only(self, scan_path: Optional[Path] = None) -> PerformanceReport:
-        """
-        Scan only for caching issues.
-
-        Args:
-            scan_path: Root path to scan
-
-        Returns:
-            PerformanceReport with cache findings only
-        """
-        path = scan_path or self.config.scan_path
-        path = Path(path).resolve()
-
-        start_time = time.time()
-
-        report = PerformanceReport(
-            scan_path=str(path),
-            scan_config=self.config,
-        )
-
-        report.cache_report = self.cache_service.scan(path)
-        report.scan_duration_seconds = time.time() - start_time
-        report.calculate_totals()
-
-        return report
+        """Scan cache with other analyzers explicitly skipped."""
+        return self._scan_only("cache", scan_path)
 
     def analyze(self, scan_path: Optional[Path] = None) -> PerformanceReport:
         """
@@ -230,6 +150,8 @@ class StaticPerformanceService:
         Returns:
             Formatted report string
         """
+        if output_format == "json":
+            return report.model_dump_json(indent=2)
         return generate_summary(report)
 
     def get_summary(self, report: PerformanceReport) -> str:
