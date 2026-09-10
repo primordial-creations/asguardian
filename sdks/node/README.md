@@ -1,6 +1,6 @@
 # @gaia/asgard-sdk (candidate 0.1.0)
 
-Dependency-free Node >=22 POSIX client. CommonJS and ESM share one implementation;
+Dependency-free Node >=18 POSIX client. CommonJS and ESM share one implementation;
 TypeScript declarations ship for both. Install the pinned Asguardian engine
 separately; no browser/engine installation occurs through this package.
 
