@@ -1,7 +1,7 @@
 import argparse
 
 from Asgard.Volundr.Scaffold import Language, Framework
-from Asgard.Volundr.cli._parser_flags import add_performance_flags
+from Asgard.common.cli_flags import add_performance_flags
 
 
 def _add_helm_commands(subparsers: argparse._SubParsersAction) -> None:

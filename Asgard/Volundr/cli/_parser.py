@@ -1,6 +1,6 @@
 import argparse
 
-from Asgard.Volundr.cli._parser_flags import add_performance_flags
+from Asgard.common.cli_flags import add_performance_flags
 from Asgard.Volundr.cli._parser_commands_1 import (
     _add_kubernetes_commands,
     _add_terraform_commands,
