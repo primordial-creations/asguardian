@@ -28,3 +28,7 @@ manual-review finding (kind/category/priority/status), Python parse failure,
 unreadable UTF-8 input, and invalid configuration. Parse/read failures retain the
 other successfully detected hotspot while marking the result incomplete. These
 bring the shared fixture to14observations (12actual-engine plus2lifecycle cases).
+
+The common fixture also checks negotiated logical snapshot paths, original-path
+context rules, invalid labels, and unsupported mapping on other profiles. Actual
+files exist only at the physical target; the logical tree need not exist.

@@ -89,6 +89,24 @@ with tempfile.TemporaryDirectory(prefix='hotspot fixtures ') as temporary:
         invalid = hotspots.scan(**options)
         assert not invalid['complete']
         observations['hotspot_config'] = invalid['errors'][0]['code']
+        logical = '/tests/nonexistent-asgard-logical-fixture'
+        (root / 'broken.py').unlink()
+        (root / '.heimdall.yml').write_text('strict_scan_paths: ["^/tests/nonexistent-asgard-logical-fixture/"]\n')
+        mapped = hotspots.scan(**options, logical_root=logical)
+        assert mapped['complete'] and len(mapped['findings']) == 1
+        assert mapped['findings'][0]['context_tag'] == 'production'
+        observations['logical_context'] = dict(priority=mapped['findings'][0]['review_priority'], path=mapped['findings'][0]['file_path'] == logical + '/main.py')
+        try:
+            hotspots.scan(**options, logical_root='relative')
+            raise AssertionError('invalid logical label accepted')
+        except ScanError as error:
+            assert error.code == 'engine_error'
+            observations['logical_invalid'] = error.response['errors'][0]['code']
+        try:
+            hotspots.scan(**{**options, 'profile':'quality.file-length'}, logical_root=logical)
+            raise AssertionError('unsupported logical mapping accepted')
+        except ScanError as error:
+            observations['logical_unsupported'] = error.code
 
 closed = Client(command, engine_version=version)
 closed.close()

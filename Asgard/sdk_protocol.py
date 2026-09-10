@@ -75,21 +75,33 @@ def respond(request):
                 "profiles": list(PROFILES), "transport": "single-request-stdio",
                 "progress": False, "remote": False, "max_request_bytes": MAX_REQUEST_BYTES,
                 "target_policy": "host-authorized-quiescent-directory-no-symlinks",
+                "logical_paths": ["security.hotspots"],
             })
             return response, 0
         if operation != "scan" or request.get("profile") not in PROFILES:
             response["errors"] = [{"code": "unsupported_operation"}]
             return response, 2
         if set(request) - {"protocol_version", "correlation_id", "operation", "profile",
-                           "authorized_root", "target", "max_findings"}:
+                           "authorized_root", "target", "max_findings", "logical_root"}:
             raise ValueError("unknown scan request fields")
         limit = request.get("max_findings", 1000)
         if type(limit) is not int or not 1 <= limit <= 10000:
             raise ValueError("max_findings must be an integer from 1 to 10000")
         target = target_path(request)
+        logical_root = None
+        if "logical_root" in request:
+            if request["profile"] != "security.hotspots":
+                response["errors"] = [{"code": "unsupported_operation"}]
+                return response, 2
+            label = request["logical_root"]
+            if not isinstance(label, str) or not label or "\0" in label:
+                raise ValueError("logical_root must be an absolute path label")
+            logical_root = Path(label)
+            if not logical_root.is_absolute() or ".." in logical_root.parts:
+                raise ValueError("logical_root must be absolute without parent traversal")
         if request["profile"] == "security.hotspots":
             from Asgard.sdk_hotspots import scan_hotspots
-            result, code = scan_hotspots(target, limit)
+            result, code = scan_hotspots(target, limit, logical_root=logical_root)
             response.update(result)
             return response, code
         # Lazy engine import keeps handshake independent from optional engine tools.

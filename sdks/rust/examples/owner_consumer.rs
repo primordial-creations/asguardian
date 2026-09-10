@@ -124,9 +124,33 @@ async fn main() {
     assert_eq!(hotread["complete"], false);
     assert_eq!(hotread["findings"].as_array().unwrap().len(), 1);
     assert_eq!(hotread["errors"][0]["error_type"], "UnicodeDecodeError");
-    std::fs::write(config, "test_context_enabled: []\n").unwrap();
+    std::fs::write(&config, "test_context_enabled: []\n").unwrap();
     let hotinvalid = c.scan(hotrequest(), &token).await.unwrap();
     assert_eq!(hotinvalid["complete"], false);
+    let logical = "/tests/nonexistent-asgard-logical-fixture";
+    std::fs::remove_file(hotroot.join("broken.py")).unwrap();
+    std::fs::write(
+        &config,
+        "strict_scan_paths: [\"^/tests/nonexistent-asgard-logical-fixture/\"]\n",
+    )
+    .unwrap();
+    let mut logical_request = hotrequest();
+    logical_request.logical_root = Some(logical.into());
+    let mapped = c.scan(logical_request, &token).await.unwrap();
+    assert_eq!(mapped["complete"], true);
+    assert_eq!(mapped["findings"].as_array().unwrap().len(), 1);
+    assert_eq!(mapped["findings"][0]["context_tag"], "production");
+    let logical_context = json!({"priority":mapped["findings"][0]["review_priority"],"path":mapped["findings"][0]["file_path"]==json!(format!("{logical}/main.py"))});
+    let mut invalid_label = hotrequest();
+    invalid_label.logical_root = Some("relative".into());
+    let logical_error = c.scan(invalid_label, &token).await.unwrap_err();
+    assert_eq!(logical_error.code, "engine_error");
+    let logical_invalid = logical_error.response.unwrap()["errors"][0]["code"].clone();
+    let mut unsupported = hotrequest();
+    unsupported.logical_root = Some(logical.into());
+    unsupported.profile = "quality.file-length".into();
+    let logical_unsupported = c.scan(unsupported, &token).await.unwrap_err().code;
+
     c.close().await;
     let closed = Client::new(command, Options::new(version)).unwrap();
     closed.close().await;
@@ -153,6 +177,6 @@ async fn main() {
     std::fs::remove_dir_all(root).unwrap();
     println!(
         "{}",
-        json!({"clean":clean["state"],"finding":finding["findings"][0]["lines_over"],"truncated":capped["state"],"invalid_target":"invalid_request","symlink":partial["state"],"mismatch":error.code,"zero_limit":zero_code,"closed_cancel":closed_code,"pipe_drain":drained["state"],"hotspot":hotspot,"hotspot_clean":cleanhot["state"],"hotspot_read":hotread["state"],"hotspot_parse":hotpartial["state"],"hotspot_config":hotinvalid["errors"][0]["code"]})
+        json!({"logical_context":logical_context,"logical_invalid":logical_invalid,"logical_unsupported":logical_unsupported,"clean":clean["state"],"finding":finding["findings"][0]["lines_over"],"truncated":capped["state"],"invalid_target":"invalid_request","symlink":partial["state"],"mismatch":error.code,"zero_limit":zero_code,"closed_cancel":closed_code,"pipe_drain":drained["state"],"hotspot":hotspot,"hotspot_clean":cleanhot["state"],"hotspot_read":hotread["state"],"hotspot_parse":hotpartial["state"],"hotspot_config":hotinvalid["errors"][0]["code"]})
     );
 }

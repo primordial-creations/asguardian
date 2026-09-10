@@ -17,5 +17,11 @@
   "hotspot_parse": "incomplete",
   "hotspot_config": "scan_configuration_error",
   "hotspot_clean": "complete",
-  "hotspot_read": "incomplete"
+  "hotspot_read": "incomplete",
+  "logical_context": {
+    "priority": "medium",
+    "path": true
+  },
+  "logical_invalid": "invalid_request",
+  "logical_unsupported": "unsupported_operation"
 }

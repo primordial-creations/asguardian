@@ -93,12 +93,17 @@ class Client {
   handshake({ signal } = {}) {
     return this.#invoke({ protocol_version: 1, operation: 'handshake', correlation_id: randomUUID() }, performance.now() + this.#timeout, signal);
   }
-  async scan({ authorizedRoot, target, profile = 'quality.file-length', maxFindings = 1000, correlationId = randomUUID(), signal }) {
+  async scan({ authorizedRoot, target, profile = 'quality.file-length', maxFindings = 1000, correlationId = randomUUID(), signal, logicalRoot }) {
     const deadline = performance.now() + this.#timeout;
     if (typeof correlationId !== 'string' || !correlationId || [...correlationId].length > 256) throw new TypeError('Invalid correlationId');
     const hello = await this.#invoke({ protocol_version: 1, operation: 'handshake', correlation_id: correlationId }, deadline, signal);
     if (!hello.capabilities.profiles.includes(profile)) throw new ScanError('unsupported_operation');
-    return this.#invoke({ protocol_version: 1, operation: 'scan', correlation_id: correlationId, profile, authorized_root: authorizedRoot, target, max_findings: maxFindings }, deadline, signal);
+    const payload = { protocol_version: 1, operation: 'scan', correlation_id: correlationId, profile, authorized_root: authorizedRoot, target, max_findings: maxFindings };
+    if (logicalRoot !== undefined) {
+      if (!Array.isArray(hello.capabilities.logical_paths) || !hello.capabilities.logical_paths.includes(profile)) throw new ScanError('unsupported_operation');
+      payload.logical_root = logicalRoot;
+    }
+    return this.#invoke(payload, deadline, signal);
   }
 }
 module.exports = { Client, ScanError };

@@ -48,6 +48,7 @@ impl Options {
     }
 }
 pub struct Request {
+    pub logical_root: Option<String>,
     pub authorized_root: String,
     pub target: String,
     pub profile: String,
@@ -57,6 +58,7 @@ pub struct Request {
 impl Request {
     pub fn new(root: impl Into<String>, target: impl Into<String>) -> Self {
         Self {
+            logical_root: None,
             authorized_root: root.into(),
             target: target.into(),
             profile: "quality.file-length".into(),
@@ -168,7 +170,17 @@ impl Client {
         {
             return Err(fail("unsupported_operation"));
         }
-        self.invoke(json!({"protocol_version":1,"operation":"scan","correlation_id":request.correlation_id,"profile":request.profile,"authorized_root":request.authorized_root,"target":request.target,"max_findings":request.max_findings}),deadline,cancel).await
+        let mut payload = json!({"protocol_version":1,"operation":"scan","correlation_id":request.correlation_id,"profile":request.profile,"authorized_root":request.authorized_root,"target":request.target,"max_findings":request.max_findings});
+        if let Some(label) = request.logical_root {
+            if !hello["capabilities"]["logical_paths"]
+                .as_array()
+                .is_some_and(|profiles| profiles.contains(&json!(request.profile)))
+            {
+                return Err(fail("unsupported_operation"));
+            }
+            payload["logical_root"] = json!(label);
+        }
+        self.invoke(payload, deadline, cancel).await
     }
     async fn invoke(
         &self,

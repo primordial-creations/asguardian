@@ -55,6 +55,7 @@ edition = "2021"
 [dependencies]
 gaia-asgard-sdk = {{ version = "={version}", registry = "asgard-qualification" }}
 serde_json = "1.0"
+libc = "0.2"
 tokio = {{ version = "1.52", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time"] }}
 ''')
 www=output/'registry';www.mkdir()

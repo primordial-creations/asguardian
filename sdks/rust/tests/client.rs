@@ -1,11 +1,13 @@
 use gaia_asgard_sdk::{CancellationToken, Client, Options, Request};
 use std::{sync::Arc, time::Duration};
 const FIXTURE: &str = r#"
-import json,sys,time,subprocess
+import json,sys,time,subprocess,os
 r=json.load(sys.stdin);mode=sys.argv[1]
 if mode.startswith('child='):
  child=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)'])
- with open(mode[6:],'w') as f:f.write(str(child.pid))
+ # Publish readiness only after the PID has been flushed and closed.
+ with open(mode[6:]+'.pending','w') as f:f.write(str(child.pid))
+ os.replace(mode[6:]+'.pending',mode[6:])
  time.sleep(60)
 if mode=='sleep':time.sleep(60)
 if mode in ('stdout','stderr'):
@@ -178,7 +180,11 @@ async fn dropped_future_cleans_child_group() {
     tokio::time::timeout(Duration::from_secs(2), c.close())
         .await
         .unwrap();
-    let pid = std::fs::read_to_string(&marker).unwrap();
+    let pid: u32 = std::fs::read_to_string(&marker)
+        .unwrap()
+        .parse()
+        .expect("published child PID");
+    assert!(pid > 0);
     // SIGKILL delivery to the group is asynchronous. close reaps the direct
     // child; its orphaned grandchild must also stop within a bounded interval.
     let deadline = tokio::time::Instant::now() + Duration::from_secs(2);
@@ -192,7 +198,12 @@ async fn dropped_future_cleans_child_group() {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             }
             Ok(_) => break,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => break,
+            Err(error)
+                if error.kind() == std::io::ErrorKind::NotFound
+                    || error.raw_os_error() == Some(libc::ESRCH) =>
+            {
+                break
+            }
             Err(error) => panic!("could not verify grandchild cleanup: {error}"),
         }
     }

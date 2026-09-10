@@ -72,3 +72,19 @@ truncation never become clean empty scans. Default language/test-context/exclusi
 rules remain owner rules. No target tool execution or review-state mutation is
 introduced. Legacy detector traversal/fallback compatibility remains available;
 its report does not assert strict completeness. Protocol clients always opt in.
+
+For security.hotspots, an optional logical_root absolute path label preserves
+original workspace locations/context rules when a host scans a private snapshot.
+The engine reads configuration and file contents ONLY from target under
+ authorized_root; logical_root is never resolved, opened or used for traversal.
+Relative paths within the physical target are appended to that label for findings,
+parse/read diagnostics, test-context matching and strict_scan_paths regexes.
+The host controls this label and remains responsible for authorization and snapshot
+capture. It is not a second filesystem root or an access grant.
+
+Handshake logical_paths lists the profiles supporting this optional behavior.
+All SDKs reject an unadvertised mapping with unsupported_operation. Omitted labels
+preserve existing behavior; malformed labels fail invalid_request. Other profiles
+must not accept or silently ignore it. Node logicalRoot, Python logical_root,
+Go Request.LogicalRoot (*string), Rust Request.logical_root (Option<String>) map
+to the one owner field. Existing required engine version pins still apply.
