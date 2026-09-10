@@ -60,12 +60,14 @@ def is_excluded_path(
     return False
 
 
-def count_lines(file_path: str) -> int:
+def count_lines(file_path: str, *, strict_io: bool = False) -> int:
     """Count the total number of lines in a file."""
     try:
         with open(file_path, "r", encoding="utf-8", errors="replace") as fh:
             return sum(1 for _ in fh)
     except OSError:
+        if strict_io:
+            raise
         return 0
 
 
@@ -73,12 +75,14 @@ def scan_directory(
     root: str,
     include_extensions: Optional[List[str]] = None,
     exclude_patterns: Optional[List[str]] = None,
+    *,
+    strict_io: bool = False,
 ) -> Iterator[Path]:
     """Yield absolute paths of code files under root, respecting exclusions."""
     from Asgard.Bragi.Quality.languages._confined_walk import iter_confined_regular_files
 
     for full_path in iter_confined_regular_files(
-        Path(root), exclude_patterns=exclude_patterns
+        Path(root), exclude_patterns=exclude_patterns, strict_io=strict_io
     ):
         if is_code_file(str(full_path), include_extensions):
             yield full_path

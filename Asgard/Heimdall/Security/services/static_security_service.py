@@ -95,7 +95,10 @@ class StaticSecurityService:
     ):
         """Run one domain scanner; record and log failures instead of swallowing them."""
         try:
-            return scanner(path)
+            result = scanner(path)
+            for error in getattr(result, "analysis_errors", ()):
+                report.domain_errors.append({"domain": domain, **error})
+            return result
         except Exception as exc:
             logger.exception("Security scan domain %s failed to complete", domain)
             report.domain_errors.append({

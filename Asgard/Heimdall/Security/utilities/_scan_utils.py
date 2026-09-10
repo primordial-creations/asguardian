@@ -150,6 +150,7 @@ def iter_confined_files(
     root_path: Path,
     *,
     should_skip: Optional[Callable[[Path], bool]] = None,
+    analysis_errors: Optional[list] = None,
 ) -> Generator[Path, None, None]:
     """Yield regular files under *root_path* without following symlinks.
 
@@ -157,9 +158,13 @@ def iter_confined_files(
     under the resolved scan root (CH-0078).
     """
     root = Path(root_path)
+    def record(path, kind):
+        if analysis_errors is not None:
+            analysis_errors.append({"stage": "discovery", "file_path": str(path), "error_type": kind})
     try:
         root_resolved = root.resolve()
-    except (OSError, RuntimeError):
+    except (OSError, RuntimeError) as error:
+        record(root, type(error).__name__)
         return
 
     def _walk(current: Path) -> Generator[Path, None, None]:
@@ -167,13 +172,17 @@ def iter_confined_files(
             with os.scandir(current) as entries:
                 for entry in entries:
                     if entry.is_symlink():
+                        if should_skip is None or not should_skip(Path(entry.path)):
+                            record(entry.path, "SymlinkSkipped")
                         continue
                     path = Path(entry.path)
                     try:
                         resolved = path.resolve()
-                    except (OSError, RuntimeError):
+                    except (OSError, RuntimeError) as error:
+                        record(path, type(error).__name__)
                         continue
                     if not resolved.is_relative_to(root_resolved):
+                        record(path, "OutsideRoot")
                         continue
                     if should_skip is not None and should_skip(path):
                         continue
@@ -181,7 +190,10 @@ def iter_confined_files(
                         yield from _walk(path)
                     elif entry.is_file(follow_symlinks=False):
                         yield path
-        except (PermissionError, FileNotFoundError, NotADirectoryError):
+        except OSError as error:
+            if analysis_errors is None and not isinstance(error, (PermissionError, FileNotFoundError, NotADirectoryError)):
+                raise
+            record(current, type(error).__name__)
             return
 
     yield from _walk(root)
@@ -191,6 +203,7 @@ def scan_directory_for_security(
     root_path: Path,
     exclude_patterns: Optional[List[str]] = None,
     include_extensions: Optional[List[str]] = None,
+    analysis_errors: Optional[list] = None,
 ) -> Generator[Path, None, None]:
     """
     Recursively scan a directory for files to analyze for security issues.
@@ -216,7 +229,7 @@ def scan_directory_for_security(
     def _should_skip(path: Path) -> bool:
         return is_excluded_path(path, all_exclusions)
 
-    for entry in iter_confined_files(root_path, should_skip=_should_skip):
+    for entry in iter_confined_files(root_path, should_skip=_should_skip, analysis_errors=analysis_errors):
         ext = entry.suffix.lower()
         if ext in valid_extensions and not is_binary_file(entry):
             yield entry

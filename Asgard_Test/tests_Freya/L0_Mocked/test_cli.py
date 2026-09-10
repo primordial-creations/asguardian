@@ -481,14 +481,14 @@ class TestMobileFormatting:
 
     def test_format_mobile_text(self):
         """Test formatting mobile compatibility report."""
-        mock_result = Mock()
-        mock_result.url = "https://example.com"
-        mock_result.devices_tested = ["iPhone 14", "Pixel 7"]
-        mock_result.load_time_ms = 1500
-        mock_result.page_size_bytes = 500000
-        mock_result.resource_count = 25
-        mock_result.mobile_friendly_score = 85.0
-        mock_result.issues = []
+        from Asgard.Freya.Responsive.models.responsive_models import MobileCompatibilityReport
+        mock_result = MobileCompatibilityReport(
+            url="https://example.com", devices_tested=["iphone-14"],
+            load_time_ms=1000, page_size_bytes=500000, resource_count=20,
+            mobile_friendly_score=90.0,
+            check_outcomes={"iphone-14": {name: {"status": "succeeded"}
+                for name in ("navigation", "flash", "hover", "text", "fixed", "resources")}},
+        )
 
         output = format_mobile_text(mock_result)
 
@@ -957,15 +957,14 @@ class TestMobileTestCommand:
         args.output = None
         args.devices = None
 
-        mock_result = Mock()
-        mock_result.url = "https://example.com"
-        mock_result.devices_tested = []
-        mock_result.load_time_ms = 1000
-        mock_result.page_size_bytes = 500000
-        mock_result.resource_count = 20
-        mock_result.mobile_friendly_score = 90.0
-        mock_result.issues = []
-        mock_result.model_dump_json = Mock(return_value='{}')
+        from Asgard.Freya.Responsive.models.responsive_models import MobileCompatibilityReport
+        mock_result = MobileCompatibilityReport(
+            url="https://example.com", devices_tested=["iphone-14"],
+            load_time_ms=1000, page_size_bytes=500000, resource_count=20,
+            mobile_friendly_score=90.0,
+            check_outcomes={"iphone-14": {name: {"status": "succeeded"}
+                for name in ("navigation", "flash", "hover", "text", "fixed", "resources")}},
+        )
 
         with patch('Asgard.Freya.cli._handlers_visual_responsive.MobileCompatibilityTester') as mock_tester:
             mock_instance = AsyncMock()

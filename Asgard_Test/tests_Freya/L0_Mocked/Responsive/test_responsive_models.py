@@ -682,7 +682,8 @@ class TestMobileCompatibilityReport:
         assert report.load_time_ms is None
         assert report.page_size_bytes is None
         assert report.resource_count == 0
-        assert report.mobile_friendly_score == 100.0
+        assert report.mobile_friendly_score is None
+        assert not report.is_complete
         assert report.device_results == {}
 
     @pytest.mark.L0
@@ -718,6 +719,9 @@ class TestMobileCompatibilityReport:
             page_size_bytes=2048000,
             resource_count=45,
             mobile_friendly_score=85.0,
+            check_outcomes={device: {name: {"status": "succeeded"}
+                            for name in ("navigation", "flash", "hover", "text", "fixed", "resources")}
+                            for device in ("iphone-14", "pixel-7")},
             device_results={"iphone-14": {"load_time_ms": 3500}},
         )
         assert len(report.devices_tested) == 2

@@ -1,0 +1,17 @@
+{
+  "name": "@gaia/asgard-sdk",
+  "version": "0.1.0",
+  "description": "Asgard owner process scanning client",
+  "license": "SEE LICENSE IN LICENSE",
+  "engines": {"node": ">=18"},
+  "main": "index.cjs",
+  "types": "index.d.cts",
+  "exports": {
+    ".": {
+      "import": {"types": "./index.d.mts", "default": "./index.mjs"},
+      "require": {"types": "./index.d.cts", "default": "./index.cjs"}
+    }
+  },
+  "files": ["index.cjs", "index.mjs", "index.d.cts", "index.d.mts", "LICENSE", "README.md"],
+  "scripts": {"test": "node --test tests/client.test.cjs"}
+}

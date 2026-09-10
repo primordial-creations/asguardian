@@ -148,11 +148,22 @@ def format_mobile_text(result) -> str:
     lines.append("")
     lines.append(f"  URL:              {result.url}")
     lines.append(f"  Devices Tested:   {', '.join(result.devices_tested)}")
-    lines.append(f"  Load Time:        {result.load_time_ms}ms")
-    lines.append(f"  Page Size:        {result.page_size_bytes / 1024:.1f} KB")
+    lines.append(f"  Load Time:        {result.load_time_ms}ms"
+                 if result.load_time_ms is not None else "  Load Time:        unavailable")
+    lines.append(f"  Page Size:        {result.page_size_bytes / 1024:.1f} KB"
+                 if result.page_size_bytes is not None else "  Page Size:        unavailable")
     lines.append(f"  Resources:        {result.resource_count}")
-    lines.append(f"  Score:            {result.mobile_friendly_score:.0f}/100")
+    lines.append(f"  Score:            {result.mobile_friendly_score:.0f}/100"
+                 if result.is_complete and result.mobile_friendly_score is not None
+                 else "  Score:            unavailable (INCOMPLETE)")
     lines.append("")
+
+    for device, checks in result.check_outcomes.items():
+        for name, outcome in checks.items():
+            if outcome.status != "succeeded":
+                lines.append(f"  {device}/{name}: {outcome.status} — {outcome.diagnostic or 'coverage incomplete'}")
+                if outcome.limitations:
+                    lines.append("    Coverage limits: " + ", ".join(outcome.limitations))
 
     if result.issues:
         lines.append("-" * 70)

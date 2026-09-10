@@ -1,0 +1,19 @@
+[package]
+name = "gaia-asgard-sdk"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.96"
+description = "Asgard owner asynchronous process scanning client"
+repository = "https://github.com/primordial-creations/asguardian"
+license-file = "LICENSE"
+publish = false
+include = ["src/**", "tests/**", "examples/**", "Cargo.toml", "Cargo.lock", "README.md", "LICENSE"]
+
+[dependencies]
+serde_json = "1.0"
+libc = "0.2"
+tokio = { version = "1.52", features = ["process", "io-util", "sync", "time", "macros", "rt"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+
+[dev-dependencies]
+tokio = { version = "1.52", features = ["rt-multi-thread"] }

@@ -121,6 +121,7 @@ Documentation = "https://github.com/JakeDruett/asguardian#readme"
 Repository = "https://github.com/JakeDruett/asguardian"
 
 [tool.setuptools.packages.find]
+include = ["Asgard", "Asgard.*"]
 exclude = ["Asgard_Test", "Asgard_Test.*"]
 
 [tool.setuptools.package-data]

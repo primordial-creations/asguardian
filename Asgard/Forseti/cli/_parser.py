@@ -1,6 +1,6 @@
 import argparse
 
-from Asgard.Forseti.cli._parser_flags import add_performance_flags
+from Asgard.common.cli_flags import add_performance_flags
 from Asgard.Forseti.cli._parser_commands import (
     _add_openapi_parser,
     _add_graphql_parser,

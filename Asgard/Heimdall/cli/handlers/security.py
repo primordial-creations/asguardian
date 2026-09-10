@@ -110,6 +110,71 @@ def _dispatch_entry_to_finding(entry: dict) -> VulnerabilityFinding:
     )
 
 
+def collect_security_analysis(service, scan_path: Path, *, analysis_type: str = "all",
+                              exclude_patterns=(), include_test_context: bool = False,
+                              test_context_enabled: bool = True, strict_scan_paths=()):
+    """Collect the canonical security result without rendering or CLI exit handling.
+
+    Domain and dispatch failures stay attached to the report. Protocol consumers
+    must validate target/configuration and preserve those failures as incomplete.
+    """
+    result = service.analyze(scan_path)
+
+    # LOC for v2 size normalization; recompute the dual-reported scores.
+    result.total_lines_of_code = count_lines_of_code(
+        scan_path, exclude_patterns
+    )
+    result.calculate_totals()
+
+    # Route the full scan through the layered dispatch engine.
+    dispatch_entries = []
+    dispatch_outcome = None
+    if analysis_type == "all":
+        dispatch_outcome = collect_dispatch_scan(
+            scan_path,
+            exclude_patterns=exclude_patterns,
+            include_test_context=include_test_context,
+            test_context_enabled=test_context_enabled,
+            strict_scan_paths=strict_scan_paths,
+        )
+        dispatch_entries = dispatch_outcome.entries
+
+    # StaticSecurityService's totals (and hence the summary header:
+    # "Total Issues" / "Critical" / "security_score" / "is_passing")
+    # never see the DispatchEngine's findings -- those were previously
+    # only appended as a separate text/JSON section below, so the
+    # header undercounted and the score stayed a false 100.
+    #
+    # run_dispatch_scan() also re-scans .py files (it isn't restricted
+    # to non-Python), so anything it finds there is *already* counted
+    # by StaticSecurityService -- folding those back in would double
+    # count a single Python finding. Restrict to non-.py so this is a
+    # disjoint union, matching the same filter used for `heimdall scan`
+    # (scan_steps_1_6.py).
+    multilang_entries = [
+        e for e in dispatch_entries
+        if not str(e["file_path"]).endswith(".py")
+    ]
+    if multilang_entries:
+        if result.vulnerability_report is None:
+            result.vulnerability_report = VulnerabilityReport(
+                scan_path=str(scan_path)
+            )
+        result.vulnerability_report.findings.extend(
+            _dispatch_entry_to_finding(e) for e in multilang_entries
+        )
+        # Single recompute over ALL findings (StaticSecurityService's
+        # plus the newly-added multilang ones): counts, legacy_score,
+        # security_score_v2, and security_score all come out mutually
+        # consistent -- no separate hand-tally that the score misses.
+        result.calculate_totals()
+
+    if dispatch_outcome is not None:
+        mark_incomplete_security_report(result, dispatch_outcome)
+
+    return result, dispatch_entries
+
+
 def run_security_analysis(args: argparse.Namespace, verbose: bool = False, analysis_type: str = "all") -> int:
     scan_path = Path(args.path).resolve()
 
@@ -148,59 +213,11 @@ def run_security_analysis(args: argparse.Namespace, verbose: bool = False, analy
 
     try:
         service = StaticSecurityService(config)
-        result = service.analyze(scan_path)
-
-        # LOC for v2 size normalization; recompute the dual-reported scores.
-        result.total_lines_of_code = count_lines_of_code(
-            scan_path, exclude_patterns
+        result, dispatch_entries = collect_security_analysis(
+            service, scan_path, analysis_type=analysis_type,
+            exclude_patterns=exclude_patterns, include_test_context=include_test_context,
+            test_context_enabled=test_context_enabled, strict_scan_paths=strict_scan_paths,
         )
-        result.calculate_totals()
-
-        # Route the full scan through the layered dispatch engine.
-        dispatch_entries = []
-        dispatch_outcome = None
-        if analysis_type == "all":
-            dispatch_outcome = collect_dispatch_scan(
-                scan_path,
-                exclude_patterns=exclude_patterns,
-                include_test_context=include_test_context,
-                test_context_enabled=test_context_enabled,
-                strict_scan_paths=strict_scan_paths,
-            )
-            dispatch_entries = dispatch_outcome.entries
-
-        # StaticSecurityService's totals (and hence the summary header:
-        # "Total Issues" / "Critical" / "security_score" / "is_passing")
-        # never see the DispatchEngine's findings -- those were previously
-        # only appended as a separate text/JSON section below, so the
-        # header undercounted and the score stayed a false 100.
-        #
-        # run_dispatch_scan() also re-scans .py files (it isn't restricted
-        # to non-Python), so anything it finds there is *already* counted
-        # by StaticSecurityService -- folding those back in would double
-        # count a single Python finding. Restrict to non-.py so this is a
-        # disjoint union, matching the same filter used for `heimdall scan`
-        # (scan_steps_1_6.py).
-        multilang_entries = [
-            e for e in dispatch_entries
-            if not str(e["file_path"]).endswith(".py")
-        ]
-        if multilang_entries:
-            if result.vulnerability_report is None:
-                result.vulnerability_report = VulnerabilityReport(
-                    scan_path=str(scan_path)
-                )
-            result.vulnerability_report.findings.extend(
-                _dispatch_entry_to_finding(e) for e in multilang_entries
-            )
-            # Single recompute over ALL findings (StaticSecurityService's
-            # plus the newly-added multilang ones): counts, legacy_score,
-            # security_score_v2, and security_score all come out mutually
-            # consistent -- no separate hand-tally that the score misses.
-            result.calculate_totals()
-
-        if dispatch_outcome is not None:
-            mark_incomplete_security_report(result, dispatch_outcome)
 
         report = service.generate_report(result, args.format)
         if args.format == "json":

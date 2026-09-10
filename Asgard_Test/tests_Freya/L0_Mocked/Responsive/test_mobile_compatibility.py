@@ -19,6 +19,7 @@ from Asgard.Freya.Responsive.models.responsive_models import (
     MOBILE_DEVICES,
 )
 from Asgard.Freya.Responsive.services.mobile_compatibility import MobileCompatibilityTester
+from Asgard.Freya.Responsive.services._mobile_compatibility_checks import MobileCheckError
 
 
 # =============================================================================
@@ -74,7 +75,7 @@ class TestMobileCompatibilityTesterTest:
         mock_page.goto = AsyncMock(return_value=mock_response)
         mock_page.evaluate = AsyncMock(side_effect=[
             0,
-            [],
+            {"candidates": [], "limitations": []},
             [],
             [],
             {"resourceCount": 25, "totalSize": 1024000},
@@ -115,7 +116,7 @@ class TestMobileCompatibilityTesterTest:
         mock_page.goto = AsyncMock(return_value=mock_response)
         mock_page.evaluate = AsyncMock(side_effect=[
             0,
-            [],
+            {"candidates": [], "limitations": []},
             [],
             [],
             {"resourceCount": 20, "totalSize": 512000},
@@ -153,7 +154,7 @@ class TestMobileCompatibilityTesterTest:
         mock_page.goto = AsyncMock(return_value=mock_response)
         mock_page.evaluate = AsyncMock(side_effect=[
             0,
-            [],
+            {"candidates": [], "limitations": []},
             [],
             [],
             {"resourceCount": 50, "totalSize": 2048000},
@@ -194,7 +195,7 @@ class TestMobileCompatibilityTesterTest:
         mock_page.goto = AsyncMock(return_value=mock_response)
         mock_page.evaluate = AsyncMock(side_effect=[
             0,
-            [],
+            {"candidates": [], "limitations": []},
             [],
             [],
             {"resourceCount": 30, "totalSize": 1536000},
@@ -256,9 +257,8 @@ class TestCheckFlashContent:
         """Test that Flash check handles exceptions gracefully."""
         mock_page.evaluate = AsyncMock(side_effect=Exception("JavaScript error"))
 
-        issues = await tester._check_flash_content(mock_page)
-
-        assert len(issues) == 0
+        with pytest.raises(MobileCheckError):
+            await tester._check_flash_content(mock_page)
 
 
 class TestCheckHoverDependencies:
@@ -268,7 +268,7 @@ class TestCheckHoverDependencies:
     @pytest.mark.asyncio
     async def test_check_no_hover_dependencies(self, tester, mock_page):
         """Test checking page with no hover dependencies."""
-        mock_page.evaluate = AsyncMock(return_value=[])
+        mock_page.evaluate = AsyncMock(return_value={"candidates": [], "limitations": []})
 
         issues = await tester._check_hover_dependencies(mock_page)
 
@@ -278,12 +278,16 @@ class TestCheckHoverDependencies:
     @pytest.mark.asyncio
     async def test_check_with_hover_dependencies(self, tester, mock_page):
         """Test checking page with hover-dependent elements."""
-        hover_elements = [
-            {"selector": "nav ul ul", "type": "hidden-menu"}
-        ]
-        mock_page.evaluate = AsyncMock(return_value=hover_elements)
-
-        issues = await tester._check_hover_dependencies(mock_page)
+        from Asgard.Freya.Responsive.models.responsive_models import MobileCompatibilityIssue
+        from Asgard.Freya.Responsive.services._hover_evidence import HoverAssessment
+        observed = MobileCompatibilityIssue(
+            issue_type=MobileCompatibilityIssueType.HOVER_DEPENDENT,
+            element_selector="#menu", description="Observed hover reveal",
+            severity="moderate", suggested_fix="Verify touch access",
+        )
+        with patch('Asgard.Freya.Responsive.services._hover_evidence.assess_hover_dependencies',
+                   new=AsyncMock(return_value=HoverAssessment([observed], []))):
+            issues = await tester._check_hover_dependencies(mock_page)
 
         assert len(issues) == 1
         assert issues[0].issue_type == MobileCompatibilityIssueType.HOVER_DEPENDENT
@@ -295,9 +299,8 @@ class TestCheckHoverDependencies:
         """Test that hover check handles exceptions gracefully."""
         mock_page.evaluate = AsyncMock(side_effect=Exception("JavaScript error"))
 
-        issues = await tester._check_hover_dependencies(mock_page)
-
-        assert len(issues) == 0
+        with pytest.raises(MobileCheckError):
+            await tester._check_hover_dependencies(mock_page)
 
 
 class TestCheckSmallText:
@@ -335,9 +338,8 @@ class TestCheckSmallText:
         """Test that small text check handles exceptions gracefully."""
         mock_page.evaluate = AsyncMock(side_effect=Exception("JavaScript error"))
 
-        issues = await tester._check_small_text(mock_page)
-
-        assert len(issues) == 0
+        with pytest.raises(MobileCheckError):
+            await tester._check_small_text(mock_page)
 
 
 class TestCheckFixedPositioning:
@@ -374,9 +376,8 @@ class TestCheckFixedPositioning:
         """Test that fixed positioning check handles exceptions gracefully."""
         mock_page.evaluate = AsyncMock(side_effect=Exception("JavaScript error"))
 
-        issues = await tester._check_fixed_positioning(mock_page)
-
-        assert len(issues) == 0
+        with pytest.raises(MobileCheckError):
+            await tester._check_fixed_positioning(mock_page)
 
 
 # =============================================================================
@@ -540,7 +541,7 @@ class TestMobileCompatibilityTesterIntegration:
         mock_page.goto = AsyncMock(return_value=mock_response)
         mock_page.evaluate = AsyncMock(side_effect=[
             2,
-            [{"selector": "nav", "type": "hidden-menu"}],
+            {"candidates": [], "limitations": []},
             [{"selector": "p", "fontSize": 10}],
             [],
             {"resourceCount": 30, "totalSize": 1536000},

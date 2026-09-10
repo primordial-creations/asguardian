@@ -3,7 +3,7 @@ import argparse
 from Asgard.Volundr.Kubernetes import WorkloadType, SecurityProfile, EnvironmentType
 from Asgard.Volundr.Terraform import CloudProvider, ResourceCategory, ModuleComplexity
 from Asgard.Volundr.CICD import CICDPlatform
-from Asgard.Volundr.cli._parser_flags import add_performance_flags
+from Asgard.common.cli_flags import add_performance_flags
 
 
 def _add_kubernetes_commands(subparsers: argparse._SubParsersAction) -> None:

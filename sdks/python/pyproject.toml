@@ -1,0 +1,15 @@
+[build-system]
+requires = ["hatchling>=1.21"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gaia-asgard-sdk"
+version = "0.1.0"
+description = "Asgard owner process scanning client"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "Proprietary"}
+dependencies = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/asgard_sdk"]

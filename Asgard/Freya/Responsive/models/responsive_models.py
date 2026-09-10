@@ -6,9 +6,9 @@ Pydantic models for responsive design testing.
 
 from datetime import datetime
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 
 class Breakpoint(BaseModel):
@@ -223,6 +223,13 @@ class MobileCompatibilityIssue(BaseModel):
     affected_devices: List[str] = Field(default_factory=list, description="Devices affected")
 
 
+class MobileCheckOutcome(BaseModel):
+    """Completion of a required mobile observation."""
+    status: Literal["succeeded", "failed", "incomplete"]
+    diagnostic: Optional[str] = None
+    limitations: List[str] = Field(default_factory=list)
+
+
 class MobileCompatibilityReport(BaseModel):
     """Report from mobile compatibility testing."""
     url: str = Field(..., description="URL tested")
@@ -232,8 +239,26 @@ class MobileCompatibilityReport(BaseModel):
     load_time_ms: Optional[int] = Field(None, description="Page load time in ms")
     page_size_bytes: Optional[int] = Field(None, description="Total page size")
     resource_count: int = Field(0, description="Number of resources")
-    mobile_friendly_score: float = Field(100.0, description="Mobile-friendly score 0-100")
+    mobile_friendly_score: Optional[float] = Field(None, ge=0, le=100, description="Score is null when required observations are incomplete")
     device_results: Dict[str, Dict[str, Any]] = Field(default_factory=dict)
+
+    check_outcomes: Dict[str, Dict[str, MobileCheckOutcome]] = Field(default_factory=dict)
+
+    @computed_field
+    @property
+    def is_complete(self) -> bool:
+        required = ("navigation", "flash", "hover", "text", "fixed", "resources")
+        return bool(self.devices_tested) and all(
+            all(name in self.check_outcomes.get(device, {}) and
+                self.check_outcomes[device][name].status == "succeeded" for name in required)
+            for device in self.devices_tested
+        )
+
+    @model_validator(mode="after")
+    def reject_incomplete_score(self):
+        if not self.is_complete:
+            self.mobile_friendly_score = None
+        return self
 
     @property
     def has_issues(self) -> bool:

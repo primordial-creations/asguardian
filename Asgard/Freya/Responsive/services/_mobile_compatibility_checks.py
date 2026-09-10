@@ -14,6 +14,10 @@ from Asgard.Freya.Responsive.models.responsive_models import (
 )
 
 
+class MobileCheckError(Exception):
+    """A required browser check did not produce a valid observation."""
+
+
 async def check_flash_content(page: Page) -> List[MobileCompatibilityIssue]:
     """Check for Flash content."""
     issues = []
@@ -39,71 +43,21 @@ async def check_flash_content(page: Page) -> List[MobileCompatibilityIssue]:
             ))
 
     except Exception:
-        pass
+        raise MobileCheckError("Browser check execution or output validation failed") from None
 
     return issues
 
 
 async def check_hover_dependencies(page: Page) -> List[MobileCompatibilityIssue]:
-    """Check for hover-dependent functionality."""
-    issues = []
-
+    """Return observed hover findings; incomplete coverage is an explicit error."""
+    from Asgard.Freya.Responsive.services._hover_evidence import assess_hover_dependencies
     try:
-        hover_elements = await page.evaluate("""
-            () => {
-                const results = [];
-
-                const allElements = document.querySelectorAll('*');
-                for (const el of allElements) {
-                    const style = getComputedStyle(el);
-
-                    if (el.matches(':hover') === false) {
-                        const hoverRules = Array.from(document.styleSheets).some(sheet => {
-                            try {
-                                return Array.from(sheet.cssRules || []).some(rule => {
-                                    return rule.selectorText &&
-                                           rule.selectorText.includes(':hover') &&
-                                           el.matches(rule.selectorText.replace(':hover', ''));
-                                });
-                            } catch (e) {
-                                return false;
-                            }
-                        });
-                    }
-                }
-
-                const dropdowns = document.querySelectorAll(
-                    '[class*="dropdown"], [class*="menu"], nav ul ul'
-                );
-
-                for (const dropdown of dropdowns) {
-                    const style = getComputedStyle(dropdown);
-                    if (style.display === 'none' || style.visibility === 'hidden') {
-                        results.push({
-                            selector: dropdown.className || dropdown.tagName.toLowerCase(),
-                            type: 'hidden-menu'
-                        });
-                    }
-                }
-
-                return results.slice(0, 5);
-            }
-        """)
-
-        for elem in hover_elements:
-            issues.append(MobileCompatibilityIssue(
-                issue_type=MobileCompatibilityIssueType.HOVER_DEPENDENT,
-                element_selector=elem["selector"],
-                description="Element appears to require hover interaction",
-                severity="moderate",
-                suggested_fix="Add touch/click alternatives for hover-based interactions",
-                affected_devices=[],
-            ))
-
+        assessment = await assess_hover_dependencies(page)
     except Exception:
-        pass
-
-    return issues
+        raise MobileCheckError("Hover observation failed") from None
+    if assessment.limitations:
+        raise MobileCheckError("Hover observation coverage is incomplete")
+    return assessment.issues
 
 
 async def check_small_text(page: Page) -> List[MobileCompatibilityIssue]:
@@ -150,7 +104,7 @@ async def check_small_text(page: Page) -> List[MobileCompatibilityIssue]:
             ))
 
     except Exception:
-        pass
+        raise MobileCheckError("Browser check execution or output validation failed") from None
 
     return issues
 
@@ -202,7 +156,7 @@ async def check_fixed_positioning(page: Page) -> List[MobileCompatibilityIssue]:
             ))
 
     except Exception:
-        pass
+        raise MobileCheckError("Browser check execution or output validation failed") from None
 
     return issues
 

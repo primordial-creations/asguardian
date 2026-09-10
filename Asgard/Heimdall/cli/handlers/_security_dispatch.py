@@ -59,7 +59,7 @@ BUCKET_LABELS = {
 }
 
 
-def load_heimdall_yml(scan_path: Path) -> Dict[str, Any]:
+def load_heimdall_yml(scan_path: Path, *, strict: bool = False) -> Dict[str, Any]:
     """
     Read `.heimdall.yml` from the scan path (zero-config: absent file is
     simply empty config). Recognized keys:
@@ -67,13 +67,32 @@ def load_heimdall_yml(scan_path: Path) -> Dict[str, Any]:
         strict_scan_paths: list of regexes forced to production context
     """
     config_file = Path(scan_path) / ".heimdall.yml"
+    if strict and config_file.is_symlink():
+        raise ValueError(".heimdall.yml must not be a symlink")
     if not config_file.is_file():
+        if strict and config_file.exists():
+            raise ValueError(".heimdall.yml must be a regular file")
         return {}
     try:
         import yaml
         data = yaml.safe_load(config_file.read_text(encoding="utf-8"))
     except Exception:
+        if strict:
+            raise
         return {}
+    if strict:
+        import re
+        if data is None:
+            return {}
+        if not isinstance(data, dict):
+            raise ValueError(".heimdall.yml must contain an object")
+        if "test_context_enabled" in data and type(data["test_context_enabled"]) is not bool:
+            raise ValueError("test_context_enabled must be a boolean")
+        patterns = data.get("strict_scan_paths", [])
+        if not isinstance(patterns, list) or not all(isinstance(item, str) for item in patterns):
+            raise ValueError("strict_scan_paths must contain regex strings")
+        for pattern in patterns:
+            re.compile(pattern)
     return data if isinstance(data, dict) else {}
 
 

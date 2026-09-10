@@ -78,7 +78,7 @@ class HotspotDetector:
         """
         self.config = config or HotspotConfig()
 
-    def scan(self, scan_path: Path) -> HotspotReport:
+    def scan(self, scan_path: Path, *, strict_io: bool = False, logical_root: Path | None = None) -> HotspotReport:
         """
         Scan a directory for security hotspots.
 
@@ -91,11 +91,17 @@ class HotspotDetector:
         Raises:
             FileNotFoundError: If scan_path does not exist
         """
+        if logical_root is not None and (not strict_io or not logical_root.is_absolute() or ".." in logical_root.parts):
+            raise ValueError("Logical paths require strict scanning and an absolute path label")
         if not scan_path.exists():
             raise FileNotFoundError(f"Path does not exist: {scan_path}")
 
+        if strict_io and (scan_path.is_symlink() or not scan_path.is_dir()):
+            raise ValueError("Strict hotspot scans require a non-symlink directory")
         start_time = datetime.now()
-        report = HotspotReport(scan_path=str(scan_path))
+        report = HotspotReport(scan_path=str(logical_root or scan_path), strict_analysis_checked=strict_io)
+        if strict_io:
+            return self._scan_strict(scan_path, report, start_time, logical_root)
 
         for root, dirs, files in os.walk(scan_path):
             root_path = Path(root)
@@ -112,14 +118,7 @@ class HotspotDetector:
                 file_path = root_path / file
                 try:
                     hotspots = self._analyze_file(file_path)
-                    for hotspot in hotspots:
-                        if not self._meets_min_priority(hotspot.review_priority):
-                            continue
-                        if hotspot.suppressed_by_context:
-                            report.suppressed_by_context_count += 1
-                            if not self.config.include_test_context:
-                                continue
-                        report.add_hotspot(hotspot)
+                    self._record_hotspots(report, hotspots)
                 except Exception:
                     pass
 
@@ -127,16 +126,51 @@ class HotspotDetector:
 
         return report
 
-    def _analyze_file(self, file_path: Path) -> List[SecurityHotspot]:
+    def _record_hotspots(self, report, hotspots):
+        for hotspot in hotspots:
+            if not self._meets_min_priority(hotspot.review_priority):
+                continue
+            if hotspot.suppressed_by_context:
+                report.suppressed_by_context_count += 1
+                if not self.config.include_test_context:
+                    continue
+            report.add_hotspot(hotspot)
+
+    def _scan_strict(self, scan_path, report, start_time, logical_root=None):
+        from Asgard.Bragi.Quality.languages._confined_walk import iter_confined_regular_files
+
+        files_analyzed = 0
+        try:
+            for path in iter_confined_regular_files(
+                scan_path, exclude_patterns=self.config.exclude_patterns, strict_io=True
+            ):
+                if not self._should_analyze_file(path.name):
+                    continue
+                logical_path = logical_root / path.relative_to(scan_path) if logical_root is not None else path
+                try:
+                    hotspots = self._analyze_file(path, analysis_errors=report.analysis_errors, logical_path=logical_path)
+                    files_analyzed += 1
+                    self._record_hotspots(report, hotspots)
+                except Exception as error:
+                    report.analysis_errors.append({"stage": "analysis", "file_path": str(logical_path), "error_type": type(error).__name__})
+        except (OSError, RuntimeError) as error:
+            report.analysis_errors.append({"stage": "discovery", "error_type": type(error).__name__})
+        report.files_analyzed = files_analyzed
+        report.scan_duration_seconds = (datetime.now() - start_time).total_seconds()
+        return report
+
+    def _analyze_file(self, file_path: Path, *, analysis_errors=None, logical_path=None) -> List[SecurityHotspot]:
         """Analyze a single file for hotspots using AST and regex."""
         try:
             source = file_path.read_text(encoding="utf-8")
         except Exception:
+            if analysis_errors is not None:
+                raise
             return []
 
         hotspots: List[SecurityHotspot] = []
         lines = source.splitlines()
-        str_path = str(file_path)
+        str_path = str(logical_path or file_path)
         tree = None
 
         if file_path.suffix in (".py", ".pyw"):
@@ -147,6 +181,8 @@ class HotspotDetector:
                     self._get_line, self._get_call_name,
                 ))
             except SyntaxError:
+                if analysis_errors is not None:
+                    analysis_errors.append({"stage": "parse", "file_path": str_path, "error_type": "SyntaxError"})
                 tree = None
 
         # Regex fallback; on parsed Python files, dedupe (category, line)

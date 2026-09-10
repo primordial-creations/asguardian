@@ -1,6 +1,6 @@
 import argparse
 
-from Asgard.Forseti.cli._parser_flags import add_performance_flags
+from Asgard.common.cli_flags import add_performance_flags
 
 
 def _add_openapi_parser(subparsers: argparse._SubParsersAction) -> None:

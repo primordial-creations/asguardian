@@ -1,0 +1,27 @@
+{
+  "clean": "complete",
+  "finding": 1,
+  "invalid_target": "invalid_request",
+  "mismatch": "engine_version_mismatch",
+  "symlink": "incomplete",
+  "truncated": "incomplete",
+  "zero_limit": "invalid_request",
+  "closed_cancel": "closed",
+  "pipe_drain": "ready",
+  "hotspot": {
+    "kind": "security_hotspot",
+    "category": "weak_hashing",
+    "priority": "medium",
+    "review_status": "to_review"
+  },
+  "hotspot_parse": "incomplete",
+  "hotspot_config": "scan_configuration_error",
+  "hotspot_clean": "complete",
+  "hotspot_read": "incomplete",
+  "logical_context": {
+    "priority": "medium",
+    "path": true
+  },
+  "logical_invalid": "invalid_request",
+  "logical_unsupported": "unsupported_operation"
+}

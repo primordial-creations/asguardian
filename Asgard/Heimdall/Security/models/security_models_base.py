@@ -214,6 +214,7 @@ class CryptoFinding(BaseModel):
 
 class SecurityScanConfig(BaseModel):
     """Configuration for security scanning."""
+    strict_io: bool = Field(False, description="Record source read failures for protocol scans")
     scan_path: Path = Field(default_factory=lambda: Path("."), description="Root path to scan")
     scan_secrets: bool = Field(True, description="Enable secrets detection")
     scan_vulnerabilities: bool = Field(True, description="Enable vulnerability scanning")
