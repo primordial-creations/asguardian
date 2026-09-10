@@ -54,6 +54,10 @@ test('preabort, independent instances, unsupported profile and missing engine',a
 test('ESM delegates to the same CommonJS classes',async()=>{
  const esm=await import('../index.mjs');assert.equal(esm.Client,Client);
 });
+test('invalid cancellation input fails before starting a process',async()=>{
+ const c=create('sleep');
+ try{await assert.rejects(scan(c,{signal:{aborted:false}}),TypeError);}finally{await c.close();}
+});
 test('timeout terminates child processes in the group',async()=>{
  const fs=require('node:fs'),os=require('node:os'),path=require('node:path');
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'asgard-child-')),marker=path.join(dir,'pid');

@@ -26,6 +26,7 @@ class Client {
     await Promise.all(active.map(operation => operation.done));
   }
   #check(deadline, signal) {
+    if (signal !== undefined && !(signal instanceof AbortSignal)) throw new TypeError('signal must be an AbortSignal');
     if (this.#closed) throw new ScanError('closed');
     if (signal?.aborted) throw new ScanError('cancelled');
     if (performance.now() >= deadline) throw new ScanError('timeout');
