@@ -72,6 +72,16 @@ test = [
     # suite needs and nothing provided.
     "pylint>=3.0",
 ]
+l8 = [
+    # Kept separate from the normal test extra because the calibrated L8
+    # suites are deliberately disabled in CI until the runner/owner gate in
+    # _Docs/Testing/L8_Perf_Budget_Policy.md is accepted.
+    "pytest>=7.0.0",
+    "pytest-benchmark>=4.0.0",
+    # Scanner benchmarks must exercise the real multi-language engines, not
+    # their safe degraded path on a runner that happens to lack grammars.
+    "asguardian[treesitter]",
+]
 ast = [
     "tree-sitter>=0.23",
     "tree-sitter-python",

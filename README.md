@@ -40,6 +40,9 @@ asguardian heimdall issues ./src
 ### Security Scanning
 
 ```bash
+# Versioned external-orchestrator scan (JSON Lines output)
+asgard scan --contract-version hercules-l13/v1 --target ./src --output findings.jsonl
+
 # Detect security hotspots requiring manual review
 asguardian heimdall security hotspots ./src
 
@@ -49,6 +52,13 @@ asguardian heimdall security compliance ./src
 # Taint analysis: source-to-sink injection tracking
 asguardian heimdall security taint ./src
 ```
+
+The root `scan` command is the supported Hercules executable boundary. Exit 0
+means analysis completed and the final `HERCULES_SCAN:` record says either
+`clean` or `findings`; scanner/domain failures exit 3 and do not write a new
+result. Omitting `--contract-version` emits the transition-only `legacy-v0`
+finding lines. Both installed aliases, `asgard` and `asguardian`, expose the
+same command.
 
 ### API and Schema Validation
 
@@ -295,7 +305,7 @@ from Asgard.Heimdall.QualityGate.services.quality_gate_evaluator import QualityG
 from Asgard.Heimdall.Security.services.hotspot_detector import HotspotDetector
 from Asgard.Heimdall.Security.services.taint_analyzer import TaintAnalyzer
 from Asgard.Heimdall.Issues.services.issue_tracker import IssueTracker
-from Asgard.Reporting.services.history_store import HistoryStore
+from Asgard.Reporting.History import HistoryStore
 from Asgard.Dashboard.services.data_collector import DataCollector
 from Asgard.Forseti.OpenAPI.services import SpecValidatorService
 from Asgard.Verdandi.Web.services import VitalsCalculator

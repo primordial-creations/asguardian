@@ -79,20 +79,27 @@ class NodeAuditAnalyzer:
             report.scan_duration_seconds = (datetime.now() - start).total_seconds()
             return report
 
-        # npm's own top-level "error" (e.g. ENOAUDIT for an unreachable
-        # registry) means the audit itself did not run, not that it ran and
-        # found nothing.
-        top_level_error = payload.get("error")
-        if top_level_error:
-            summary = top_level_error.get("summary") or top_level_error.get("code") or "unknown error"
-            report.tools_unavailable.append(f"npm audit could not reach the registry: {summary}")
+        if not isinstance(payload, dict):
+            report.tools_unavailable.append("npm audit produced an invalid JSON envelope (expected an object)")
             report.tool_failed = True
             report.scan_duration_seconds = (datetime.now() - start).total_seconds()
             return report
 
-        vulnerabilities = payload.get("vulnerabilities") or {}
-        report.files_analyzed = 1
+        has_top_level_error = "error" in payload
+        top_level_error = payload.get("error")
+        vulnerabilities = payload.get("vulnerabilities", {} if has_top_level_error else None)
+        if not isinstance(vulnerabilities, dict):
+            report.tools_unavailable.append("npm audit output did not contain a valid vulnerabilities object")
+            report.tool_failed = True
+            report.scan_duration_seconds = (datetime.now() - start).total_seconds()
+            return report
+
+        incomplete_output = False
+        report.files_analyzed = 1 if "vulnerabilities" in payload else 0
         for pkg_name, entry in vulnerabilities.items():
+            if not isinstance(pkg_name, str) or not pkg_name or not self._is_supported_entry(entry):
+                incomplete_output = True
+                continue
             finding = self._finding_from_entry(pkg_name, entry)
             if finding is not None:
                 report.add_finding(finding)
@@ -100,9 +107,60 @@ class NodeAuditAnalyzer:
                     report.tool_failed = True
                     report.tools_unavailable.append("npm audit finding limit reached; remaining vulnerabilities are unverified")
                     break
+            else:
+                incomplete_output = True
+
+        if incomplete_output:
+            report.tools_unavailable.append("npm audit output contained malformed or unsupported vulnerability entries")
+            report.tool_failed = True
+
+        # npm may include vulnerability data alongside a top-level execution
+        # error. Keep those findings, but never represent the partial result as
+        # a complete scan.
+        if has_top_level_error:
+            if isinstance(top_level_error, dict):
+                summary = top_level_error.get("summary") or top_level_error.get("code") or "unknown error"
+            else:
+                summary = str(top_level_error or "unknown error")
+            report.tools_unavailable.append(f"npm audit could not complete: {summary}")
+            report.tool_failed = True
+
+        if result.returncode not in (0, 1):
+            report.tools_unavailable.append(f"npm audit failed to complete (exit {result.returncode})")
+            report.tool_failed = True
+        elif result.returncode == 1 and not vulnerabilities and not has_top_level_error:
+            report.tools_unavailable.append("npm audit exited nonzero without reporting any vulnerabilities")
+            report.tool_failed = True
 
         report.scan_duration_seconds = (datetime.now() - start).total_seconds()
         return report
+
+    @staticmethod
+    def _is_supported_entry(entry: object) -> bool:
+        if not isinstance(entry, dict):
+            return False
+        if str(entry.get("severity", "")).lower() not in _NPM_SEVERITY_TO_TOOL:
+            return False
+        via = entry.get("via")
+        if not isinstance(via, list):
+            return False
+        if any(not isinstance(advisory, (str, dict)) for advisory in via):
+            return False
+        for advisory in via:
+            if isinstance(advisory, dict) and any(
+                key in advisory and not isinstance(advisory[key], str)
+                for key in ("title", "url")
+            ):
+                return False
+        fix_available = entry.get("fixAvailable", False)
+        if not isinstance(fix_available, (bool, dict)):
+            return False
+        if isinstance(fix_available, dict) and any(
+            key in fix_available and not isinstance(fix_available[key], str)
+            for key in ("name", "version")
+        ):
+            return False
+        return True
 
     @staticmethod
     def _finding_from_entry(pkg_name: str, entry: dict) -> Optional[ToolFinding]:

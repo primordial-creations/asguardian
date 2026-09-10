@@ -3,6 +3,7 @@
 import importlib.util
 import json
 import os
+import shlex
 import subprocess
 import sys
 from pathlib import Path
@@ -236,6 +237,9 @@ def clean_report(scan):
         {"error_count": 1},
         {"scan_path": "/wrong/project"},
         {"tool_failed": "false"},
+        {"error_count": False},
+        {"error_count": 0.0},
+        {"scan_path": ""},
     ],
 )
 def test_even_zero_exit_cannot_pass_incomplete_or_wrong_scan(caller, monkeypatch, change):
@@ -260,7 +264,9 @@ def test_all_checks_attempted_and_exit_failure_preserved(caller, monkeypatch):
     )
     monkeypatch.setattr(gate.subprocess, "run", execute)
     assert gate.run_checks(caller, ["go-vet", "go-fmt"], "45", caller) == 1
-    assert [call.args[0][2] for call in execute.call_args_list] == ["go-vet", "go-fmt"]
+    for call, check in zip(execute.call_args_list, ("go-vet", "go-fmt"), strict=True):
+        assert call.args[0][:4] == [sys.executable, "-E", "-P", "-c"]
+        assert call.args[0][5:9] == [str(ROOT), "heimdall", "quality", check]
     assert execute.call_args_list[1].args[0][-2:] == ["--timeout", "45"]
 
 
@@ -271,6 +277,53 @@ def test_clean_executed_report_passes(caller, monkeypatch):
         Mock(return_value=subprocess.CompletedProcess([], 0, json.dumps(clean_report(caller)), "")),
     )
     assert gate.run_checks(caller, ["go-fmt"], "", caller) == 0
+
+
+def test_path_console_script_cannot_substitute_a_clean_report(caller, monkeypatch):
+    fake_bin = caller.parent / "fake-bin"
+    fake_bin.mkdir()
+    marker = caller.parent / "wrong-scanner-ran"
+    scanner = fake_bin / "heimdall"
+    scanner.write_text(
+        f"#!/bin/sh\ntouch {shlex.quote(str(marker))}\nprintf '%s\\n' {shlex.quote(json.dumps(clean_report(caller)))}\n"
+    )
+    scanner.chmod(0o755)
+    monkeypatch.setenv("PATH", str(fake_bin) + os.pathsep + os.environ.get("PATH", ""))
+    monkeypatch.chdir(caller.parent)
+
+    # No manifest: the actual source CLI must reject this request before any
+    # tool runs. A stray old console script would supply the fake clean report.
+    assert gate.run_checks(caller, ["go-fmt"], "", caller) == 1
+    assert not marker.exists()
+
+
+@pytest.mark.parametrize("injection", ["cwd", "pythonpath"])
+def test_source_dispatch_ignores_other_asgard_imports(caller, monkeypatch, injection):
+    shadow_root = caller.parent / "shadow"
+    shadow_package = shadow_root / "Asgard"
+    shadow_package.mkdir(parents=True)
+    marker = caller.parent / "wrong-package-imported"
+    (shadow_package / "__init__.py").write_text(
+        f"from pathlib import Path\nPath({str(marker)!r}).touch()\n"
+        "raise RuntimeError('shadow Asgard must never be imported')\n"
+    )
+    monkeypatch.chdir(shadow_root if injection == "cwd" else caller.parent)
+    monkeypatch.setenv("PYTHONPATH", str(shadow_root) if injection == "pythonpath" else "")
+    real_run = subprocess.run
+    results = []
+
+    def record_run(*args, **kwargs):
+        result = real_run(*args, **kwargs)
+        results.append(result)
+        return result
+
+    monkeypatch.setattr(gate.subprocess, "run", record_run)
+    assert gate.run_checks(caller, ["go-fmt"], "", caller) == 1
+    assert not marker.exists()
+    assert len(results) == 1
+    report = json.loads(results[0].stdout)
+    assert report["scan_path"] == str(caller)
+    assert report["tools_unavailable"]
 
 
 @pytest.mark.parametrize("check", ["node-lint", "node-typecheck"])

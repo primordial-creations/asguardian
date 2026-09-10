@@ -18,7 +18,7 @@ from Asgard.Dashboard.models.dashboard_models import (
 )
 from Asgard.Shared.Issues.models.issue_models import IssueSeverity
 from Asgard.Shared.Issues.services._issue_repository import IIssueRepository
-from Asgard.Reporting.History.services._history_repository import IHistoryRepository
+from Asgard.Reporting.History.ports.history_repository import IHistoryRepository
 
 
 class DataCollector:

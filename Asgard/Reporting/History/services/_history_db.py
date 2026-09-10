@@ -13,9 +13,9 @@ from Asgard.Reporting.History.infrastructure.persistence.history_schema import (
     connect,
     ensure_db,
     get_default_db_path,
-    get_lower_is_better_metrics,
     row_to_snapshot,
 )
+from Asgard.Reporting.History.models.metric_policy import get_lower_is_better_metrics
 
 __all__ = [
     "connect",

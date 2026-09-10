@@ -24,6 +24,10 @@ ESLINT_CONFIGS = (
     ".eslintrc.yaml",
     ".eslintrc",
 )
+ANALYZER_ROOT = Path(__file__).resolve().parent.parent
+ANALYZER_ENTRYPOINT = (
+    "import sys; sys.path.insert(0, sys.argv.pop(1)); from Asgard.cli import main; raise SystemExit(main())"
+)
 
 
 def confined_directory(root: Path, value: str) -> Path:
@@ -112,7 +116,24 @@ def run_checks(scan: Path, checks: list[str], timeout: str, install: Path, rust_
     env["PATH"] = f"{wrapper_path}{os.pathsep}{env.get('PATH', '')}"
     failed = False
     for check in checks:
-        argv = ["heimdall", "quality", check, str(scan), "--format", "json"]
+        # Use this interpreter and the verified checkout containing this helper.
+        # Ignore Python environment overrides and implicit working-directory
+        # imports; installed dependencies (including the interpreter's user
+        # site) remain available. A PATH console script is not source identity.
+        argv = [
+            sys.executable,
+            "-E",
+            "-P",
+            "-c",
+            ANALYZER_ENTRYPOINT,
+            str(ANALYZER_ROOT),
+            "heimdall",
+            "quality",
+            check,
+            str(scan),
+            "--format",
+            "json",
+        ]
         if timeout:
             argv += ["--timeout", timeout]
         print(f"Running {check} against {scan}", flush=True)
@@ -126,9 +147,12 @@ def run_checks(scan: Path, checks: list[str], timeout: str, install: Path, rust_
                 key in report for key in ("scan_path", "tool_failed", "tools_unavailable", "error_count")
             )
             clean = valid and (
-                Path(report["scan_path"]).resolve() == scan.resolve()
+                isinstance(report["scan_path"], str)
+                and bool(report["scan_path"])
+                and Path(report["scan_path"]).resolve() == scan.resolve()
                 and report["tool_failed"] is False
                 and report["tools_unavailable"] == []
+                and type(report["error_count"]) is int
                 and report["error_count"] == 0
             )
         except (ValueError, TypeError):

@@ -4,37 +4,6 @@
 # When you add L3 coverage for a model, its entry becomes stale and
 # test_model_coverage_meta.py forces you to delete it. New models must ship
 # with L3 tests instead of being added here.
-Asgard.Baseline.models.BaselineEntry
-Asgard.Baseline.models.BaselineFile
-Asgard.Baseline.models.BaselineStats
-Asgard.Bragi.Quality.languages.cpp.models.cpp_models.CppFinding
-Asgard.Bragi.Quality.languages.cpp.models.cpp_models.CppReport
-Asgard.Bragi.Quality.languages.cpp.models.cpp_models.CppScanConfig
-Asgard.Bragi.Quality.languages.csharp.models.csharp_models.CsharpFinding
-Asgard.Bragi.Quality.languages.csharp.models.csharp_models.CsharpReport
-Asgard.Bragi.Quality.languages.csharp.models.csharp_models.CsharpScanConfig
-Asgard.Bragi.Quality.languages.go.models.go_models.GoFinding
-Asgard.Bragi.Quality.languages.go.models.go_models.GoReport
-Asgard.Bragi.Quality.languages.go.models.go_models.GoScanConfig
-Asgard.Bragi.Quality.languages.java.models.java_models.JavaFinding
-Asgard.Bragi.Quality.languages.java.models.java_models.JavaReport
-Asgard.Bragi.Quality.languages.java.models.java_models.JavaScanConfig
-Asgard.Bragi.Quality.languages.php.models.php_models.PhpFinding
-Asgard.Bragi.Quality.languages.php.models.php_models.PhpReport
-Asgard.Bragi.Quality.languages.php.models.php_models.PhpScanConfig
-Asgard.Bragi.Quality.languages.ruby.models.ruby_models.RubyFinding
-Asgard.Bragi.Quality.languages.ruby.models.ruby_models.RubyReport
-Asgard.Bragi.Quality.languages.ruby.models.ruby_models.RubyScanConfig
-Asgard.Bragi.Quality.languages.rust.models.rust_models.RustFinding
-Asgard.Bragi.Quality.languages.rust.models.rust_models.RustReport
-Asgard.Bragi.Quality.languages.rust.models.rust_models.RustScanConfig
-Asgard.Bragi.Quality.models.debt_models.EffortInterval
-Asgard.Bragi.Quality.models.debt_models.EffortModels
-Asgard.Bragi.Quality.models.debt_models.FileFriction
-Asgard.Bragi.Quality.models.debt_models.InterestRates
-Asgard.Bragi.Quality.models.debt_models.ROIAnalysis
-Asgard.Bragi.Quality.models.debt_models.RemediationFunction
-Asgard.Bragi.Quality.models.debt_models.TimeProjection
 Asgard.Bragi.Quality.models.maintainability_models.LanguageWeights
 Asgard.Bragi.Quality.models.maintainability_models.MaintainabilityThresholds
 Asgard.Bragi.Quality.models.smell_models.SmellThresholds
@@ -87,11 +56,6 @@ Asgard.Freya.Performance.models._performance_timing_models.PageLoadMetrics
 Asgard.Heimdall.Security.models.security_models_base.CryptoFinding
 Asgard.Heimdall.Security.models.security_models_base.SecretFinding
 Asgard.Heimdall.Security.models.security_models_base.VulnerabilityFinding
-Asgard.MCP.models.mcp_models.MCPRequest
-Asgard.MCP.models.mcp_models.MCPResponse
-Asgard.MCP.models.mcp_models.MCPServerConfig
-Asgard.MCP.models.mcp_models.MCPTool
-Asgard.MCP.models.mcp_models.MCPToolParam
 Asgard.Reporting.History.models.history_models.AnalysisSnapshot
 Asgard.Reporting.History.models.history_models.MetricSnapshot
 Asgard.Reporting.History.models.history_models.MetricTrend

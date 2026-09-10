@@ -9,6 +9,7 @@ from Asgard.Reporting.History.models.history_models import (
     TrendDirection,
     TrendReport,
 )
+from Asgard.Reporting.History.models.metric_policy import get_lower_is_better_metrics
 
 __all__ = [
     "AnalysisSnapshot",
@@ -16,4 +17,5 @@ __all__ = [
     "MetricTrend",
     "TrendDirection",
     "TrendReport",
+    "get_lower_is_better_metrics",
 ]

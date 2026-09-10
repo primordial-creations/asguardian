@@ -9,6 +9,13 @@ The draft is already hardened: `permissions: contents: read`,
 no unguarded `pip install -e` on `pull_request`. Do not flip `if: false`
 without keeping that split. See `_Docs/Architecture/Security_Hardening.md`.
 
+The ordinary CI workflow explicitly ignores both `L8_PerfBudgets` and every
+`L8_Performance` directory. This is part of the disabled-state contract: L8
+must not be activated accidentally by recursive test or coverage collection.
+The dedicated workflow installs the declared `[l8]` extra on trusted events;
+on pull requests it installs the equivalent base and L8 dependencies directly
+without executing package build hooks.
+
 ## What is enforced
 
 All budgets live in one file: `Asgard_Test/L8_budgets.yaml`.

@@ -220,13 +220,23 @@ jobs:
           hadolint --version
 
       - name: Run tests
-        run: pytest Asgard_Test/ -v --tb=short --ignore=Asgard_Test/fixtures
+        # L8 has its own explicitly disabled, hardware-calibrated workflow.
+        # Keep ordinary CI from activating those suites through recursion.
+        run: |
+          pytest Asgard_Test/ -v --tb=short \
+            --ignore=Asgard_Test/fixtures \
+            --ignore=Asgard_Test/L8_PerfBudgets \
+            --ignore-glob='Asgard_Test/**/L8_Performance'
         env:
           PYTHONPATH: ${{ github.event_name == 'pull_request' && github.workspace || '' }}
 
       - name: Run tests with coverage
         if: matrix.python-version == '3.12'
-        run: pytest Asgard_Test/ --cov=Asgard --cov-report=term-missing --cov-report=xml --ignore=Asgard_Test/fixtures
+        run: |
+          pytest Asgard_Test/ --cov=Asgard --cov-report=term-missing --cov-report=xml \
+            --ignore=Asgard_Test/fixtures \
+            --ignore=Asgard_Test/L8_PerfBudgets \
+            --ignore-glob='Asgard_Test/**/L8_Performance'
         env:
           PYTHONPATH: ${{ github.event_name == 'pull_request' && github.workspace || '' }}
 

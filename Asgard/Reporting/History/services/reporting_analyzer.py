@@ -10,7 +10,7 @@ data; it performs no direct I/O or database operations itself.
 from datetime import datetime
 from typing import Dict, List, Optional, Tuple
 
-from Asgard.Reporting.History.infrastructure.persistence.history_schema import (
+from Asgard.Reporting.History.models.metric_policy import (
     get_lower_is_better_metrics,
 )
 from Asgard.Reporting.History.models.history_models import (
@@ -18,7 +18,7 @@ from Asgard.Reporting.History.models.history_models import (
     TrendDirection,
     TrendReport,
 )
-from Asgard.Reporting.History.services._history_repository import IHistoryRepository
+from Asgard.Reporting.History.ports.history_repository import IHistoryRepository
 
 
 class ReportingAnalyzerService:

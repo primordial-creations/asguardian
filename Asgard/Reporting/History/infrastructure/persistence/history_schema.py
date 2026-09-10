@@ -14,27 +14,9 @@ from pathlib import Path
 from typing import Optional
 
 from Asgard.Reporting.History.models.history_models import AnalysisSnapshot, MetricSnapshot
+from Asgard.Reporting.History.models.metric_policy import get_lower_is_better_metrics
 
 _DB_PATH = Path.home() / ".asgard" / "history.db"
-
-_LOWER_IS_BETTER_METRICS = {
-    "duplication_percentage",
-    "cyclomatic_complexity",
-    "technical_debt_hours",
-    "critical_vulnerabilities",
-    "high_vulnerabilities",
-    "naming_violations",
-    # SAVD (Severity-Adjusted Vulnerability Density, plan 06 §D): lower
-    # findings-per-KLOC is always the improving direction, for every
-    # severity bucket. Kept as literal strings (rather than importing
-    # savd_metrics here) to avoid a persistence-layer -> service-layer
-    # dependency; see Reporting/History/services/savd_metrics.py for the
-    # canonical name builder used when constructing these metrics.
-    "savd_critical",
-    "savd_high",
-    "savd_medium",
-    "savd_low",
-}
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS snapshots (
@@ -56,11 +38,6 @@ CREATE INDEX IF NOT EXISTS idx_snapshots_timestamp ON snapshots (project_path, s
 def get_default_db_path() -> Path:
     """Return the default SQLite database path."""
     return _DB_PATH
-
-
-def get_lower_is_better_metrics() -> set:
-    """Return the set of metric names where lower values are better."""
-    return _LOWER_IS_BETTER_METRICS
 
 
 def ensure_db(db_path: Path) -> None:

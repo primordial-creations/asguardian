@@ -46,6 +46,18 @@ layers:
     allowed_imports: [domain]
     forbidden_imports: [infrastructure]
 
+  # These two legacy modules deliberately preserve old no-argument/import
+  # surfaces while acting as composition shims. New application code depends
+  # on History/ports and wires the SQLite adapter at an outer boundary.
+  - name: compatibility_composition
+    level: 2
+    heuristics:
+      paths:
+        - "*/Reporting/History/services/history_store.py"
+        - "*/Reporting/History/services/_history_db.py"
+    allowed_imports: [domain, ports, application, infrastructure]
+    forbidden_imports: []
+
   - name: application
     level: 1
     heuristics:
