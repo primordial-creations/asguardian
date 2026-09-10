@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "description": "Asgard owner process scanning client",
   "license": "SEE LICENSE IN LICENSE",
-  "engines": {"node": ">=22"},
+  "engines": {"node": ">=18"},
   "main": "index.cjs",
   "types": "index.d.cts",
   "exports": {
