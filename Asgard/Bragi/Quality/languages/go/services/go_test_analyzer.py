@@ -3,15 +3,30 @@ Go test result parsing via go test -json.
 
 Orchestrates `go test ./... -json`, the Go toolchain's own structured test
 event stream, rather than scraping `go test`'s human-oriented text output.
-Verified against real `go test -json` (go1.24.7, this sandbox) for three
-shapes: an ordinary assertion failure (`Action: "fail"` with a `Test`
-field, preceded by `Action: "output"` lines carrying the `t.Errorf`/
-`t.Fatal` message), a package that fails to compile for testing at all
-(`Action: "build-fail"` with an `ImportPath` and no `Test`, preceded by
-`Action: "build-output"` lines carrying the real compiler diagnostic in
-`file:line:col: message` shape), and a panicking test (recovered per-test
-by the `testing` package and reported through the same per-test `fail`
-action as an ordinary failure, not a special case).
+Verified against real `go test -json` for three shapes: an ordinary
+assertion failure (`Action: "fail"` with a `Test` field, preceded by
+`Action: "output"` lines carrying the `t.Errorf`/`t.Fatal` message), a
+package that fails to compile for testing at all, and a panicking test
+(recovered per-test by the `testing` package and reported through the
+same per-test `fail` action as an ordinary failure, not a special case).
+
+The compile-failure shape itself differs by Go toolchain version. Go
+1.24+ emits a dedicated `Action: "build-fail"` event carrying `ImportPath`,
+preceded by `Action: "build-output"` lines with the real compiler
+diagnostic in `file:line:col: message` shape -- verified against real
+`go test -json` on go1.24.7. Go versions before that (verified on
+go1.22.2) emit no such structured event at all: the compiler diagnostic
+goes to stderr as plain text (a `# <import path>` header line followed by
+`file:line:col: message` lines), and the JSON stream on stdout carries
+only an ordinary package-level `Action: "output"` line containing
+`FAIL\t<import path> [build failed]` followed by a package-level
+`Action: "fail"` with no `Test` field and no `FailedBuild` flag --
+indistinguishable, without inspecting that output text, from a package
+that failed without a specific failing test (e.g. a bad `TestMain` exit).
+`_looks_like_build_failure` and `_stderr_diagnostics_by_package` exist to
+recover the same `go-test::build-failed` finding on those older
+toolchains, sourcing diagnostics from stderr's `# <import path>` blocks
+since none reach the JSON stream in that shape.
 
 The stream has no guaranteed message order (see golang.org/x/vuln's own
 Message doc for the equivalent caveat on a different tool), so this
@@ -42,6 +57,8 @@ from Asgard.Bragi.Quality.languages.go.services._go_diagnostics import parse_dia
 INSTALL_HINT = "Install Go from https://go.dev/dl (go test ships with the go command)."
 
 _SOURCE_LINE_RE = re.compile(r"(?P<file>[A-Za-z0-9_./-]+\.go):(?P<line>\d+):")
+_BUILD_FAILED_MARKER_RE = re.compile(r"\[build failed\]")
+_STDERR_PACKAGE_HEADER_RE = re.compile(r"^#\s+(?P<import_path>\S+)\s*$")
 
 
 class GoTestAnalyzer:
@@ -97,6 +114,7 @@ class GoTestAnalyzer:
         package_test_fails: Dict[str, Set[str]] = {}
         events_parsed = 0
         findings_before = report.total_findings
+        stderr_diagnostics = self._stderr_diagnostics_by_package(result.stderr or "")
 
         for line in result.stdout.splitlines():
             line = line.strip()
@@ -136,7 +154,23 @@ class GoTestAnalyzer:
                     # silently dropped.
                     if not package_test_fails.get(package):
                         output_lines = test_output.get((package, ""), [])
-                        self._add_package_fail_finding(package, output_lines, report)
+                        if self._looks_like_build_failure(output_lines):
+                            # Go toolchains before 1.24 never emit a
+                            # structured build-fail/build-output event for
+                            # this shape (see module docstring) -- the only
+                            # signal on stdout is this package-level fail
+                            # plus a "[build failed]" marker in its Output.
+                            # Recover the real diagnostic from stderr, where
+                            # it was printed as plain text instead.
+                            self._add_build_fail_finding(
+                                package,
+                                stderr_diagnostics.get(package, output_lines),
+                                module_dir,
+                                root,
+                                report,
+                            )
+                        else:
+                            self._add_package_fail_finding(package, output_lines, report)
 
             if self._config.max_findings and report.total_findings >= self._config.max_findings:
                 return
@@ -232,6 +266,33 @@ class GoTestAnalyzer:
                     tool="go-test",
                 )
             )
+
+    @staticmethod
+    def _looks_like_build_failure(output_lines: List[str]) -> bool:
+        """True if a package-level fail's buffered Output carries go test's own "[build failed]" marker."""
+        return any(_BUILD_FAILED_MARKER_RE.search(line) for line in output_lines)
+
+    @staticmethod
+    def _stderr_diagnostics_by_package(stderr: str) -> Dict[str, List[str]]:
+        """
+        Split go test's stderr into per-package diagnostic blocks.
+
+        On Go toolchains before 1.24, a package that fails to build for
+        testing prints its compiler diagnostics to stderr as plain text,
+        headed by a `# <import path>` line (the same shape `go build`
+        itself uses), rather than through the JSON event stream on stdout.
+        """
+        diagnostics: Dict[str, List[str]] = {}
+        current: Optional[str] = None
+        for line in stderr.splitlines():
+            header = _STDERR_PACKAGE_HEADER_RE.match(line)
+            if header:
+                current = header.group("import_path")
+                diagnostics.setdefault(current, [])
+                continue
+            if current is not None:
+                diagnostics[current].append(line + "\n")
+        return diagnostics
 
     def _add_package_fail_finding(self, package: str, output_lines: List[str], report: ToolReport) -> None:
         description = "".join(output_lines).strip() or f"{package} failed without a specific failing test"
