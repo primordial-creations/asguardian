@@ -1,0 +1,22 @@
+default remediation kind: exit=1 rejected=true
+negative base accepted: exit=1 rejected=true
+batchability above one accepted: exit=1 rejected=true
+discount floor above one accepted: exit=1 rejected=true
+effort midpoint divisor: exit=1 rejected=true
+unknown confidence accepted: exit=1 rejected=true
+negative churn accepted: exit=1 rejected=true
+ROI default changed: exit=1 rejected=true
+time horizon wire value changed: exit=1 rejected=true
+projection default changed: exit=1 rejected=true
+effort factor default changed: exit=1 rejected=true
+interest default changed: exit=1 rejected=true
+high confidence removed: exit=1 rejected=true
+churn counter widened to float: exit=1 rejected=true
+ROI map values widened to Any: exit=1 rejected=true
+remediation unit widened to Any: exit=1 rejected=true
+effort factor widened to Any: exit=1 rejected=true
+projection current debt widened to Any: exit=1 rejected=true
+interest rate widened to Any: exit=1 rejected=true
+undocumented remediation kind added: exit=1 rejected=true
+ROI map keys widened to Any: exit=1 rejected=true
+all 21 mutations rejected

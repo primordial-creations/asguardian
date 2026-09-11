@@ -1,0 +1,298 @@
+{
+  "adrasta_branch_correction": {
+    "file_edits_by_lane": 0,
+    "restored_branch": "integration/all-current-updates-20260908"
+  },
+  "adrasta_current": {
+    "branch": "integration/all-current-updates-20260908",
+    "head": "35e3822d0b3b14088d356d51888f4f9f9f472c9a",
+    "status_record_count": 1202,
+    "status_z_sha256": "675a8133a6db59dca7b35ab959854e8b99b9ac095cdc9b364640d1d9c2cb9255"
+  },
+  "asgard_all_dirty_paths_match_candidate_baseline": true,
+  "asgard_dirty_path_count": 53,
+  "asgard_path_comparisons": [
+    {
+      "matches_baseline": true,
+      "path": ".github/workflows/ci.yml",
+      "sha256": "fb2778e377268a15b8189d80f1f6c5a1221eb2696553dac321a0e3183a0c84b7"
+    },
+    {
+      "matches_baseline": true,
+      "path": ".github/workflows/l8-perf-budgets.yml",
+      "sha256": "f94eea69292695657c25f51d66818c66ee63925900863a77bed50c4487fb0772"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Baseline/models.py",
+      "sha256": "ebf795e036e455a8f16d3a8b67be58ab3032693b2c8f56816e8cd38beaf6fef0"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Bragi/Quality/languages/node/services/node_audit_analyzer.py",
+      "sha256": "a38198c9587b89c29e641602b47d2fe76e4b55ed783ce12e67f6282f055ef018"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Bragi/Quality/languages/node/services/node_eslint_analyzer.py",
+      "sha256": "3fc546adbeacc1a2bdb033b000abb7e75f6aeeb06b727cd59c4cafd543b4a766"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Dashboard/adapters/web/dashboard_handler.py",
+      "sha256": "9a54bd604b89a45dee3554d5592e78a06846e43be8558fbdf03e509a59cfcde2"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Dashboard/services/data_collector.py",
+      "sha256": "9a205f7212bb3630d726d44408f1f995c248fa3c14676e3e6c125d5d016fd73f"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/__init__.py",
+      "sha256": "f4a9094319e03f0df498e1efd0d02eee7b384766ae53411e0fd23fc7422607d5"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/infrastructure/persistence/__init__.py",
+      "sha256": "d88bf37d9af301faa973e18edc4a03048f63bb26c40951811328d51fa55d0425"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/infrastructure/persistence/history_schema.py",
+      "sha256": "270125641dd23d1297a9d4108219e673ac692f64a88a78540d00ec1cc1c18fc5"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/models/__init__.py",
+      "sha256": "46962acda6720e63b41d0f3e420319be78e557d63e7d13622448648c6c16def0"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/models/history_models.py",
+      "sha256": "e60897e7296b8edbe41260c1b8e7c623f73835550836efa805ddc03d1575c60e"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/services/__init__.py",
+      "sha256": "e5d1a6fb8bf3a0067251723bc06a85aa96272b747b57f0c3a23b33069b241271"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/services/_history_db.py",
+      "sha256": "f01c01cc06c402250169ba53a76e828b36e7bc3bf25ca1097ce1d8cc187817c7"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/services/_history_repository.py",
+      "sha256": "1d3acb1d7319e35e77650120598ac09f7df4d27fd20450cb6d9ad1bb8ccf7a3b"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/services/history_store.py",
+      "sha256": "004bd4b47703588eef57c522759367843859bcc86a67cd0626e68410cbc67091"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/services/reporting_analyzer.py",
+      "sha256": "78df6238be9c8697eda79d5ef2def92a3d13b459de4b1d01d923de8f331e32ee"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/__init__.py",
+      "sha256": "a2be819e62c277cb37a42fcadfd3676464b5c26880c52a4fec74a90b8590442f"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/cli.py",
+      "sha256": "37668c3d8b24eee7d2a695bb24354e1493e799a031d72bc335014c38ead717cd"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/L3_Meta/l3_uncovered_allowlist.txt",
+      "sha256": "37ac7232d4c115f6eadcc91148c3fa46690aee42c3224a2b316caa15963984d4"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/test_cli_entrypoints.py",
+      "sha256": "ca92d084f8e45fdcc85aacb205ecc0608b93ac29224dc99fd89bf986a95428ab"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/test_reusable_quality_gate.py",
+      "sha256": "401230e3a6df7d221a78d73da9ed8d19ac7a6723cb01af695f8aa172029cfe1d"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Bragi/L0_Mocked/Quality/Languages/test_node_toolchain_analyzers.py",
+      "sha256": "cd295b8c806a40ddcbb23a30b23d9a8210664d65b91f8cf70199173f5c42920b"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Reporting/L0_Mocked/test_savd_metrics.py",
+      "sha256": "1c908766956ebf653c19677eb00d5aebd8d9a1606b01914c0a57207be8b24d40"
+    },
+    {
+      "matches_baseline": true,
+      "path": "README.md",
+      "sha256": "c6d82e0121f7eaf0ae362ec6fbaa330e190320012e00c19cb79da3864868818c"
+    },
+    {
+      "matches_baseline": true,
+      "path": "_Docs/Asgard/Heimdall/Reporting-Advanced.md",
+      "sha256": "a078860d2811c519d61608914b3f84dd7a375100d472fc411dc6445848a8da09"
+    },
+    {
+      "matches_baseline": true,
+      "path": "_Docs/Asgard/Heimdall/Security-Module.md",
+      "sha256": "ee556f81531d0e2e009e2a9a8a6e166b8e51bd1a1fa30a7365d1d7ef4d15e4a3"
+    },
+    {
+      "matches_baseline": true,
+      "path": "_Docs/CI/Consumer-Wiring.md",
+      "sha256": "cad4e36dfed877d49698fae486e567660714ea500e663bc6cdcb18453ec2503b"
+    },
+    {
+      "matches_baseline": true,
+      "path": "_Docs/Planning/Astra_TokenReduction/README.md",
+      "sha256": "9efdb5add7770fc0f4b6b34b696fbfef4bde563e8e5768221a470c31a5bbebf3"
+    },
+    {
+      "matches_baseline": true,
+      "path": "_Docs/Testing/L8_Perf_Budget_Policy.md",
+      "sha256": "3733af75553cc3bda934c2f53cdab5d4c6ec98d5754f9c65be9fe396fa4fc3e0"
+    },
+    {
+      "matches_baseline": true,
+      "path": "architecture.yml",
+      "sha256": "78923bf72ba25f81c34a116bd98eabfef8f5d3e89568b036f553f9feb1724321"
+    },
+    {
+      "matches_baseline": true,
+      "path": "pyproject.toml",
+      "sha256": "35806e50b0dc808b20aa25d8fc228ed54f07878630bec603821721f992faaacd"
+    },
+    {
+      "matches_baseline": true,
+      "path": "scripts/reusable_quality_gate.py",
+      "sha256": "a17a399ef1d4e5df5e74964a9f4a5735c37b5ff24160ef86390b15afd4f32b03"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/infrastructure/persistence/sqlite_history_repository.py",
+      "sha256": "925f1a69878f087a262d5af7ce79f1cad606dcef14fa91e5b2229ae41dc5aeb7"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/models/metric_policy.py",
+      "sha256": "7eb8d3d0886f1fb89682636c30c6e117679849c3a2782da9206222bf713c064a"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/ports/__init__.py",
+      "sha256": "7ba39e0ea84faac9a838d8703ff707fd2e84e95baf865fe09f0b739e4004e71f"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/Reporting/History/ports/history_repository.py",
+      "sha256": "ffe9ec0d2900bc26ac9ccb645fd29f3e34877f8ab1b36bc06b07b15ba42cbb7d"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard/hercules_l13.py",
+      "sha256": "38be80913830fd80526c86707cd37ad6bfafeebf71bbb83f41c522f4a253d9e9"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/test_l8_workflow_contract.py",
+      "sha256": "c8ea87332f1b66308c8e718d941cb7db862752816dc020d7f6c3edf2a876a056"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Baseline/L3_Contract/test_baseline_model_contracts.py",
+      "sha256": "80797d871a8def100e72341e0421b6d576a43673022ddbd4e7d9d550a2319507"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Bragi/L3_Contract/test_cpp_model_contracts.py",
+      "sha256": "7e0969b40623815d0d6f669081b5c2e3128b81c2f723ef0b4f5d4beed9d54d8d"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Bragi/L3_Contract/test_csharp_model_contracts.py",
+      "sha256": "b54b4cc9d2c3b76a7a6a1e3b7ff6d3b5173fb911f498f2481b2fa5d5ae6c482b"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Bragi/L3_Contract/test_go_model_contracts.py",
+      "sha256": "e87640d6582b84aa7cbf86f3e849b6a46a629872e01f34106a802c52dab205b9"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Bragi/L3_Contract/test_java_model_contracts.py",
+      "sha256": "0985021aead44dbfccb8f2dc7465896cacc9d791f0c9b21cab9187a82da9f0d5"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Bragi/L3_Contract/test_php_model_contracts.py",
+      "sha256": "dbac7b0616a9603b2789c47c084010756dbae555761c230fac5a51fc9f9a42e2"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Bragi/L3_Contract/test_ruby_model_contracts.py",
+      "sha256": "6706eb48c790231a96f692f618b579740772bffda85a0c87ce5fb9b023cc54d5"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Bragi/L3_Contract/test_rust_model_contracts.py",
+      "sha256": "095e88264494ee2161eda4b861a767f8969ae7ffdcb00c6f248c18cd857484f9"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Heimdall/L0_Mocked/test_hercules_l13_contract.py",
+      "sha256": "10988f1cf4e70755be2b4dd69670b17e50755581d6b0c25bc22a30d11d182bcf"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Heimdall/L1_Integration/test_hercules_l13_contract.py",
+      "sha256": "62475a0eea0322c7e3562e853144f9c404d34a6ff3ec215a6c21f0aaaaf8b3ae"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_MCP/L3_Contract/__init__.py",
+      "sha256": "9d2665d987daa6895b4ee44e189cc129a4652e2dc1a70272c704ed72638b9989"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_MCP/L3_Contract/test_mcp_model_contracts.py",
+      "sha256": "1ef5cb1d3cb2ec53cf80c378f2f82bc03e009bd1f926b972b3d2e8cf6d39db71"
+    },
+    {
+      "matches_baseline": true,
+      "path": "Asgard_Test/tests_Reporting/L0_Mocked/test_history_repository_boundary.py",
+      "sha256": "d85b1b519accc53661ce1cdf8fa199f93b5798dadbbff7fe4efb29e4611c5357"
+    },
+    {
+      "matches_baseline": true,
+      "path": "_Docs/Planning/Astra_TokenReduction/01-Implementation-Packets.md",
+      "sha256": "e54a5a810a0cfaa61239b7bd79820eb7f5a5023a85fb45a6b5ffe84136427c13"
+    }
+  ],
+  "candidate_current": {
+    "branch": "work/round36-asgard-asg04",
+    "head": "065104161285786fc872192ec5d8fbd63e22f73a",
+    "status_record_count": 0,
+    "status_z_sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "candidate_worktree_porcelain": [],
+  "scratch_cleanup": {
+    "freed_kib": 405036,
+    "removed_only_disposable_candidate_caches_and_build_output": true
+  },
+  "shared_asgard_current": {
+    "branch": "integration/all-current-updates-20260908",
+    "head": "612d2a8650232adb10a58e7ed62f27c443a489b4",
+    "status_record_count": 51,
+    "status_z_sha256": "3518659bc697d68bab2336b2c9f951fcc58df3a242731fd0a49c183f9e710857"
+  }
+}

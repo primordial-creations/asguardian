@@ -1,0 +1,467 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard
+configfile: pyproject.toml
+plugins: asyncio-1.3.0, cov-7.1.0, benchmark-5.2.3, anyio-4.13.0, respx-0.23.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 31 items
+
+Asgard_Test/tests_Bragi/L3_Contract/test_debt_value_model_contracts.py . [  3%]
+..............................                                           [100%]
+
+=============================== warnings summary ===============================
+Asgard/Bragi/Quality/models/analysis_models.py:23
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/analysis_models.py:23: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileAnalysis(BaseModel):
+
+Asgard/Bragi/Quality/models/analysis_models.py:53
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/analysis_models.py:53: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AnalysisResult(BaseModel):
+
+Asgard/Bragi/Quality/models/analysis_models.py:123
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/analysis_models.py:123: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AnalysisConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/complexity_models.py:24
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/complexity_models.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FunctionComplexity(BaseModel):
+
+Asgard/Bragi/Quality/models/complexity_models.py:73
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/complexity_models.py:73: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileComplexityAnalysis(BaseModel):
+
+Asgard/Bragi/Quality/models/complexity_models.py:124
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/complexity_models.py:124: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ComplexityResult(BaseModel):
+
+Asgard/Bragi/Quality/models/complexity_models.py:203
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/complexity_models.py:203: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ComplexityConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/duplication_models.py:30
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:30: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CodeBlock(BaseModel):
+
+Asgard/Bragi/Quality/models/duplication_models.py:51
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:51: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DuplicationMatch(BaseModel):
+
+Asgard/Bragi/Quality/models/duplication_models.py:68
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:68: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CloneFamily(BaseModel):
+
+Asgard/Bragi/Quality/models/duplication_models.py:111
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:111: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DuplicationResult(BaseModel):
+
+Asgard/Bragi/Quality/models/duplication_models.py:168
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:168: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DuplicationConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/smell_models.py:40
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/smell_models.py:40: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CodeSmell(BaseModel):
+
+Asgard/Bragi/Quality/models/smell_models.py:61
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/smell_models.py:61: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SmellReport(BaseModel):
+
+Asgard/Bragi/Quality/models/smell_models.py:139
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/smell_models.py:139: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SmellConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/debt_models.py:113
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/debt_models.py:113: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DebtItem(BaseModel):
+
+Asgard/Bragi/Quality/models/debt_models.py:192
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/debt_models.py:192: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TimeProjection(BaseModel):
+
+Asgard/Bragi/Quality/models/debt_models.py:203
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/debt_models.py:203: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DebtReport(BaseModel):
+
+Asgard/Bragi/Quality/models/debt_models.py:299
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/debt_models.py:299: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DebtConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/maintainability_models.py:66
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/maintainability_models.py:66: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FunctionMaintainability(BaseModel):
+
+Asgard/Bragi/Quality/models/maintainability_models.py:112
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/maintainability_models.py:112: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileMaintainability(BaseModel):
+
+Asgard/Bragi/Quality/models/maintainability_models.py:140
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/maintainability_models.py:140: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MaintainabilityReport(BaseModel):
+
+Asgard/Bragi/Quality/models/maintainability_models.py:234
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/maintainability_models.py:234: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MaintainabilityConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/lazy_import_models.py:35
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/lazy_import_models.py:35: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LazyImport(BaseModel):
+
+Asgard/Bragi/Quality/models/lazy_import_models.py:72
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/lazy_import_models.py:72: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LazyImportReport(BaseModel):
+
+Asgard/Bragi/Quality/models/lazy_import_models.py:121
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/lazy_import_models.py:121: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LazyImportConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/library_usage_models.py:24
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/library_usage_models.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ForbiddenImportViolation(BaseModel):
+
+Asgard/Bragi/Quality/models/library_usage_models.py:50
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/library_usage_models.py:50: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ForbiddenImportReport(BaseModel):
+
+Asgard/Bragi/Quality/models/library_usage_models.py:97
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/library_usage_models.py:97: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ForbiddenImportConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/datetime_models.py:31
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/datetime_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DatetimeViolation(BaseModel):
+
+Asgard/Bragi/Quality/models/datetime_models.py:74
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/datetime_models.py:74: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DatetimeReport(BaseModel):
+
+Asgard/Bragi/Quality/models/datetime_models.py:123
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/datetime_models.py:123: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DatetimeConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/typing_models.py:30
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/typing_models.py:30: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FunctionAnnotation(BaseModel):
+
+Asgard/Bragi/Quality/models/typing_models.py:74
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/typing_models.py:74: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileTypingStats(BaseModel):
+
+Asgard/Bragi/Quality/models/typing_models.py:94
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/typing_models.py:94: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypingReport(BaseModel):
+
+Asgard/Bragi/Quality/models/typing_models.py:149
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/typing_models.py:149: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypingConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/thread_safety_models.py:31
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/thread_safety_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ThreadSafetyIssue(BaseModel):
+
+Asgard/Bragi/Quality/models/thread_safety_models.py:58
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/thread_safety_models.py:58: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ThreadSafetyReport(BaseModel):
+
+Asgard/Bragi/Quality/models/thread_safety_models.py:105
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/thread_safety_models.py:105: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ThreadSafetyConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/race_condition_models.py:31
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/race_condition_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RaceConditionIssue(BaseModel):
+
+Asgard/Bragi/Quality/models/race_condition_models.py:65
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/race_condition_models.py:65: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RaceConditionReport(BaseModel):
+
+Asgard/Bragi/Quality/models/race_condition_models.py:112
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/race_condition_models.py:112: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RaceConditionConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/daemon_thread_models.py:32
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/daemon_thread_models.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DaemonThreadIssue(BaseModel):
+
+Asgard/Bragi/Quality/models/daemon_thread_models.py:66
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/daemon_thread_models.py:66: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DaemonThreadReport(BaseModel):
+
+Asgard/Bragi/Quality/models/daemon_thread_models.py:113
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/daemon_thread_models.py:113: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DaemonThreadConfig(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_base.py:68
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:68: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecretFinding(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_base.py:122
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:122: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class VulnerabilityFinding(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_base.py:155
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:155: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DependencyVulnerability(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_base.py:200
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:200: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CryptoFinding(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_base.py:215
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:215: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecurityScanConfig(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_findings.py:19
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:19: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecretsReport(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_findings.py:61
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:61: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class VulnerabilityReport(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_findings.py:112
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:112: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DependencyReport(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_findings.py:163
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:163: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CryptoReport(BaseModel):
+
+Asgard/Heimdall/Security/models/security_models_findings.py:186
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:186: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecurityReport(BaseModel):
+
+Asgard/Bragi/Dependencies/models/sbom_models.py:39
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Dependencies/models/sbom_models.py:39: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SBOMComponent(BaseModel):
+
+Asgard/Bragi/Dependencies/models/sbom_models.py:63
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Dependencies/models/sbom_models.py:63: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SBOMDocument(BaseModel):
+
+Asgard/Bragi/Dependencies/models/sbom_models.py:93
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Dependencies/models/sbom_models.py:93: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SBOMConfig(BaseModel):
+
+Asgard/Heimdall/Security/Access/models/access_models.py:31
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Access/models/access_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AccessFinding(BaseModel):
+
+Asgard/Heimdall/Security/Access/models/access_models.py:53
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Access/models/access_models.py:53: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AccessConfig(BaseModel):
+
+Asgard/Heimdall/Security/Access/models/access_models.py:152
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Access/models/access_models.py:152: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AccessReport(BaseModel):
+
+Asgard/Heimdall/Security/Auth/models/auth_models.py:36
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Auth/models/auth_models.py:36: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AuthFinding(BaseModel):
+
+Asgard/Heimdall/Security/Auth/models/auth_models.py:61
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Auth/models/auth_models.py:61: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AuthConfig(BaseModel):
+
+Asgard/Heimdall/Security/Auth/models/auth_models.py:131
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Auth/models/auth_models.py:131: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AuthReport(BaseModel):
+
+Asgard/Heimdall/Security/Headers/models/header_models.py:43
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Headers/models/header_models.py:43: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HeaderFinding(BaseModel):
+
+Asgard/Heimdall/Security/Headers/models/header_models.py:93
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Headers/models/header_models.py:93: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HeaderConfig(BaseModel):
+
+Asgard/Heimdall/Security/Headers/models/header_models.py:191
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Headers/models/header_models.py:191: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HeaderReport(BaseModel):
+
+Asgard/Heimdall/Security/TLS/models/tls_models.py:33
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TLS/models/tls_models.py:33: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TLSFinding(BaseModel):
+
+Asgard/Heimdall/Security/TLS/models/tls_models.py:71
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TLS/models/tls_models.py:71: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TLSConfig(BaseModel):
+
+Asgard/Heimdall/Security/TLS/models/tls_models.py:168
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TLS/models/tls_models.py:168: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TLSReport(BaseModel):
+
+Asgard/Heimdall/Security/Container/models/container_models.py:41
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Container/models/container_models.py:41: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ContainerFinding(BaseModel):
+
+Asgard/Heimdall/Security/Container/models/container_models.py:87
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Container/models/container_models.py:87: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ContainerConfig(BaseModel):
+
+Asgard/Heimdall/Security/Container/models/container_models.py:189
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Container/models/container_models.py:189: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ContainerReport(BaseModel):
+
+Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:35
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:35: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class InfraFinding(BaseModel):
+
+Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:58
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:58: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class InfraConfig(BaseModel):
+
+Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:179
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:179: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class InfraReport(BaseModel):
+
+Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:72
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:72: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecurityHotspot(BaseModel):
+
+Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:101
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:101: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HotspotConfig(BaseModel):
+
+Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:148
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:148: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HotspotReport(BaseModel):
+
+Asgard/Heimdall/Security/Compliance/models/compliance_models.py:80
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CWEEntry(BaseModel):
+
+Asgard/Heimdall/Security/Compliance/models/compliance_models.py:99
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:99: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CategoryCompliance(BaseModel):
+
+Asgard/Heimdall/Security/Compliance/models/compliance_models.py:118
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:118: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class OWASPComplianceReport(BaseModel):
+
+Asgard/Heimdall/Security/Compliance/models/compliance_models.py:137
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:137: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CWEComplianceReport(BaseModel):
+
+Asgard/Heimdall/Security/Compliance/models/compliance_models.py:155
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:155: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ComplianceConfig(BaseModel):
+
+Asgard/Shared/common/_new_code_models.py:22
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/common/_new_code_models.py:22: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NewCodePeriodConfig(BaseModel):
+
+Asgard/Shared/common/_new_code_models.py:54
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/common/_new_code_models.py:54: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NewCodePeriodResult(BaseModel):
+
+Asgard/Bragi/Quality/models/env_fallback_models.py:58
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/env_fallback_models.py:58: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class EnvFallbackViolation(BaseModel):
+
+Asgard/Bragi/Quality/models/env_fallback_models.py:108
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/env_fallback_models.py:108: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class EnvFallbackReport(BaseModel):
+
+Asgard/Bragi/Quality/models/env_fallback_models.py:157
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/env_fallback_models.py:157: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class EnvFallbackConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/documentation_models.py:21
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:21: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DocumentationConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/documentation_models.py:59
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:59: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FunctionDocumentation(BaseModel):
+
+Asgard/Bragi/Quality/models/documentation_models.py:76
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:76: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ClassDocumentation(BaseModel):
+
+Asgard/Bragi/Quality/models/documentation_models.py:102
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:102: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileDocumentation(BaseModel):
+
+Asgard/Bragi/Quality/models/documentation_models.py:152
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:152: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DocumentationReport(BaseModel):
+
+Asgard/Bragi/Quality/models/naming_models.py:32
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/naming_models.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NamingViolation(BaseModel):
+
+Asgard/Bragi/Quality/models/naming_models.py:51
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/naming_models.py:51: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NamingConfig(BaseModel):
+
+Asgard/Bragi/Quality/models/naming_models.py:87
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/naming_models.py:87: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NamingReport(BaseModel):
+
+Asgard/Bragi/Quality/models/type_check_models.py:80
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/type_check_models.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypeCheckDiagnostic(BaseModel):
+
+Asgard/Bragi/Quality/models/type_check_models.py:107
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/type_check_models.py:107: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileTypeCheckStats(BaseModel):
+
+Asgard/Bragi/Quality/models/type_check_models.py:130
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/type_check_models.py:130: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypeCheckReport(BaseModel):
+
+Asgard/Bragi/Quality/models/type_check_models.py:212
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/type_check_models.py:212: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypeCheckConfig(BaseModel):
+
+Asgard/Bragi/Quality/services/_debt_state_store.py:27
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/services/_debt_state_store.py:27: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileDebtState(BaseModel):
+
+Asgard/Bragi/Quality/services/_debt_state_store.py:37
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/services/_debt_state_store.py:37: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DebtState(BaseModel):
+
+Asgard/Bragi/Quality/services/_debt_state_store.py:48
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/services/_debt_state_store.py:48: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DeltaResult(BaseModel):
+
+Asgard/Bragi/Quality/BugDetection/models/bug_models.py:48
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/BugDetection/models/bug_models.py:48: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugFinding(BaseModel):
+
+Asgard/Bragi/Quality/BugDetection/models/bug_models.py:63
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/BugDetection/models/bug_models.py:63: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugReport(BaseModel):
+
+Asgard/Bragi/Quality/BugDetection/models/bug_models.py:128
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/BugDetection/models/bug_models.py:128: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugDetectionConfig(BaseModel):
+
+Asgard/Bragi/Quality/languages/javascript/models/js_models.py:32
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/javascript/models/js_models.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class JSFinding(BaseModel):
+
+Asgard/Bragi/Quality/languages/javascript/models/js_models.py:49
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/javascript/models/js_models.py:49: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class JSReport(BaseModel):
+
+Asgard/Bragi/Quality/languages/javascript/models/js_models.py:83
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/javascript/models/js_models.py:83: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class JSAnalysisConfig(BaseModel):
+
+Asgard/Bragi/Quality/languages/shell/models/shell_models.py:31
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/shell/models/shell_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ShellFinding(BaseModel):
+
+Asgard/Bragi/Quality/languages/shell/models/shell_models.py:47
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/shell/models/shell_models.py:47: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ShellReport(BaseModel):
+
+Asgard/Bragi/Quality/languages/shell/models/shell_models.py:80
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/shell/models/shell_models.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ShellAnalysisConfig(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+======================= 31 passed, 113 warnings in 1.79s =======================
