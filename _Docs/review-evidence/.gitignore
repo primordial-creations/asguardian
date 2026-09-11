@@ -1,0 +1,3 @@
+# Preserved review evidence. Run logs are part of the evidence, so the
+# repository-wide *.log exclusion is reversed for this directory only.
+!*.log

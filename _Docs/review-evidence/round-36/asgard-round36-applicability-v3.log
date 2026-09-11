@@ -1,0 +1,4 @@
+branch=integration/all-current-updates-20260908
+head=612d2a8650232adb10a58e7ed62f27c443a489b4
+status_z_sha256=3518659bc697d68bab2336b2c9f951fcc58df3a242731fd0a49c183f9e710857
+incremental_v3_applicability=pass

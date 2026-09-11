@@ -1,0 +1,41 @@
+{
+  "artifacts": {
+    "asgard-round36-applicability-v2.log": "02fe3f72fa1a3bf379eeb0bf1613bb5ad708a9fb43066a5672b8e66f4a42ebf6",
+    "asgard-round36-asg04-full-v1.patch": "54e4fe89f9bbdbd1459dab13eb5075b5cfeefa1e27eab2f6865103164c769101",
+    "asgard-round36-asg04-full-v2.patch": "966f0e7a27c79d9bcd37d13772e3eb3323cd237a35a70bedafdc985a9d267899",
+    "asgard-round36-asg04-incremental-v1.patch": "ec0fce44fd7ea585b31068a66b12b3d314666ba828b9f808c3f9ce2f375e2143",
+    "asgard-round36-asg04-incremental-v2.patch": "ff245143d7049c000d8867949e16f8d06f9ce9707bcdbb7bdc4cc897bef38a43",
+    "asgard-round36-asg04-independent-review-v1.md": "25aee8728b5519a168acd0d33d5d6fadd944aa687f8b4942726e020aba91c7ce",
+    "asgard-round36-baseline-negative.log": "149e7d1ea80e85471bb5de65f9f6d1d9b79cb4330b3e316a4228e82232d2e6ec",
+    "asgard-round36-focused-green-v2.log": "567fb1c4abd5f803cb80a3f82314740e82ebc6ab063afe6fcc43db7e7fefa44b",
+    "asgard-round36-l3-meta-green-v2.log": "126ffd97b50ab2ce5325abe9ba884847e11870c17406f4adac0ce870350553ae",
+    "asgard-round36-mutations-v2.log": "e7d3bec66469c2c4e8418fc937deb3c310983d0d2e3722f1418aa53ed434b9cb",
+    "asgard-round36-preservation-v2.json": "d4a1ab101d3d7e98acbd170848eb237fa4b638518b0262a27344fd463740c89c",
+    "asgard-round36-report-v3.md": "502346f77ccef50926c92e2d7162dd8964bd60c4ae8b1dd0e52036e233563ab2",
+    "run_asgard_round36_mutations_v2.py": "593139fe7bcfd66f261036d84b5d8f557ef29243c7cd0c6c4767dd6587801142"
+  },
+  "candidate": {
+    "baseline_commit": "b331ca55cc71736a41047083c041c54f94d17a89",
+    "branch": "work/round36-asgard-asg04",
+    "feature_commit": "28130ca9242fbbc9d210529a8dd62687c00aebee",
+    "rejected_v1_commit": "9338ffd5742842ad4b7798827eb76e3fef3c39b2",
+    "worktree_porcelain": []
+  },
+  "lane": "round36-asgard-asg04",
+  "schema": 3,
+  "scope": {
+    "allowlist_after": 188,
+    "allowlist_before": 195,
+    "focused_passed": 38,
+    "l3_meta_passed": 1540,
+    "l3_meta_skipped": 4,
+    "models": 7,
+    "mutations_rejected": 20,
+    "reviewer_v1_survivors_now_rejected": 8
+  },
+  "shared_start": {
+    "branch": "integration/all-current-updates-20260908",
+    "head": "612d2a8650232adb10a58e7ed62f27c443a489b4"
+  },
+  "verdict": "pending independent v2 review"
+}

@@ -1,0 +1,13 @@
+default remediation kind: exit=1 rejected=true
+negative base accepted: exit=1 rejected=true
+batchability above one accepted: exit=1 rejected=true
+discount floor above one accepted: exit=1 rejected=true
+effort midpoint divisor: exit=1 rejected=true
+unknown confidence accepted: exit=1 rejected=true
+negative churn accepted: exit=1 rejected=true
+ROI default changed: exit=1 rejected=true
+time horizon wire value changed: exit=1 rejected=true
+projection default changed: exit=1 rejected=true
+effort factor default changed: exit=1 rejected=true
+interest default changed: exit=1 rejected=true
+all 12 mutations rejected

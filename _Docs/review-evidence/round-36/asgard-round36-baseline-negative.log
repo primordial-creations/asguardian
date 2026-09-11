@@ -1,0 +1,973 @@
+============================= test session starts ==============================
+platform linux -- Python 3.12.3, pytest-9.0.3, pluggy-1.6.0
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard
+configfile: pyproject.toml
+plugins: asyncio-1.3.0, cov-7.1.0, benchmark-5.2.3, anyio-4.13.0, respx-0.23.1
+asyncio: mode=Mode.AUTO, debug=False, asyncio_default_fixture_loop_scope=None, asyncio_default_test_loop_scope=function
+collected 2 items
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py .F                       [100%]
+
+=================================== FAILURES ===================================
+__________ test_every_public_model_has_l3_coverage_or_is_allowlisted ___________
+Asgard_Test/L3_Meta/test_model_coverage_meta.py:111: in test_every_public_model_has_l3_coverage_or_is_allowlisted
+    assert not stale, (
+E   AssertionError: Allowlist entries that now HAVE L3 coverage — ratchet: remove them from l3_uncovered_allowlist.txt:
+E       Asgard.Bragi.Quality.models.debt_models.EffortInterval
+E       Asgard.Bragi.Quality.models.debt_models.EffortModels
+E       Asgard.Bragi.Quality.models.debt_models.FileFriction
+E       Asgard.Bragi.Quality.models.debt_models.InterestRates
+E       Asgard.Bragi.Quality.models.debt_models.ROIAnalysis
+E       Asgard.Bragi.Quality.models.debt_models.RemediationFunction
+E       Asgard.Bragi.Quality.models.debt_models.TimeProjection
+E   assert not ['Asgard.Bragi.Quality.models.debt_models.EffortInterval', 'Asgard.Bragi.Quality.models.debt_models.EffortModels', 'As...gard.Bragi.Quality.models.debt_models.ROIAnalysis', 'Asgard.Bragi.Quality.models.debt_models.RemediationFunction', ...]
+=============================== warnings summary ===============================
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Baseline/models.py:19: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BaselineEntry(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Baseline/models.py:101: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BaselineStats(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Baseline/models.py:113: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BaselineFile(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/analysis_models.py:23: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileAnalysis(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/analysis_models.py:53: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AnalysisResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/analysis_models.py:123: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AnalysisConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/complexity_models.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FunctionComplexity(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/complexity_models.py:73: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileComplexityAnalysis(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/complexity_models.py:124: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ComplexityResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/complexity_models.py:203: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ComplexityConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:30: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CodeBlock(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:51: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DuplicationMatch(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:68: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CloneFamily(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:111: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DuplicationResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/duplication_models.py:168: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DuplicationConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/smell_models.py:40: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CodeSmell(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/smell_models.py:61: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SmellReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/smell_models.py:139: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SmellConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/debt_models.py:113: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DebtItem(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/debt_models.py:192: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TimeProjection(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/debt_models.py:203: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DebtReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/debt_models.py:299: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DebtConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/maintainability_models.py:66: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FunctionMaintainability(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/maintainability_models.py:112: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileMaintainability(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/maintainability_models.py:140: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MaintainabilityReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/maintainability_models.py:234: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MaintainabilityConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/lazy_import_models.py:35: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LazyImport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/lazy_import_models.py:72: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LazyImportReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/lazy_import_models.py:121: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LazyImportConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/library_usage_models.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ForbiddenImportViolation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/library_usage_models.py:50: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ForbiddenImportReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/library_usage_models.py:97: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ForbiddenImportConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/datetime_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DatetimeViolation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/datetime_models.py:74: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DatetimeReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/datetime_models.py:123: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DatetimeConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/typing_models.py:30: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FunctionAnnotation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/typing_models.py:74: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileTypingStats(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/typing_models.py:94: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypingReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/typing_models.py:149: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypingConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/thread_safety_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ThreadSafetyIssue(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/thread_safety_models.py:58: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ThreadSafetyReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/thread_safety_models.py:105: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ThreadSafetyConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/race_condition_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RaceConditionIssue(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/race_condition_models.py:65: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RaceConditionReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/race_condition_models.py:112: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RaceConditionConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/daemon_thread_models.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DaemonThreadIssue(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/daemon_thread_models.py:66: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DaemonThreadReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/daemon_thread_models.py:113: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DaemonThreadConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:68: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecretFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:122: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class VulnerabilityFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:155: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DependencyVulnerability(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:200: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CryptoFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_base.py:215: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecurityScanConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:19: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecretsReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:61: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class VulnerabilityReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:112: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DependencyReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:163: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CryptoReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/security_models_findings.py:186: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecurityReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Dependencies/models/sbom_models.py:39: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SBOMComponent(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Dependencies/models/sbom_models.py:63: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SBOMDocument(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Dependencies/models/sbom_models.py:93: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SBOMConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Access/models/access_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AccessFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Access/models/access_models.py:53: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AccessConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Access/models/access_models.py:152: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AccessReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Auth/models/auth_models.py:36: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AuthFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Auth/models/auth_models.py:61: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AuthConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Auth/models/auth_models.py:131: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AuthReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Headers/models/header_models.py:43: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HeaderFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Headers/models/header_models.py:93: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HeaderConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Headers/models/header_models.py:191: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HeaderReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TLS/models/tls_models.py:33: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TLSFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TLS/models/tls_models.py:71: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TLSConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TLS/models/tls_models.py:168: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TLSReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Container/models/container_models.py:41: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ContainerFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Container/models/container_models.py:87: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ContainerConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Container/models/container_models.py:189: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ContainerReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:35: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class InfraFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:58: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class InfraConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Infrastructure/models/infra_models.py:179: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class InfraReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:72: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SecurityHotspot(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:101: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HotspotConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Hotspots/models/hotspot_models.py:148: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class HotspotReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CWEEntry(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:99: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CategoryCompliance(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:118: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class OWASPComplianceReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:137: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CWEComplianceReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/Compliance/models/compliance_models.py:155: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ComplianceConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/common/_new_code_models.py:22: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NewCodePeriodConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/common/_new_code_models.py:54: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NewCodePeriodResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/env_fallback_models.py:58: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class EnvFallbackViolation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/env_fallback_models.py:108: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class EnvFallbackReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/env_fallback_models.py:157: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class EnvFallbackConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:21: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DocumentationConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:59: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FunctionDocumentation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:76: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ClassDocumentation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:102: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileDocumentation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/documentation_models.py:152: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DocumentationReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/naming_models.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NamingViolation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/naming_models.py:51: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NamingConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/naming_models.py:87: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NamingReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/type_check_models.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypeCheckDiagnostic(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/type_check_models.py:107: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileTypeCheckStats(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/type_check_models.py:130: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypeCheckReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/type_check_models.py:212: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TypeCheckConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/services/_debt_state_store.py:27: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FileDebtState(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/services/_debt_state_store.py:37: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DebtState(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/services/_debt_state_store.py:48: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DeltaResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/BugDetection/models/bug_models.py:48: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/BugDetection/models/bug_models.py:63: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/BugDetection/models/bug_models.py:128: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BugDetectionConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/javascript/models/js_models.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class JSFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/javascript/models/js_models.py:49: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class JSReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/javascript/models/js_models.py:83: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class JSAnalysisConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/shell/models/shell_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ShellFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/shell/models/shell_models.py:47: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ShellReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/shell/models/shell_models.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ShellAnalysisConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Calibration/models/calibration_models.py:47: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LanguageProfile(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Calibration/models/calibration_models.py:110: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ValidityReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Calibration/models/calibration_models.py:143: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SZZResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Calibration/models/calibration_models.py:197: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class Stage2ValidityReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/CodeFix/models/codefix_models.py:28: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CodeFix(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/CodeFix/models/codefix_models.py:44: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FixSuggestion(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/CodeFix/models/codefix_models.py:56: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CodeFixReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_findings.py:63: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MemoryFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_findings.py:79: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CpuFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_findings.py:96: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DatabaseFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_findings.py:112: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CacheFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_reports.py:23: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PerformanceScanConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_reports.py:58: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MemoryReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_reports.py:94: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CpuReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_reports.py:120: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DatabaseReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_reports.py:144: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CacheReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Performance/models/_performance_reports.py:168: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PerformanceReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/common/tool_models.py:47: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ToolFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/languages/common/tool_models.py:65: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ToolReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/blocking_async_models.py:33: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BlockingCall(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/blocking_async_models.py:69: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BlockingAsyncReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/blocking_async_models.py:124: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BlockingAsyncConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/error_handling_models.py:37: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ErrorHandlingViolation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/error_handling_models.py:77: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ErrorHandlingReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/error_handling_models.py:130: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ErrorHandlingConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/future_leak_models.py:32: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FutureLeak(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/future_leak_models.py:66: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FutureLeakReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/future_leak_models.py:115: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class FutureLeakConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/resource_cleanup_models.py:37: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ResourceCleanupViolation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/resource_cleanup_models.py:76: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ResourceCleanupReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Quality/models/resource_cleanup_models.py:129: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ResourceCleanupConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:103: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GateCondition(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:127: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ConditionResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:162: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class QualityGate(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:175: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class QualityGateResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:244: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GateFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:275: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class NewCodeDefinition(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:287: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BreakGlassRecord(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:306: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DifferentialGateResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/models/quality_gate_models.py:367: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class QualityGateConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/baseline_store.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class BranchBaseline(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/suppressions.py:49: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SuppressionDirective(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/QualityGate/services/_project_state_store.py:23: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProjectState(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Ratings/models/_scoring_models.py:35: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MetricUtility(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Ratings/models/_scoring_models.py:50: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CategoryScore(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Ratings/models/_scoring_models.py:74: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ScoreConfidence(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Ratings/models/ratings_models.py:51: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DimensionRating(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Ratings/models/ratings_models.py:116: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProjectRatings(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Bragi/Ratings/models/ratings_models.py:167: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RatingsConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/Issues/models/issue_models.py:43: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TrackedIssue(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/Issues/models/issue_models.py:75: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class IssueFilter(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/Issues/models/issue_models.py:91: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class IssuesSummary(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Reporting/History/models/history_models.py:16: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MetricSnapshot(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Reporting/History/models/history_models.py:31: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AnalysisSnapshot(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Reporting/History/models/history_models.py:84: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MetricTrend(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Reporting/History/models/history_models.py:107: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TrendReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/OpenAPI/models/_openapi_base_models.py:42: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class OpenAPIConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/OpenAPI/models/_openapi_base_models.py:78: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class OpenAPIValidationError(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/OpenAPI/models/_openapi_base_models.py:104: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class OpenAPIValidationResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/OpenAPI/models/openapi_models.py:68: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class OpenAPIParameter(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/OpenAPI/models/openapi_models.py:116: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class OpenAPISecurityScheme(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/GraphQL/models/graphql_models.py:56: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GraphQLConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/GraphQL/models/graphql_models.py:92: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GraphQLValidationError(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/GraphQL/models/graphql_models.py:123: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GraphQLValidationResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/GraphQL/models/graphql_models.py:199: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GraphQLType(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/GraphQL/models/graphql_models.py:230: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GraphQLDirective(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Database/models/database_models.py:128: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SchemaChange(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Compatibility/models/legacy_models.py:17: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class LegacyBreakingChange(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Contracts/models/contract_models.py:178: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CompatibilityResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/LiveContract/models/live_contract_models.py:70: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class WorkflowStep(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/MockServer/models/_mock_base_models.py:48: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MockServerConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/MockServer/models/_mock_base_models.py:121: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MockResponse(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/MockServer/models/_mock_base_models.py:155: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MockParameter(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/MockServer/models/_mock_base_models.py:172: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MockRequestBody(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/MockServer/models/mock_models.py:26: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MockEndpoint(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/CodeGen/models/_codegen_base_models.py:44: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CodeGenConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/CodeGen/models/codegen_models.py:23: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GeneratedFile(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/CodeGen/models/codegen_models.py:136: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class CodeGenReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/AsyncAPI/models/_asyncapi_base_models.py:50: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AsyncAPIConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/AsyncAPI/models/_asyncapi_base_models.py:86: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AsyncAPIValidationError(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/AsyncAPI/models/_asyncapi_base_models.py:112: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MessageInfo(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/AsyncAPI/models/_asyncapi_base_models.py:158: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class OperationInfo(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/AsyncAPI/models/_asyncapi_base_models.py:235: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ServerInfo(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/AsyncAPI/models/_asyncapi_base_models.py:263: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AsyncAPIInfo(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/AsyncAPI/models/asyncapi_models.py:28: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AsyncAPISpec(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/AsyncAPI/models/asyncapi_models.py:103: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AsyncAPIValidationResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Documentation/models/_docs_base_models.py:126: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class APIDocConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Documentation/models/docs_models.py:23: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class GeneratedDocument(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Documentation/models/docs_models.py:47: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class DocumentationReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Protobuf/models/_protobuf_base_models.py:48: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProtobufConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Protobuf/models/_protobuf_base_models.py:88: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProtobufValidationError(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Protobuf/models/protobuf_models.py:68: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProtobufSchema(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Protobuf/models/protobuf_models.py:137: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProtobufValidationResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Protobuf/models/protobuf_models.py:207: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProtobufCompatibilityResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Avro/models/_avro_base_models.py:69: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AvroConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Avro/models/_avro_base_models.py:109: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AvroValidationError(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Avro/models/avro_models.py:27: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AvroSchema(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Avro/models/avro_models.py:99: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AvroValidationResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Forseti/Avro/models/avro_models.py:169: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class AvroCompatibilityResult(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TaintAnalysis/models/taint_models.py:55: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TaintFlowStep(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TaintAnalysis/models/taint_models.py:69: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class SanitizerRecord(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TaintAnalysis/models/taint_models.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TaintFlow(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TaintAnalysis/models/taint_models.py:160: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TaintReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/TaintAnalysis/models/taint_models.py:220: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TaintConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/config_secrets_models.py:37: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ConfigSecretFinding(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/config_secrets_models.py:67: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ConfigSecretsReport(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/models/config_secrets_models.py:120: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ConfigSecretsConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/runtime/models.py:49: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RuntimeObservation(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Heimdall/Security/triage/models/triage_models.py:30: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class TriageVerdict(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/Profiles/models/profile_models.py:25: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class RuleConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/Profiles/models/profile_models.py:48: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class QualityProfile(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Shared/Profiles/models/profile_models.py:87: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class ProfileAssignment(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/MCP/models/mcp_models.py:12: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MCPToolParam(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/MCP/models/mcp_models.py:24: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MCPTool(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/MCP/models/mcp_models.py:34: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MCPRequest(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/MCP/models/mcp_models.py:45: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MCPResponse(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/MCP/models/mcp_models.py:56: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class MCPServerConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Reporting/PRDecoration/models/decoration_models.py:21: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class IssueComment(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Reporting/PRDecoration/models/decoration_models.py:38: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PRDecorationConfig(BaseModel):
+
+Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+  /mnt/4ce95f90-9c55-40a5-bfd9-e478c6e0e11c/home-data/Documents/GAIA-Ecosystem/Adrasta/.round36-scratch/asgard/Asgard/Reporting/PRDecoration/models/decoration_models.py:80: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.13/migration/
+    class PRDecorationResult(BaseModel):
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED Asgard_Test/L3_Meta/test_model_coverage_meta.py::test_every_public_model_has_l3_coverage_or_is_allowlisted
+================== 1 failed, 1 passed, 236 warnings in 6.15s ===================

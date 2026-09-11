@@ -1,0 +1,45 @@
+{
+  "artifacts": {
+    "asgard-round36-applicability-v3.log": "c01f81b1a1120e86a2dbb2c34999217b6db305a155182d5254cb23197af42eca",
+    "asgard-round36-asg04-full-v1.patch": "54e4fe89f9bbdbd1459dab13eb5075b5cfeefa1e27eab2f6865103164c769101",
+    "asgard-round36-asg04-full-v2.patch": "966f0e7a27c79d9bcd37d13772e3eb3323cd237a35a70bedafdc985a9d267899",
+    "asgard-round36-asg04-full-v3.patch": "63f7edbad62311c52e568053704a5c3f807bef2b6a9a3f80620d25fb5c732211",
+    "asgard-round36-asg04-incremental-v1.patch": "ec0fce44fd7ea585b31068a66b12b3d314666ba828b9f808c3f9ce2f375e2143",
+    "asgard-round36-asg04-incremental-v2.patch": "ff245143d7049c000d8867949e16f8d06f9ce9707bcdbb7bdc4cc897bef38a43",
+    "asgard-round36-asg04-incremental-v3.patch": "c0925b4a83640ebdde12de5d4bd5d25a7f1ce134f499abcc22469fe0afc2b8f9",
+    "asgard-round36-asg04-independent-review-v1.md": "25aee8728b5519a168acd0d33d5d6fadd944aa687f8b4942726e020aba91c7ce",
+    "asgard-round36-asg04-independent-review-v2.md": "2859b71e533a1cf11197c8765b9212c6edc4bf074b83e774afcc91c9e13a5dc3",
+    "asgard-round36-baseline-negative.log": "149e7d1ea80e85471bb5de65f9f6d1d9b79cb4330b3e316a4228e82232d2e6ec",
+    "asgard-round36-focused-green-v3.log": "131aa02a96adccdda3d176c9dd87bfa00832f16782e6d864f2c1c38a89b677f7",
+    "asgard-round36-l3-meta-green-v3.log": "01a47685b59376269ee8bc749a00650429cb1197d9157f9437c3d1a186acfcc7",
+    "asgard-round36-mutations-v3.log": "95468cb3929203a70fa286164827eb46060a4d3d678aae6bdf13c5a261b01b66",
+    "asgard-round36-preservation-v3.json": "dca1771beab99fdc7b7cbb846c3e0f308988bde2bba003081f6deceb9be704cf",
+    "asgard-round36-report-v4.md": "44693f78fb86824e9da45ce623350e0bb87ebeea3c3cb09a5a5e671f1b8640fc",
+    "run_asgard_round36_mutations_v3.py": "26656b2cb07aedbb7340e84adc3b778d92e18de7ac32c79f7d806689425234aa"
+  },
+  "candidate": {
+    "baseline_commit": "b331ca55cc71736a41047083c041c54f94d17a89",
+    "branch": "work/round36-asgard-asg04",
+    "feature_commit": "065104161285786fc872192ec5d8fbd63e22f73a",
+    "rejected_v1_commit": "9338ffd5742842ad4b7798827eb76e3fef3c39b2",
+    "rejected_v2_commit": "28130ca9242fbbc9d210529a8dd62687c00aebee",
+    "worktree_porcelain": []
+  },
+  "lane": "round36-asgard-asg04",
+  "schema": 4,
+  "scope": {
+    "allowlist_after": 188,
+    "allowlist_before": 195,
+    "focused_passed": 39,
+    "l3_meta_passed": 1541,
+    "l3_meta_skipped": 4,
+    "models": 7,
+    "mutations_rejected": 21,
+    "reviewer_survivors_now_rejected": 9
+  },
+  "shared_start": {
+    "branch": "integration/all-current-updates-20260908",
+    "head": "612d2a8650232adb10a58e7ed62f27c443a489b4"
+  },
+  "verdict": "pending independent v3 review"
+}
