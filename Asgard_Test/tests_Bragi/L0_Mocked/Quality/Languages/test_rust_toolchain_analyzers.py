@@ -309,7 +309,14 @@ class TestRustClippyRealToolIntegration:
         crate_copy = tmp_path / "rust_toolchain_demo"
         shutil.copytree(fixture_src, crate_copy)
 
-        report = RustClippyAnalyzer(RustClippyConfig(scan_path=crate_copy, timeout_seconds=120)).analyze()
+        # A cold clippy run compiles the crate from scratch (no warm
+        # incremental cache), which alone took over 120s under real load
+        # in CI -- shorter than the 120s this test used to pass, and well
+        # under RustClippyConfig's own production default of 300s. Use
+        # that same 300s default here instead of an arbitrarily tighter
+        # value, so this test measures a real hang, not ordinary cold-build
+        # variance under load.
+        report = RustClippyAnalyzer(RustClippyConfig(scan_path=crate_copy, timeout_seconds=300)).analyze()
 
         assert not report.tools_unavailable
         rule_ids = {f.rule_id for f in report.findings}

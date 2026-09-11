@@ -71,6 +71,22 @@ test = [
     # installed by the workflow; pylint was the one linter the isolation
     # suite needs and nothing provided.
     "pylint>=3.0",
+    # Asgard_Test/test_utils/assertion_utils.py imports jsonschema
+    # unconditionally (used by assert_json_schema), and that module is
+    # imported by Asgard_Test/test_utils/__init__.py at package import time,
+    # so every test module that pulls in test_utils fails collection without
+    # it. Not needed by any production module -- test-only.
+    "jsonschema>=4.0",
+    # Asgard_Test/tests_Forseti/L1_Integration/conftest.py builds its
+    # fixtures against a real SQLAlchemy ORM/engine to exercise the database
+    # integration tests. Not needed by any production module -- test-only.
+    "sqlalchemy>=2.0",
+    # Asgard_Test/tests_Verdandi/L0_Mocked/{test_latency_calculator,
+    # test_statistical_validation,test_trend_analyzer}.py import numpy
+    # directly for the numeric fixtures/assertions they exercise Verdandi's
+    # statistics helpers against. Not needed by any production module --
+    # test-only.
+    "numpy>=1.24",
 ]
 l8 = [
     # Kept separate from the normal test extra because the calibrated L8
